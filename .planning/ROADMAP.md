@@ -33,7 +33,17 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. PIN rules are enforced (60s expiry, 5 attempts, lockout); tokens are stored only as SHA-256 hashes and the raw token never crosses the wire after pairing (HMAC-SHA256 of a server nonce)
   4. Killing the socket mid-drag releases all held keys/buttons via the session-cleanup hook (mock-executor test) — no phantom held input after disconnect
   5. `server-core` builds and passes all tests with zero Windows dependencies
-**Plans**: TBD
+**Plans**: 8 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Protocol contract: SPEC.md, JSON schema, 19 golden fixtures (auth construction + diff-ops locked)
+- [ ] 01-02-PLAN.md — Rust workspace scaffold, full public API contracts, red test harness (walking-skeleton E2E + fixtures)
+- [ ] 01-03-PLAN.md — Rust codecs (binary + JSON, all families) green against fixtures
+- [ ] 01-04-PLAN.md — Auth: PIN lifecycle/lockout, token hashing, challenge-response (auth-proof fixture anchor)
+- [ ] 01-05-PLAN.md — Recording mock executors + dispatch gates, routing, held-input (CONN-07 mechanism)
+- [ ] 01-06-PLAN.md — Transport + full integration suite: walking skeleton green, CONN-07 headline test
+- [ ] 01-07-PLAN.md — Flutter/Dart SDK environment setup (human-in-loop)
+- [ ] 01-08-PLAN.md — Pure Dart remote_protocol package vs same fixtures + dormant CI workflow
 
 ### Phase 2: End-to-End Cursor Spike
 **Goal**: A finger moving on the phone moves the real Windows cursor with visually instant response over real WiFi — the enigo MouseKeys executor (dedicated input thread, sub-pixel accumulation, DPI awareness) plus a bare Dart binary-codec sender prove the <30ms WebSocket-only budget before anything is built on top of it
@@ -126,7 +136,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol Contract & Server Core | 0/TBD | Not started | - |
+| 1. Protocol Contract & Server Core | 0/8 | Planned | - |
 | 2. End-to-End Cursor Spike | 0/TBD | Not started | - |
 | 3. Discovery, Pairing & Connection | 0/TBD | Not started | - |
 | 4. Trackpad & Keyboard | 0/TBD | Not started | - |
