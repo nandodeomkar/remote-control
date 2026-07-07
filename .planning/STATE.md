@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 1 context gathered
-last_updated: "2026-07-07T07:20:46.991Z"
-last_activity: 2026-07-07 — Roadmap created (7 phases, 38/38 requirements mapped)
+status: executing
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-07-07T14:38:00.627Z"
+last_activity: 2026-07-07 -- Phase 01 execution started
 progress:
   total_phases: 7
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 8
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-07)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 1 — Protocol Contract & Server Core
+**Current focus:** Phase 01 — protocol-contract-server-core
 
 ## Current Position
 
-Phase: 1 of 7 (Protocol Contract & Server Core)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-07-07 — Roadmap created (7 phases, 38/38 requirements mapped)
+Phase: 01 (protocol-contract-server-core) — EXECUTING
+Plan: 2 of 8
+Status: Ready to execute
+Last activity: 2026-07-07 -- Phase 01 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01 P01 | 10min | 3 tasks | 23 files |
 
 ## Accumulated Context
 
@@ -64,6 +65,9 @@ Recent decisions affecting current work:
 - [Roadmap]: Phase 2 is a hard gate — <30ms cursor budget on real WiFi must pass before Phase 3, else transport decision (UDP channel) is revisited
 - [Roadmap]: Two spec amendments from research are wire-format decisions settled in Phase 1: challenge-response auth (HMAC-SHA256 of server nonce) and diff-ops text messages (IME-safe)
 - [Roadmap]: REQUIREMENTS.md said "36 total" but contains 38 REQ-IDs; coverage corrected to 38/38
+- [Phase ?]: Auth construction locked: HMAC key = SHA-256(raw token), message = nonce bytes — verifiable from stored hash; fixes design spec §4 unimplementable literal text
+- [Phase ?]: 05-auth-proof.json macHex computed by independent .NET crypto — cross-language byte-identity anchor for Rust and Dart codecs
+- [Phase ?]: Nonfinite binary fixture uses canonical quiet NaN bits 0x7fc00000 per plan (not .NET's negative-NaN variant)
 
 ### Pending Todos
 
@@ -85,6 +89,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-07T07:20:46.982Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-protocol-contract-server-core/01-CONTEXT.md
+Last session: 2026-07-07T14:38:00.610Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: None

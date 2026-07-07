@@ -13,7 +13,7 @@
 - [ ] **CONN-04**: Connection recovers automatically after WiFi drops or PC IP changes (backoff + beacon re-listen)
 - [ ] **CONN-05**: User can connect by typing IP:port manually when discovery fails (AP isolation, firewall, VPN adapters)
 - [ ] **CONN-06**: User sees connection status and live latency in the app header
-- [ ] **CONN-07**: Server releases all held keys/buttons when a session ends (no phantom input after mid-drag disconnect)
+- [x] **CONN-07**: Server releases all held keys/buttons when a session ends (no phantom input after mid-drag disconnect)
 
 ### Trackpad
 
@@ -118,7 +118,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONN-04 | Phase 3 | Pending |
 | CONN-05 | Phase 3 | Pending |
 | CONN-06 | Phase 3 | Pending |
-| CONN-07 | Phase 1 | Pending |
+| CONN-07 | Phase 1 | Complete |
 | PAD-01 | Phase 4 | Pending |
 | PAD-02 | Phase 4 | Pending |
 | PAD-03 | Phase 4 | Pending |
@@ -152,6 +152,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UI-02 | Phase 7 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 38 total (note: earlier "36" was a miscount; the sections above contain 38 REQ-IDs)
 - Mapped to phases: 38
 - Unmapped: 0 ✓
