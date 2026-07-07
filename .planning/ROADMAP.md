@@ -13,7 +13,7 @@ The journey runs strictly down the dependency graph the design spec and research
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Protocol Contract & Server Core** - Lock the wire protocol (challenge-response auth, diff-ops text, golden fixtures) and build the fully CI-tested OS-agnostic server core with mock executors
+- [x] **Phase 1: Protocol Contract & Server Core** - Lock the wire protocol (challenge-response auth, diff-ops text, golden fixtures) and build the fully CI-tested OS-agnostic server core with mock executors (completed 2026-07-07)
 - [ ] **Phase 2: End-to-End Cursor Spike** - A finger on the phone moves the real Windows cursor visually instantly on real WiFi — retires the <30ms transport risk while the code is small
 - [ ] **Phase 3: Discovery, Pairing & Connection** - Phone finds the PC automatically, pairs once via PIN, then reconnects silently and recovers from WiFi drops and IP changes
 - [ ] **Phase 4: Trackpad & Keyboard** - The product-defining screens: full trackpad feel checklist and IME-correct typing with special-key rows, sticky modifiers, and autorepeat
@@ -48,7 +48,7 @@ Plans:
 - [x] 01-05-PLAN.md — Recording mock executors + dispatch gates, routing, held-input (CONN-07 mechanism)
 - [x] 01-06-PLAN.md — Transport + full integration suite: walking skeleton green, CONN-07 headline test
 - [x] 01-07-PLAN.md — Flutter/Dart SDK environment setup (human-in-loop)
-- [ ] 01-08-PLAN.md — Pure Dart remote_protocol package vs same fixtures + dormant CI workflow
+- [x] 01-08-PLAN.md — Pure Dart remote_protocol package vs same fixtures + dormant CI workflow
 
 ### Phase 2: End-to-End Cursor Spike
 
@@ -158,7 +158,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol Contract & Server Core | 7/8 | In Progress|  |
+| 1. Protocol Contract & Server Core | 8/8 | Complete   | 2026-07-07 |
 | 2. End-to-End Cursor Spike | 0/TBD | Not started | - |
 | 3. Discovery, Pairing & Connection | 0/TBD | Not started | - |
 | 4. Trackpad & Keyboard | 0/TBD | Not started | - |
