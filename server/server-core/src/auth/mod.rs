@@ -11,33 +11,48 @@ pub mod token;
 
 use std::net::IpAddr;
 
-use pin::PinOutcome;
+use pin::{PinOutcome, PinState};
 
 /// Owns pairing state (active PIN + expiry), attempt/lockout tables, the
-/// stored token hash, and per-connection challenge nonces.
+/// stored token hashes, and the active challenge nonce.
 ///
 /// Shared across sessions as `Arc<std::sync::Mutex<AuthManager>>` (see
 /// [`crate::transport::ServerDeps`]).
-pub struct AuthManager {}
+pub struct AuthManager {
+    /// PIN window + per-IP lockout table (`HashMap<IpAddr, Instant>`) +
+    /// global failure counter. Lives HERE, not on any session type, so
+    /// lockout survives disconnect/reconnect (threat T-01-19).
+    pin: PinState,
+    /// Paired-device token hashes — SHA-256 ONLY, never raw tokens
+    /// (threat T-01-17). In-memory for Phase 1; config persistence is
+    /// Phase 7.
+    paired_hashes: Vec<[u8; 32]>,
+    /// Most recently issued challenge nonce (fresh per `issue_challenge`).
+    active_nonce: Option<[u8; 32]>,
+}
 
 impl AuthManager {
     /// Create a manager with no stored pairing and empty lockout tables.
     pub fn new() -> Self {
-        todo!("implemented in plan 01-04 (auth wave)")
+        Self {
+            pin: PinState::new(),
+            paired_hashes: Vec::new(),
+            active_nonce: None,
+        }
     }
 
     /// Start a pairing window: generate a fresh 6-digit zero-padded PIN
     /// (CSPRNG), valid for [`pin::PIN_TTL_SECS`]. Returns the PIN string so
     /// the host UI (or a test) can display it.
     pub fn begin_pairing(&mut self) -> String {
-        todo!("implemented in plan 01-04 (auth wave)")
+        self.pin.begin()
     }
 
     /// Verify a submitted PIN against the active pairing window, enforcing
     /// expiry, per-source attempt limits, per-IP lockout, and the global
     /// failure cap (SPEC §5).
     pub fn verify_pin(&mut self, pin: &str, source: IpAddr) -> PinOutcome {
-        todo!("implemented in plan 01-04 (auth wave)")
+        self.pin.verify(pin, source)
     }
 
     /// Complete a successful pairing: issue a fresh 32-byte token, store
