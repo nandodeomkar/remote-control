@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-07-07T15:09:41.255Z"
-last_activity: 2026-07-07 -- Phase 01 execution started
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-07-07T15:30:00.000Z"
+last_activity: 2026-07-07 -- Plan 01-04 (auth module) completed
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 8
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 01 (protocol-contract-server-core) — EXECUTING
-Plan: 4 of 8
+Plan: 5 of 8
 Status: Ready to execute
-Last activity: 2026-07-07 -- Phase 01 execution started
+Last activity: 2026-07-07 -- Plan 01-04 (auth module) completed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01 P01 | 10min | 3 tasks | 23 files |
 | Phase 01 P02 | 10min | 2 tasks | 24 files |
 | Phase 01 P03 | 6min | 2 tasks | 2 files |
+| Phase 01 P04 | 13min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -75,6 +76,7 @@ Recent decisions affecting current work:
 - [Phase 01]: Every todo!() body names its implementing plan (01-03..01-06) so red-test panics identify the responsible wave
 - [Phase 01]: encode_msg always emits p (as {} for empty payloads): fixture expect envelopes carry p unconditionally, overriding the plan's omit-empty-p wording
 - [Phase 01]: MissingField is reserved for payload-level required fields; envelope-level serde failures map to BadJson
+- [Phase 01]: rand 0.10 renamed RngCore → Rng at crate root; hmac 0.13 requires explicit KeyInit import for new_from_slice (RESEARCH snippets predate these majors)
 
 ### Pending Todos
 
@@ -96,6 +98,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-07T15:09:41.240Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-07-07T15:30:00.000Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
