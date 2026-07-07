@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-07-07T14:38:00.627Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-07-07T14:58:04.049Z"
 last_activity: 2026-07-07 -- Phase 01 execution started
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 8
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 01 (protocol-contract-server-core) — EXECUTING
-Plan: 2 of 8
+Plan: 3 of 8
 Status: Ready to execute
 Last activity: 2026-07-07 -- Phase 01 execution started
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01 P01 | 10min | 3 tasks | 23 files |
+| Phase 01 P02 | 10min | 2 tasks | 24 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 - [Phase ?]: Auth construction locked: HMAC key = SHA-256(raw token), message = nonce bytes — verifiable from stored hash; fixes design spec §4 unimplementable literal text
 - [Phase ?]: 05-auth-proof.json macHex computed by independent .NET crypto — cross-language byte-identity anchor for Rust and Dart codecs
 - [Phase ?]: Nonfinite binary fixture uses canonical quiet NaN bits 0x7fc00000 per plan (not .NET's negative-NaN variant)
+- [Phase 01]: Enum-valued wire fields (button/action/reason) are plain Strings in codec payload structs: codec stays value-lenient (version-2 hello must decode), semantic validation lives in the router
+- [Phase 01]: Canonical-form serde attributes (skip_serializing_if on every Option field) locked in Wave 2 so Plan 03 encode round-trip needs no struct changes
+- [Phase 01]: Every todo!() body names its implementing plan (01-03..01-06) so red-test panics identify the responsible wave
 
 ### Pending Todos
 
@@ -89,6 +93,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-07T14:38:00.610Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-07-07T14:58:04.034Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
