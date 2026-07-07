@@ -1,0 +1,135 @@
+# Roadmap: Remote Control
+
+## Overview
+
+The journey runs strictly down the dependency graph the design spec and research locked: first the versioned wire protocol and a fully CI-tested OS-agnostic server core (the contract everything else is written against), then a deliberately early end-to-end cursor spike to retire the single make-or-break unknown — the <30ms WebSocket cursor budget on real WiFi. With transport proven, the Flutter connection layer makes discovery, PIN pairing, and silent reconnect a solved problem for every screen that follows. Then the product-defining trackpad and keyboard land with the full "feel" checklist, followed by the control-center breadth in two slices: the thin key-macro features (media, power, presenter, browser) and the fiddly push-driven pair (apps, clipboard). The final phase packages it into a daily driver: tray shell with settings/autostart/revoke, honest failure surfacing (firewall, UIPI), and the dashboard identity with dark-minimal polish.
+
+## Phases
+
+**Phase Numbering:**
+- Integer phases (1, 2, 3): Planned milestone work
+- Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
+
+Decimal phases appear between their surrounding integers in numeric order.
+
+- [ ] **Phase 1: Protocol Contract & Server Core** - Lock the wire protocol (challenge-response auth, diff-ops text, golden fixtures) and build the fully CI-tested OS-agnostic server core with mock executors
+- [ ] **Phase 2: End-to-End Cursor Spike** - A finger on the phone moves the real Windows cursor visually instantly on real WiFi — retires the <30ms transport risk while the code is small
+- [ ] **Phase 3: Discovery, Pairing & Connection** - Phone finds the PC automatically, pairs once via PIN, then reconnects silently and recovers from WiFi drops and IP changes
+- [ ] **Phase 4: Trackpad & Keyboard** - The product-defining screens: full trackpad feel checklist and IME-correct typing with special-key rows, sticky modifiers, and autorepeat
+- [ ] **Phase 5: Media, Power, Presenter & Browser** - The everyday control-center extras: media/absolute volume, double-confirmed power actions, slide driving with timer, browser macros
+- [ ] **Phase 6: Apps & Clipboard** - Window/app management with live server push, and bidirectional clipboard with history and loop-safe auto-sync
+- [ ] **Phase 7: Server Shell, Dashboard & Polish** - Tray shell with settings/autostart/revoke, firewall and UIPI status surfacing, dashboard identity and final app polish
+
+## Phase Details
+
+### Phase 1: Protocol Contract & Server Core
+**Goal**: The wire protocol is locked as a versioned contract (challenge-response auth, diff-ops text, 9-byte binary mouse frames) and an OS-agnostic Rust server core enforces it — pairing, auth gating, routing, pause, and session cleanup all proven in CI with mock executors and zero Windows dependencies
+**Mode:** mvp
+**Depends on**: Nothing (first phase)
+**Requirements**: CONN-07
+**Success Criteria** (what must be TRUE):
+  1. Shared golden fixtures in `protocol/` (auth handshake, IME-revision, emoji, rapid-backspace, binary mouse frames) decode identically in the Rust and Dart codecs — both test suites pass against the same fixture files
+  2. In integration tests, a fake WebSocket client completes the full pair → challenge-response auth → input flow, and dispatch gates drop all pre-auth and paused-input traffic
+  3. PIN rules are enforced (60s expiry, 5 attempts, lockout); tokens are stored only as SHA-256 hashes and the raw token never crosses the wire after pairing (HMAC-SHA256 of a server nonce)
+  4. Killing the socket mid-drag releases all held keys/buttons via the session-cleanup hook (mock-executor test) — no phantom held input after disconnect
+  5. `server-core` builds and passes all tests with zero Windows dependencies
+**Plans**: TBD
+
+### Phase 2: End-to-End Cursor Spike
+**Goal**: A finger moving on the phone moves the real Windows cursor with visually instant response over real WiFi — the enigo MouseKeys executor (dedicated input thread, sub-pixel accumulation, DPI awareness) plus a bare Dart binary-codec sender prove the <30ms WebSocket-only budget before anything is built on top of it
+**Mode:** mvp
+**Depends on**: Phase 1
+**Requirements**: PAD-05
+**Success Criteria** (what must be TRUE):
+  1. Moving a finger on the phone moves the PC cursor with no perceptible lag on real WiFi (visually instant)
+  2. Measured move-frame end-to-end latency is under 30ms on the same LAN — measured on actual move frames, not just ping RTT
+  3. No 40–200ms cursor hitches during slow precise movement — TCP_NODELAY verified active on both ends
+  4. Slow diagonal movement tracks smoothly without drift or stair-stepping (server-side sub-pixel accumulation and DPI awareness working)
+
+**Gate:** If the <30ms budget cannot be met on real WiFi, the transport decision is revisited (UDP mouse channel behind the existing transport abstraction) before any later phase proceeds.
+**Plans**: TBD
+
+### Phase 3: Discovery, Pairing & Connection
+**Goal**: The phone finds the PC on the LAN, pairs once with a PIN, and from then on connects and recovers silently — the ConnectionService (reconnect FSM, beacon listener, secure token store, per-message-class send policy) makes connectivity a solved problem for every later screen
+**Mode:** mvp
+**Depends on**: Phase 2 (spike gate passed — transport locked)
+**Requirements**: CONN-01, CONN-02, CONN-03, CONN-04, CONN-05, CONN-06
+**Success Criteria** (what must be TRUE):
+  1. The PC appears automatically in the app's device list within a few seconds on the same LAN, showing name and IP (machine GUID disambiguates duplicate names)
+  2. First-time pairing works via the 6-digit PIN shown in a Windows notification; expiry, wrong attempts, and lockout each show a clear error with remaining wait
+  3. A paired phone reconnects silently with no PIN prompt — challenge-response only, and the token never crosses the wire; a revoked/stale token returns the user to pairing with an explanation instead of a silent retry loop
+  4. After a WiFi drop or a PC IP change, the app reconnects automatically (exponential backoff plus beacon re-listen, instant retry on app resume) without user action
+  5. Manual IP:port entry connects when discovery fails, and the app header shows live connection status and latency
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 4: Trackpad & Keyboard
+**Goal**: The phone is a genuinely usable daily mouse and keyboard — trackpad feel (raw Listener classifier, acceleration, momentum, drag lock) and typing fidelity (IME diff-ops, special rows, sticky modifiers, server-side autorepeat) match a real laptop, not a toy
+**Mode:** mvp
+**Depends on**: Phase 3
+**Requirements**: PAD-01, PAD-02, PAD-03, PAD-04, KEY-01, KEY-02, KEY-03, KEY-04
+**Success Criteria** (what must be TRUE):
+  1. The trackpad handles the full gesture set: one-finger move with velocity acceleration, tap = left click, two-finger tap = right click, on-screen L/M/R buttons, two-finger scroll with momentum and instant touch-stop, long-press drag with drag lock for screen-edge drags
+  2. Typing with the phone keyboard — including IME autocomplete revisions, emoji, and backspace — produces exactly the same text on the PC
+  3. F1–F12, numpad, and the nav cluster (Home/End/PgUp/PgDn/Del/Esc/Tab, arrows) all work from toggleable key rows
+  4. Sticky modifiers (Ctrl/Alt/Shift/Win) show visible held state, send combos like Win+D, and auto-reset after the combo; they also reset safely on disconnect
+  5. Holding a key autorepeats via server-side key-down/hold and stops immediately on release
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 5: Media, Power, Presenter & Browser
+**Goal**: The everyday control-center extras work end-to-end from the couch — system media and accurate absolute volume, safely double-confirmed power actions, PowerPoint-standard slide driving with a timer, and browser control via key macros
+**Mode:** mvp
+**Depends on**: Phase 4 (keyboard key down/up model powers presenter/browser macros)
+**Requirements**: MED-01, MED-02, PWR-01, PWR-02, PWR-03, PRES-01, PRES-02, BROW-01
+**Success Criteria** (what must be TRUE):
+  1. Play/pause, next, and previous control whatever is playing system-wide; the volume slider sets absolute volume and stays accurate when volume is changed on the PC itself (server volume-state push)
+  2. Lock and sleep execute only after slide-to-confirm, and sleep actually suspends (SetSuspendState) rather than hibernating
+  3. Restart and shutdown require slide-to-confirm plus the server-side confirm message — there is no single-action path to either
+  4. The presenter drives slides (next/prev, start/end show, blank screen) in PowerPoint and shows an elapsed timer
+  5. Browser controls (back/forward, new/close tab, refresh, zoom in/out) act on the focused browser window
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 6: Apps & Clipboard
+**Goal**: The phone manages PC windows and apps and moves text between devices — the two push-driven, platform-fiddly features (EnumWindows/foreground-lock workarounds, clipboard polling with echo suppression and honest Android 10+ scoping) work reliably
+**Mode:** mvp
+**Depends on**: Phase 3 (connection layer and server push; independent of Phases 4–5, can run in parallel with them)
+**Requirements**: APPS-01, APPS-02, APPS-03, CLIP-01, CLIP-02, CLIP-03, CLIP-04
+**Success Criteria** (what must be TRUE):
+  1. The Apps screen lists real user windows (Alt-Tab-quality filtering, no ghost/cloaked entries); tapping focuses the window reliably and close closes it, with a clear toast if the window is gone
+  2. Pinned favorites launch their apps, and the window list refreshes automatically via server push (`apps.changed`) as windows open and close
+  3. The user can send the phone clipboard to the PC and fetch the PC clipboard to the phone, each with one tap
+  4. With auto-sync enabled, a PC copy appears on the phone live and a phone copy syncs on app resume (Android 10+ limit surfaced honestly) — with no sync loops thanks to content-hash echo suppression
+  5. The last 5 clipboard entries are visible and reusable from history
+**Plans**: TBD
+**UI hint**: yes
+
+### Phase 7: Server Shell, Dashboard & Polish
+**Goal**: The system is a daily-driver product — the server lives quietly in the tray with settings, autostart, and device revoke; failures surface honestly (firewall self-test, UIPI status); and the app gets its final dashboard identity with dark-minimal polish, haptics, and keep-awake
+**Mode:** mvp
+**Depends on**: Phase 5, Phase 6
+**Requirements**: SRV-01, SRV-02, SRV-03, SRV-04, SRV-05, UI-01, UI-02
+**Success Criteria** (what must be TRUE):
+  1. The server lives in the tray with a status tooltip (connected device count); pause-input drops input while keeping the connection alive; quit works; the tray icon survives an Explorer restart
+  2. With autostart enabled, the server starts with Windows after a reboot; the toggle turns it off cleanly
+  3. The settings window manages device name, port, clipboard sync, and the paired-device list — a revoked phone is disconnected and must re-pair
+  4. A firewall-blocked port produces a tray warning with a fix hint at startup, and input blocked by an elevated window (UIPI) shows a clear status on the phone instead of failing silently
+  5. The dashboard home shows the 8 tool tiles with the persistent trackpad quick-bar on every screen, dark minimal theme (#0E0F12, blue accent), haptic feedback toggle, and keep-awake during trackpad/presenter use
+**Plans**: TBD
+**UI hint**: yes
+
+## Progress
+
+**Execution Order:**
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 may run in parallel with Phases 4–5 — it depends only on Phase 3)
+
+| Phase | Plans Complete | Status | Completed |
+|-------|----------------|--------|-----------|
+| 1. Protocol Contract & Server Core | 0/TBD | Not started | - |
+| 2. End-to-End Cursor Spike | 0/TBD | Not started | - |
+| 3. Discovery, Pairing & Connection | 0/TBD | Not started | - |
+| 4. Trackpad & Keyboard | 0/TBD | Not started | - |
+| 5. Media, Power, Presenter & Browser | 0/TBD | Not started | - |
+| 6. Apps & Clipboard | 0/TBD | Not started | - |
+| 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |

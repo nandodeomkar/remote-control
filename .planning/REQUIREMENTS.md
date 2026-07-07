@@ -112,13 +112,50 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (populated by roadmap) | | |
+| CONN-01 | Phase 3 | Pending |
+| CONN-02 | Phase 3 | Pending |
+| CONN-03 | Phase 3 | Pending |
+| CONN-04 | Phase 3 | Pending |
+| CONN-05 | Phase 3 | Pending |
+| CONN-06 | Phase 3 | Pending |
+| CONN-07 | Phase 1 | Pending |
+| PAD-01 | Phase 4 | Pending |
+| PAD-02 | Phase 4 | Pending |
+| PAD-03 | Phase 4 | Pending |
+| PAD-04 | Phase 4 | Pending |
+| PAD-05 | Phase 2 | Pending |
+| KEY-01 | Phase 4 | Pending |
+| KEY-02 | Phase 4 | Pending |
+| KEY-03 | Phase 4 | Pending |
+| KEY-04 | Phase 4 | Pending |
+| MED-01 | Phase 5 | Pending |
+| MED-02 | Phase 5 | Pending |
+| PWR-01 | Phase 5 | Pending |
+| PWR-02 | Phase 5 | Pending |
+| PWR-03 | Phase 5 | Pending |
+| APPS-01 | Phase 6 | Pending |
+| APPS-02 | Phase 6 | Pending |
+| APPS-03 | Phase 6 | Pending |
+| CLIP-01 | Phase 6 | Pending |
+| CLIP-02 | Phase 6 | Pending |
+| CLIP-03 | Phase 6 | Pending |
+| CLIP-04 | Phase 6 | Pending |
+| PRES-01 | Phase 5 | Pending |
+| PRES-02 | Phase 5 | Pending |
+| BROW-01 | Phase 5 | Pending |
+| SRV-01 | Phase 7 | Pending |
+| SRV-02 | Phase 7 | Pending |
+| SRV-03 | Phase 7 | Pending |
+| SRV-04 | Phase 7 | Pending |
+| SRV-05 | Phase 7 | Pending |
+| UI-01 | Phase 7 | Pending |
+| UI-02 | Phase 7 | Pending |
 
 **Coverage:**
-- v1 requirements: 36 total
-- Mapped to phases: 0
-- Unmapped: 36 ⚠️ (roadmap pending)
+- v1 requirements: 38 total (note: earlier "36" was a miscount; the sections above contain 38 REQ-IDs)
+- Mapped to phases: 38
+- Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-07-07*
-*Last updated: 2026-07-07 after initial definition*
+*Last updated: 2026-07-07 after roadmap creation (traceability populated)*
