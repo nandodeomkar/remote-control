@@ -47,7 +47,7 @@ Plans:
 - [x] 01-04-PLAN.md — Auth: PIN lifecycle/lockout, token hashing, challenge-response (auth-proof fixture anchor)
 - [x] 01-05-PLAN.md — Recording mock executors + dispatch gates, routing, held-input (CONN-07 mechanism)
 - [x] 01-06-PLAN.md — Transport + full integration suite: walking skeleton green, CONN-07 headline test
-- [ ] 01-07-PLAN.md — Flutter/Dart SDK environment setup (human-in-loop)
+- [x] 01-07-PLAN.md — Flutter/Dart SDK environment setup (human-in-loop)
 - [ ] 01-08-PLAN.md — Pure Dart remote_protocol package vs same fixtures + dormant CI workflow
 
 ### Phase 2: End-to-End Cursor Spike
@@ -158,7 +158,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol Contract & Server Core | 6/8 | In Progress|  |
+| 1. Protocol Contract & Server Core | 7/8 | In Progress|  |
 | 2. End-to-End Cursor Spike | 0/TBD | Not started | - |
 | 3. Discovery, Pairing & Connection | 0/TBD | Not started | - |
 | 4. Trackpad & Keyboard | 0/TBD | Not started | - |
