@@ -9,23 +9,43 @@
 //! Cross-language proof: `protocol/fixtures/handshake/05-auth-proof.json`
 //! (macHex computed by independent .NET crypto).
 
+use hmac::{Hmac, KeyInit, Mac};
+use rand::Rng;
+use sha2::{Digest, Sha256};
+
+type HmacSha256 = Hmac<Sha256>;
+
 /// Fresh 32-byte CSPRNG nonce — one per connection, never reused (SPEC §3).
 pub fn new_nonce() -> [u8; 32] {
-    todo!("implemented in plan 01-04 (auth wave)")
+    let mut nonce = [0u8; 32];
+    rand::rng().fill_bytes(&mut nonce);
+    nonce
 }
 
 /// Client-side proof (used by tests and fixture verification): derive the
 /// HMAC key as SHA-256(`raw_token`), MAC the `nonce`, return 64 lowercase
 /// hex.
 pub fn auth_proof(raw_token: &[u8], nonce: &[u8]) -> String {
-    todo!("implemented in plan 01-04 (auth wave)")
+    let key = Sha256::digest(raw_token); // key = SHA-256(raw token) — LOCKED
+    let mut mac = HmacSha256::new_from_slice(&key).expect("HMAC accepts any key length");
+    mac.update(nonce);
+    hex::encode(mac.finalize().into_bytes())
 }
 
 /// Server-side verify: HMAC the `nonce` with `stored_hash` as key and
 /// compare to `mac_hex` in constant time (`Mac::verify_slice`). Malformed
 /// hex returns `false`, never panics.
 pub fn verify_mac(stored_hash: &[u8; 32], nonce: &[u8], mac_hex: &str) -> bool {
-    todo!("implemented in plan 01-04 (auth wave)")
+    // Defensive hex decode: attacker-controlled input, bad hex is a plain
+    // rejection, never a panic.
+    let Ok(received) = hex::decode(mac_hex) else {
+        return false;
+    };
+    let mut mac = HmacSha256::new_from_slice(stored_hash).expect("HMAC accepts any key length");
+    mac.update(nonce);
+    // Mac::verify_slice is constant-time by construction (CtOutput,
+    // T-01-15) — the ONLY comparison; no manual byte compare.
+    mac.verify_slice(&received).is_ok()
 }
 
 #[cfg(test)]

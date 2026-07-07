@@ -59,20 +59,28 @@ impl AuthManager {
     /// ONLY its SHA-256 hash, and return the raw token hex (64 lowercase)
     /// for the one-time `pairOk` delivery (SPEC §3a, §12).
     pub fn complete_pairing(&mut self) -> String {
-        todo!("implemented in plan 01-04 (auth wave)")
+        let issued = token::issue_token();
+        self.paired_hashes.push(issued.hash);
+        // The raw hex leaves this scope immediately — AuthManager keeps no
+        // raw-token field (threat T-01-17).
+        issued.raw_hex
     }
 
     /// Issue a fresh 32-byte CSPRNG challenge nonce for this connection
     /// (SPEC §3 — never reused).
     pub fn issue_challenge(&mut self) -> [u8; 32] {
-        todo!("implemented in plan 01-04 (auth wave)")
+        let nonce = challenge::new_nonce();
+        self.active_nonce = Some(nonce);
+        nonce
     }
 
     /// Verify an `auth` proof: recompute HMAC-SHA256 with the STORED hash as
     /// key over `nonce` and compare against `mac_hex` in constant time
     /// (SPEC §4). Returns `false` when no pairing is stored.
     pub fn verify_auth(&self, nonce: &[u8], mac_hex: &str) -> bool {
-        todo!("implemented in plan 01-04 (auth wave)")
+        self.paired_hashes
+            .iter()
+            .any(|hash| challenge::verify_mac(hash, nonce, mac_hex))
     }
 }
 

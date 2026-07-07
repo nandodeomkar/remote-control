@@ -1,6 +1,9 @@
 //! Token issue + hashing (SPEC §4, §12): tokens are stored ONLY as SHA-256
 //! hashes; the raw token crosses the wire exactly once (`pairOk`).
 
+use rand::Rng;
+use sha2::{Digest, Sha256};
+
 /// A freshly issued token: the raw hex to hand to the phone once, plus the
 /// SHA-256 hash — the ONLY form the server persists (threat T-01-08).
 pub struct IssuedToken {
@@ -13,12 +16,16 @@ pub struct IssuedToken {
 
 /// Generate a fresh 32-byte CSPRNG token.
 pub fn issue_token() -> IssuedToken {
-    todo!("implemented in plan 01-04 (auth wave)")
+    // ThreadRng is a CSPRNG (T-01-18): Rng::fill_bytes, never a
+    // timestamp/xorshift seed.
+    let mut raw = [0u8; 32];
+    rand::rng().fill_bytes(&mut raw);
+    IssuedToken { raw_hex: hex::encode(raw), hash: hash_token(&raw) }
 }
 
 /// SHA-256 of raw token bytes (the stored form AND the HMAC key).
 pub fn hash_token(raw: &[u8]) -> [u8; 32] {
-    todo!("implemented in plan 01-04 (auth wave)")
+    Sha256::digest(raw).into()
 }
 
 #[cfg(test)]
