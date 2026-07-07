@@ -1,0 +1,16 @@
+{
+  "name": "auth-fail-bad-mac",
+  "description": "Server authFail with reason badMac — HMAC verification failed (SPEC section 5 reason enum).",
+  "wire": {
+    "t": "authFail",
+    "p": {
+      "reason": "badMac"
+    }
+  },
+  "expect": {
+    "t": "authFail",
+    "p": {
+      "reason": "badMac"
+    }
+  }
+}

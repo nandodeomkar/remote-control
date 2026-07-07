@@ -1,0 +1,16 @@
+{
+  "name": "pair-ok",
+  "description": "Server pairOk delivering the raw token (64 lowercase hex = 32 bytes) — the ONLY time the token crosses the wire, documented v1 tradeoff (SPEC sections 3a and 12). Token matches 05-auth-proof.json input.tokenHex.",
+  "wire": {
+    "t": "pairOk",
+    "p": {
+      "token": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+    }
+  },
+  "expect": {
+    "t": "pairOk",
+    "p": {
+      "token": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+    }
+  }
+}

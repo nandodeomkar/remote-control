@@ -1,0 +1,12 @@
+{
+  "name": "auth-ok",
+  "description": "Server authOk with empty payload; session becomes Authed (SPEC section 3).",
+  "wire": {
+    "t": "authOk",
+    "p": {}
+  },
+  "expect": {
+    "t": "authOk",
+    "p": {}
+  }
+}

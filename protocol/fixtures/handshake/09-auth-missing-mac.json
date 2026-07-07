@@ -1,0 +1,11 @@
+{
+  "name": "auth-missing-mac",
+  "description": "Negative fixture (D-05, SPEC section 1): auth without the required p.mac field. Missing required fields are hard decode errors in both codecs.",
+  "wire": {
+    "t": "auth",
+    "p": {}
+  },
+  "expect": {
+    "error": true
+  }
+}

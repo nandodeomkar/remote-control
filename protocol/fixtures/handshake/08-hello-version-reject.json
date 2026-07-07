@@ -1,0 +1,16 @@
+{
+  "name": "hello-version-reject",
+  "description": "Negative fixture (D-06, SPEC section 2): hello with major version 2 — codecs decode it fine, but the SERVER must reject it with err code versionMismatch (carrying serverVersion and clientVersion) and close. The expect shape flags the scenario for the integration suite.",
+  "wire": {
+    "t": "hello",
+    "seq": 1,
+    "p": {
+      "protoVersion": "2.0",
+      "device": "Pixel 8"
+    }
+  },
+  "expect": {
+    "error": true,
+    "reason": "versionMismatch"
+  }
+}

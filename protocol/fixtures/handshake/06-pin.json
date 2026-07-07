@@ -1,0 +1,18 @@
+{
+  "name": "pin",
+  "description": "Client pin message. The PIN is a 6-digit zero-padded STRING (leading zero significant) — proves it survives decode as a string, never a number (SPEC section 3a).",
+  "wire": {
+    "t": "pin",
+    "seq": 1,
+    "p": {
+      "pin": "042137"
+    }
+  },
+  "expect": {
+    "t": "pin",
+    "seq": 1,
+    "p": {
+      "pin": "042137"
+    }
+  }
+}

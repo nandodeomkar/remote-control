@@ -1,0 +1,16 @@
+{
+  "name": "challenge",
+  "description": "Server challenge with a fixed 64-lowercase-hex nonce (hex encoding of bytes 0xa0..0xbf). SPEC section 3: fresh CSPRNG nonce per connection.",
+  "wire": {
+    "t": "challenge",
+    "p": {
+      "nonce": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
+    }
+  },
+  "expect": {
+    "t": "challenge",
+    "p": {
+      "nonce": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
+    }
+  }
+}

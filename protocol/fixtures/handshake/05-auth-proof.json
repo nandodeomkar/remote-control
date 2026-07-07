@@ -1,0 +1,11 @@
+{
+  "name": "auth-proof",
+  "description": "Cross-language proof of the locked auth construction (SPEC section 4): mac = HMAC-SHA256(key = SHA-256(raw token bytes), message = nonce bytes), lowercase hex. Token bytes are 0x00..0x1f, nonce bytes are 0xa0..0xbf. expect.macHex was computed by an independent third implementation (.NET System.Security.Cryptography: SHA256.ComputeHash for the key, HMACSHA256.ComputeHash over the nonce) — NOT by either codec. Both the Rust and Dart auth-proof helpers must reproduce it byte-identically. Special fixture format documented in fixtures README.",
+  "input": {
+    "tokenHex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "nonceHex": "a0a1a2a3a4a5a6a7a8a9aaabacadaeafb0b1b2b3b4b5b6b7b8b9babbbcbdbebf"
+  },
+  "expect": {
+    "macHex": "d0f10703352913066fcbf70360201fe0dfb691d66a74b2132968ad5659113d48"
+  }
+}

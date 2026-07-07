@@ -1,0 +1,22 @@
+{
+  "name": "hello-ok",
+  "description": "Valid hello with protoVersion 1.0. Carries one unknown field inside p and one unknown top-level field; per D-05 (SPEC section 1) both are IGNORED on decode, so expect contains neither. Proves ignore-unknown in both codecs.",
+  "wire": {
+    "t": "hello",
+    "seq": 1,
+    "unknownTopLevel": "ignored",
+    "p": {
+      "protoVersion": "1.0",
+      "device": "Pixel 8",
+      "futureField": "ignored"
+    }
+  },
+  "expect": {
+    "t": "hello",
+    "seq": 1,
+    "p": {
+      "protoVersion": "1.0",
+      "device": "Pixel 8"
+    }
+  }
+}
