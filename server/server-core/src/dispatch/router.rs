@@ -1,18 +1,29 @@
 //! Family routing behind the auth and pause gates (SPEC §6, §7, §10, §11).
 
 use std::sync::Mutex;
-use std::time::Instant;
+use std::time::Duration;
+
+// tokio's Instant (not std's) so the paused-clock test harness
+// (`start_paused` + `tokio::time::advance`) can drive the 10s confirm
+// window deterministically. Outside a test runtime it is std's Instant.
+use tokio::time::Instant;
 
 use crate::auth::AuthManager;
 use crate::codec::binary::MouseFrame;
-use crate::codec::json::{Decoded, Msg};
+use crate::codec::json::{
+    AppsListPayload, ClipSetPayload, Decoded, ErrPayload, Msg, PongPayload,
+};
 use crate::dispatch::AuthState;
 use crate::dispatch::held::HeldInput;
-use crate::executors::Executors;
+use crate::executors::{Button, Executors, KeyCode, Modifier};
 
 /// Maximum `text.bs` value; larger requests are rejected with
 /// `err{code:"bsTooLarge"}` and not executed (SPEC §8).
 pub const MAX_BS: u64 = 10000;
+
+/// `power` → `confirm` window (SPEC §7): a confirm landing later than this
+/// after its `power` request is `err{noPendingAction}`.
+const CONFIRM_WINDOW: Duration = Duration::from_secs(10);
 
 /// Mutable per-session routing context.
 pub struct SessionCtx {
@@ -40,10 +51,296 @@ pub fn route(
     decoded: Decoded,
     ctx: &mut SessionCtx,
     exec: &Executors,
-    auth: &Mutex<AuthManager>,
+    _auth: &Mutex<AuthManager>,
     paused: bool,
 ) -> Vec<Msg> {
-    todo!("implemented in plan 01-05 (dispatch wave)")
+    // Handshake messages (hello/pin/auth) are owned by the session-layer
+    // FSM (Plan 06) — they must never reach the post-auth router.
+    debug_assert!(
+        !matches!(decoded.msg, Msg::Hello(_) | Msg::Pin(_) | Msg::Auth(_)),
+        "handshake messages are owned by the session FSM, never route()"
+    );
+
+    // GATE 1 — auth (SPEC §6, threat T-01-20): pre-auth, EVERYTHING
+    // non-handshake is silently dropped. No reply, no executor call, no
+    // probing oracle — even `ping` gets nothing.
+    if ctx.auth_state != AuthState::Authed {
+        return Vec::new();
+    }
+
+    // GATE 2 — pause (SPEC §11, threat T-01-21): executor-bound families
+    // are silently dropped while paused. `ping`/`pong` (and the read-only
+    // queries `apps.list`/`clip.get`, which SPEC §11 does not list) keep
+    // working — pause never breaks liveness probing.
+    if paused && is_executor_bound(&decoded.msg) {
+        return Vec::new();
+    }
+
+    // GATE 3 — family routing to the OS-agnostic trait objects.
+    match decoded.msg {
+        // ── mouse / keyboard ───────────────────────────────────────────
+        Msg::Click(p) => {
+            if let Some(button) = parse_button(&p.button) {
+                exec.mouse_keys.click(button);
+            }
+            Vec::new()
+        }
+        Msg::Drag(p) => {
+            if let Some(button) = parse_button(&p.button) {
+                match p.action.as_str() {
+                    // Held state updates BEFORE the trait call (RESEARCH
+                    // Pattern 4): tracking must never lag execution.
+                    "start" => {
+                        ctx.held.note_button_down(button);
+                        exec.mouse_keys.button_down(button);
+                    }
+                    "end" => {
+                        ctx.held.note_button_up(button);
+                        exec.mouse_keys.button_up(button);
+                    }
+                    _ => {} // semantic validation: unknown action → drop
+                }
+            }
+            Vec::new()
+        }
+        Msg::Key(p) => {
+            let code = KeyCode(p.code);
+            match p.action.as_str() {
+                "tap" => exec.mouse_keys.key_tap(code, &parse_mods(&p.mods)),
+                "down" => {
+                    ctx.held.note_key_down(code.clone());
+                    exec.mouse_keys.key_down(code);
+                }
+                "up" => {
+                    ctx.held.note_key_up(code.clone());
+                    exec.mouse_keys.key_up(code);
+                }
+                _ => {} // unknown action → drop
+            }
+            Vec::new()
+        }
+        Msg::Text(p) => {
+            // T-01-22: cap check BEFORE any executor call.
+            if p.bs > MAX_BS {
+                return vec![err(
+                    "bsTooLarge",
+                    format!("text.bs {} exceeds the cap of {MAX_BS}", p.bs),
+                )];
+            }
+            if p.bs > 0 {
+                // Infallible narrowing: bs <= MAX_BS = 10000 < u32::MAX.
+                exec.mouse_keys.backspace(p.bs as u32);
+            }
+            if !p.ins.is_empty() {
+                exec.mouse_keys.type_text(&p.ins);
+            }
+            Vec::new()
+        }
+
+        // ── media ──────────────────────────────────────────────────────
+        Msg::Media(p) => {
+            match p.action.as_str() {
+                "playpause" => exec.media.play_pause(),
+                "next" => exec.media.next(),
+                "prev" => exec.media.prev(),
+                "volup" => exec.media.vol_up(),
+                "voldown" => exec.media.vol_down(),
+                "mute" => exec.media.mute(),
+                // `value` required iff setvol (SPEC §7); out-of-range or
+                // missing values are semantic errors → dropped.
+                "setvol" => {
+                    if let Some(pct) = p.value.filter(|v| *v <= 100) {
+                        exec.media.set_volume(pct);
+                    }
+                }
+                _ => {} // unknown action → drop
+            }
+            Vec::new()
+        }
+
+        // ── power double-confirm gate (SPEC §7, threat T-01-23) ────────
+        Msg::Power(p) => {
+            if matches!(p.action.as_str(), "lock" | "sleep" | "restart" | "shutdown") {
+                ctx.pending_power = Some((p.action, Instant::now()));
+            }
+            // NEVER an executor call from `power` alone.
+            Vec::new()
+        }
+        Msg::Confirm(p) => {
+            // take(): the pending slot is single-shot. A mismatched confirm
+            // also clears it — suspicious traffic must restart the two-step
+            // sequence from `power`.
+            match ctx.pending_power.take() {
+                Some((action, requested_at))
+                    if action == p.action && requested_at.elapsed() < CONFIRM_WINDOW =>
+                {
+                    match action.as_str() {
+                        "lock" => exec.power.lock(),
+                        "sleep" => exec.power.sleep(),
+                        "restart" => exec.power.restart(),
+                        "shutdown" => exec.power.shutdown(),
+                        // Only the four validated actions are ever stored.
+                        _ => unreachable!("pending_power only stores validated actions"),
+                    }
+                    Vec::new()
+                }
+                _ => vec![err(
+                    "noPendingAction",
+                    format!("no pending power action matches confirm '{}'", p.action),
+                )],
+            }
+        }
+
+        // ── apps ───────────────────────────────────────────────────────
+        Msg::AppsList(_) => vec![Msg::AppsList(AppsListPayload {
+            windows: Some(exec.apps.list()),
+        })],
+        Msg::AppsLaunch(p) => {
+            exec.apps.launch(&p.path);
+            Vec::new()
+        }
+        Msg::AppsFocus(p) => {
+            exec.apps.focus(p.id);
+            Vec::new()
+        }
+        Msg::AppsClose(p) => {
+            exec.apps.close(p.id);
+            Vec::new()
+        }
+
+        // ── clipboard ──────────────────────────────────────────────────
+        Msg::ClipSet(p) => {
+            exec.clipboard.set(&p.text);
+            Vec::new()
+        }
+        Msg::ClipGet(_) => vec![Msg::ClipSet(ClipSetPayload {
+            text: exec.clipboard.get(),
+        })],
+
+        // ── key-macro families (Phase 1 minimal tables; Phase 5 refines)
+        Msg::Browser(p) => {
+            if let Some((code, mods)) = browser_macro(&p.action) {
+                exec.mouse_keys.key_tap(code, &mods);
+            }
+            Vec::new()
+        }
+        Msg::Present(p) => {
+            if let Some(code) = present_macro(&p.action) {
+                exec.mouse_keys.key_tap(code, &[]);
+            }
+            Vec::new()
+        }
+
+        // ── liveness ───────────────────────────────────────────────────
+        Msg::Ping(p) => vec![Msg::Pong(PongPayload { ts: p.ts })],
+
+        // ── unknown type (SPEC §10, D-07, threat T-01-25) ──────────────
+        Msg::Unknown { t } => vec![err(
+            "unknownType",
+            format!("unknown message type: {t}"),
+        )],
+
+        // Handshake types: unreachable post-debug_assert; release builds
+        // drop them defensively (the session FSM owns them).
+        Msg::Hello(_) | Msg::Pin(_) | Msg::Auth(_) => Vec::new(),
+
+        // S→C-only types arriving FROM a client are known-but-invalid
+        // direction: ignored silently (no unknownType — the type IS known;
+        // no routing fallthrough — nothing executes).
+        Msg::PairOk(_)
+        | Msg::Challenge(_)
+        | Msg::AuthOk(_)
+        | Msg::AuthFail(_)
+        | Msg::AppsChanged(_)
+        | Msg::ClipChanged(_)
+        | Msg::Pong(_)
+        | Msg::Err(_) => Vec::new(),
+    }
+}
+
+/// SPEC §11's pause drop list: every executor-bound family. `ping`/`pong`
+/// and the read-only queries (`apps.list`, `clip.get`) are exempt.
+fn is_executor_bound(msg: &Msg) -> bool {
+    matches!(
+        msg,
+        Msg::Click(_)
+            | Msg::Drag(_)
+            | Msg::Key(_)
+            | Msg::Text(_)
+            | Msg::Media(_)
+            | Msg::Power(_)
+            | Msg::Confirm(_)
+            | Msg::AppsLaunch(_)
+            | Msg::AppsFocus(_)
+            | Msg::AppsClose(_)
+            | Msg::ClipSet(_)
+            | Msg::Browser(_)
+            | Msg::Present(_)
+    )
+}
+
+/// Semantic validation of the wire `button` string (codec is value-lenient
+/// by design; the router owns enum validation). Unknown values → `None` →
+/// silent drop.
+fn parse_button(s: &str) -> Option<Button> {
+    match s {
+        "left" => Some(Button::Left),
+        "middle" => Some(Button::Middle),
+        "right" => Some(Button::Right),
+        _ => None,
+    }
+}
+
+/// Parse wire `key.mods` strings; unknown modifier names are skipped.
+fn parse_mods(mods: &[String]) -> Vec<Modifier> {
+    mods.iter()
+        .filter_map(|m| match m.as_str() {
+            "ctrl" => Some(Modifier::Ctrl),
+            "alt" => Some(Modifier::Alt),
+            "shift" => Some(Modifier::Shift),
+            "win" => Some(Modifier::Win),
+            _ => None,
+        })
+        .collect()
+}
+
+/// `browser` → key-macro table (Phase 1 minimal mapping; Phase 5 refines
+/// semantics). Unknown actions → `None` → silent drop.
+fn browser_macro(action: &str) -> Option<(KeyCode, Vec<Modifier>)> {
+    let (code, mods): (&str, Vec<Modifier>) = match action {
+        "back" => ("BrowserBack", vec![]),
+        "forward" => ("BrowserForward", vec![]),
+        "newtab" => ("T", vec![Modifier::Ctrl]),
+        "closetab" => ("W", vec![Modifier::Ctrl]),
+        "refresh" => ("F5", vec![]),
+        "zoomin" => ("Plus", vec![Modifier::Ctrl]),
+        "zoomout" => ("Minus", vec![Modifier::Ctrl]),
+        _ => return None,
+    };
+    Some((KeyCode(code.to_string()), mods))
+}
+
+/// `present` → key-macro table (Phase 1 minimal; modifier-free).
+fn present_macro(action: &str) -> Option<KeyCode> {
+    let code = match action {
+        "next" => "Right",
+        "prev" => "Left",
+        "start" => "F5",
+        "end" => "Esc",
+        "blank" => "B",
+        _ => return None,
+    };
+    Some(KeyCode(code.to_string()))
+}
+
+/// Build an `err` reply with `code` + human-readable `msg` (SPEC §7).
+fn err(code: &str, msg: String) -> Msg {
+    Msg::Err(ErrPayload {
+        code: code.to_string(),
+        msg,
+        server_version: None,
+        client_version: None,
+    })
 }
 
 /// Route one decoded binary mouse frame (fire-and-forget hot path).
@@ -51,7 +348,15 @@ pub fn route(
 /// Dropped silently unless `ctx.auth_state` is [`AuthState::Authed`] and not
 /// `paused` (SPEC §6, §11). Never replies.
 pub fn route_binary(frame: MouseFrame, ctx: &SessionCtx, exec: &Executors, paused: bool) {
-    todo!("implemented in plan 01-05 (dispatch wave)")
+    // Same gate order as route(): auth first (SPEC §6), pause second
+    // (SPEC §11). Binary frames never produce a reply.
+    if ctx.auth_state != AuthState::Authed || paused {
+        return;
+    }
+    match frame {
+        MouseFrame::Move { dx, dy } => exec.mouse_keys.move_rel(dx, dy),
+        MouseFrame::Scroll { dx, dy } => exec.mouse_keys.scroll(dx, dy),
+    }
 }
 
 #[cfg(test)]

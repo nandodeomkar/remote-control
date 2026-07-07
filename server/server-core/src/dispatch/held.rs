@@ -21,33 +21,41 @@ pub struct HeldInput {
 impl HeldInput {
     /// Record a button press (`drag start`).
     pub fn note_button_down(&mut self, button: Button) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.buttons.insert(button);
     }
 
     /// Record a button release (`drag end`).
     pub fn note_button_up(&mut self, button: Button) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.buttons.remove(&button);
     }
 
     /// Record a key press (`key down`).
     pub fn note_key_down(&mut self, code: KeyCode) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.keys.insert(code);
     }
 
     /// Record a key release (`key up`).
     pub fn note_key_up(&mut self, code: KeyCode) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.keys.remove(&code);
     }
 
     /// Release EVERYTHING still held: `button_up` for each held button,
     /// `key_up` for each held key, leaving this set empty (CONN-07 — no
     /// phantom held input survives a mid-drag disconnect).
+    ///
+    /// Idempotent: draining leaves both sets empty, so a second call emits
+    /// nothing.
     pub fn release_all(&mut self, mk: &dyn MouseKeys) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        for button in self.buttons.drain() {
+            mk.button_up(button);
+        }
+        for code in self.keys.drain() {
+            mk.key_up(code);
+        }
     }
 
     /// True when nothing is held (used to assert clean session starts).
     pub fn is_empty(&self) -> bool {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.buttons.is_empty() && self.keys.is_empty()
     }
 }
