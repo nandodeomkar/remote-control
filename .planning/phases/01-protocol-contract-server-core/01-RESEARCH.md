@@ -582,20 +582,23 @@ jobs:
 
 All other factual claims in this document are [VERIFIED] against crates.io/pub.dev registries + the package-legitimacy seam, or [CITED] from docs.rs official documentation, or restate the locked design spec / upstream project research.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **How is the Dart SDK delivered on this machine?**
    - What we know: no `dart`, `flutter`, `winget`, or `choco` on PATH (verified via both Git Bash and PowerShell). Rust 1.89 is present.
    - What's unclear: whether the user prefers the Flutter SDK (bundles Dart; needed by Phase 2 anyway; ~2GB zip, extract + PATH, no admin) or the standalone Dart SDK (~250MB).
    - Recommendation: plan a `checkpoint:human-verify` environment-setup task early in the phase: install Flutter SDK stable (zip extract, add `flutter\bin` to PATH) — one install serves Phases 1–7. Gate all Dart tasks behind it.
+   - RESOLVED: Flutter SDK install as a human-action checkpoint task, Rust tasks sequenced first, all Dart tasks gated behind it (see Plan 01-07; Plan 01-08 depends on it).
 
 2. **Global vs per-source-IP lockout.**
    - What we know: spec §4 says "5-minute lockout per source IP"; project PITFALLS (Pitfall 9) recommends a global counter because LAN attackers rotate IPs freely.
    - Recommendation: implement per-source-IP per the locked spec (success criterion 3 mirrors it), and add a cheap global cap (e.g. 20 total failures → lockout regardless of IP) as discretionary hardening — it's ~10 lines inside the same auth-manager table and doesn't change the wire contract.
+   - RESOLVED: per-source-IP lockout per spec plus global cap of 20 total failures as discretionary hardening (see Plan 01-04 and protocol SPEC auth rules in Plan 01-01).
 
 3. **Does `pairOk` carry the raw token in plaintext during pairing?**
    - What we know: some message must deliver the token once; spec §4 step 4 implies it; PITFALLS Pitfall 9 calls plaintext-once-during-pairing "a documented tradeoff for v1" (alternative: PIN-derived encryption).
    - Recommendation: plaintext-once during pairing, explicitly documented as a tradeoff in `protocol/SPEC.md`'s security notes. PIN-derived wrapping is a v2 minor-version candidate; don't spend Phase 1 budget on it.
+   - RESOLVED: plaintext-once during pairing, documented as a v1 tradeoff in `protocol/SPEC.md` security notes; PIN-derived wrapping deferred to a v2 minor version (see Plan 01-01 SPEC security notes).
 
 ## Environment Availability
 
