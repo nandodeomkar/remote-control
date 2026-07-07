@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-02-PLAN.md
-last_updated: "2026-07-07T14:58:04.049Z"
+stopped_at: Completed 01-03-PLAN.md
+last_updated: "2026-07-07T15:09:41.255Z"
 last_activity: 2026-07-07 -- Phase 01 execution started
 progress:
   total_phases: 7
   completed_phases: 0
   total_plans: 8
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 01 (protocol-contract-server-core) — EXECUTING
-Plan: 3 of 8
+Plan: 4 of 8
 Status: Ready to execute
 Last activity: 2026-07-07 -- Phase 01 execution started
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 01 P01 | 10min | 3 tasks | 23 files |
 | Phase 01 P02 | 10min | 2 tasks | 24 files |
+| Phase 01 P03 | 6min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 01]: Enum-valued wire fields (button/action/reason) are plain Strings in codec payload structs: codec stays value-lenient (version-2 hello must decode), semantic validation lives in the router
 - [Phase 01]: Canonical-form serde attributes (skip_serializing_if on every Option field) locked in Wave 2 so Plan 03 encode round-trip needs no struct changes
 - [Phase 01]: Every todo!() body names its implementing plan (01-03..01-06) so red-test panics identify the responsible wave
+- [Phase 01]: encode_msg always emits p (as {} for empty payloads): fixture expect envelopes carry p unconditionally, overriding the plan's omit-empty-p wording
+- [Phase 01]: MissingField is reserved for payload-level required fields; envelope-level serde failures map to BadJson
 
 ### Pending Todos
 
@@ -93,6 +96,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-07T14:58:04.034Z
-Stopped at: Completed 01-02-PLAN.md
+Last session: 2026-07-07T15:09:41.240Z
+Stopped at: Completed 01-03-PLAN.md
 Resume file: None

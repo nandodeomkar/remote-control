@@ -43,7 +43,7 @@ Plans:
 
 - [x] 01-01-PLAN.md — Protocol contract: SPEC.md, JSON schema, 19 golden fixtures (auth construction + diff-ops locked)
 - [x] 01-02-PLAN.md — Rust workspace scaffold, full public API contracts, red test harness (walking-skeleton E2E + fixtures)
-- [ ] 01-03-PLAN.md — Rust codecs (binary + JSON, all families) green against fixtures
+- [x] 01-03-PLAN.md — Rust codecs (binary + JSON, all families) green against fixtures
 - [ ] 01-04-PLAN.md — Auth: PIN lifecycle/lockout, token hashing, challenge-response (auth-proof fixture anchor)
 - [ ] 01-05-PLAN.md — Recording mock executors + dispatch gates, routing, held-input (CONN-07 mechanism)
 - [ ] 01-06-PLAN.md — Transport + full integration suite: walking skeleton green, CONN-07 headline test
@@ -158,7 +158,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol Contract & Server Core | 2/8 | In Progress|  |
+| 1. Protocol Contract & Server Core | 3/8 | In Progress|  |
 | 2. End-to-End Cursor Spike | 0/TBD | Not started | - |
 | 3. Discovery, Pairing & Connection | 0/TBD | Not started | - |
 | 4. Trackpad & Keyboard | 0/TBD | Not started | - |
