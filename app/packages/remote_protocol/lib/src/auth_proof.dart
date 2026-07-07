@@ -6,7 +6,11 @@
 /// by .NET crypto — both codecs must reproduce it byte-identically).
 library;
 
+import 'package:crypto/crypto.dart';
+
 /// Compute the auth proof mac for [rawToken] and [nonce], as lowercase hex.
 String authProof(List<int> rawToken, List<int> nonce) {
-  throw UnimplementedError('implemented by 01-08 Task 2');
+  final key = sha256.convert(rawToken).bytes; // key = SHA-256(token)
+  final mac = Hmac(sha256, key).convert(nonce);
+  return mac.toString(); // Digest.toString() is lowercase hex
 }
