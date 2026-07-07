@@ -36,5 +36,5 @@ pub struct ServerDeps {
 /// is released unconditionally when a session ends for ANY reason
 /// (CONN-07).
 pub async fn run(listener: tokio::net::TcpListener, deps: ServerDeps) {
-    todo!("implemented in plan 01-06 (transport wave)")
+    listener::accept_loop(listener, deps).await
 }
