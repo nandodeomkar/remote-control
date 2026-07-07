@@ -17,3 +17,9 @@ rand = "0.10"
 subtle = "2.6"
 thiserror = "2"
 hex = "0.4"
+
+[dev-dependencies]
+# test-util enables #[tokio::test(start_paused = true)] + tokio::time::advance
+# for the paused-time auth unit tests (RESEARCH Pattern 5). Dev-only: the
+# published lib never activates the mock clock.
+tokio = { version = "1.52", features = ["test-util"] }
