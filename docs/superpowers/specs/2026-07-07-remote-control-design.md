@@ -82,8 +82,8 @@ WebSocket carries two frame types.
 | --------------------------------------------- | --------------------------------------------------------------------------------------------- |
 | `hello`, `pin`, `auth`, `authOk`, `authFail`  | Handshake, version negotiation, pairing, token auth                                           |
 | `click`, `drag`                               | Mouse buttons (reliable → JSON, not binary)                                                   |
-| `key`, `text`                                 | Single key with modifiers; `text` sends a whole string (autocomplete-friendly)                |
-| `media`                                       | playpause, next, prev, volup, voldown, mute                                                   |
+| `key`, `text`                                 | `key` is a single key with modifiers; `text` carries text incrementally as typed — characters or whole words as the phone IME commits them (autocomplete-friendly) |
+| `media`                                       | playpause, next, prev, volup, voldown, mute, setvol (absolute 0–100 for the volume slider)    |
 | `power`                                       | shutdown, restart, sleep, lock — server requires a follow-up `confirm` before executing       |
 | `apps.list`, `apps.launch`, `apps.focus`, `apps.close` | Window/launcher control; server pushes `apps.changed`                                |
 | `clip.set`, `clip.get`                        | Clipboard both directions; server pushes `clip.changed` when auto-sync enabled                |
@@ -108,7 +108,7 @@ Workspace with two crates.
 
 **`server-windows`** (binary):
 
-- `MouseKeys`/`Media` via `enigo` (SendInput, media virtual keys)
+- `MouseKeys`/`Media` via `enigo` (SendInput, media virtual keys); absolute volume (`setvol`) via Core Audio `IAudioEndpointVolume`
 - `Power` via `shutdown.exe` arguments and `LockWorkStation`
 - `Apps` via Win32 `EnumWindows` (list/focus/close) and `ShellExecute` (launch)
 - `Clipboard` via `arboard` + change polling
