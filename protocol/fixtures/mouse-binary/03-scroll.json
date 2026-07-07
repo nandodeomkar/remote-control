@@ -1,0 +1,10 @@
+{
+  "name": "scroll",
+  "description": "Scroll frame: opcode 0x02, dx 0.0, dy -1.5 (f32-exact; LE bytes via .NET BitConverter).",
+  "wire": "02000000000000c0bf",
+  "expect": {
+    "op": "scroll",
+    "dx": 0.0,
+    "dy": -1.5
+  }
+}

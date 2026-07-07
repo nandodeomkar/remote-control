@@ -1,0 +1,8 @@
+{
+  "name": "nonfinite",
+  "description": "Negative fixture (SPEC section 9 strict decode): opcode 0x01 with dx = NaN (canonical quiet NaN, f32 bits 0x7fc00000, little-endian hex 0000c07f), dy 0.0. Non-finite f32 must be a decode error.",
+  "wire": "010000c07f00000000",
+  "expect": {
+    "error": true
+  }
+}

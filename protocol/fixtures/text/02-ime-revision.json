@@ -1,0 +1,24 @@
+{
+  "name": "ime-revision",
+  "description": "IME autocomplete revision (SPEC section 8): old 'thw' -> new 'the '. Common prefix 'th' (2 graphemes); bs = 3 - 2 = 1, ins = 'e '.",
+  "wire": {
+    "t": "text",
+    "seq": 8,
+    "p": {
+      "bs": 1,
+      "ins": "e "
+    }
+  },
+  "expect": {
+    "t": "text",
+    "seq": 8,
+    "p": {
+      "bs": 1,
+      "ins": "e "
+    }
+  },
+  "compute": {
+    "old": "thw",
+    "new": "the "
+  }
+}

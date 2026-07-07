@@ -1,0 +1,8 @@
+{
+  "name": "short-frame",
+  "description": "Negative fixture (SPEC section 9 strict decode): only 8 bytes (a move frame truncated by one byte). Length != 9 must be a decode error.",
+  "wire": "01000048410000c8",
+  "expect": {
+    "error": true
+  }
+}

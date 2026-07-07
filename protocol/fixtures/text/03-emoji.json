@@ -1,0 +1,24 @@
+{
+  "name": "emoji",
+  "description": "Multi-codepoint grapheme insert: thumbs-up + medium skin-tone modifier (U+1F44D U+1F3FD) is ONE extended grapheme cluster. Proves multi-byte UTF-8 survives the wire round-trip intact.",
+  "wire": {
+    "t": "text",
+    "seq": 9,
+    "p": {
+      "bs": 0,
+      "ins": "👍🏽"
+    }
+  },
+  "expect": {
+    "t": "text",
+    "seq": 9,
+    "p": {
+      "bs": 0,
+      "ins": "👍🏽"
+    }
+  },
+  "compute": {
+    "old": "hi",
+    "new": "hi👍🏽"
+  }
+}

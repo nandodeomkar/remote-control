@@ -1,0 +1,10 @@
+{
+  "name": "move-negative",
+  "description": "Move frame with negative deltas (D-09 required coverage): opcode 0x01, dx -3.25, dy -0.5 (f32-exact; LE bytes via .NET BitConverter).",
+  "wire": "01000050c0000000bf",
+  "expect": {
+    "op": "move",
+    "dx": -3.25,
+    "dy": -0.5
+  }
+}

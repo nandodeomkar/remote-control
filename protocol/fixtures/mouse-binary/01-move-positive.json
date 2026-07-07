@@ -1,0 +1,10 @@
+{
+  "name": "move-positive",
+  "description": "Move frame with positive deltas: opcode 0x01, dx 12.5, dy 100.0 (both f32-exact; LE bytes computed via .NET BitConverter). SPEC section 9.",
+  "wire": "01000048410000c842",
+  "expect": {
+    "op": "move",
+    "dx": 12.5,
+    "dy": 100.0
+  }
+}

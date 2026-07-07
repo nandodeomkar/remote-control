@@ -1,0 +1,24 @@
+{
+  "name": "rapid-backspace",
+  "description": "Grapheme-count lock (SPEC section 8): old 'hello👋🏽!' has graphemes h,e,l,l,o,👋🏽,! = 7 (the waving-hand + skin-tone modifier is ONE extended grapheme cluster); new 'hel' shares prefix 3, so bs = 7 - 3 = 4. UTF-16 or byte counting would give a different number — this fixture fails any codec counting in the wrong unit.",
+  "wire": {
+    "t": "text",
+    "seq": 10,
+    "p": {
+      "bs": 4,
+      "ins": ""
+    }
+  },
+  "expect": {
+    "t": "text",
+    "seq": 10,
+    "p": {
+      "bs": 4,
+      "ins": ""
+    }
+  },
+  "compute": {
+    "old": "hello👋🏽!",
+    "new": "hel"
+  }
+}

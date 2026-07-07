@@ -1,0 +1,8 @@
+{
+  "name": "bad-opcode",
+  "description": "Negative fixture (SPEC section 9 strict decode): opcode 0x7f is unknown; payload is a valid f32 pair (dx 1.0, dy 0.0). Decode must error; frame is dropped and counted, never routed.",
+  "wire": "7f0000803f00000000",
+  "expect": {
+    "error": true
+  }
+}

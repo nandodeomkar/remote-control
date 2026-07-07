@@ -1,0 +1,24 @@
+{
+  "name": "simple-insert",
+  "description": "Plain insertion: no deletions, ins is ASCII. compute block (Dart diff-helper test only): old empty, new hello.",
+  "wire": {
+    "t": "text",
+    "seq": 7,
+    "p": {
+      "bs": 0,
+      "ins": "hello"
+    }
+  },
+  "expect": {
+    "t": "text",
+    "seq": 7,
+    "p": {
+      "bs": 0,
+      "ins": "hello"
+    }
+  },
+  "compute": {
+    "old": "",
+    "new": "hello"
+  }
+}
