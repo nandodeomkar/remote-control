@@ -1,0 +1,23 @@
+# .github/workflows/ci.yml — activates automatically if repo is ever pushed to GitHub
+name: ci
+on: [push, pull_request]
+jobs:
+  rust:
+    runs-on: ubuntu-latest          # proves zero-Windows-deps claim by construction
+    defaults: { run: { working-directory: server } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with: { workspaces: server }
+      - run: cargo test --workspace
+  dart:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: app/packages/remote_protocol } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with: { sdk: stable }
+      - run: dart pub get
+      - run: dart analyze --fatal-infos
+      - run: dart test
