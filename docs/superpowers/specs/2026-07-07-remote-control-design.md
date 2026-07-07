@@ -18,7 +18,7 @@ Long-term goal: expand to iOS (client) and Linux/macOS (server). The design is p
 - Media controls: play/pause, next/prev, volume slider, mute
 - Power controls: lock, sleep, restart, shutdown — each behind slide-to-confirm
 - App launcher/switcher: list running windows (focus/close), pinned favorites (launch)
-- Cross-device clipboard: manual send/fetch both directions, optional auto-sync, last-5 history
+- Cross-device clipboard: manual send/fetch both directions, optional auto-sync (PC→phone push; phone→PC syncs on app resume — Android 10+ blocks background clipboard reads), last-5 history, echo suppression via content hash to prevent sync loops
 - Presentation remote: next/prev, start/end show, blank screen, elapsed timer
 - Browser controls: back/forward, new/close tab, refresh, zoom (key-macro based)
 - Auto-discovery of PCs on LAN, one-time PIN pairing, remembered devices with silent reconnect
@@ -62,7 +62,7 @@ Monorepo, three top-level directories:
 2. Phone listens, lists discovered PCs (GUID disambiguates duplicate names; IP shown).
 3. First connect: server shows a 6-digit PIN in a Windows notification. Phone sends PIN.
 4. Server verifies and issues a 32-byte random auth token. Phone stores it in secure storage; server stores its SHA-256 hash in config.
-5. Subsequent connects: phone sends token in `auth` message immediately after WebSocket opens. Silent reconnect.
+5. Subsequent connects use challenge-response — the token never crosses the wire again: server sends a random nonce in `challenge`, phone replies `auth` with HMAC-SHA256(token, nonce), server verifies against its stored hash. Defeats LAN sniffing and beacon-spoofing replay. Silent reconnect.
 
 PIN rules: 60s expiry, 5 attempts, then 5-minute lockout per source IP.
 
@@ -80,9 +80,9 @@ WebSocket carries two frame types.
 
 | Family                                        | Purpose                                                                                       |
 | --------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `hello`, `pin`, `auth`, `authOk`, `authFail`  | Handshake, version negotiation, pairing, token auth                                           |
+| `hello`, `pin`, `challenge`, `auth`, `authOk`, `authFail` | Handshake, version negotiation, pairing, challenge-response auth (HMAC of server nonce) |
 | `click`, `drag`                               | Mouse buttons (reliable → JSON, not binary)                                                   |
-| `key`, `text`                                 | `key` is a single key with modifiers; `text` carries text incrementally as typed — characters or whole words as the phone IME commits them (autocomplete-friendly) |
+| `key`, `text`                                 | `key` is a single key with modifiers; `text` carries diff operations (insert/delete at position) as the phone IME commits them — handles autocomplete and backspace correctly |
 | `media`                                       | playpause, next, prev, volup, voldown, mute, setvol (absolute 0–100 for the volume slider)    |
 | `power`                                       | shutdown, restart, sleep, lock — server requires a follow-up `confirm` before executing       |
 | `apps.list`, `apps.launch`, `apps.focus`, `apps.close` | Window/launcher control; server pushes `apps.changed`                                |
@@ -109,7 +109,7 @@ Workspace with two crates.
 **`server-windows`** (binary):
 
 - `MouseKeys`/`Media` via `enigo` (SendInput, media virtual keys); absolute volume (`setvol`) via Core Audio `IAudioEndpointVolume`
-- `Power` via `shutdown.exe` arguments and `LockWorkStation`
+- `Power` via `shutdown.exe` arguments (shutdown/restart), `SetSuspendState` (sleep — `shutdown.exe` cannot sleep), and `LockWorkStation`
 - `Apps` via Win32 `EnumWindows` (list/focus/close) and `ShellExecute` (launch)
 - `Clipboard` via `arboard` + change polling
 - Tray via `tray-icon`: status tooltip (connected device count), menu — settings, pause input, quit
@@ -157,7 +157,7 @@ A persistent bottom quick-bar with a trackpad shortcut is visible on every scree
 
 | Case                            | Behavior                                                                                                     |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| WiFi drop / laptop sleep        | Status "reconnecting"; exponential backoff 1s→2s→4s (cap 10s); beacon re-listen in parallel (handles IP change); sticky modifiers reset on disconnect |
+| WiFi drop / laptop sleep        | Status "reconnecting"; exponential backoff 1s→2s→4s (cap 10s); beacon re-listen in parallel (handles IP change); sticky modifiers reset client-side AND server releases all held keys/buttons on session close (prevents phantom held input after mid-drag disconnect) |
 | Server killed mid-session       | Same path; dashboard shows "PC offline", tiles disabled except Settings                                       |
 | Stale/revoked token             | `authFail` → phone clears token, returns to pairing flow with explanation (no silent retry loop)              |
 | PIN timeout/exhausted           | Clear error + retry; lockout message shows remaining wait                                                     |
