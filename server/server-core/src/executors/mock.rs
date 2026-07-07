@@ -161,3 +161,84 @@ impl Clipboard for MockExecutors {
         todo!("implemented in plan 01-05 (dispatch wave)")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn wait_for_resolves_after_cross_task_record() {
+        let (exec, log) = MockExecutors::recording();
+        let mk = Arc::clone(&exec.mouse_keys);
+        // Record from ANOTHER task after a delay: wait_for must wake up
+        // promptly via the notify path, not by returning a stale snapshot.
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            mk.button_up(Button::Left);
+        });
+        let satisfied = log
+            .wait_for(
+                |calls| calls.contains(&Call::ButtonUp(Button::Left)),
+                Duration::from_secs(2),
+            )
+            .await;
+        assert!(satisfied, "wait_for must resolve true once the call lands");
+    }
+
+    #[tokio::test]
+    async fn wait_for_times_out_when_predicate_never_satisfied() {
+        let (_exec, log) = MockExecutors::recording();
+        let satisfied = log
+            .wait_for(|calls| !calls.is_empty(), Duration::from_millis(100))
+            .await;
+        assert!(!satisfied, "wait_for must resolve false at timeout");
+    }
+
+    #[tokio::test]
+    async fn calls_snapshot_preserves_recording_order() {
+        let (exec, log) = MockExecutors::recording();
+        exec.mouse_keys.click(Button::Left);
+        exec.media.play_pause();
+        assert_eq!(
+            log.calls(),
+            vec![Call::Click(Button::Left), Call::MediaAction("playpause".into())],
+            "calls() must be a snapshot in call order"
+        );
+    }
+
+    #[tokio::test]
+    async fn every_trait_records_through_the_shared_log() {
+        let (exec, log) = MockExecutors::recording();
+        exec.mouse_keys.key_tap(KeyCode("F5".into()), &[Modifier::Ctrl]);
+        exec.media.set_volume(40);
+        exec.power.restart();
+        exec.apps.launch("C:\\x.exe");
+        exec.clipboard.set("hi");
+        assert_eq!(
+            log.calls(),
+            vec![
+                Call::KeyTap(KeyCode("F5".into()), vec![Modifier::Ctrl]),
+                Call::SetVolume(40),
+                Call::PowerAction("restart".into()),
+                Call::AppsLaunch("C:\\x.exe".into()),
+                Call::ClipSet("hi".into()),
+            ],
+            "all five traits must share one recording sink"
+        );
+    }
+
+    #[tokio::test]
+    async fn apps_list_returns_fixed_two_windows() {
+        let (exec, _log) = MockExecutors::recording();
+        let windows = exec.apps.list();
+        assert_eq!(windows.len(), 2, "mock apps.list is a fixed two-entry table");
+        assert_eq!(windows[0].id, 1);
+        assert_eq!(windows[1].id, 2);
+    }
+
+    #[tokio::test]
+    async fn clipboard_get_returns_fixed_mock_clip() {
+        let (exec, _log) = MockExecutors::recording();
+        assert_eq!(exec.clipboard.get(), "mock-clip");
+    }
+}
