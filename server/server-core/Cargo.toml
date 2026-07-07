@@ -1,0 +1,19 @@
+[package]
+name = "server-core"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "OS-agnostic Remote Control server core: protocol codecs, auth, dispatch, transport (zero Windows dependencies)."
+
+[dependencies]
+tokio = { version = "1.52", features = ["rt-multi-thread", "net", "sync", "time", "macros"] }
+tokio-tungstenite = "0.29"
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+hmac = "0.13"
+rand = "0.10"
+subtle = "2.6"
+thiserror = "2"
+hex = "0.4"

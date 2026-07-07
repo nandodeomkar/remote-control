@@ -1,1 +1,4 @@
 .superpowers/
+/server/target/
+**/.dart_tool/
+app/packages/remote_protocol/build/
