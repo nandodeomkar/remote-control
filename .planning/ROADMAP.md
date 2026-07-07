@@ -158,7 +158,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Protocol Contract & Server Core | 8/8 | Complete   | 2026-07-07 |
+| 1. Protocol Contract & Server Core | 8/8 | Complete    | 2026-07-07 |
 | 2. End-to-End Cursor Spike | 0/TBD | Not started | - |
 | 3. Discovery, Pairing & Connection | 0/TBD | Not started | - |
 | 4. Trackpad & Keyboard | 0/TBD | Not started | - |

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 01-08-PLAN.md — all Phase 01 plans complete
-last_updated: "2026-07-07T18:25:00.000Z"
-last_activity: 2026-07-07 -- Plan 01-08 (Dart protocol package) completed; Phase 01 execution done, verification pending
+status: phase_complete
+stopped_at: Phase 01 complete and verified (5/5 criteria + CONN-07)
+last_updated: "2026-07-07T18:30:00.000Z"
+last_activity: 2026-07-07 -- Phase 01 verified and marked complete
 progress:
   total_phases: 7
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 8
   completed_plans: 8
-  percent: 0
+  percent: 14
 ---
 
 # Project State
@@ -21,22 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-07)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 01 — protocol-contract-server-core
+**Current focus:** Phase 02 — end-to-end-cursor-spike (not started)
 
 ## Current Position
 
-Phase: 01 (protocol-contract-server-core) — EXECUTING
-Plan: 8 of 8 — all complete
-Status: Executed, verification pending
-Last activity: 2026-07-07 -- Plan 01-08 (Dart protocol package) completed; Phase 01 execution done
+Phase: 2 (end-to-end-cursor-spike) — NOT STARTED
+Plan: Not started
+Status: Phase 01 complete & verified; Phase 02 awaiting discuss/plan
+Last activity: 2026-07-07 -- Phase 01 verified and marked complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 14% (1 of 7 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 0
+- Total plans completed: 8
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -44,7 +44,7 @@ Progress: [░░░░░░░░░░] 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 01 | 8 | - | - |
 
 **Recent Trend:**
 
@@ -107,6 +107,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-07T16:07:14.005Z
-Stopped at: Completed 01-06-PLAN.md
+Last session: 2026-07-07T18:30:00.000Z
+Stopped at: Phase 01 complete and verified — next is Phase 02 (discuss or plan)
 Resume file: None
