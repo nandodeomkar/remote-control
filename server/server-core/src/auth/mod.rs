@@ -75,3 +75,50 @@ impl AuthManager {
         todo!("implemented in plan 01-04 (auth wave)")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    //! AuthManager wiring tests: challenge nonce lifecycle and the full
+    //! pair -> proof -> verify round trip using ONLY the stored hash.
+
+    use super::challenge::auth_proof;
+    use super::AuthManager;
+
+    #[test]
+    fn issue_challenge_yields_fresh_nonces() {
+        let mut auth = AuthManager::new();
+        let a = auth.issue_challenge();
+        let b = auth.issue_challenge();
+        assert_ne!(a, b, "challenge nonces must never be reused (SPEC section 3)");
+    }
+
+    #[test]
+    fn pair_then_prove_then_verify_round_trip() {
+        let mut auth = AuthManager::new();
+        let raw_hex = auth.complete_pairing();
+        assert_eq!(raw_hex.len(), 64, "pairOk token is 64 lowercase hex chars");
+
+        let nonce = auth.issue_challenge();
+        // Client-side: derives the key from the RAW token it was handed.
+        let mac = auth_proof(&hex::decode(&raw_hex).unwrap(), &nonce);
+        // Server-side: verifies from the stored hash alone.
+        assert!(auth.verify_auth(&nonce, &mac));
+    }
+
+    #[test]
+    fn verify_auth_rejects_wrong_mac() {
+        let mut auth = AuthManager::new();
+        let _raw = auth.complete_pairing();
+        let nonce = auth.issue_challenge();
+        let bogus = "0".repeat(64);
+        assert!(!auth.verify_auth(&nonce, &bogus));
+    }
+
+    #[test]
+    fn verify_auth_without_pairing_is_false() {
+        let mut auth = AuthManager::new();
+        let nonce = auth.issue_challenge();
+        let mac = auth_proof(b"any raw token", &nonce);
+        assert!(!auth.verify_auth(&nonce, &mac), "empty hash table must verify nothing");
+    }
+}

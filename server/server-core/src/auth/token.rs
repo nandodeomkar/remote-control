@@ -20,3 +20,40 @@ pub fn issue_token() -> IssuedToken {
 pub fn hash_token(raw: &[u8]) -> [u8; 32] {
     todo!("implemented in plan 01-04 (auth wave)")
 }
+
+#[cfg(test)]
+mod tests {
+    use sha2::{Digest, Sha256};
+
+    use super::*;
+
+    #[test]
+    fn issued_raw_hex_is_64_lowercase_hex_chars() {
+        let t = issue_token();
+        assert_eq!(t.raw_hex.len(), 64, "32 bytes -> 64 hex chars");
+        assert!(
+            t.raw_hex
+                .bytes()
+                .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b)),
+            "raw_hex must be lowercase hex, got {:?}",
+            t.raw_hex
+        );
+    }
+
+    #[test]
+    fn issued_hash_is_sha256_of_raw_bytes() {
+        let t = issue_token();
+        let raw = hex::decode(&t.raw_hex).expect("raw_hex decodes");
+        let expected: [u8; 32] = Sha256::digest(&raw).into();
+        assert_eq!(t.hash, expected, "hash must be SHA-256(raw token bytes)");
+        assert_eq!(t.hash, hash_token(&raw), "hash_token must agree");
+    }
+
+    #[test]
+    fn two_issued_tokens_differ() {
+        let a = issue_token();
+        let b = issue_token();
+        assert_ne!(a.raw_hex, b.raw_hex, "CSPRNG tokens must not repeat");
+        assert_ne!(a.hash, b.hash);
+    }
+}
