@@ -1,0 +1,250 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://remote-control.local/protocol/messages.schema.json",
+  "title": "Remote Control wire protocol — JSON text frames (protoVersion 1.0)",
+  "description": "Documentation-grade schema mirroring protocol/SPEC.md §7. Not consumed by code; the golden fixtures in protocol/fixtures/ are the executable contract. Per D-05, decoders IGNORE unknown fields — additionalProperties is deliberately left permissive everywhere.",
+  "type": "object",
+  "properties": {
+    "t": { "type": "string" },
+    "seq": { "type": "integer", "description": "Client-assigned, opaque to the server." },
+    "p": { "type": "object" }
+  },
+  "required": ["t"],
+  "$defs": {
+    "hexString64": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "64 lowercase hex characters encoding 32 bytes."
+    },
+    "windowEntry": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "integer" },
+        "title": { "type": "string" }
+      },
+      "required": ["id", "title"]
+    },
+    "hello": {
+      "description": "C→S. Opens the handshake (SPEC §3).",
+      "type": "object",
+      "properties": {
+        "protoVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+        "device": { "type": "string" }
+      },
+      "required": ["protoVersion", "device"]
+    },
+    "pin": {
+      "description": "C→S. Pairing path (SPEC §3a). PIN is a 6-digit zero-padded STRING, never a number.",
+      "type": "object",
+      "properties": {
+        "pin": { "type": "string", "pattern": "^[0-9]{6}$" }
+      },
+      "required": ["pin"]
+    },
+    "pairOk": {
+      "description": "S→C. The ONLY wire appearance of the raw token (SPEC §12).",
+      "type": "object",
+      "properties": {
+        "token": { "$ref": "#/$defs/hexString64" }
+      },
+      "required": ["token"]
+    },
+    "challenge": {
+      "description": "S→C. Fresh CSPRNG nonce per connection (SPEC §3).",
+      "type": "object",
+      "properties": {
+        "nonce": { "$ref": "#/$defs/hexString64" }
+      },
+      "required": ["nonce"]
+    },
+    "auth": {
+      "description": "C→S. mac = HMAC-SHA256(key = SHA-256(raw token), message = nonce bytes), lowercase hex (SPEC §4).",
+      "type": "object",
+      "properties": {
+        "mac": { "$ref": "#/$defs/hexString64" }
+      },
+      "required": ["mac"]
+    },
+    "authOk": {
+      "description": "S→C. Empty payload; session becomes Authed.",
+      "type": "object"
+    },
+    "authFail": {
+      "description": "S→C. Reason enum per SPEC §5.",
+      "type": "object",
+      "properties": {
+        "reason": {
+          "type": "string",
+          "enum": ["pinInvalid", "pinExpired", "lockedOut", "noPairing", "badMac"]
+        },
+        "attemptsRemaining": { "type": "integer", "description": "Present iff reason = pinInvalid." },
+        "retryAfterSecs": { "type": "integer", "description": "Present iff reason = lockedOut." }
+      },
+      "required": ["reason"]
+    },
+    "click": {
+      "description": "C→S. Reliable mouse button path.",
+      "type": "object",
+      "properties": {
+        "button": { "type": "string", "enum": ["left", "middle", "right"] }
+      },
+      "required": ["button"]
+    },
+    "drag": {
+      "description": "C→S. Held state is tracked server-side and released on session end (SPEC §11, CONN-07).",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "enum": ["start", "end"] },
+        "button": { "type": "string", "enum": ["left", "middle", "right"] }
+      },
+      "required": ["action", "button"]
+    },
+    "key": {
+      "description": "C→S. Single key with modifiers.",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "mods": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["ctrl", "alt", "shift", "win"] },
+          "default": []
+        },
+        "action": { "type": "string", "enum": ["tap", "down", "up"] }
+      },
+      "required": ["code", "action"]
+    },
+    "text": {
+      "description": "C→S. Diff-ops: delete bs graphemes (extended grapheme clusters, UAX #29) at end, then insert ins (SPEC §8). Server rejects bs > 10000 with err bsTooLarge.",
+      "type": "object",
+      "properties": {
+        "bs": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "ins": { "type": "string" }
+      },
+      "required": ["bs", "ins"]
+    },
+    "media": {
+      "description": "C→S. value is required iff action = setvol.",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["playpause", "next", "prev", "volup", "voldown", "mute", "setvol"]
+        },
+        "value": { "type": "integer", "minimum": 0, "maximum": 100 }
+      },
+      "required": ["action"],
+      "if": { "properties": { "action": { "const": "setvol" } } },
+      "then": { "required": ["action", "value"] }
+    },
+    "power": {
+      "description": "C→S. Requires follow-up confirm within 10s (SPEC §7).",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "enum": ["lock", "sleep", "restart", "shutdown"] }
+      },
+      "required": ["action"]
+    },
+    "confirm": {
+      "description": "C→S. Must match a pending power action within 10s, else err noPendingAction.",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "enum": ["lock", "sleep", "restart", "shutdown"] }
+      },
+      "required": ["action"]
+    },
+    "appsList": {
+      "description": "apps.list — C→S request has empty p; S→C reply carries windows.",
+      "type": "object",
+      "properties": {
+        "windows": { "type": "array", "items": { "$ref": "#/$defs/windowEntry" } }
+      }
+    },
+    "appsLaunch": {
+      "description": "apps.launch — C→S.",
+      "type": "object",
+      "properties": { "path": { "type": "string" } },
+      "required": ["path"]
+    },
+    "appsFocus": {
+      "description": "apps.focus — C→S.",
+      "type": "object",
+      "properties": { "id": { "type": "integer" } },
+      "required": ["id"]
+    },
+    "appsClose": {
+      "description": "apps.close — C→S.",
+      "type": "object",
+      "properties": { "id": { "type": "integer" } },
+      "required": ["id"]
+    },
+    "appsChanged": {
+      "description": "apps.changed — S→C push.",
+      "type": "object",
+      "properties": {
+        "windows": { "type": "array", "items": { "$ref": "#/$defs/windowEntry" } }
+      },
+      "required": ["windows"]
+    },
+    "clipSet": {
+      "description": "clip.set — C↔S (both directions).",
+      "type": "object",
+      "properties": { "text": { "type": "string" } },
+      "required": ["text"]
+    },
+    "clipGet": {
+      "description": "clip.get — C→S; server replies with clip.set.",
+      "type": "object"
+    },
+    "clipChanged": {
+      "description": "clip.changed — S→C push (auto-sync).",
+      "type": "object",
+      "properties": { "text": { "type": "string" } },
+      "required": ["text"]
+    },
+    "browser": {
+      "description": "C→S. Key-macro based browser controls.",
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["back", "forward", "newtab", "closetab", "refresh", "zoomin", "zoomout"]
+        }
+      },
+      "required": ["action"]
+    },
+    "present": {
+      "description": "C→S. Presenter remote.",
+      "type": "object",
+      "properties": {
+        "action": { "type": "string", "enum": ["next", "prev", "start", "end", "blank"] }
+      },
+      "required": ["action"]
+    },
+    "ping": {
+      "description": "C→S. Latency probe.",
+      "type": "object",
+      "properties": { "ts": { "type": "integer" } },
+      "required": ["ts"]
+    },
+    "pong": {
+      "description": "S→C. Echoes ping ts.",
+      "type": "object",
+      "properties": { "ts": { "type": "integer" } },
+      "required": ["ts"]
+    },
+    "err": {
+      "description": "S→C. Failure report. Codes: versionMismatch (+ serverVersion, clientVersion), unknownType, noPendingAction, bsTooLarge, internal (SPEC §7).",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "enum": ["versionMismatch", "unknownType", "noPendingAction", "bsTooLarge", "internal"]
+        },
+        "msg": { "type": "string" },
+        "serverVersion": { "type": "string", "description": "Present iff code = versionMismatch." },
+        "clientVersion": { "type": "string", "description": "Present iff code = versionMismatch." }
+      },
+      "required": ["code", "msg"]
+    }
+  }
+}
