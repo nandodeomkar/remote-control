@@ -7,6 +7,8 @@
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use tokio::sync::Notify;
+
 use super::{Apps, Button, Clipboard, Executors, KeyCode, Media, Modifier, MouseKeys, Power, WindowInfo};
 
 /// One recorded executor invocation, in call order.
@@ -34,21 +36,60 @@ pub enum Call {
 }
 
 /// Shared, cloneable view of everything the mocks have recorded.
+///
+/// Internals: one `Mutex<Vec<Call>>` (call order) + one [`Notify`]
+/// (notify-driven wakeups for [`CallLog::wait_for`] — NO polling loops).
 #[derive(Debug, Clone, Default)]
 pub struct CallLog {
-    calls: Arc<Mutex<Vec<Call>>>,
+    inner: Arc<LogInner>,
+}
+
+#[derive(Debug, Default)]
+struct LogInner {
+    calls: Mutex<Vec<Call>>,
+    notify: Notify,
 }
 
 impl CallLog {
+    /// Append one call and wake every pending [`CallLog::wait_for`].
+    fn record(&self, call: Call) {
+        self.inner
+            .calls
+            .lock()
+            .expect("CallLog mutex poisoned")
+            .push(call);
+        self.inner.notify.notify_waiters();
+    }
+
     /// Snapshot of all recorded calls, in order.
     pub fn calls(&self) -> Vec<Call> {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.inner
+            .calls
+            .lock()
+            .expect("CallLog mutex poisoned")
+            .clone()
     }
 
     /// Poll until `pred` returns true over the recorded calls, or `timeout`
     /// elapses. Returns whether the predicate was satisfied.
+    ///
+    /// Notify-driven (no busy-wait): the `Notified` future is registered
+    /// BEFORE the predicate check, so a `record` landing between the check
+    /// and the await still wakes the waiter (no lost-notification race).
     pub async fn wait_for(&self, pred: impl Fn(&[Call]) -> bool, timeout: Duration) -> bool {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        let satisfied = async {
+            loop {
+                let notified = self.inner.notify.notified();
+                tokio::pin!(notified);
+                // Register interest before checking, closing the race window.
+                notified.as_mut().enable();
+                if pred(&self.inner.calls.lock().expect("CallLog mutex poisoned")) {
+                    return;
+                }
+                notified.await;
+            }
+        };
+        tokio::time::timeout(timeout, satisfied).await.is_ok()
     }
 }
 
@@ -60,105 +101,122 @@ pub struct MockExecutors {
 
 impl MockExecutors {
     /// Build a recording executor bundle: every trait object in the returned
-    /// [`Executors`] appends to the returned [`CallLog`].
+    /// [`Executors`] appends to the returned [`CallLog`] (one shared sink).
     pub fn recording() -> (Executors, CallLog) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        let log = CallLog::default();
+        let mock = Arc::new(MockExecutors { log: log.clone() });
+        let executors = Executors {
+            mouse_keys: Arc::clone(&mock) as Arc<dyn MouseKeys>,
+            media: Arc::clone(&mock) as Arc<dyn Media>,
+            power: Arc::clone(&mock) as Arc<dyn Power>,
+            apps: Arc::clone(&mock) as Arc<dyn Apps>,
+            clipboard: mock as Arc<dyn Clipboard>,
+        };
+        (executors, log)
     }
 }
 
 impl MouseKeys for MockExecutors {
     fn move_rel(&self, dx: f32, dy: f32) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::MoveRel(dx, dy));
     }
     fn scroll(&self, dx: f32, dy: f32) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::Scroll(dx, dy));
     }
     fn click(&self, button: Button) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::Click(button));
     }
     fn button_down(&self, button: Button) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::ButtonDown(button));
     }
     fn button_up(&self, button: Button) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::ButtonUp(button));
     }
     fn key_down(&self, code: KeyCode) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::KeyDown(code));
     }
     fn key_up(&self, code: KeyCode) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::KeyUp(code));
     }
     fn key_tap(&self, code: KeyCode, mods: &[Modifier]) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::KeyTap(code, mods.to_vec()));
     }
     fn type_text(&self, text: &str) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::TypeText(text.to_string()));
     }
     fn backspace(&self, n: u32) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::Backspace(n));
     }
 }
 
 impl Media for MockExecutors {
     fn play_pause(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::MediaAction("playpause".to_string()));
     }
     fn next(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::MediaAction("next".to_string()));
     }
     fn prev(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::MediaAction("prev".to_string()));
     }
     fn vol_up(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::MediaAction("volup".to_string()));
     }
     fn vol_down(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::MediaAction("voldown".to_string()));
     }
     fn mute(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::MediaAction("mute".to_string()));
     }
     fn set_volume(&self, pct: u8) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::SetVolume(pct));
     }
 }
 
 impl Power for MockExecutors {
     fn lock(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::PowerAction("lock".to_string()));
     }
     fn sleep(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::PowerAction("sleep".to_string()));
     }
     fn restart(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::PowerAction("restart".to_string()));
     }
     fn shutdown(&self) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::PowerAction("shutdown".to_string()));
     }
 }
 
 impl Apps for MockExecutors {
+    /// Fixed two-entry window table (ids 1, 2) so `apps.list` routing is
+    /// assertable through the reply payload. There is no `Call` variant for
+    /// `list` — it is a read-only query, observable via its reply.
     fn list(&self) -> Vec<WindowInfo> {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        vec![
+            WindowInfo { id: 1, title: "Mock Window One".to_string() },
+            WindowInfo { id: 2, title: "Mock Window Two".to_string() },
+        ]
     }
     fn launch(&self, path: &str) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::AppsLaunch(path.to_string()));
     }
     fn focus(&self, id: u64) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::AppsFocus(id));
     }
     fn close(&self, id: u64) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::AppsClose(id));
     }
 }
 
 impl Clipboard for MockExecutors {
+    /// Fixed clipboard content so `clip.get` routing is assertable through
+    /// the `clip.set` reply. Read-only: not recorded as a `Call`.
     fn get(&self) -> String {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        "mock-clip".to_string()
     }
     fn set(&self, text: &str) {
-        todo!("implemented in plan 01-05 (dispatch wave)")
+        self.log.record(Call::ClipSet(text.to_string()));
     }
 }
 
