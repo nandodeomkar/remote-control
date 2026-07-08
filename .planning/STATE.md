@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 02-02-PLAN.md
+status: gaps_found
+stopped_at: Phase 02 verification — gate blocked (end-to-end vertical not wired)
 last_updated: "2026-07-08T04:39:12.109Z"
 last_activity: 2026-07-08 -- Phase 02 execution started
 progress:
@@ -25,12 +25,16 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 
 ## Current Position
 
-Phase: 02 (end-to-end-cursor-spike) — EXECUTING
-Plan: 2 of 2
-Status: Phase complete — ready for verification
-Last activity: 2026-07-08 -- Completed quick task 260708-ejx: Fix WR-01 pairing re-pair loop
+Phase: 02 (end-to-end-cursor-spike) — VERIFICATION: GAPS FOUND (gate BLOCKED)
+Plan: 2 of 2 executed — but the end-to-end vertical was never wired
+Status: Hard transport gate NOT met. Server half runnable; client half is
+  unit-tested library code never called by the app. Missing: trackpad screen,
+  client pair→challenge→auth handshake, latency HUD. Needs a new 02-03 plan
+  (wire the vertical) + 02-04 manual gate before Phase 03 can start.
+  See: .planning/phases/02-end-to-end-cursor-spike/02-VERIFICATION.md
+Last activity: 2026-07-08 -- Phase 02 verification: gaps found (gate blocked)
 
-Progress: [█░░░░░░░░░] 14% (1 of 7 phases complete)
+Progress: [█░░░░░░░░░] 14% (1 of 7 phases fully complete; Phase 02 gate open)
 
 ## Performance Metrics
 
@@ -105,6 +109,7 @@ None yet.
 - [Phase 2]: Dart-side TCP_NODELAY plumbing needs empirical verification for the chosen web_socket_channel construction path (research flag)
 - [Phase 3]: Android UDP broadcast reception varies by device — test on owner's device early; MulticastLock + manual IP entry are the mitigations
 - [Phase 6]: apps.focus foreground-lock workarounds and EnumWindows filtering flagged as highest-fiddliness area — research recommends a phase-level spike during planning
+- [Phase 2 — BLOCKER]: Hard transport gate NOT met. Phase executed as two halves (02-01 server, 02-02 client seams) but the runnable end-to-end vertical was never planned/built. Missing: trackpad screen (Listener→MoveSender), client pair→challenge→auth handshake, latency HUD. `MoveSender`/`connectNoDelay` are unit-tested but never called by the app; `main.dart` is a static placeholder. Plans 02-03/02-04 (referenced by both SUMMARYs) do not exist. Must reopen phase and build the vertical before Phase 3. See 02-VERIFICATION.md.
 
 ### Quick Tasks Completed
 
