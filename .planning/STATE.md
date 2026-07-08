@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: in_progress
-stopped_at: Completed 02-03-PLAN.md — vertical wired; 02-04 manual on-device gate pending
-last_updated: "2026-07-08T05:54:06Z"
-last_activity: 2026-07-08 -- 02-03 executed (client handshake FSM + latency HUD + trackpad screen)
+stopped_at: Phase 02 CLOSED — 02-04 hard gate PASS (p50 6ms / p95 10ms); next is Phase 3 planning
+last_updated: "2026-07-08T07:35:24Z"
+last_activity: 2026-07-08 -- 02-04 gate run by owner on-device (PASS), Phase 02 closed out, pointer-accel todo captured
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 11
-  completed_plans: 11
-  percent: 30
+  total_plans: 12
+  completed_plans: 12
+  percent: 29
 ---
 
 # Project State
@@ -21,26 +21,25 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-07)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 02 — end-to-end-cursor-spike
+**Current focus:** Phase 03 — discovery-pairing-connection (ready to plan)
 
 ## Current Position
 
-Phase: 02 (end-to-end-cursor-spike) — VERTICAL WIRED (3/4), 02-04 manual gate pending
-Plan: 02-03 (wire the vertical) EXECUTED — client handshake FSM (pair/reconnect),
-  Listener trackpad screen (onPointerMove -> MoveSender gated on Authed), interleaved-ping
-  latency HUD, INTERNET/cleartext manifest. flutter analyze clean, 32 tests pass.
-  No protocol/server/crypto change; reused remote_protocol codecs/authProof +
-  connectNoDelay + MoveSender exactly as shipped.
-Status: Hard transport gate now EXERCISABLE on real hardware — the structural blocker
-  in 02-VERIFICATION.md is cleared. Remaining: 02-04 measures p50/p95 <30ms on real WiFi
-  (MANUAL human-verify on-device gate; NOT agent-executable). Token is in-memory only,
-  manual IP:port entry, latency HUD/PIN shortcut are spike-only removables (D-09) — all
-  Phase-3 items.
-  Next: /gsd-execute-phase 02 pauses at 02-04 human gate (on-device measurement).
-  See: 02-03-SUMMARY.md, 02-04-PLAN.md, 02-VERIFICATION.md
-Last activity: 2026-07-08 -- 02-03 executed: handshake FSM + latency probe (TDD) + trackpad screen
+Phase: 02 (end-to-end-cursor-spike) — COMPLETE (4/4). Hard gate PASSED.
+Plan: 02-04 (manual hard-gate) DONE — owner ran the on-device measurement over real
+  WiFi (Xiaomi Android 16 phone -> Windows 11 laptop): p50 = 6ms, p95 = 10ms, all four
+  PAD-05 criteria PASS. Transport locked (ws:// + TCP_NODELAY); the roadmap's
+  UDP-mouse-channel reconsideration is NOT triggered.
+Status: Phase 3 (Discovery, Pairing & Connection) is unblocked and ready to plan
+  (no 03 CONTEXT.md yet — discuss-phase first is the default route). Known issue from
+  the gate run: Windows "Enhance pointer precision" suppresses slow relative deltas —
+  workaround is disabling the setting; absolute-injection fix captured as a pending
+  todo (Phase 4 candidate). Spike removables (latency HUD, PIN shortcut, in-memory
+  token, manual IP entry) are Phase-3 items per D-09.
+  See: 02-04-GATE-RESULT.md, 02-04-SUMMARY.md, 02-VERIFICATION.md
+Last activity: 2026-07-08 -- 02-04 gate PASS recorded; Phase 02 closed
 
-Progress: [██░░░░░░░░] 30% (1 of 7 phases fully complete; Phase 02 vertical wired, manual gate pending)
+Progress: [███░░░░░░░] 29% (2 of 7 phases complete; transport risk retired)
 
 ## Performance Metrics
 
@@ -73,6 +72,7 @@ Progress: [██░░░░░░░░] 30% (1 of 7 phases fully complete; Ph
 | Phase 02 P01 | 45min | 3 tasks | 8 files |
 | Phase 02 P02 | 28min | 3 tasks | 31 files |
 | Phase 02 P03 | 11min | 3 tasks | 10 files |
+| Phase 02 P04 | manual | 1 task | 1 file |
 
 ## Accumulated Context
 
@@ -111,17 +111,19 @@ Recent decisions affecting current work:
 - [Phase 02]: Latency measured round-trip-UNDER-move-load (ping every K moves OR ~250ms), not idle RTT — the faithful proxy for ack-less move frames (D-06); nearest-rank percentile (rank = ceil(p/100*N), clamped)
 - [Phase 02]: Single channel-stream listener decodes each frame once and routes handshake -> driver, pong -> probe (no double-subscribe); hot move path never rebuilds the HUD (timer-polled on a throttle)
 - [Phase 02]: ws:// LAN needs AndroidManifest INTERNET permission + usesCleartextTraffic=true; scoped network-security-config deferred to Phase 3
+- [Phase 02]: Hard gate judged PASS with the pointer-accel workaround (Windows "Enhance pointer precision" disabled): the suppressed slow deltas are OS-injection fidelity downstream of the correct sub-pixel accumulator, not transport/latency — absolute-injection fix (enigo Coordinate::Abs) deferred to a pending todo (Phase 4 candidate)
 
 ### Pending Todos
 
-None yet.
+1 pending — see .planning/todos/pending/
+
+- Absolute pointer injection so slow drags survive Windows pointer acceleration (area: server; Phase 4 candidate) — from the 02-04 gate run
 
 ### Blockers/Concerns
 
-- [Phase 2]: Dart-side TCP_NODELAY plumbing needs empirical verification for the chosen web_socket_channel construction path (research flag)
 - [Phase 3]: Android UDP broadcast reception varies by device — test on owner's device early; MulticastLock + manual IP entry are the mitigations
 - [Phase 6]: apps.focus foreground-lock workarounds and EnumWindows filtering flagged as highest-fiddliness area — research recommends a phase-level spike during planning
-- [Phase 2 — RESOLVED STRUCTURALLY by 02-03]: The runnable end-to-end vertical is now built and wired. Trackpad screen (Listener→MoveSender gated on Authed), client pair→challenge→auth handshake FSM, and interleaved-ping latency HUD all exist and are called by the app; `main.dart` routes to the trackpad screen. `flutter analyze` clean, 32 tests pass. REMAINING (not a code blocker): the numeric <30ms p50/p95 pass is the MANUAL on-device gate in 02-04 (human-verify over real WiFi) — must pass before Phase 3, else the roadmap's UDP-channel transport reconsideration triggers. See 02-03-SUMMARY.md, 02-04-PLAN.md, 02-VERIFICATION.md.
+- [Phase 2 — RESOLVED 2026-07-08]: Hard transport gate PASSED on-device (p50 = 6ms, p95 = 10ms on real WiFi, all four PAD-05 criteria). TCP_NODELAY empirical verification also resolved — sub-6ms p50 under continuous load with no traffic-pattern-dependent hitching. UDP-channel reconsideration NOT triggered. See 02-04-GATE-RESULT.md.
 
 ### Quick Tasks Completed
 
@@ -139,6 +141,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08T05:54:06Z
-Stopped at: Completed 02-03-PLAN.md — vertical wired; 02-04 manual on-device gate pending
+Last session: 2026-07-08T07:35:24Z
+Stopped at: Phase 02 closed (02-04 gate PASS recorded); next is Phase 3 discuss/plan
 Resume file: None
