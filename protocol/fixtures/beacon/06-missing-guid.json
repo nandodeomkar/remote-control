@@ -1,0 +1,15 @@
+{
+  "name": "missing-guid",
+  "description": "Negative fixture (BEACON.md validation rule 5): guid is absent. guid is required (non-empty string, at most 64 chars); datagram must be silently dropped.",
+  "wire": {
+    "v": 1,
+    "app": "remote-control",
+    "name": "OMKAR-LAPTOP",
+    "port": 17777,
+    "proto": "1.0"
+  },
+  "expect": {
+    "error": true,
+    "reason": "missing-guid"
+  }
+}

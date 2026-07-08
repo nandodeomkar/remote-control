@@ -1,0 +1,19 @@
+{
+  "name": "extra-fields",
+  "description": "Forward-compat (BEACON.md validation rule 6, mirroring SPEC section 1): an unknown key is present alongside all required fields. Still decodes; the unknown field is ignored and never appears in expect.",
+  "wire": {
+    "v": 1,
+    "app": "remote-control",
+    "name": "OMKAR-LAPTOP",
+    "guid": "9f3c-test-guid",
+    "port": 17777,
+    "proto": "1.0",
+    "futureField": "decoders must ignore me"
+  },
+  "expect": {
+    "name": "OMKAR-LAPTOP",
+    "guid": "9f3c-test-guid",
+    "port": 17777,
+    "proto": "1.0"
+  }
+}

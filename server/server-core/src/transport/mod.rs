@@ -1,4 +1,6 @@
-//! WebSocket transport: accept loop + per-connection session tasks.
+//! WebSocket transport: accept loop + per-connection session tasks, plus
+//! the UDP discovery beacon broadcaster ([`beacon`] — public because the
+//! composition root spawns it with OS-injected identity).
 //!
 //! `run` is the crate's single entry point (re-exported as
 //! `server_core::run`): the caller binds the listener (tests use
@@ -9,6 +11,7 @@
 //! 64 KB, enforced pre- and post-auth. Every accepted stream gets
 //! `set_nodelay(true)` (Phase-2 latency prerequisite).
 
+pub mod beacon;
 mod listener;
 mod session;
 

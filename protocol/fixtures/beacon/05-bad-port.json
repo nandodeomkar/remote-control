@@ -1,0 +1,16 @@
+{
+  "name": "bad-port",
+  "description": "Negative fixture (BEACON.md validation rule 5): port is a string, not an int. Typed field checks fail; datagram must be silently dropped.",
+  "wire": {
+    "v": 1,
+    "app": "remote-control",
+    "name": "OMKAR-LAPTOP",
+    "guid": "9f3c-test-guid",
+    "port": "17777",
+    "proto": "1.0"
+  },
+  "expect": {
+    "error": true,
+    "reason": "bad-port-type"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "wrong-app",
+  "description": "Negative fixture (BEACON.md validation rule 4): app is not the literal remote-control. Datagram must be silently dropped.",
+  "wire": {
+    "v": 1,
+    "app": "someone-else",
+    "name": "OMKAR-LAPTOP",
+    "guid": "9f3c-test-guid",
+    "port": 17777,
+    "proto": "1.0"
+  },
+  "expect": {
+    "error": true,
+    "reason": "wrong-app"
+  }
+}

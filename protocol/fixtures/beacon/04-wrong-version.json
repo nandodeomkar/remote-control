@@ -1,0 +1,16 @@
+{
+  "name": "wrong-version",
+  "description": "Negative fixture (BEACON.md validation rule 3): v 2 is an unknown beacon format version. Unknown format versions are dropped, never best-effort parsed.",
+  "wire": {
+    "v": 2,
+    "app": "remote-control",
+    "name": "OMKAR-LAPTOP",
+    "guid": "9f3c-test-guid",
+    "port": 17777,
+    "proto": "1.0"
+  },
+  "expect": {
+    "error": true,
+    "reason": "wrong-version"
+  }
+}

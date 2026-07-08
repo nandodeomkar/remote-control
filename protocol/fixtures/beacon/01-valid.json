@@ -1,0 +1,18 @@
+{
+  "name": "valid",
+  "description": "Canonical beacon datagram (BEACON.md): all six keys, v 1, app remote-control. Decodes. The Rust encoder test asserts encode_beacon output equals this wire object; the Dart decoder test asserts the decoded beacon equals expect.",
+  "wire": {
+    "v": 1,
+    "app": "remote-control",
+    "name": "OMKAR-LAPTOP",
+    "guid": "9f3c-test-guid",
+    "port": 17777,
+    "proto": "1.0"
+  },
+  "expect": {
+    "name": "OMKAR-LAPTOP",
+    "guid": "9f3c-test-guid",
+    "port": 17777,
+    "proto": "1.0"
+  }
+}
