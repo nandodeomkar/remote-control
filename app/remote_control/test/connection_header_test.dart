@@ -33,9 +33,13 @@ Widget _host(Widget child) {
 
 /// The chip's status-word target color (AnimatedDefaultTextStyle animates
 /// TOWARD this — reading the target avoids animation-timing flakiness).
+/// Scoped to the chip: Material mounts its own AnimatedDefaultTextStyles.
 Color? _statusWordColor(WidgetTester tester) {
   final animated = tester.widget<AnimatedDefaultTextStyle>(
-    find.byType(AnimatedDefaultTextStyle),
+    find.descendant(
+      of: find.byType(ConnectionHeaderChip),
+      matching: find.byType(AnimatedDefaultTextStyle),
+    ),
   );
   return animated.style.color;
 }
@@ -67,7 +71,10 @@ void main() {
 
       // The 8px status dot animates toward the connected color.
       final dot = tester.widget<AnimatedContainer>(
-        find.byType(AnimatedContainer),
+        find.descendant(
+          of: find.byType(ConnectionHeaderChip),
+          matching: find.byType(AnimatedContainer),
+        ),
       );
       final decoration = dot.decoration! as BoxDecoration;
       expect(decoration.color, _connectedColor);
