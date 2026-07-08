@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "03-04 complete (on-device checkpoint approved — Xiaomi beacon reception + cleartext swap proven; UDP concern retired). Wave 2 remaining: 03-05"
-last_updated: "2026-07-08T17:21:10.128Z"
-last_activity: 2026-07-08 -- Phase 03 execution started
+stopped_at: "03-05 complete (ConnectionService reconnect driver + providers; CONN-03..06 proven against fakes). Remaining: 03-06, 03-07"
+last_updated: "2026-07-09T00:00:00.000Z"
+last_activity: 2026-07-09 -- Phase 03 plan 05 complete (resumed mid-plan, finished Task 2)
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 19
-  completed_plans: 16
-  percent: 29
+  completed_plans: 17
+  percent: 31
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 03 (discovery-pairing-connection) — EXECUTING
-Plan: 4 of 7 complete (01, 02, 03, 04 — wave 2 next: 03-05)
+Plan: 5 of 7 complete (01, 02, 03, 04, 05 — next: 03-06 device list, then 03-07 wiring)
   WiFi (Xiaomi Android 16 phone -> Windows 11 laptop): p50 = 6ms, p95 = 10ms, all four
   PAD-05 criteria PASS. Transport locked (ws:// + TCP_NODELAY); the roadmap's
   UDP-mouse-channel reconsideration is NOT triggered.
@@ -77,6 +77,7 @@ Progress: [███░░░░░░░] 29% (2 of 7 phases complete; transpor
 | Phase 03 P03 | 8min | 2 tasks | 4 files |
 | Phase 03 P01 | 15min | 3 tasks | 17 files |
 | Phase 03 P04 | 11min + checkpoint | 3 tasks | 8 files |
+| Phase 03 P05 | ~25min (2 sessions) | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -129,6 +130,10 @@ Recent decisions affecting current work:
 - [Phase 03-04]: BeaconListener pairs MulticastLock with the socket lifecycle: acquire before bind, release on stop AND bind failure (retryable); broadcast stream survives stop/start
 - [Phase 03-04]: MulticastLock MethodChannel no-ops on MissingPluginException — OEM insurance, not a requirement; tests and non-Android hosts need no fakes
 - [Phase 03-04]: network_security_config.xml keeps base-config cleartext (Android XML has no CIDR scoping); real LAN-only enforcement is the ConnectionService RFC1918 guard in 03-05 (D-10 split documented in-file)
+- [Phase 03-05]: Liveness is a generation-guarded tick chain on the injected schedule seam (no Timer.periodic) — probe stays timer-free, tests deterministic; probe.reset() keeps the RTT window so the header shows last-known latency through teardown
+- [Phase 03-05]: Guard refusal (non-RFC1918 dial) is a terminal user-input error -> idle with lastDialError; transportFailed is reserved for real transport blips (backoff would hammer a public host)
+- [Phase 03-05]: Reliable queue survives transport blips (teardown drops only volatile gating); AuthStopEffect is the sole queue-clearing path — a revoked target re-pairs before anything flushes
+- [Phase 03-05]: ConnectionStatus snapshot is value-equal (== / hashCode) so the Riverpod Notifier suppresses no-op rebuilds on changes pings; D-10 enforcement split now COMPLETE (XML + code guard both shipped)
 
 ### Pending Todos
 
@@ -158,6 +163,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08T17:21:10.115Z
-Stopped at: 03-04 complete (on-device checkpoint approved — Xiaomi beacon reception + cleartext swap proven; UDP concern retired). Wave 2 remaining: 03-05
+Last session: 2026-07-09
+Stopped at: 03-05 complete (ConnectionService + providers committed, SUMMARY written). Next: 03-06 device list
 Resume file: None
