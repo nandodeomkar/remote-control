@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 2 context gathered
-last_updated: "2026-07-08T03:08:39.626Z"
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-07-08T04:02:08.561Z"
 last_activity: 2026-07-08 -- Phase 02 execution started
 progress:
   total_phases: 7
   completed_phases: 1
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 14
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 02 (end-to-end-cursor-spike) — EXECUTING
-Plan: 1 of 2
-Status: Executing Phase 02
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-07-08 -- Phase 02 execution started
 
 Progress: [█░░░░░░░░░] 14% (1 of 7 phases complete)
@@ -60,6 +60,7 @@ Progress: [█░░░░░░░░░] 14% (1 of 7 phases complete)
 | Phase 01 P06 | 13min | 2 tasks | 4 files |
 | Phase 01 P07 | 16min | 2 tasks | 0 files |
 | Phase 01 P08 | 18min | 3 tasks | 13 files |
+| Phase 02 P01 | 45min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,10 @@ Recent decisions affecting current work:
 - [Phase 01]: Post-auth JSON decode errors reply err{internal} and keep the connection; SPEC err table defines no decode-failure code, pre-auth decode errors stay silent per SPEC section 6
 - [Phase 01]: Unparseable protoVersion major treated as versionMismatch (err + close) per D-06 reject-by-default; session FSM owns hello/pin/auth and ignores post-auth handshake replays
 - [Phase 01]: Zero-Windows-deps verified against Linux target tree: windows-sys on the host tree is tokio/mio/socket2 platform plumbing only
+- [Phase 02]: Default WebSocket port 17777 with RC_PORT env override (spec names no numeric default; settings UI is Phase 7)
+- [Phase 02]: DEV_PIN dev shortcut not implemented — AuthManager has no fixed-PIN API and the console-printed real PIN serves the owner's test loop (T-02-EP surface never created)
+- [Phase 02]: enigo::set_dpi_awareness() helper (re-exported at crate root in 0.6.1) used for DPI awareness; windows-crate fallback not needed
+- [Phase 02]: Enigo injection failures on the input thread are dropped (send-and-forget hot path), never panic
 
 ### Pending Todos
 
@@ -107,6 +112,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-07T18:27:27.672Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-end-to-end-cursor-spike/02-CONTEXT.md
+Last session: 2026-07-08T04:02:08.548Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None

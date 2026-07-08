@@ -21,7 +21,7 @@
 - [ ] **PAD-02**: User clicks via tap (left), two-finger tap (right), and on-screen L/M/R buttons
 - [ ] **PAD-03**: User scrolls with two fingers — momentum with instant touch-stop
 - [ ] **PAD-04**: User drags via long-press drag with drag lock for screen-edge drags
-- [ ] **PAD-05**: Cursor response is visually instant on same LAN (<30ms end-to-end; TCP_NODELAY both ends, raw pointer events)
+- [x] **PAD-05**: Cursor response is visually instant on same LAN (<30ms end-to-end; TCP_NODELAY both ends, raw pointer events)
 
 ### Keyboard
 
@@ -123,7 +123,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PAD-02 | Phase 4 | Pending |
 | PAD-03 | Phase 4 | Pending |
 | PAD-04 | Phase 4 | Pending |
-| PAD-05 | Phase 2 | Pending |
+| PAD-05 | Phase 2 | Complete |
 | KEY-01 | Phase 4 | Pending |
 | KEY-02 | Phase 4 | Pending |
 | KEY-03 | Phase 4 | Pending |
