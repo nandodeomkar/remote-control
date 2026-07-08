@@ -75,7 +75,7 @@ class _RecordingWsSink implements WebSocketSink {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-class _MemSecureKv implements SecureKv {
+class MemSecureKv implements SecureKv {
   final Map<String, String> map = <String, String>{};
 
   @override
@@ -88,7 +88,7 @@ class _MemSecureKv implements SecureKv {
   Future<void> delete(String key) async => map.remove(key);
 }
 
-class _MemPrefsKv implements PrefsKv {
+class MemPrefsKv implements PrefsKv {
   final Map<String, String> map = <String, String>{};
 
   @override
@@ -101,13 +101,13 @@ class _MemPrefsKv implements PrefsKv {
 /// A real [DeviceStore] over in-memory seams, recording mutating calls.
 class RecordingStore extends DeviceStore {
   final List<String> calls = <String>[];
-  final _MemSecureKv secureKv;
-  final _MemPrefsKv prefsKv;
+  final MemSecureKv secureKv;
+  final MemPrefsKv prefsKv;
 
   RecordingStore._(this.secureKv, this.prefsKv)
       : super(secure: secureKv, prefs: prefsKv);
 
-  factory RecordingStore() => RecordingStore._(_MemSecureKv(), _MemPrefsKv());
+  factory RecordingStore() => RecordingStore._(MemSecureKv(), MemPrefsKv());
 
   /// Preload a token WITHOUT polluting the call log (test arrangement).
   void preloadToken(String deviceKey, String token) =>
