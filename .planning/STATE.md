@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: in_progress
-stopped_at: Phase 02 CLOSED — 02-04 hard gate PASS (p50 6ms / p95 10ms); next is Phase 3 planning
-last_updated: "2026-07-08T07:35:24Z"
-last_activity: 2026-07-08 -- 02-04 gate run by owner on-device (PASS), Phase 02 closed out, pointer-accel todo captured
+status: planning
+stopped_at: Phase 3 context gathered
+last_updated: "2026-07-08T07:42:10.607Z"
+last_activity: 2026-07-08 -- 02-04 gate PASS recorded; Phase 02 closed
 progress:
   total_phases: 7
   completed_phases: 2
@@ -141,6 +141,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08T07:35:24Z
-Stopped at: Phase 02 closed (02-04 gate PASS recorded); next is Phase 3 discuss/plan
-Resume file: None
+Last session: 2026-07-08T07:42:10.591Z
+Stopped at: Phase 3 context gathered
+Resume file: .planning/phases/03-discovery-pairing-connection/03-CONTEXT.md
