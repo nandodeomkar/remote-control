@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "03-05 complete (ConnectionService reconnect driver + providers; CONN-03..06 proven against fakes). Remaining: 03-06, 03-07"
-last_updated: "2026-07-09T00:00:00.000Z"
-last_activity: 2026-07-09 -- Phase 03 plan 05 complete (resumed mid-plan, finished Task 2)
+stopped_at: "03-06 complete (device list + pairing sheet + Connect-by-IP; 139 tests green). Next: 03-07 launch wiring"
+last_updated: "2026-07-08T19:49:31.399Z"
+last_activity: 2026-07-08 -- Phase 03 execution started
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 19
-  completed_plans: 17
-  percent: 31
+  completed_plans: 18
+  percent: 29
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 03 (discovery-pairing-connection) — EXECUTING
-Plan: 5 of 7 complete (01, 02, 03, 04, 05 — next: 03-06 device list, then 03-07 wiring)
+Plan: 6 of 7 complete (01, 02, 03, 04, 05 — next: 03-06 device list, then 03-07 wiring)
   WiFi (Xiaomi Android 16 phone -> Windows 11 laptop): p50 = 6ms, p95 = 10ms, all four
   PAD-05 criteria PASS. Transport locked (ws:// + TCP_NODELAY); the roadmap's
   UDP-mouse-channel reconsideration is NOT triggered.
@@ -78,6 +78,7 @@ Progress: [███░░░░░░░] 29% (2 of 7 phases complete; transpor
 | Phase 03 P01 | 15min | 3 tasks | 17 files |
 | Phase 03 P04 | 11min + checkpoint | 3 tasks | 8 files |
 | Phase 03 P05 | ~25min (2 sessions) | 2 tasks | 5 files |
+| Phase 03 P06 | 17min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -134,6 +135,10 @@ Recent decisions affecting current work:
 - [Phase 03-05]: Guard refusal (non-RFC1918 dial) is a terminal user-input error -> idle with lastDialError; transportFailed is reserved for real transport blips (backoff would hammer a public host)
 - [Phase 03-05]: Reliable queue survives transport blips (teardown drops only volatile gating); AuthStopEffect is the sole queue-clearing path — a revoked target re-pairs before anything flushes
 - [Phase 03-05]: ConnectionStatus snapshot is value-equal (== / hashCode) so the Riverpod Notifier suppresses no-op rebuilds on changes pings; D-10 enforcement split now COMPLETE (XML + code guard both shipped)
+- [Phase 03-06]: DeviceListEntry equality excludes lastSeenMillis: anti-churn falls out of listEquals — unchanged beacons publish nothing, rows never blink per packet
+- [Phase 03-06]: Pairing sheet rebuilds via StreamBuilder over service.changes — needPin/failure transitions never alter the value-equal ConnectionStatus snapshot, so a provider watch alone would miss them
+- [Phase 03-06]: Post-authFail retry is one tap: the sheet stores the PIN as pending, fires a fresh connectTo, and auto-feeds it when the new handshake reaches needPin
+- [Phase 03-06]: Firewall-blocked copy requires BOTH a failed manual dial AND a currently-live beacon row at that host; otherwise the generic transport copy with ip:port renders
 
 ### Pending Todos
 
@@ -163,6 +168,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-09
-Stopped at: 03-05 complete (ConnectionService + providers committed, SUMMARY written). Next: 03-06 device list
+Last session: 2026-07-08T19:49:13.063Z
+Stopped at: 03-06 complete (device list + pairing sheet + Connect-by-IP; 139 tests green). Next: 03-07 launch wiring
 Resume file: None
