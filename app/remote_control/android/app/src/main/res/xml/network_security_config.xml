@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- ws:// to LAN IPs: Android XML cannot scope cleartext by IP range (no CIDR
+         support — domain-config accepts exact domains only). Cleartext stays
+         permitted at base level; the app enforces private-range-only dialing
+         (RFC1918 + link-local) in ConnectionService (lands in 03-05, D-10). -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
