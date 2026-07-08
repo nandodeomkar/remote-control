@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-03-PLAN.md
-last_updated: "2026-07-08T13:58:35.825Z"
-last_activity: 2026-07-08 -- Phase 03 execution started
+stopped_at: Completed 03-01-PLAN.md (wave 1 complete)
+last_updated: "2026-07-08T15:10:00.000Z"
+last_activity: 2026-07-08 -- 03-01 checkpoint approved, wave 1 complete
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 19
-  completed_plans: 14
+  completed_plans: 15
   percent: 29
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 03 (discovery-pairing-connection) — EXECUTING
-Plan: 3 of 7
+Plan: wave 1 complete (03-01, 03-02, 03-03); next wave 2 (03-04)
   WiFi (Xiaomi Android 16 phone -> Windows 11 laptop): p50 = 6ms, p95 = 10ms, all four
   PAD-05 criteria PASS. Transport locked (ws:// + TCP_NODELAY); the roadmap's
   UDP-mouse-channel reconsideration is NOT triggered.
@@ -75,6 +75,7 @@ Progress: [███░░░░░░░] 29% (2 of 7 phases complete; transpor
 | Phase 02 P04 | manual | 1 task | 1 file |
 | Phase 03 P02 | 8min | 2 tasks | 4 files |
 | Phase 03 P03 | 8min | 2 tasks | 4 files |
+| Phase 03 P01 | 15min | 3 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -120,6 +121,9 @@ Recent decisions affecting current work:
 - [Phase 03-03]: loadDevices returns Map keyed by deviceKey; DeviceMeta.toJson excludes the key so the prefs devices JSON byte-matches RESEARCH Pattern 7
 - [Phase 03-03]: SharedPrefsKv wraps SharedPreferencesAsync (2.5.x current API), thin adapter so DeviceStore never sees the API choice
 - [Phase 03-03]: Every SecureKv read/delete is Pitfall-5-wrapped (deleteToken swallows PlatformException like reads); writes stay raw so pairing save failures surface
+- [Phase 03-01]: SERVER_PROTO_VERSION widened to pub(crate) and referenced by encode_beacon — proto literal never duplicated
+- [Phase 03-01]: MachineGuid registry-read failure degrades to stable "name-<device_name>" id with a warn — identity failure never crashes the server
+- [Phase 03-01]: if-addrs in server-core (cross-platform, preserves zero-Windows-deps); winreg + tauri-winrt-notification isolated in server-windows; toast attributed to "Windows PowerShell" is the accepted v1 quirk (AUMID lands with Phase-7 tray)
 
 ### Pending Todos
 
@@ -149,6 +153,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08T13:58:35.812Z
-Stopped at: Completed 03-03-PLAN.md
+Last session: 2026-07-08 (resumed)
+Stopped at: 03-01 complete (checkpoint approved) — wave 1 done, wave 2 (03-04) next
 Resume file: None
