@@ -66,6 +66,13 @@ impl AuthManager {
         issued.raw_hex
     }
 
+    /// Whether at least one device has completed pairing (a token hash is
+    /// stored). The composition root uses this to stop refreshing the pairing
+    /// PIN once a phone is paired (WR-01).
+    pub fn is_paired(&self) -> bool {
+        !self.paired_hashes.is_empty()
+    }
+
     /// Issue a fresh 32-byte CSPRNG challenge nonce for this connection
     /// (SPEC §3 — never reused).
     pub fn issue_challenge(&mut self) -> [u8; 32] {
@@ -120,6 +127,14 @@ mod tests {
         let nonce = auth.issue_challenge();
         let bogus = "0".repeat(64);
         assert!(!auth.verify_auth(&nonce, &bogus));
+    }
+
+    #[test]
+    fn is_paired_flips_after_complete_pairing() {
+        let mut auth = AuthManager::new();
+        assert!(!auth.is_paired(), "no pairing stored at construction");
+        let _raw = auth.complete_pairing();
+        assert!(auth.is_paired(), "a stored token hash means paired");
     }
 
     #[test]

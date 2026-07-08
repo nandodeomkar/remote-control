@@ -8,6 +8,7 @@ mod input_thread;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Context;
+use server_core::auth::pin::PIN_TTL_SECS;
 use server_core::auth::AuthManager;
 use server_core::executors::Executors;
 use server_core::transport::ServerDeps;
@@ -60,6 +61,29 @@ async fn main() -> anyhow::Result<()> {
         .expect("auth mutex poisoned at startup")
         .begin_pairing();
     println!("Pairing PIN: {pin}");
+
+    // 5a. Re-pair loop (WR-01): the initial PIN expires after PIN_TTL_SECS.
+    //     Without this, pairing is permanently impossible ~60s after launch
+    //     with no console indication. Refresh the window (reprint a fresh PIN)
+    //     each TTL while still unpaired; stop once a phone pairs. Clone the
+    //     Arc BEFORE `auth` is moved into ServerDeps below.
+    let auth_for_repin = Arc::clone(&auth);
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(PIN_TTL_SECS)).await;
+            let refreshed = {
+                let mut guard = auth_for_repin
+                    .lock()
+                    .expect("auth mutex poisoned during re-pair refresh");
+                if guard.is_paired() {
+                    break; // a device paired — stop refreshing
+                }
+                guard.begin_pairing()
+                // guard dropped here, before the println! below
+            };
+            println!("Pairing PIN (refreshed): {refreshed}");
+        }
+    });
 
     // 6. Server-side pause flag (SPEC §11) — no pause UI in the spike.
     let (_pause_tx, pause_rx) = tokio::sync::watch::channel(false);
