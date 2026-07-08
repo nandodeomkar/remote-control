@@ -4,6 +4,7 @@
 //! (DPI awareness, tracing subscriber, input thread, ServerDeps,
 //! `server_core::run`).
 
+mod executors;
 mod input_thread;
 
 fn main() {
