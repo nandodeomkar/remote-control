@@ -1,8 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- ws:// LAN socket (02-03): the WebSocket transport needs network access,
+         and the LAN-only ws:// (non-TLS) connection requires cleartext to be
+         permitted. A scoped network-security-config is Phase 3 polish;
+         app-wide cleartext is sufficient for the LAN-only spike. -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="remote_control"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -1,14 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'trackpad/trackpad_screen.dart';
+
 void main() {
   runApp(const ProviderScope(child: RemoteControlApp()));
 }
 
-/// Minimal shell for the cursor spike.
+/// The cursor-spike app shell: routes straight to the trackpad screen.
 ///
-/// Plan 02-03 wires this to the trackpad screen; the dashboard home and
-/// dark-minimal theme (#0E0F12, blue accent) are built out in later phases.
+/// Plan 02-03 wires the runnable end-to-end vertical (connect -> pair/auth ->
+/// move cursor -> live latency). The dashboard home and richer dark-minimal
+/// theme (blue accent, persistent quick-bar) are built out in later phases;
+/// the #0E0F12 background is kept here.
 class RemoteControlApp extends StatelessWidget {
   const RemoteControlApp({super.key});
 
@@ -16,15 +20,16 @@ class RemoteControlApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Remote Control',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
         scaffoldBackgroundColor: const Color(0xFF0E0F12),
-      ),
-      home: const Scaffold(
-        body: Center(
-          child: Text('Remote Control — cursor spike'),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF4C8DFF),
+          brightness: Brightness.dark,
         ),
       ),
+      home: const TrackpadScreen(),
     );
   }
 }
