@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 Phase: 02 (end-to-end-cursor-spike) — EXECUTING
 Plan: 2 of 2
 Status: Phase complete — ready for verification
-Last activity: 2026-07-08 -- Phase 02 execution started
+Last activity: 2026-07-08 -- Completed quick task 260708-ejx: Fix WR-01 pairing re-pair loop
 
 Progress: [█░░░░░░░░░] 14% (1 of 7 phases complete)
 
@@ -105,6 +105,12 @@ None yet.
 - [Phase 2]: Dart-side TCP_NODELAY plumbing needs empirical verification for the chosen web_socket_channel construction path (research flag)
 - [Phase 3]: Android UDP broadcast reception varies by device — test on owner's device early; MulticastLock + manual IP entry are the mitigations
 - [Phase 6]: apps.focus foreground-lock workarounds and EnumWindows filtering flagged as highest-fiddliness area — research recommends a phase-level spike during planning
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260708-ejx | Fix WR-01 — pairing window re-pair loop | 2026-07-08 | 54cfcff | [260708-ejx-fix-wr-01-pairing-window-re-pair-loop](./quick/260708-ejx-fix-wr-01-pairing-window-re-pair-loop/) |
 
 ## Deferred Items
 
