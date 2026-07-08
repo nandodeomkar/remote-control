@@ -92,7 +92,7 @@ Plans:
 Plans:
 
 - [ ] 03-01-PLAN.md — Beacon wire contract + server-core broadcaster + PIN toast (notify.rs, RC_BEACON_PORT)
-- [ ] 03-02-PLAN.md — Reconnect FSM + per-message-class send policy (pure Dart, TDD — D-04/D-05/D-06 policy table)
+- [x] 03-02-PLAN.md — Reconnect FSM + per-message-class send policy (pure Dart, TDD — D-04/D-05/D-06 policy table)
 - [ ] 03-03-PLAN.md — GUID-keyed device store: secure tokens + prefs metadata (D-07/D-10)
 - [ ] 03-04-PLAN.md — Client discovery: beacon codec + listener + MulticastLock + scoped cleartext swap; EARLY Xiaomi on-device check
 - [ ] 03-05-PLAN.md — ConnectionService: FSM driver, token lifecycle, RFC1918 guard, idle-ping liveness, Riverpod providers
@@ -178,7 +178,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 |-------|----------------|--------|-----------|
 | 1. Protocol Contract & Server Core | 8/8 | Complete    | 2026-07-07 |
 | 2. End-to-End Cursor Spike | 4/4 | Complete — gate PASS (p50 6ms / p95 10ms) | 2026-07-08 |
-| 3. Discovery, Pairing & Connection | 0/7 | Planned | - |
+| 3. Discovery, Pairing & Connection | 1/7 | In Progress|  |
 | 4. Trackpad & Keyboard | 0/TBD | Not started | - |
 | 5. Media, Power, Presenter & Browser | 0/TBD | Not started | - |
 | 6. Apps & Clipboard | 0/TBD | Not started | - |

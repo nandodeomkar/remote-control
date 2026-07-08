@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planning
-stopped_at: Phase 3 UI-SPEC approved
-last_updated: "2026-07-08T08:48:45.977Z"
-last_activity: 2026-07-08 -- 02-04 gate PASS recorded; Phase 02 closed
+status: executing
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-07-08T13:47:09.040Z"
+last_activity: 2026-07-08 -- Phase 03 execution started
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 19
+  completed_plans: 13
   percent: 29
 ---
 
@@ -21,23 +21,23 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-07)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 03 — discovery-pairing-connection (ready to plan)
+**Current focus:** Phase 03 — discovery-pairing-connection
 
 ## Current Position
 
-Phase: 02 (end-to-end-cursor-spike) — COMPLETE (4/4). Hard gate PASSED.
-Plan: 02-04 (manual hard-gate) DONE — owner ran the on-device measurement over real
+Phase: 03 (discovery-pairing-connection) — EXECUTING
+Plan: 2 of 7
   WiFi (Xiaomi Android 16 phone -> Windows 11 laptop): p50 = 6ms, p95 = 10ms, all four
   PAD-05 criteria PASS. Transport locked (ws:// + TCP_NODELAY); the roadmap's
   UDP-mouse-channel reconsideration is NOT triggered.
-Status: Phase 3 (Discovery, Pairing & Connection) is unblocked and ready to plan
+Status: Ready to execute
   (no 03 CONTEXT.md yet — discuss-phase first is the default route). Known issue from
   the gate run: Windows "Enhance pointer precision" suppresses slow relative deltas —
   workaround is disabling the setting; absolute-injection fix captured as a pending
   todo (Phase 4 candidate). Spike removables (latency HUD, PIN shortcut, in-memory
   token, manual IP entry) are Phase-3 items per D-09.
   See: 02-04-GATE-RESULT.md, 02-04-SUMMARY.md, 02-VERIFICATION.md
-Last activity: 2026-07-08 -- 02-04 gate PASS recorded; Phase 02 closed
+Last activity: 2026-07-08 -- Phase 03 execution started
 
 Progress: [███░░░░░░░] 29% (2 of 7 phases complete; transport risk retired)
 
@@ -73,6 +73,7 @@ Progress: [███░░░░░░░] 29% (2 of 7 phases complete; transpor
 | Phase 02 P02 | 28min | 3 tasks | 31 files |
 | Phase 02 P03 | 11min | 3 tasks | 10 files |
 | Phase 02 P04 | manual | 1 task | 1 file |
+| Phase 03 P02 | 8min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,9 @@ Recent decisions affecting current work:
 - [Phase 02]: Single channel-stream listener decodes each frame once and routes handshake -> driver, pong -> probe (no double-subscribe); hot move path never rebuilds the HUD (timer-polled on a throttle)
 - [Phase 02]: ws:// LAN needs AndroidManifest INTERNET permission + usesCleartextTraffic=true; scoped network-security-config deferred to Phase 3
 - [Phase 02]: Hard gate judged PASS with the pointer-accel workaround (Windows "Enhance pointer precision" disabled): the suppressed slow deltas are OS-injection fidelity downstream of the correct sub-pixel accumulator, not transport/latency — absolute-injection fix (enigo Coordinate::Abs) deferred to a pending todo (Phase 4 candidate)
+- [Phase 03-02]: Backoff cap is 10s (design spec §8) over D-06 discretionary ~30s; delay = base(1/2/4/8/10s) x (0.8 + 0.4*random()) rounded to ms, injectable random for deterministic tests
+- [Phase 03-02]: authRejected for ANY reason lands in needPairing with AuthStopEffect + CloseEffect and never a retry; ClearTokenEffect + revoked explanation only for noPairing/badMac
+- [Phase 03-02]: beaconSighted short-circuit also resets the attempt counter — consistent D-06 fresh-start semantics with appResumed/retryNowPressed
 
 ### Pending Todos
 
@@ -141,6 +145,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08T08:48:45.967Z
-Stopped at: Phase 3 UI-SPEC approved
-Resume file: .planning/phases/03-discovery-pairing-connection/03-UI-SPEC.md
+Last session: 2026-07-08T13:47:09.028Z
+Stopped at: Completed 03-02-PLAN.md
+Resume file: None

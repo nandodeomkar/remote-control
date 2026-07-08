@@ -9,8 +9,8 @@
 
 - [ ] **CONN-01**: User sees laptops on the same LAN appear automatically in a device list (UDP beacon discovery)
 - [ ] **CONN-02**: User pairs with a laptop once via 6-digit PIN shown on the PC (60s expiry, 5 attempts, lockout)
-- [ ] **CONN-03**: Paired phone reconnects silently using challenge-response auth — the token never crosses the wire
-- [ ] **CONN-04**: Connection recovers automatically after WiFi drops or PC IP changes (backoff + beacon re-listen)
+- [x] **CONN-03**: Paired phone reconnects silently using challenge-response auth — the token never crosses the wire
+- [x] **CONN-04**: Connection recovers automatically after WiFi drops or PC IP changes (backoff + beacon re-listen)
 - [ ] **CONN-05**: User can connect by typing IP:port manually when discovery fails (AP isolation, firewall, VPN adapters)
 - [ ] **CONN-06**: User sees connection status and live latency in the app header
 - [x] **CONN-07**: Server releases all held keys/buttons when a session ends (no phantom input after mid-drag disconnect)
@@ -114,8 +114,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 |-------------|-------|--------|
 | CONN-01 | Phase 3 | Pending |
 | CONN-02 | Phase 3 | Pending |
-| CONN-03 | Phase 3 | Pending |
-| CONN-04 | Phase 3 | Pending |
+| CONN-03 | Phase 3 | Complete |
+| CONN-04 | Phase 3 | Complete |
 | CONN-05 | Phase 3 | Pending |
 | CONN-06 | Phase 3 | Pending |
 | CONN-07 | Phase 1 | Complete |
