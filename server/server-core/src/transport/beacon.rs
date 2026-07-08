@@ -17,8 +17,10 @@
 //! enters [`encode_beacon`]. The beacon is unauthenticated broadcast
 //! output; a spoofed beacon harvests nothing (challenge-response, SPEC §4).
 
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
+
+use super::session::SERVER_PROTO_VERSION;
 
 /// Beacon send cadence (BEACON.md: every 2 seconds).
 pub const BEACON_INTERVAL: Duration = Duration::from_secs(2);
@@ -45,8 +47,15 @@ pub struct BeaconIdentity {
 ///
 /// Identity never changes at runtime — callers encode ONCE at task start.
 pub fn encode_beacon(identity: &BeaconIdentity) -> String {
-    let _ = identity;
-    todo!("implemented in 03-01 GREEN")
+    serde_json::json!({
+        "v": 1,
+        "app": "remote-control",
+        "name": identity.name,
+        "guid": identity.guid,
+        "port": identity.ws_port,
+        "proto": SERVER_PROTO_VERSION,
+    })
+    .to_string()
 }
 
 /// Compute the subnet-directed broadcast address for an interface.
@@ -58,8 +67,7 @@ pub(crate) fn directed_broadcast(
     netmask: Ipv4Addr,
     broadcast: Option<Ipv4Addr>,
 ) -> Ipv4Addr {
-    let _ = (ip, netmask, broadcast);
-    todo!("implemented in 03-01 GREEN")
+    broadcast.unwrap_or_else(|| Ipv4Addr::from(u32::from(ip) | !u32::from(netmask)))
 }
 
 /// Broadcast the beacon forever: bind an ephemeral UDP socket with
@@ -68,8 +76,37 @@ pub(crate) fn directed_broadcast(
 /// broadcast address at `beacon_port`. Per-tick errors never kill the loop
 /// (listener.rs never-die posture).
 pub async fn run_beacon(identity: BeaconIdentity, beacon_port: u16) {
-    let _ = (identity, beacon_port);
-    todo!("implemented in 03-01 GREEN")
+    // Startup failures ARE fatal to the beacon task (nothing sensible to
+    // retry against a bind that the OS refused) — but only to this spawned
+    // task, never to the server.
+    let sock = tokio::net::UdpSocket::bind(("0.0.0.0", 0))
+        .await
+        .expect("bind beacon socket");
+    sock.set_broadcast(true).expect("SO_BROADCAST on beacon socket");
+
+    // Identity never changes at runtime: encode the payload ONCE.
+    let payload = encode_beacon(&identity);
+
+    let mut tick = tokio::time::interval(BEACON_INTERVAL);
+    loop {
+        tick.tick().await;
+
+        // Re-enumerate EVERY tick — adapters come and go under VPN/WSL/
+        // Hyper-V churn; a one-shot enumeration at startup goes stale.
+        for iface in if_addrs::get_if_addrs().unwrap_or_default() {
+            if iface.is_loopback() {
+                continue;
+            }
+            if let if_addrs::IfAddr::V4(v4) = iface.addr {
+                let bcast = directed_broadcast(v4.ip, v4.netmask, v4.broadcast);
+                // Transient per-interface send errors never kill the loop
+                // (listener.rs never-die posture).
+                let _ = sock
+                    .send_to(payload.as_bytes(), SocketAddrV4::new(bcast, beacon_port))
+                    .await;
+            }
+        }
+    }
 }
 
 #[cfg(test)]

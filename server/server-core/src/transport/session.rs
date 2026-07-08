@@ -33,8 +33,9 @@ use crate::dispatch::router::{self, SessionCtx};
 use crate::executors::Executors;
 
 /// The server's protocol version (SPEC §2). Only the MAJOR component is
-/// compared against the client's `hello.protoVersion`.
-const SERVER_PROTO_VERSION: &str = "1.0";
+/// compared against the client's `hello.protoVersion`. `pub(crate)` so the
+/// beacon's `proto` field references it instead of duplicating the literal.
+pub(crate) const SERVER_PROTO_VERSION: &str = "1.0";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
 /// Run one connection to completion: write task + read loop + handshake FSM

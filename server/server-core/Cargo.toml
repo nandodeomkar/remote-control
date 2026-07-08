@@ -17,6 +17,10 @@ rand = "0.10"
 subtle = "2.6"
 thiserror = "2"
 hex = "0.4"
+# Cross-platform interface enumeration for the discovery beacon's
+# per-interface directed broadcast (CONN-01). Cross-platform on purpose —
+# preserves this crate's zero-Windows-deps invariant.
+if-addrs = "0.15"
 
 [dev-dependencies]
 # test-util enables #[tokio::test(start_paused = true)] + tokio::time::advance
