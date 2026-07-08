@@ -1,0 +1,15 @@
+[package]
+name = "server-windows"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Windows composition root for Remote Control: enigo input injection, DPI awareness, tracing subscriber, ServerDeps assembly around server-core."
+
+[dependencies]
+server-core = { path = "../server-core" }
+enigo = "0.6"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_UI_HiDpi"] }
+tokio = { version = "1.52", features = ["rt-multi-thread", "net", "sync", "time", "macros"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
