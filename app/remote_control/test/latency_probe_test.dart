@@ -163,4 +163,164 @@ void main() {
       expect(sink.pings.first.ts, 777);
     });
   });
+
+  group('LatencyProbe — idle-ping liveness (D-08 / CONN-06)', () {
+    test('onIdleTick emits only when >= idlePingIntervalMillis elapsed', () {
+      final clock = _FakeClock();
+      final sink = _RecordingSink();
+      final probe = LatencyProbe(
+        nowMillis: clock.call,
+        send: sink.add,
+        idlePingIntervalMillis: 2000,
+      );
+
+      // No prior ping at all: the first idle tick emits immediately (an
+      // authed-idle session must start measuring, not wait a full interval).
+      probe.onIdleTick();
+      expect(sink.pings, hasLength(1));
+
+      // Repeated ticks with no time elapsed emit nothing.
+      probe.onIdleTick();
+      probe.onIdleTick();
+      expect(sink.pings, hasLength(1));
+
+      // Just short of the interval: still nothing.
+      clock.advance(1999);
+      probe.onIdleTick();
+      expect(sink.pings, hasLength(1));
+
+      // At the interval boundary: the idle ping fires.
+      clock.advance(1);
+      probe.onIdleTick();
+      expect(sink.pings, hasLength(2));
+    });
+
+    test('a recent move-ping suppresses the idle ping (interleave)', () {
+      final clock = _FakeClock();
+      final sink = _RecordingSink();
+      final probe = LatencyProbe(
+        nowMillis: clock.call,
+        send: sink.add,
+        movesPerPing: 1, // every move emits a ping
+        idlePingIntervalMillis: 2000,
+      );
+
+      clock.now = 1000;
+      probe.onMove(); // move-driven ping at t=1000
+      expect(sink.pings, hasLength(1));
+
+      // Idle tick 500ms after the move-ping: suppressed (shared baseline).
+      clock.now = 1500;
+      probe.onIdleTick();
+      expect(sink.pings, hasLength(1));
+
+      // Idle tick a full interval after the move-ping: fires.
+      clock.now = 3000;
+      probe.onIdleTick();
+      expect(sink.pings, hasLength(2));
+    });
+
+    test('pingsAwaited counts unanswered pings; onPong zeroes it AND still '
+        'records the RTT sample', () {
+      final clock = _FakeClock();
+      final sink = _RecordingSink();
+      final probe = LatencyProbe(
+        nowMillis: clock.call,
+        send: sink.add,
+        idlePingIntervalMillis: 2000,
+      );
+
+      probe.onIdleTick(); // ping #1 at t=0
+      clock.advance(2000);
+      probe.onIdleTick(); // ping #2 at t=2000
+      expect(probe.pingsAwaited, 2);
+
+      clock.advance(10); // pong for ping #2: RTT 10ms
+      probe.onPong(const PongMsg(ts: 2000));
+      expect(probe.pingsAwaited, 0);
+      expect(probe.p50, 10, reason: 'RTT recording is unchanged by liveness');
+      expect(probe.sampleCount, 1);
+    });
+
+    test('reaching missedPongLimit fires onDead EXACTLY once (latched)', () {
+      final clock = _FakeClock();
+      final sink = _RecordingSink();
+      var deadCount = 0;
+      final probe = LatencyProbe(
+        nowMillis: clock.call,
+        send: sink.add,
+        idlePingIntervalMillis: 2000,
+        missedPongLimit: 3,
+        onDead: () => deadCount++,
+      );
+
+      probe.onIdleTick(); // awaited 1
+      expect(deadCount, 0);
+      clock.advance(2000);
+      probe.onIdleTick(); // awaited 2
+      expect(deadCount, 0);
+      clock.advance(2000);
+      probe.onIdleTick(); // awaited 3 -> dead
+      expect(deadCount, 1);
+
+      // Further unanswered pings do NOT re-fire until reset (latch).
+      clock.advance(2000);
+      probe.onIdleTick();
+      clock.advance(2000);
+      probe.onIdleTick();
+      expect(deadCount, 1);
+    });
+
+    test('move-driven pings count toward the missed-pong limit too '
+        '(one shared awaited counter)', () {
+      final clock = _FakeClock();
+      final sink = _RecordingSink();
+      var deadCount = 0;
+      final probe = LatencyProbe(
+        nowMillis: clock.call,
+        send: sink.add,
+        movesPerPing: 1,
+        missedPongLimit: 3,
+        onDead: () => deadCount++,
+      );
+
+      clock.now = 0;
+      probe.onMove(); // ping 1
+      clock.now = 300;
+      probe.onMove(); // ping 2
+      clock.now = 600;
+      probe.onMove(); // ping 3 -> dead
+      expect(probe.pingsAwaited, 3);
+      expect(deadCount, 1);
+    });
+
+    test('reset clears pingsAwaited and re-arms onDead', () {
+      final clock = _FakeClock();
+      final sink = _RecordingSink();
+      var deadCount = 0;
+      final probe = LatencyProbe(
+        nowMillis: clock.call,
+        send: sink.add,
+        idlePingIntervalMillis: 2000,
+        missedPongLimit: 3,
+        onDead: () => deadCount++,
+      );
+
+      for (var i = 0; i < 3; i++) {
+        probe.onIdleTick();
+        clock.advance(2000);
+      }
+      expect(deadCount, 1);
+
+      probe.reset();
+      expect(probe.pingsAwaited, 0);
+
+      // A fresh dead episode fires again after reset (re-armed latch).
+      for (var i = 0; i < 3; i++) {
+        probe.onIdleTick();
+        clock.advance(2000);
+      }
+      expect(deadCount, 2);
+    });
+  });
 }
