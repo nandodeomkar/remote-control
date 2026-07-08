@@ -5,8 +5,8 @@
 /// owning hello/challenge/pin/auth — pin/auth states are NEVER duplicated
 /// here (drift against `session.rs` is the failure mode). The driver that
 /// does IO is ConnectionService (plan 03-05): timers, sockets, and storage
-/// are all driver effects — this class holds no `Timer`, no channel, and
-/// imports nothing from Flutter or `dart:io`.
+/// are all driver effects — this class holds no timer objects, no channel,
+/// and imports nothing from Flutter or the IO libraries.
 ///
 /// Policy table (03-RESEARCH Pattern 6):
 /// - Transport failures retry with exponential backoff 1/2/4/8s capped at
@@ -20,6 +20,8 @@
 /// Secrets discipline: effects carry key/host/port only — no token field
 /// exists anywhere in this file (tokens stay in DeviceStore/driver).
 library;
+
+import 'dart:math' as math;
 
 /// The exact D-05 copy shown when the server no longer recognizes this
 /// phone (`authFail` noPairing/badMac — revoked or stale token).
@@ -147,80 +149,246 @@ class ReconnectStep {
   static const ReconnectStep none = ReconnectStep();
 }
 
-/// Pure connection-lifecycle state machine. All methods are implemented in
-/// plan 03-02 Task 2 (GREEN); this stub only fixes the API surface so the
-/// policy-table suites compile and fail red.
+/// Pure connection-lifecycle state machine.
 class ReconnectFsm {
-  // Injected jitter source — consumed by delayFor in Task 2 (GREEN).
-  // ignore: unused_field
-  final double Function()? _random;
+  ReconnectState _state = ReconnectState.idle;
+
+  /// The device being dialed; carried through backoff so redials reuse the
+  /// last-known ip:port. Never holds a token (secrets stay driver-side).
+  DeviceTarget? _target;
+
+  /// Consecutive transport-failure count (1-based per failure).
+  int _attempt = 0;
+
+  /// The needPairing copy (kRevokedExplanation for noPairing/badMac).
+  String? _explanation;
+
+  /// Jitter source returning 0.0..1.0 — injectable for deterministic tests.
+  final double Function() _random;
+
+  /// Base backoff delays in seconds: 1, 2, 4, 8, then cap 10 (design
+  /// spec §8 cap wins over D-06's discretionary ~30s).
+  static const List<int> _baseDelaySecs = [1, 2, 4, 8, 10];
 
   /// Creates an FSM. Inject [random] (returning 0.0..1.0) for deterministic
-  /// jitter in tests; defaults to a real PRNG in Task 2.
-  ReconnectFsm({double Function()? random}) : _random = random;
+  /// jitter in tests; defaults to `math.Random().nextDouble`.
+  ReconnectFsm({double Function()? random})
+      : _random = random ?? math.Random().nextDouble;
 
   /// The current lifecycle state.
-  ReconnectState get state =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  ReconnectState get state => _state;
 
   /// The current dial target, or `null` when idle.
-  DeviceTarget? get target =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  DeviceTarget? get target => _target;
 
   /// Consecutive transport-failure count (reset on auth / short-circuits).
-  int get attempt => throw UnimplementedError('implemented in 03-02 Task 2');
+  int get attempt => _attempt;
 
   /// The needPairing explanation copy, or `null` (D-05).
-  String? get explanation =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  String? get explanation => _explanation;
 
-  /// The jittered backoff delay for a 1-based [attempt].
-  Duration delayFor(int attempt) =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// The jittered backoff delay for a 1-based [attempt]: base 1/2/4/8s
+  /// capped at 10s, multiplied by a 0.8..1.2 jitter factor (±20%, D-06).
+  Duration delayFor(int attempt) {
+    final idx = math.min(math.max(attempt - 1, 0), _baseDelaySecs.length - 1);
+    final factor = 0.8 + 0.4 * _random();
+    return Duration(
+      milliseconds: (_baseDelaySecs[idx] * 1000 * factor).round(),
+    );
+  }
 
-  /// User/driver asks to connect to [target].
-  ReconnectStep connectRequested(DeviceTarget target) =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// User/driver asks to connect to [target] (any non-authed state).
+  ReconnectStep connectRequested(DeviceTarget target) {
+    switch (_state) {
+      case ReconnectState.authed:
+        // Already live — the caller must disconnect first.
+        return ReconnectStep.none;
+      case ReconnectState.idle:
+      case ReconnectState.connecting:
+      case ReconnectState.handshaking:
+      case ReconnectState.backoff:
+      case ReconnectState.needPairing:
+        _target = target;
+        _attempt = 0;
+        _explanation = null;
+        return _dialNow();
+    }
+  }
 
-  /// The socket came up; the driver starts the handshake.
-  ReconnectStep socketConnected() =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// The socket came up; the driver starts the `HandshakeFsm` (composition —
+  /// no handshake state is mirrored here). No driver effects.
+  ReconnectStep socketConnected() {
+    switch (_state) {
+      case ReconnectState.connecting:
+        _state = ReconnectState.handshaking;
+        return ReconnectStep.none;
+      case ReconnectState.idle:
+      case ReconnectState.handshaking:
+      case ReconnectState.authed:
+      case ReconnectState.backoff:
+      case ReconnectState.needPairing:
+        return ReconnectStep.none;
+    }
+  }
 
-  /// Socket connect failed / stream closed / pong timeout.
-  ReconnectStep transportFailed() =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// Socket connect failed / stream closed / pong timeout — enter a
+  /// jittered backoff (D-06). Transport failures ALWAYS retry; only auth
+  /// failures stop (D-05). Stray in needPairing: auth-stop is sticky.
+  ReconnectStep transportFailed() {
+    switch (_state) {
+      case ReconnectState.connecting:
+      case ReconnectState.handshaking:
+      case ReconnectState.authed:
+        _attempt += 1;
+        _state = ReconnectState.backoff;
+        return ReconnectStep(
+          effects: [StartBackoffEffect(delayFor(_attempt), _attempt)],
+        );
+      case ReconnectState.idle:
+      case ReconnectState.backoff:
+      case ReconnectState.needPairing:
+        return ReconnectStep.none;
+    }
+  }
 
-  /// The driver's backoff timer fired.
-  ReconnectStep backoffElapsed() =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// The driver's backoff timer fired — redial the same target.
+  ReconnectStep backoffElapsed() {
+    switch (_state) {
+      case ReconnectState.backoff:
+        return _dialNow();
+      case ReconnectState.idle:
+      case ReconnectState.connecting:
+      case ReconnectState.handshaking:
+      case ReconnectState.authed:
+      case ReconnectState.needPairing:
+        return ReconnectStep.none;
+    }
+  }
 
-  /// The app returned to the foreground (D-06 short-circuit).
-  ReconnectStep appResumed() =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// The app returned to the foreground (D-06 short-circuit): reset the
+  /// attempt counter and dial immediately.
+  ReconnectStep appResumed() => _shortCircuit();
 
-  /// The user tapped "Retry now" (D-04 affordance, D-06 short-circuit).
-  ReconnectStep retryNowPressed() =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// The user tapped "Retry now" (D-04 affordance) — same D-06 semantics
+  /// as [appResumed].
+  ReconnectStep retryNowPressed() => _shortCircuit();
 
-  /// A beacon for [guid] was sighted at [host]:[port] (D-06 short-circuit;
-  /// handles PC IP changes). Ignored unless [guid] matches the target key.
-  ReconnectStep beaconSighted(String guid, String host, int port) =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// A beacon for [guid] was sighted at [host]:[port] (D-06 short-circuit):
+  /// update the target's last-known address (PC IP change recovery) and
+  /// dial immediately. Ignored unless [guid] matches the current target —
+  /// a foreign beacon may never redirect a dial (T-03-06); even a matching
+  /// spoof only redirects a CONNECT ATTEMPT into challenge-response.
+  ReconnectStep beaconSighted(String guid, String host, int port) {
+    final current = _target;
+    if (current == null || guid != current.key) {
+      return ReconnectStep.none;
+    }
+    switch (_state) {
+      case ReconnectState.backoff:
+        _target = DeviceTarget(
+          key: current.key,
+          name: current.name,
+          host: host,
+          port: port,
+        );
+        _attempt = 0;
+        return _dialNow();
+      case ReconnectState.idle:
+      case ReconnectState.connecting:
+      case ReconnectState.handshaking:
+      case ReconnectState.authed:
+      case ReconnectState.needPairing:
+        return ReconnectStep.none;
+    }
+  }
 
-  /// The handshake reported `pairOk`/`authOk`.
-  ReconnectStep authedOk() =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// The handshake reported `pairOk`/`authOk` — the session is live and the
+  /// failure counter resets.
+  ReconnectStep authedOk() {
+    switch (_state) {
+      case ReconnectState.handshaking:
+        _attempt = 0;
+        _state = ReconnectState.authed;
+        return ReconnectStep.none;
+      case ReconnectState.idle:
+      case ReconnectState.connecting:
+      case ReconnectState.authed:
+      case ReconnectState.backoff:
+      case ReconnectState.needPairing:
+        return ReconnectStep.none;
+    }
+  }
 
   /// The handshake reported a definitive `authFail` (or versionMismatch) —
-  /// auth-stop, NEVER a retry (D-05).
+  /// auth-stop (D-05): NEVER a retry for ANY reason (retrying badMac would
+  /// hammer the server's global lockout counter, T-03-05). Only
+  /// noPairing/badMac mean a revoked/stale token, so only they clear it.
   ReconnectStep authRejected(
     String reason, {
     int? attemptsRemaining,
     int? retryAfterSecs,
-  }) =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  }) {
+    switch (_state) {
+      case ReconnectState.handshaking:
+        final revoked = reason == 'noPairing' || reason == 'badMac';
+        _explanation = revoked ? kRevokedExplanation : null;
+        _state = ReconnectState.needPairing;
+        final key = _target?.key;
+        return ReconnectStep(effects: [
+          if (revoked && key != null) ClearTokenEffect(key),
+          AuthStopEffect(
+            reason,
+            attemptsRemaining: attemptsRemaining,
+            retryAfterSecs: retryAfterSecs,
+          ),
+          const CloseEffect(),
+        ]);
+      case ReconnectState.idle:
+      case ReconnectState.connecting:
+      case ReconnectState.authed:
+      case ReconnectState.backoff:
+      case ReconnectState.needPairing:
+        return ReconnectStep.none;
+    }
+  }
 
-  /// User/driver asks to drop the connection.
-  ReconnectStep disconnectRequested() =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// User/driver asks to drop the connection — back to idle, never a retry.
+  ReconnectStep disconnectRequested() {
+    switch (_state) {
+      case ReconnectState.idle:
+        return ReconnectStep.none;
+      case ReconnectState.connecting:
+      case ReconnectState.handshaking:
+      case ReconnectState.authed:
+      case ReconnectState.backoff:
+      case ReconnectState.needPairing:
+        _state = ReconnectState.idle;
+        _target = null;
+        _attempt = 0;
+        _explanation = null;
+        return const ReconnectStep(effects: [CloseEffect()]);
+    }
+  }
+
+  /// Backoff short-circuit shared by [appResumed]/[retryNowPressed]:
+  /// reset the counter and dial immediately (D-06). Stray elsewhere.
+  ReconnectStep _shortCircuit() {
+    switch (_state) {
+      case ReconnectState.backoff:
+        _attempt = 0;
+        return _dialNow();
+      case ReconnectState.idle:
+      case ReconnectState.connecting:
+      case ReconnectState.handshaking:
+      case ReconnectState.authed:
+      case ReconnectState.needPairing:
+        return ReconnectStep.none;
+    }
+  }
+
+  /// Enter connecting and ask the driver to dial the current target.
+  ReconnectStep _dialNow() {
+    _state = ReconnectState.connecting;
+    return ReconnectStep(effects: [DialEffect(_target!)]);
+  }
 }

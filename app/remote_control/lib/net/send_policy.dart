@@ -17,8 +17,6 @@
 library;
 
 /// Bounded send policy: volatile drop-if-not-authed, reliable queue ≤[maxQueue].
-/// Methods are implemented in plan 03-02 Task 2 (GREEN); this stub only
-/// fixes the API surface so the suite compiles and fails red.
 class SendPolicy {
   /// Whether the session is authed (set by the driver on authedOk/loss).
   bool authed = false;
@@ -29,21 +27,42 @@ class SendPolicy {
   /// Called once per reliable frame dropped due to a full queue.
   final void Function()? onOverflow;
 
+  /// Reliable frames buffered during a blip, oldest first.
+  final List<Object> _queue = <Object>[];
+
   /// Creates a send policy.
   SendPolicy({this.maxQueue = 10, this.onOverflow});
 
-  /// Whether a volatile frame may be sent right now (never queued).
-  bool shouldSendVolatile() =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// Whether a volatile frame may be sent right now (never queued —
+  /// a plain boolean read, allocation-free on the pointer-move hot path).
+  bool shouldSendVolatile() => authed;
 
   /// Send [frame] via [send] when authed; queue it (bounded) otherwise.
-  void enqueueOrSendReliable(Object frame, void Function(Object) send) =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  /// Past [maxQueue] the frame is dropped and [onOverflow] fires once.
+  void enqueueOrSendReliable(Object frame, void Function(Object) send) {
+    if (authed) {
+      send(frame);
+      return;
+    }
+    if (_queue.length >= maxQueue) {
+      onOverflow?.call();
+      return;
+    }
+    _queue.add(frame);
+  }
 
   /// Deliver queued frames FIFO via [send], then empty the queue.
-  void flushOnAuthed(void Function(Object) send) =>
-      throw UnimplementedError('implemented in 03-02 Task 2');
+  void flushOnAuthed(void Function(Object) send) {
+    if (_queue.isEmpty) {
+      return;
+    }
+    final pending = List<Object>.of(_queue);
+    _queue.clear();
+    for (final frame in pending) {
+      send(frame);
+    }
+  }
 
   /// Empty the queue without sending (e.g. target switched / auth-stop).
-  void clear() => throw UnimplementedError('implemented in 03-02 Task 2');
+  void clear() => _queue.clear();
 }
