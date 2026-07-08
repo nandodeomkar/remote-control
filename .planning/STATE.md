@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-02-PLAN.md
-last_updated: "2026-07-08T13:47:09.040Z"
+stopped_at: Completed 03-03-PLAN.md
+last_updated: "2026-07-08T13:58:35.825Z"
 last_activity: 2026-07-08 -- Phase 03 execution started
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 19
-  completed_plans: 13
+  completed_plans: 14
   percent: 29
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 03 (discovery-pairing-connection) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
   WiFi (Xiaomi Android 16 phone -> Windows 11 laptop): p50 = 6ms, p95 = 10ms, all four
   PAD-05 criteria PASS. Transport locked (ws:// + TCP_NODELAY); the roadmap's
   UDP-mouse-channel reconsideration is NOT triggered.
@@ -74,6 +74,7 @@ Progress: [███░░░░░░░] 29% (2 of 7 phases complete; transpor
 | Phase 02 P03 | 11min | 3 tasks | 10 files |
 | Phase 02 P04 | manual | 1 task | 1 file |
 | Phase 03 P02 | 8min | 2 tasks | 4 files |
+| Phase 03 P03 | 8min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,9 @@ Recent decisions affecting current work:
 - [Phase 03-02]: Backoff cap is 10s (design spec §8) over D-06 discretionary ~30s; delay = base(1/2/4/8/10s) x (0.8 + 0.4*random()) rounded to ms, injectable random for deterministic tests
 - [Phase 03-02]: authRejected for ANY reason lands in needPairing with AuthStopEffect + CloseEffect and never a retry; ClearTokenEffect + revoked explanation only for noPairing/badMac
 - [Phase 03-02]: beaconSighted short-circuit also resets the attempt counter — consistent D-06 fresh-start semantics with appResumed/retryNowPressed
+- [Phase 03-03]: loadDevices returns Map keyed by deviceKey; DeviceMeta.toJson excludes the key so the prefs devices JSON byte-matches RESEARCH Pattern 7
+- [Phase 03-03]: SharedPrefsKv wraps SharedPreferencesAsync (2.5.x current API), thin adapter so DeviceStore never sees the API choice
+- [Phase 03-03]: Every SecureKv read/delete is Pitfall-5-wrapped (deleteToken swallows PlatformException like reads); writes stay raw so pairing save failures surface
 
 ### Pending Todos
 
@@ -145,6 +149,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08T13:47:09.028Z
-Stopped at: Completed 03-02-PLAN.md
+Last session: 2026-07-08T13:58:35.812Z
+Stopped at: Completed 03-03-PLAN.md
 Resume file: None
