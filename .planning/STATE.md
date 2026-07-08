@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 02-01-PLAN.md
-last_updated: "2026-07-08T04:02:08.561Z"
+status: verifying
+stopped_at: Completed 02-02-PLAN.md
+last_updated: "2026-07-08T04:39:12.109Z"
 last_activity: 2026-07-08 -- Phase 02 execution started
 progress:
   total_phases: 7
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 10
-  completed_plans: 9
-  percent: 14
+  completed_plans: 10
+  percent: 29
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 
 Phase: 02 (end-to-end-cursor-spike) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-07-08 -- Phase 02 execution started
 
 Progress: [█░░░░░░░░░] 14% (1 of 7 phases complete)
@@ -61,6 +61,7 @@ Progress: [█░░░░░░░░░] 14% (1 of 7 phases complete)
 | Phase 01 P07 | 16min | 2 tasks | 0 files |
 | Phase 01 P08 | 18min | 3 tasks | 13 files |
 | Phase 02 P01 | 45min | 3 tasks | 8 files |
+| Phase 02 P02 | 28min | 3 tasks | 31 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,9 @@ Recent decisions affecting current work:
 - [Phase 02]: DEV_PIN dev shortcut not implemented — AuthManager has no fixed-PIN API and the console-printed real PIN serves the owner's test loop (T-02-EP surface never created)
 - [Phase 02]: enigo::set_dpi_awareness() helper (re-exported at crate root in 0.6.1) used for DPI awareness; windows-crate fallback not needed
 - [Phase 02]: Enigo injection failures on the input thread are dropped (send-and-forget hot path), never panic
+- [Phase 02]: A2 resolved: ConnectionTask.fromSocket is public in Dart 3.12.2 — RESEARCH TCP_NODELAY construction used verbatim, no fallback idiom
+- [Phase 02]: connectNoDelay awaits channel.ready so WebSocket connect failures surface at the call site, not only on the stream
+- [Phase 02]: MoveSender.sink typed StreamSink<dynamic> so IOWebSocketChannel.sink plugs in directly; tests substitute a recording fake
 
 ### Pending Todos
 
@@ -112,6 +116,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08T04:02:08.548Z
-Stopped at: Completed 02-01-PLAN.md
+Last session: 2026-07-08T04:39:12.093Z
+Stopped at: Completed 02-02-PLAN.md
 Resume file: None
