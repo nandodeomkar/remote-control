@@ -70,7 +70,7 @@ Plans:
 
 - [x] 02-01-PLAN.md — server-windows crate: enigo MouseKeys executor on a dedicated input thread, sub-pixel accumulation, DPI awareness, runnable composition root
 - [x] 02-02-PLAN.md — Flutter app scaffold: TCP_NODELAY WebSocket connector (connectNoDelay) + codec-reusing MoveSender (client seams)
-- [ ] 02-03-PLAN.md — Wire the vertical: client handshake FSM (pair/reconnect), Listener trackpad screen, interleaved-ping latency HUD, INTERNET manifest permission
+- [x] 02-03-PLAN.md — Wire the vertical: client handshake FSM (pair/reconnect), Listener trackpad screen, interleaved-ping latency HUD, INTERNET manifest permission (completed 2026-07-08)
 - [ ] 02-04-PLAN.md — Manual hard-gate: on-device p50/p95 measurement over real WiFi against all 4 criteria (human-verify)
 
 ### Phase 3: Discovery, Pairing & Connection
@@ -166,7 +166,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Protocol Contract & Server Core | 8/8 | Complete    | 2026-07-07 |
-| 2. End-to-End Cursor Spike | 2/4 | Reopened (gate) | - |
+| 2. End-to-End Cursor Spike | 3/4 | Vertical wired — 02-04 manual gate pending | - |
 | 3. Discovery, Pairing & Connection | 0/TBD | Not started | - |
 | 4. Trackpad & Keyboard | 0/TBD | Not started | - |
 | 5. Media, Power, Presenter & Browser | 0/TBD | Not started | - |

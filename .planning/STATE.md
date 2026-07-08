@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: planned
-stopped_at: Phase 02 reopened — 02-03/02-04 planned, checker PASSED, ready to execute
-last_updated: "2026-07-08T04:39:12.109Z"
-last_activity: 2026-07-08 -- Phase 02 execution started
+status: in_progress
+stopped_at: Completed 02-03-PLAN.md — vertical wired; 02-04 manual on-device gate pending
+last_updated: "2026-07-08T05:54:06Z"
+last_activity: 2026-07-08 -- 02-03 executed (client handshake FSM + latency HUD + trackpad screen)
 progress:
   total_phases: 7
   completed_phases: 2
-  total_plans: 10
-  completed_plans: 10
-  percent: 29
+  total_plans: 11
+  completed_plans: 11
+  percent: 30
 ---
 
 # Project State
@@ -25,18 +25,22 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 
 ## Current Position
 
-Phase: 02 (end-to-end-cursor-spike) — REOPENED, PLANNED (2/4), ready to execute
-Plan: 02-03 (wire the vertical) + 02-04 (manual on-device gate) planned; plan-checker PASSED
-  (3 non-blocking warnings applied). 02-01/02-02 shipped code untouched.
-Status: Hard transport gate still OPEN — 02-03 makes it EXERCISABLE, then 02-04
-  measures p50/p95 <30ms on real WiFi. 02-03 is pure Flutter client wiring
-  (handshake FSM, Listener trackpad, interleaved-ping HUD) — no protocol/server
-  change; reuses shipped remote_protocol codecs/authProof + connectNoDelay + MoveSender.
-  Next: /gsd-execute-phase 02 (runs 02-03 autonomously, pauses at 02-04 human gate).
-  See: 02-03-PLAN.md, 02-04-PLAN.md, 02-VERIFICATION.md
-Last activity: 2026-07-08 -- Phase 02 replanned: 02-03/02-04 created, checker PASSED
+Phase: 02 (end-to-end-cursor-spike) — VERTICAL WIRED (3/4), 02-04 manual gate pending
+Plan: 02-03 (wire the vertical) EXECUTED — client handshake FSM (pair/reconnect),
+  Listener trackpad screen (onPointerMove -> MoveSender gated on Authed), interleaved-ping
+  latency HUD, INTERNET/cleartext manifest. flutter analyze clean, 32 tests pass.
+  No protocol/server/crypto change; reused remote_protocol codecs/authProof +
+  connectNoDelay + MoveSender exactly as shipped.
+Status: Hard transport gate now EXERCISABLE on real hardware — the structural blocker
+  in 02-VERIFICATION.md is cleared. Remaining: 02-04 measures p50/p95 <30ms on real WiFi
+  (MANUAL human-verify on-device gate; NOT agent-executable). Token is in-memory only,
+  manual IP:port entry, latency HUD/PIN shortcut are spike-only removables (D-09) — all
+  Phase-3 items.
+  Next: /gsd-execute-phase 02 pauses at 02-04 human gate (on-device measurement).
+  See: 02-03-SUMMARY.md, 02-04-PLAN.md, 02-VERIFICATION.md
+Last activity: 2026-07-08 -- 02-03 executed: handshake FSM + latency probe (TDD) + trackpad screen
 
-Progress: [█░░░░░░░░░] 14% (1 of 7 phases fully complete; Phase 02 gate open, plans ready)
+Progress: [██░░░░░░░░] 30% (1 of 7 phases fully complete; Phase 02 vertical wired, manual gate pending)
 
 ## Performance Metrics
 
@@ -68,6 +72,7 @@ Progress: [█░░░░░░░░░] 14% (1 of 7 phases fully complete; Ph
 | Phase 01 P08 | 18min | 3 tasks | 13 files |
 | Phase 02 P01 | 45min | 3 tasks | 8 files |
 | Phase 02 P02 | 28min | 3 tasks | 31 files |
+| Phase 02 P03 | 11min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -101,6 +106,11 @@ Recent decisions affecting current work:
 - [Phase 02]: A2 resolved: ConnectionTask.fromSocket is public in Dart 3.12.2 — RESEARCH TCP_NODELAY construction used verbatim, no fallback idiom
 - [Phase 02]: connectNoDelay awaits channel.ready so WebSocket connect failures surface at the call site, not only on the stream
 - [Phase 02]: MoveSender.sink typed StreamSink<dynamic> so IOWebSocketChannel.sink plugs in directly; tests substitute a recording fake
+- [Phase 02]: Client handshake is a pure IO-free FSM (HandshakeFsm) mirroring session.rs exactly (hello -> always challenge -> pin|auth branch on in-memory token); a thin HandshakeDriver does all channel IO — transitions proven without a socket
+- [Phase 02]: Reconnect/auth path reuses authProof(hexDecode token, hexDecode nonce) verbatim — no client-side crypto invented; asserted byte-equal in the FSM test
+- [Phase 02]: Latency measured round-trip-UNDER-move-load (ping every K moves OR ~250ms), not idle RTT — the faithful proxy for ack-less move frames (D-06); nearest-rank percentile (rank = ceil(p/100*N), clamped)
+- [Phase 02]: Single channel-stream listener decodes each frame once and routes handshake -> driver, pong -> probe (no double-subscribe); hot move path never rebuilds the HUD (timer-polled on a throttle)
+- [Phase 02]: ws:// LAN needs AndroidManifest INTERNET permission + usesCleartextTraffic=true; scoped network-security-config deferred to Phase 3
 
 ### Pending Todos
 
@@ -111,7 +121,7 @@ None yet.
 - [Phase 2]: Dart-side TCP_NODELAY plumbing needs empirical verification for the chosen web_socket_channel construction path (research flag)
 - [Phase 3]: Android UDP broadcast reception varies by device — test on owner's device early; MulticastLock + manual IP entry are the mitigations
 - [Phase 6]: apps.focus foreground-lock workarounds and EnumWindows filtering flagged as highest-fiddliness area — research recommends a phase-level spike during planning
-- [Phase 2 — BLOCKER]: Hard transport gate NOT met. Phase executed as two halves (02-01 server, 02-02 client seams) but the runnable end-to-end vertical was never planned/built. Missing: trackpad screen (Listener→MoveSender), client pair→challenge→auth handshake, latency HUD. `MoveSender`/`connectNoDelay` are unit-tested but never called by the app; `main.dart` is a static placeholder. Plans 02-03/02-04 (referenced by both SUMMARYs) do not exist. Must reopen phase and build the vertical before Phase 3. See 02-VERIFICATION.md.
+- [Phase 2 — RESOLVED STRUCTURALLY by 02-03]: The runnable end-to-end vertical is now built and wired. Trackpad screen (Listener→MoveSender gated on Authed), client pair→challenge→auth handshake FSM, and interleaved-ping latency HUD all exist and are called by the app; `main.dart` routes to the trackpad screen. `flutter analyze` clean, 32 tests pass. REMAINING (not a code blocker): the numeric <30ms p50/p95 pass is the MANUAL on-device gate in 02-04 (human-verify over real WiFi) — must pass before Phase 3, else the roadmap's UDP-channel transport reconsideration triggers. See 02-03-SUMMARY.md, 02-04-PLAN.md, 02-VERIFICATION.md.
 
 ### Quick Tasks Completed
 
@@ -129,6 +139,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08T04:39:12.093Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-07-08T05:54:06Z
+Stopped at: Completed 02-03-PLAN.md — vertical wired; 02-04 manual on-device gate pending
 Resume file: None
