@@ -37,6 +37,12 @@ dependencies:
   flutter_riverpod: ^3.3.2
   web_socket_channel: ^3.0.3
   wakelock_plus: ^1.6.1
+  # Per-device auth token at rest (D-10, spec-locked). v10 default cipher
+  # (RSA_ECB_OAEP+SHA-256) — NEVER set the deprecated encryptedSharedPreferences.
+  flutter_secure_storage: ^10.3.1
+  # Non-secret device metadata only (D-07): names, last-known ip:port,
+  # last-connected pointer. Secrets NEVER go here (stack rule).
+  shared_preferences: ^2.5.5
   # Wire-protocol codecs (binary mouse frames + JSON messages), fixture-proven
   # byte-identical to the Rust decoder. NEVER re-implement a codec app-side.
   remote_protocol:
