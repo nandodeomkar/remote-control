@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-01-PLAN.md (wave 1 complete)
-last_updated: "2026-07-08T15:10:00.000Z"
-last_activity: 2026-07-08 -- 03-01 checkpoint approved, wave 1 complete
+stopped_at: "03-04 complete (on-device checkpoint approved — Xiaomi beacon reception + cleartext swap proven; UDP concern retired). Wave 2 remaining: 03-05"
+last_updated: "2026-07-08T17:21:10.128Z"
+last_activity: 2026-07-08 -- Phase 03 execution started
 progress:
   total_phases: 7
   completed_phases: 2
   total_plans: 19
-  completed_plans: 15
+  completed_plans: 16
   percent: 29
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 03 (discovery-pairing-connection) — EXECUTING
-Plan: wave 1 complete (03-01, 03-02, 03-03); next wave 2 (03-04)
+Plan: 4 of 7 complete (01, 02, 03, 04 — wave 2 next: 03-05)
   WiFi (Xiaomi Android 16 phone -> Windows 11 laptop): p50 = 6ms, p95 = 10ms, all four
   PAD-05 criteria PASS. Transport locked (ws:// + TCP_NODELAY); the roadmap's
   UDP-mouse-channel reconsideration is NOT triggered.
@@ -76,6 +76,7 @@ Progress: [███░░░░░░░] 29% (2 of 7 phases complete; transpor
 | Phase 03 P02 | 8min | 2 tasks | 4 files |
 | Phase 03 P03 | 8min | 2 tasks | 4 files |
 | Phase 03 P01 | 15min | 3 tasks | 17 files |
+| Phase 03 P04 | 11min + checkpoint | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -124,6 +125,10 @@ Recent decisions affecting current work:
 - [Phase 03-01]: SERVER_PROTO_VERSION widened to pub(crate) and referenced by encode_beacon — proto literal never duplicated
 - [Phase 03-01]: MachineGuid registry-read failure degrades to stable "name-<device_name>" id with a warn — identity failure never crashes the server
 - [Phase 03-01]: if-addrs in server-core (cross-platform, preserves zero-Windows-deps); winreg + tauri-winrt-notification isolated in server-windows; toast attributed to "Windows PowerShell" is the accepted v1 quirk (AUMID lands with Phase-7 tray)
+- [Phase 03-04]: Beacon.host is always the datagram source address — payload fields can never redirect where the client dials (T-03-13 spoof containment)
+- [Phase 03-04]: BeaconListener pairs MulticastLock with the socket lifecycle: acquire before bind, release on stop AND bind failure (retryable); broadcast stream survives stop/start
+- [Phase 03-04]: MulticastLock MethodChannel no-ops on MissingPluginException — OEM insurance, not a requirement; tests and non-Android hosts need no fakes
+- [Phase 03-04]: network_security_config.xml keeps base-config cleartext (Android XML has no CIDR scoping); real LAN-only enforcement is the ConnectionService RFC1918 guard in 03-05 (D-10 split documented in-file)
 
 ### Pending Todos
 
@@ -133,7 +138,7 @@ Recent decisions affecting current work:
 
 ### Blockers/Concerns
 
-- [Phase 3]: Android UDP broadcast reception varies by device — test on owner's device early; MulticastLock + manual IP entry are the mitigations
+- [Phase 3 — RESOLVED 2026-07-08]: Android UDP broadcast reception CONFIRMED on the owner's Xiaomi 25080RABDI (Android 16 / HyperOS) at the 03-04 early on-device checkpoint — beacons listed within seconds, continuous 2s-interval reception, no MulticastLock failure, no OEM filtering. Cleartext ws:// also proven under the new network_security_config. See 03-04-SUMMARY.md.
 - [Phase 6]: apps.focus foreground-lock workarounds and EnumWindows filtering flagged as highest-fiddliness area — research recommends a phase-level spike during planning
 - [Phase 2 — RESOLVED 2026-07-08]: Hard transport gate PASSED on-device (p50 = 6ms, p95 = 10ms on real WiFi, all four PAD-05 criteria). TCP_NODELAY empirical verification also resolved — sub-6ms p50 under continuous load with no traffic-pattern-dependent hitching. UDP-channel reconsideration NOT triggered. See 02-04-GATE-RESULT.md.
 
@@ -153,6 +158,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08 (resumed)
-Stopped at: 03-01 complete (checkpoint approved) — wave 1 done, wave 2 (03-04) next
+Last session: 2026-07-08T17:21:10.115Z
+Stopped at: 03-04 complete (on-device checkpoint approved — Xiaomi beacon reception + cleartext swap proven; UDP concern retired). Wave 2 remaining: 03-05
 Resume file: None
