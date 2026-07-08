@@ -2,8 +2,8 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: gaps_found
-stopped_at: Phase 02 verification — gate blocked (end-to-end vertical not wired)
+status: planned
+stopped_at: Phase 02 reopened — 02-03/02-04 planned, checker PASSED, ready to execute
 last_updated: "2026-07-08T04:39:12.109Z"
 last_activity: 2026-07-08 -- Phase 02 execution started
 progress:
@@ -25,16 +25,18 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 
 ## Current Position
 
-Phase: 02 (end-to-end-cursor-spike) — VERIFICATION: GAPS FOUND (gate BLOCKED)
-Plan: 2 of 2 executed — but the end-to-end vertical was never wired
-Status: Hard transport gate NOT met. Server half runnable; client half is
-  unit-tested library code never called by the app. Missing: trackpad screen,
-  client pair→challenge→auth handshake, latency HUD. Needs a new 02-03 plan
-  (wire the vertical) + 02-04 manual gate before Phase 03 can start.
-  See: .planning/phases/02-end-to-end-cursor-spike/02-VERIFICATION.md
-Last activity: 2026-07-08 -- Phase 02 verification: gaps found (gate blocked)
+Phase: 02 (end-to-end-cursor-spike) — REOPENED, PLANNED (2/4), ready to execute
+Plan: 02-03 (wire the vertical) + 02-04 (manual on-device gate) planned; plan-checker PASSED
+  (3 non-blocking warnings applied). 02-01/02-02 shipped code untouched.
+Status: Hard transport gate still OPEN — 02-03 makes it EXERCISABLE, then 02-04
+  measures p50/p95 <30ms on real WiFi. 02-03 is pure Flutter client wiring
+  (handshake FSM, Listener trackpad, interleaved-ping HUD) — no protocol/server
+  change; reuses shipped remote_protocol codecs/authProof + connectNoDelay + MoveSender.
+  Next: /gsd-execute-phase 02 (runs 02-03 autonomously, pauses at 02-04 human gate).
+  See: 02-03-PLAN.md, 02-04-PLAN.md, 02-VERIFICATION.md
+Last activity: 2026-07-08 -- Phase 02 replanned: 02-03/02-04 created, checker PASSED
 
-Progress: [█░░░░░░░░░] 14% (1 of 7 phases fully complete; Phase 02 gate open)
+Progress: [█░░░░░░░░░] 14% (1 of 7 phases fully complete; Phase 02 gate open, plans ready)
 
 ## Performance Metrics
 

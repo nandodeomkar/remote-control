@@ -5,6 +5,10 @@ status: draft
 nyquist_compliant: false
 wave_0_complete: false
 created: 2026-07-08
+# NOTE: these flags track SHIPPED state. The FSM + percentile Wave-0 tests are
+# planned in 02-03 (handshake_fsm_test.dart, latency_probe_test.dart) but not yet
+# executed; flip to true when 02-03 lands. The 02-01/02-02 Wave-0 suites
+# (accumulator, nodelay factory, move sender) are already green.
 ---
 
 # Phase 2 — Validation Strategy

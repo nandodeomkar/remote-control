@@ -558,22 +558,25 @@ enigo.move_mouse(dx_int, dy_int, Coordinate::Rel)?;  // relative delta
 
 **If A1 fails, the phase's core risk materializes** — but that is exactly what the spike exists to discover, and the roadmap has the UDP-channel escape hatch ready.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does the `connectionFactory` TCP_NODELAY reliably reach the socket in web_socket_channel 3.0.3?**
    - What we know: the API surface exists and is designed for exactly this (custom socket construction); server-side NODELAY is already proven.
    - What's unclear: whether `IOWebSocketChannel` honors the `customClient`'s `connectionFactory` end-to-end on the current SDK, and whether any intermediate layer re-wraps the socket.
    - Recommendation: make "verify Dart TCP_NODELAY empirically (slow-diagonal hitch test + optional server-side inter-arrival log)" the **first** implementation task of the phase.
+   - **RESOLVED:** the seam was unit-proven in 02-02 (`connectNoDelay` sets `SocketOption.tcpNoDelay` on the resolved socket); the empirical on-wire hitch test is routed to the 02-04 manual gate.
 
 2. **ping-interleaved echo vs a dedicated stamped-move echo for measurement?**
    - What we know: `ping{ts}`/`pong{ts}` exists and round-trips on the same socket; the protocol is frozen.
    - What's unclear: whether interleaving `ping` frames *while dragging* measures the move path faithfully enough, or whether a spike-only stamped-move variant is worth a temporary protocol extension (D-06 allows research to choose the mechanism).
    - Recommendation: default to ping-interleaved-during-drag (no protocol change, shares the NODELAY socket/queue with moves). Only add a stamped-move opcode if the interleaved number proves untrustworthy — and mark it spike-only (D-09).
+   - **RESOLVED:** ping-interleaved-under-drag chosen (no protocol change); implemented by 02-03 Task 2 (`latency_probe.dart`). Moves confirmed one-way fire-and-forget with no per-frame ack, so RTT-under-load is the faithful proxy.
 
 3. **Stub executors location for the four non-mouse traits.**
    - What we know: `Executors` needs all five trait objects to construct; core mocks live under test/mock.
    - What's unclear: whether to expose a reusable no-op stub or seed real (empty) Phase-4/5/6 executors now.
    - Recommendation: seed empty `server-windows` executor files (mouse real, others no-op) — matches D-08 "kept as foundation" and gives later phases a home.
+   - **RESOLVED:** shipped in 02-01 — `server-windows/src/executors/stubs.rs` seeds no-op Media/Power/Apps/Clipboard executors; mouse path is real.
 
 ## Sources
 
