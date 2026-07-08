@@ -28,11 +28,11 @@ class MoveSender {
   /// A zero delta is still forwarded — the trackpad, not the sender, decides
   /// whether to emit (the sender is a pure pass-through).
   void sendMove(double dx, double dy) {
-    throw UnimplementedError('02-02 Task 3 GREEN implements this');
+    sink.add(encodeMove(dx, dy));
   }
 
   /// Encodes a relative scroll and adds it to the sink, fire-and-forget.
   void sendScroll(double dx, double dy) {
-    throw UnimplementedError('02-02 Task 3 GREEN implements this');
+    sink.add(encodeScroll(dx, dy));
   }
 }
