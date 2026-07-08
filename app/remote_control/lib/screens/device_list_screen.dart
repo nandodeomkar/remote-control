@@ -24,10 +24,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../net/connection_providers.dart';
+import '../net/handshake.dart';
 import '../net/reconnect_fsm.dart';
 import '../store/device_list_store.dart';
 import '../store/device_store.dart';
 import 'connection_copy.dart';
+import 'pairing_dialog.dart';
 
 // Theme tokens (03-UI-SPEC Color table; accent literal reserved — see the
 // library doc).
@@ -61,12 +63,72 @@ const TextStyle _errorLine = TextStyle(
 );
 
 /// The device list screen — phase home.
-class DeviceListScreen extends ConsumerWidget {
+class DeviceListScreen extends ConsumerStatefulWidget {
   /// Creates the device list screen.
   const DeviceListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DeviceListScreen> createState() => _DeviceListScreenState();
+}
+
+class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
+  StreamSubscription<void>? _changesSub;
+  bool _sheetOpen = false;
+
+  // Previous-ping snapshots so the sheet opens on TRANSITIONS only (a
+  // dismissed sheet must not reopen on unrelated pings).
+  HandshakeStatus? _prevHandshake;
+  ReconnectState? _prevFsm;
+
+  @override
+  void initState() {
+    super.initState();
+    final service = ref.read(connectionServiceProvider);
+    _prevHandshake = service.handshakeStatus;
+    _prevFsm = service.fsmState;
+    _changesSub = service.changes.listen((_) => _onServiceChange());
+  }
+
+  @override
+  void dispose() {
+    _changesSub?.cancel();
+    _changesSub = null;
+    super.dispose();
+  }
+
+  /// Opens the pairing sheet on the two entry transitions (Task 3 wiring):
+  /// the handshake reaching needPin (unpaired tap / manual connect), and
+  /// auth-stop landing in needPairing WITH the revoked explanation (D-05 —
+  /// the explanation renders on the sheet's reserved line, never a retry
+  /// loop).
+  void _onServiceChange() {
+    if (!mounted) return;
+    final service = ref.read(connectionServiceProvider);
+    final handshake = service.handshakeStatus;
+    final fsm = service.fsmState;
+
+    final becameNeedPin = handshake == HandshakeStatus.needPin &&
+        _prevHandshake != HandshakeStatus.needPin;
+    final becameRevoked = fsm == ReconnectState.needPairing &&
+        _prevFsm != ReconnectState.needPairing &&
+        service.pairingExplanation != null;
+    _prevHandshake = handshake;
+    _prevFsm = fsm;
+
+    if (_sheetOpen || (!becameNeedPin && !becameRevoked)) return;
+    final target = service.target;
+    if (target == null) return;
+
+    _sheetOpen = true;
+    unawaited(
+      showPairingSheet(context, target).whenComplete(() {
+        _sheetOpen = false;
+      }),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final entries = ref.watch(deviceListProvider);
 
     return Scaffold(
