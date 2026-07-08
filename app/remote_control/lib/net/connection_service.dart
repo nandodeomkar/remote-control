@@ -23,35 +23,46 @@ import 'package:web_socket_channel/io.dart';
 /// MUST route its socket through here so tests can prove the option is set
 /// without opening a real connection.
 Socket setTcpNoDelay(Socket socket) {
-  throw UnimplementedError('02-02 Task 2 GREEN implements this');
+  socket.setOption(SocketOption.tcpNoDelay, true);
+  return socket;
 }
 
 /// Wraps a [ConnectionTask] so its resolved socket has TCP_NODELAY set,
 /// preserving the original cancel path (the WebSocket upgrade rides the
 /// returned task's socket).
 ConnectionTask<Socket> noDelayTask(ConnectionTask<Socket> task) {
-  throw UnimplementedError('02-02 Task 2 GREEN implements this');
+  final Future<Socket> wrapped = task.socket.then(setTcpNoDelay);
+  return ConnectionTask.fromSocket(wrapped, task.cancel);
 }
 
 /// [HttpClient.connectionFactory]-shaped callback: connects a plain TCP
 /// socket to `uri` and applies TCP_NODELAY via [noDelayTask].
+///
+/// LAN-only `ws://` — no TLS branch (LAN-only binding is locked by spec);
+/// proxies are ignored (no proxy on a LAN).
 Future<ConnectionTask<Socket>> noDelayConnectionFactory(
   Uri uri,
   String? proxyHost,
   int? proxyPort,
 ) {
-  throw UnimplementedError('02-02 Task 2 GREEN implements this');
+  return Socket.startConnect(uri.host, uri.port).then(noDelayTask);
 }
 
 /// Builds the [HttpClient] whose connections all carry TCP_NODELAY.
 HttpClient buildNoDelayHttpClient() {
-  throw UnimplementedError('02-02 Task 2 GREEN implements this');
+  return HttpClient()..connectionFactory = noDelayConnectionFactory;
 }
 
 /// Connects a WebSocket channel to [wsUri] over a TCP_NODELAY socket.
 ///
 /// Phase 3 grows this into the full reconnect-FSM ConnectionService; the
 /// construction path (customClient + connectionFactory) is permanent.
-Future<IOWebSocketChannel> connectNoDelay(Uri wsUri) {
-  throw UnimplementedError('02-02 Task 2 GREEN implements this');
+Future<IOWebSocketChannel> connectNoDelay(Uri wsUri) async {
+  final channel = IOWebSocketChannel.connect(
+    wsUri,
+    customClient: buildNoDelayHttpClient(),
+  );
+  // Surface connect failures to the caller instead of only on the stream.
+  await channel.ready;
+  return channel;
 }
