@@ -4,6 +4,7 @@
 
 mod executors;
 mod input_thread;
+mod notify;
 
 use std::sync::{Arc, Mutex};
 
@@ -12,6 +13,7 @@ use server_core::auth::pin::PIN_TTL_SECS;
 use server_core::auth::AuthManager;
 use server_core::executors::Executors;
 use server_core::transport::ServerDeps;
+use server_core::transport::beacon::{self, BeaconIdentity};
 use tracing_subscriber::EnvFilter;
 
 use executors::mouse_keys::EnigoMouseKeys;
@@ -52,21 +54,25 @@ async fn main() -> anyhow::Result<()> {
         clipboard: Arc::new(StubClipboard),
     };
 
-    // 5. Auth: real Phase 1 pairing (D-01/D-02) — show the PIN on the
-    //    console (the tray display comes in Phase 7). The PIN goes to
-    //    stdout as the pairing UX, NOT through the tracing subscriber.
+    // 5. Auth: real Phase 1 pairing (D-01/D-02) — show the PIN via a
+    //    Windows toast with the console print as guaranteed fallback
+    //    (D-09; the tray-proper display comes in Phase 7). The PIN goes to
+    //    stdout + toast as the pairing UX, NOT through the tracing
+    //    subscriber.
     let auth = Arc::new(Mutex::new(AuthManager::new()));
     let pin = auth
         .lock()
         .expect("auth mutex poisoned at startup")
         .begin_pairing();
-    println!("Pairing PIN: {pin}");
+    notify::notify_pin(&pin);
 
     // 5a. Re-pair loop (WR-01): the initial PIN expires after PIN_TTL_SECS.
     //     Without this, pairing is permanently impossible ~60s after launch
-    //     with no console indication. Refresh the window (reprint a fresh PIN)
-    //     each TTL while still unpaired; stop once a phone pairs. Clone the
-    //     Arc BEFORE `auth` is moved into ServerDeps below.
+    //     with no indication. Refresh the window (re-notify a fresh PIN)
+    //     each TTL while still unpaired; stop once a phone pairs. Both the
+    //     initial and refreshed PIN route through the same notify path
+    //     (toast + console). Clone the Arc BEFORE `auth` is moved into
+    //     ServerDeps below.
     let auth_for_repin = Arc::clone(&auth);
     tokio::spawn(async move {
         loop {
@@ -79,9 +85,9 @@ async fn main() -> anyhow::Result<()> {
                     break; // a device paired — stop refreshing
                 }
                 guard.begin_pairing()
-                // guard dropped here, before the println! below
+                // guard dropped here, before the notify below
             };
-            println!("Pairing PIN (refreshed): {refreshed}");
+            notify::notify_pin(&refreshed);
         }
     });
 
@@ -106,7 +112,50 @@ async fn main() -> anyhow::Result<()> {
         .with_context(|| format!("bind 0.0.0.0:{port}"))?;
     tracing::info!(port, "server-windows listening");
 
+    // 7a. Discovery beacon (CONN-01): identity is Windows-specific (winreg
+    //     MachineGuid + COMPUTERNAME) and injected HERE so server-core
+    //     keeps its zero-Windows-deps invariant. `ws_port` must be the
+    //     RESOLVED WebSocket port from step 7 (after the RC_PORT override),
+    //     which is why this step lives after the port resolution. The
+    //     beacon payload carries no secrets (protocol/BEACON.md).
+    let guid = machine_guid().unwrap_or_else(|| {
+        // Never crash the server over identity: derive a stable fallback id.
+        tracing::warn!("MachineGuid registry read failed; using name-derived beacon id");
+        format!("name-{}", device_name())
+    });
+    let beacon_port: u16 = match std::env::var("RC_BEACON_PORT") {
+        Ok(v) => v
+            .parse()
+            .with_context(|| format!("RC_BEACON_PORT must be a valid port number, got {v:?}"))?,
+        Err(_) => beacon::DEFAULT_BEACON_PORT,
+    };
+    tokio::spawn(beacon::run_beacon(
+        BeaconIdentity {
+            name: device_name(),
+            guid,
+            ws_port: port,
+        },
+        beacon_port,
+    ));
+
     // 8. The whole loop lives in server-core (Phase 1, unchanged).
     server_core::run(listener, deps).await;
     Ok(())
+}
+
+/// Stable machine GUID: REG_SZ `MachineGuid` under
+/// `HKLM\SOFTWARE\Microsoft\Cryptography` (readable unelevated; the x86_64
+/// build sees the 64-bit registry view by default).
+fn machine_guid() -> Option<String> {
+    winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE)
+        .open_subkey(r"SOFTWARE\Microsoft\Cryptography")
+        .ok()?
+        .get_value::<String, _>("MachineGuid")
+        .ok()
+}
+
+/// Human-readable device name for the beacon: `COMPUTERNAME` with a literal
+/// fallback (assumption A5 — the env var is standard on Windows).
+fn device_name() -> String {
+    std::env::var("COMPUTERNAME").unwrap_or_else(|_| "Windows PC".to_string())
 }

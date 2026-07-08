@@ -13,3 +13,9 @@ tokio = { version = "1.52", features = ["rt-multi-thread", "net", "sync", "time"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
+# Machine GUID read (HKLM\SOFTWARE\Microsoft\Cryptography) for the beacon
+# identity — Windows-only, injected into server-core (CONN-01).
+winreg = "0.56"
+# WinRT toast for the pairing PIN from the unpackaged exe (D-09/CONN-02);
+# POWERSHELL_APP_ID needs no AUMID registration (proper AUMID: Phase 7 tray).
+tauri-winrt-notification = "0.8"
