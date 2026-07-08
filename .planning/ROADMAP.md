@@ -14,7 +14,7 @@ The journey runs strictly down the dependency graph the design spec and research
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Protocol Contract & Server Core** - Lock the wire protocol (challenge-response auth, diff-ops text, golden fixtures) and build the fully CI-tested OS-agnostic server core with mock executors (completed 2026-07-07)
-- [x] **Phase 2: End-to-End Cursor Spike** - A finger on the phone moves the real Windows cursor visually instantly on real WiFi — retires the <30ms transport risk while the code is small (completed 2026-07-08)
+- [ ] **Phase 2: End-to-End Cursor Spike** - A finger on the phone moves the real Windows cursor visually instantly on real WiFi — retires the <30ms transport risk while the code is small (REOPENED — end-to-end vertical being wired in 02-03; hard gate re-runs in 02-04)
 - [ ] **Phase 3: Discovery, Pairing & Connection** - Phone finds the PC automatically, pairs once via PIN, then reconnects silently and recovers from WiFi drops and IP changes
 - [ ] **Phase 4: Trackpad & Keyboard** - The product-defining screens: full trackpad feel checklist and IME-correct typing with special-key rows, sticky modifiers, and autorepeat
 - [ ] **Phase 5: Media, Power, Presenter & Browser** - The everyday control-center extras: media/absolute volume, double-confirmed power actions, slide driving with timer, browser macros
@@ -64,7 +64,14 @@ Plans:
   4. Slow diagonal movement tracks smoothly without drift or stair-stepping (server-side sub-pixel accumulation and DPI awareness working)
 
 **Gate:** If the <30ms budget cannot be met on real WiFi, the transport decision is revisited (UDP mouse channel behind the existing transport abstraction) before any later phase proceeds.
-**Plans**: TBD
+**Plans**: 4 plans
+
+Plans:
+
+- [x] 02-01-PLAN.md — server-windows crate: enigo MouseKeys executor on a dedicated input thread, sub-pixel accumulation, DPI awareness, runnable composition root
+- [x] 02-02-PLAN.md — Flutter app scaffold: TCP_NODELAY WebSocket connector (connectNoDelay) + codec-reusing MoveSender (client seams)
+- [ ] 02-03-PLAN.md — Wire the vertical: client handshake FSM (pair/reconnect), Listener trackpad screen, interleaved-ping latency HUD, INTERNET manifest permission
+- [ ] 02-04-PLAN.md — Manual hard-gate: on-device p50/p95 measurement over real WiFi against all 4 criteria (human-verify)
 
 ### Phase 3: Discovery, Pairing & Connection
 
@@ -159,7 +166,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Protocol Contract & Server Core | 8/8 | Complete    | 2026-07-07 |
-| 2. End-to-End Cursor Spike | 2/2 | Complete   | 2026-07-08 |
+| 2. End-to-End Cursor Spike | 2/4 | Reopened (gate) | - |
 | 3. Discovery, Pairing & Connection | 0/TBD | Not started | - |
 | 4. Trackpad & Keyboard | 0/TBD | Not started | - |
 | 5. Media, Power, Presenter & Browser | 0/TBD | Not started | - |
