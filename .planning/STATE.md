@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-07-09T19:28:54.863Z"
+stopped_at: Completed 04-04-PLAN.md
+last_updated: "2026-07-09T20:01:15.642Z"
 last_activity: 2026-07-09 -- Phase 04 execution started
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 25
-  completed_plans: 22
+  completed_plans: 23
   percent: 43
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 04 (trackpad-keyboard) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Next: execute Phase 04 (/gsd-execute-phase 4)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -80,6 +80,7 @@ Progress: [████░░░░░░] 43% (3 of 7 phases complete)
 | Phase 04 P01 | 10min | 2 tasks | 3 files |
 | Phase 04 P03 | 16min | 3 tasks | 7 files |
 | Phase 04 P02 | 6min | 2 tasks | 4 files |
+| Phase 04 P04 | 25min (2 sessions) | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,9 @@ Recent decisions affecting current work:
 - [Phase 04-02]: Open Q3 resolved: terse key.code vocabulary locked in keymap.rs CLIENT_KEY_CODES (Esc/Tab/Home/End/PgUp/PgDn/Del, Up/Down/Left/Right, F1..F12, Num0..Num9 + NumEnter + NumDot, ControlLeft/AltLeft/ShiftLeft/WinLeft) — 04-06 kClientKeyCodes must mirror byte-for-byte
 - [Phase 04-02]: Router Phase-1 browser/present macro codes (BrowserBack/BrowserForward/T/W/B/Plus/Minus) mapped in map_key via Key::Unicode so already-routed actions execute instead of silently no-opping
 - [Phase 04-02]: KeyTap with an unknown code drops the WHOLE command — modifiers never pressed around a key that will not fire; Cmd dropped Copy (heap-owning variants, mpsc send moves)
+- [Phase 04-04]: Long-press verdicts round-trip through the classifier (onLongPressElapsed -> onLongPressFire -> driver.handle) so drag-start vs stale-fire logic stays in the pure FSM
+- [Phase 04-04]: D-05 sensitivity bridged to the hot path via ref.listenManual(fireImmediately) updating a cached double — never a per-event provider lookup; store clamps read+write and degrades to default on platform read failure
+- [Phase 04-04]: Tune sheet is a Consumer-scoped modal route outside the Listener subtree — tuning never rebuilds the trackpad surface or header chip
 
 ### Pending Todos
 
@@ -180,6 +184,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-09T19:28:54.844Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-07-09T20:01:15.626Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None
