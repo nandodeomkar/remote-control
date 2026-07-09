@@ -5,8 +5,9 @@
 /// intents the [TrackpadDriver] executes: accelGain-scaled moves w/ the D-05
 /// sensitivity, tap/two-finger-tap clicks, momentum scroll with instant
 /// touch-stop, and long-press drag with drag-lock. Chrome added this plan:
-/// the [MouseButtonsBar] docked beneath the surface (PAD-02) and the
-/// drag-lock pill (top-center, PAD-04).
+/// the [MouseButtonsBar] docked beneath the surface (PAD-02), the drag-lock
+/// pill (top-center, PAD-04), and the tune affordance (bottom-right) that
+/// opens the D-05 sensitivity sheet.
 ///
 /// HOT-PATH INVARIANT (Phase 2/3, preserved): the pointer routes are
 /// `classifier -> driver -> service` calls with ZERO setState — the per-event
@@ -31,6 +32,7 @@ import 'package:remote_protocol/remote_protocol.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
 import '../screens/connection_copy.dart';
+import '../settings/sensitivity.dart';
 import '../widgets/connection_header.dart';
 import 'gesture_classifier.dart';
 import 'mouse_buttons.dart';
@@ -65,15 +67,25 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
   StreamSubscription<void>? _changesSub;
   ChipStatus _lastChip = ChipStatus.disconnected;
 
-  /// Cached D-05 sensitivity — the driver's getter reads THIS double; a
-  /// provider listener updates it on change (never a lookup per event).
-  // ignore: prefer_final_fields — mutated by the sensitivity wiring (Task 3).
+  /// Cached D-05 sensitivity — the driver's getter reads THIS double; the
+  /// [sensitivityProvider] listener below updates it on change (never a
+  /// provider lookup per pointer event — hot-path invariant).
   double _sensitivity = kSensitivityDefault;
 
   @override
   void initState() {
     super.initState();
     _service = ref.read(connectionServiceProvider);
+
+    // D-05 sensitivity cache: listenManual (no widget rebuild) seeds the
+    // double immediately and follows every slider change; the subscription
+    // closes with the element. The hot path only ever reads _sensitivity.
+    ref.listenManual<double>(
+      sensitivityProvider,
+      (_, next) => _sensitivity = next,
+      fireImmediately: true,
+    );
+
     _classifier = GestureClassifier(
       nowMillis: () => DateTime.now().millisecondsSinceEpoch,
     );
@@ -143,6 +155,48 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
   void _onMouseButton(String button) {
     _service.sendReliable(ClickMsg(button: button));
     unawaited(HapticFeedback.lightImpact());
+  }
+
+  // The D-05 sensitivity sheet: a modal route (OUTSIDE the Listener subtree,
+  // so opening it never rebuilds the hot path). The slider writes through
+  // sensitivityProvider — persisted immediately, applied live via the
+  // listenManual cache above.
+  void _openSensitivitySheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0E0F12),
+      shape: const Border(top: BorderSide(color: Color(0xFF2A2D34))),
+      builder: (context) => SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Pointer speed',
+                style: TextStyle(
+                  color: Color(0xFFE6E8EB),
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              Consumer(
+                builder: (context, ref, _) => Slider(
+                  value: ref.watch(sensitivityProvider),
+                  min: kSensitivityMin,
+                  max: kSensitivityMax,
+                  activeColor: const Color(0xFF4C8DFF),
+                  inactiveColor: const Color(0xFF2A2D34),
+                  onChanged: ref.read(sensitivityProvider.notifier).set,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -225,6 +279,36 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                             opacity: locked ? 1.0 : 0.0,
                             duration: const Duration(milliseconds: 150),
                             child: const _DragLockPill(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Tune affordance (D-05): bottom-right, thumb-reachable,
+                  // above the L/M/R bar — the UI-SPEC panel-toggle pattern
+                  // (neutral at rest, accent only on active states).
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: Tooltip(
+                      message: 'Pointer speed',
+                      child: Material(
+                        color: const Color(0xFF16181D),
+                        shape: const CircleBorder(
+                          side: BorderSide(color: Color(0xFF2A2D34)),
+                        ),
+                        child: InkWell(
+                          customBorder: const CircleBorder(),
+                          onTap: _openSensitivitySheet,
+                          child: const SizedBox(
+                            width: 48,
+                            height: 48,
+                            child: Icon(
+                              Icons.tune,
+                              size: 20,
+                              color: Color(0xFFE6E8EB),
+                            ),
                           ),
                         ),
                       ),
