@@ -3,11 +3,27 @@
 //! per-axis sub-pixel accumulator (RESEARCH Pattern 2, criterion 4 of
 //! PAD-05: slow diagonals must not stair-step or lose motion).
 //!
+//! Cursor moves inject ABSOLUTE via raw `SendInput` with
+//! `MOUSEEVENTF_VIRTUALDESK` (current pos + accumulated integer delta), which
+//! bypasses the Windows "Enhance pointer precision" ballistics curve so slow
+//! drags track 1:1 (D-01) and normalizes correctly across the multi-monitor
+//! virtual desktop (D-03). Scroll stays on enigo — only the move arm needs
+//! raw Win32 (RESEARCH Pattern 1).
+//!
 //! `Enigo` is created ON this thread and never leaves it — the executor
 //! side holds only an `mpsc::Sender<Cmd>` (which is `Send + Sync`), so the
 //! sync `MouseKeys` hot path stays non-blocking (RESEARCH Pitfall 2).
 
-use enigo::{Axis, Coordinate, Enigo, Mouse, Settings};
+use enigo::{Axis, Enigo, Mouse, Settings};
+use windows::Win32::Foundation::POINT;
+use windows::Win32::UI::Input::KeyboardAndMouse::{
+    INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_MOVE,
+    MOUSEEVENTF_VIRTUALDESK, MOUSEINPUT, SendInput,
+};
+use windows::Win32::UI::WindowsAndMessaging::{
+    GetCursorPos, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    SM_YVIRTUALSCREEN,
+};
 
 /// Command sent from the [`crate::executors::mouse_keys::EnigoMouseKeys`]
 /// executor (hot path, non-blocking mpsc send) to the input thread.
@@ -85,6 +101,55 @@ pub fn normalize_virtual(target_x: i32, target_y: i32, m: VirtualMetrics) -> (i3
     (axis(target_x, m.x, m.w), axis(target_y, m.y, m.h))
 }
 
+/// Current cursor position in virtual-desktop coordinates, read FRESH each
+/// frame (RESEARCH Pitfall 3: never track a floating internal target, or the
+/// cursor fights the physical mouse — the OS carries the position, the
+/// accumulator carries only the fraction).
+///
+/// `None` = `GetCursorPos` failed; the caller drops the frame (non-fatal).
+fn cursor_pos() -> Option<(i32, i32)> {
+    let mut p = POINT::default();
+    // SAFETY: GetCursorPos writes into a valid, live POINT.
+    unsafe { GetCursorPos(&mut p) }.ok().map(|()| (p.x, p.y))
+}
+
+/// Inject one absolute `INPUT_MOUSE` at the given virtual-desktop pixel.
+///
+/// Builds [`VirtualMetrics`] from `SM_*VIRTUALSCREEN` and normalizes via
+/// [`normalize_virtual`], injecting with `MOUSEEVENTF_VIRTUALDESK` so the
+/// 0..65535 grid spans the WHOLE virtual desktop — enigo 0.6.1's Abs path
+/// omits that flag and normalizes against the primary monitor only, jumping
+/// or clamping on secondary displays (RESEARCH Pitfall 2). A failed
+/// `SendInput` (returns 0 injected events) drops the frame; injection is
+/// never fatal (threat T-04-01).
+fn inject_absolute(target_x: i32, target_y: i32) {
+    // SAFETY: GetSystemMetrics is a pure read; SendInput receives one fully
+    // initialized INPUT with the matching cbSize.
+    unsafe {
+        let metrics = VirtualMetrics {
+            x: GetSystemMetrics(SM_XVIRTUALSCREEN),
+            y: GetSystemMetrics(SM_YVIRTUALSCREEN),
+            w: GetSystemMetrics(SM_CXVIRTUALSCREEN),
+            h: GetSystemMetrics(SM_CYVIRTUALSCREEN),
+        };
+        let (nx, ny) = normalize_virtual(target_x, target_y, metrics);
+        let input = INPUT {
+            r#type: INPUT_MOUSE,
+            Anonymous: INPUT_0 {
+                mi: MOUSEINPUT {
+                    dx: nx,
+                    dy: ny,
+                    mouseData: 0,
+                    dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+        let _ = SendInput(&[input], size_of::<INPUT>() as i32);
+    }
+}
+
 /// Run the input-injection loop until every `Sender<Cmd>` is dropped.
 ///
 /// MUST be called on a dedicated `std::thread` — `Enigo` is `!Sync` and this
@@ -98,11 +163,18 @@ pub fn run_input_thread(rx: std::sync::mpsc::Receiver<Cmd>) {
     while let Ok(cmd) = rx.recv() {
         match cmd {
             Cmd::Move(dx, dy) => {
+                // D-02: the accumulator is unchanged — it yields the integer
+                // delta to consume and carries the fraction across frames.
                 let (ix, iy) = move_acc.step(dx, dy);
                 if ix != 0 || iy != 0 {
-                    // Injection failure is non-fatal on the hot path: drop
-                    // the frame (send-and-forget contract), never panic.
-                    let _ = enigo.move_mouse(ix, iy, Coordinate::Rel);
+                    // Absolute inject = current REAL cursor + integer delta,
+                    // bypassing the "Enhance pointer precision" ballistics
+                    // curve so slow drags track 1:1 (D-01). A failed
+                    // GetCursorPos drops the frame (send-and-forget
+                    // contract), never panics.
+                    if let Some((cx, cy)) = cursor_pos() {
+                        inject_absolute(cx.saturating_add(ix), cy.saturating_add(iy));
+                    }
                 }
             }
             Cmd::Scroll(dx, dy) => {
