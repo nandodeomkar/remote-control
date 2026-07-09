@@ -1,5 +1,5 @@
-/// KeyboardPanel — the expandable panel over the trackpad (04-05 Task 3,
-/// D-07).
+/// KeyboardPanel — the expandable panel over the trackpad (04-05 shell,
+/// D-07; rows filled in 04-06: KEY-02/KEY-03/KEY-04).
 ///
 /// NOT a separate screen: it docks at the bottom of the trackpad screen
 /// Column (trackpad -> L/M/R bar -> panel -> system IME) and slides
@@ -11,17 +11,51 @@
 /// Expanding requests focus on [imeFocusNode] (raises the system IME);
 /// collapsing unfocuses (lowers it).
 ///
-/// The [rows] slot is a placeholder this plan; 04-06 fills it with the
-/// modifier-chip row, group switcher, and special-key rows (D-09/D-10).
+/// # The rows (04-06): chips + switcher + active key row
+///
+/// Top→bottom per UI-SPEC: the four-chip modifier row (Ctrl/Alt/Shift/Win),
+/// lg gap, the Nav/Fn/Num group switcher, then the active [KeyRows]. The
+/// panel owns ONE [ModifierFsm] and wires every emission path onto the
+/// reliable channel through the injected [send] seam:
+///
+/// - chip tap/long-press -> FSM events; every [SendModifierDown]/
+///   [SendModifierUp] effect becomes `key {code: holdCode, action: down/up}`
+///   (D-10: LOCKED = physical hold, so held-key combos autorepeat);
+/// - key-cap down/up -> `key {action: down/up}` (KEY-04 autorepeat rides the
+///   server hold);
+/// - key-cap tap+mods -> `key {action: tap, mods: modsForTap()}` then
+///   [ModifierFsm.onNonModifierTap] so armed chips visually auto-reset.
+///
+/// Chip/row rebuilds ride a panel-local setState — NEVER the trackpad
+/// surface (the panel subtree is isolated from the Listener per 04-05).
+///
+/// # D-12 reset on disconnect
+///
+/// On the transition INTO disconnected (detected off the injected [changes]
+/// ping stream + [isDisconnected] probe — the service seams, injectable so
+/// the widget test drives a fake stream), the panel calls
+/// [ModifierFsm.disconnected] (zero effects — the socket is gone; CONN-07
+/// release_all already freed the real keys) and forgets any held key cap so
+/// no stale `up` is ever flushed into a NEW session. No phantom input
+/// survives a mid-combo drop.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import 'package:remote_protocol/remote_protocol.dart';
 
 import 'diff_ops.dart';
 import 'hidden_text_input.dart';
+import 'key_rows.dart';
+import 'modifier_chip.dart';
+import 'modifier_fsm.dart';
 
-/// The expandable keyboard panel shell (D-07).
-class KeyboardPanel extends StatefulWidget {
+/// The expandable keyboard panel (D-07 shell + the 04-06 rows).
+class KeyboardPanel extends ConsumerStatefulWidget {
   /// Whether the panel is open (chrome visible, IME raised).
   final bool expanded;
 
@@ -31,8 +65,18 @@ class KeyboardPanel extends StatefulWidget {
   /// The committed-text diff producer feeding the reliable path.
   final ImeDiffProducer producer;
 
-  /// 04-06 slot: modifier chips + group switcher + key rows land here.
-  final Widget? rows;
+  /// False renders chips + caps gated (muted, inert — "muted, not red").
+  final bool enabled;
+
+  /// The reliable-path seam: the screen wires `service.sendReliable`.
+  final void Function(RemoteMessage msg) send;
+
+  /// The service `changes` ping stream (state-affecting transitions only).
+  final Stream<void> changes;
+
+  /// Probed on each [changes] ping: true when the chip status is
+  /// disconnected. The false->true transition triggers the D-12 reset.
+  final bool Function() isDisconnected;
 
   /// Creates the panel.
   const KeyboardPanel({
@@ -40,14 +84,30 @@ class KeyboardPanel extends StatefulWidget {
     required this.expanded,
     required this.imeFocusNode,
     required this.producer,
-    this.rows,
+    required this.enabled,
+    required this.send,
+    required this.changes,
+    required this.isDisconnected,
   });
 
   @override
-  State<KeyboardPanel> createState() => _KeyboardPanelState();
+  ConsumerState<KeyboardPanel> createState() => _KeyboardPanelState();
 }
 
-class _KeyboardPanelState extends State<KeyboardPanel> {
+class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
+  /// The ONE sticky-modifier FSM (chips poll stateOf after each event).
+  final ModifierFsm _fsm = ModifierFsm();
+
+  /// The key cap currently held down server-side (a `down` was sent and its
+  /// `up` is still owed), or null. Cleared WITHOUT an up on disconnect —
+  /// CONN-07 already released it and a queued stale up would leak into the
+  /// next session.
+  String? _heldCode;
+
+  /// D-12 transition detection off the changes pings.
+  StreamSubscription<void>? _changesSub;
+  bool _wasDisconnected = false;
+
   @override
   void initState() {
     super.initState();
@@ -57,6 +117,21 @@ class _KeyboardPanelState extends State<KeyboardPanel> {
         if (mounted && widget.expanded) widget.imeFocusNode.requestFocus();
       });
     }
+
+    _wasDisconnected = widget.isDisconnected();
+    _changesSub = widget.changes.listen((_) {
+      final disconnected = widget.isDisconnected();
+      if (disconnected && !_wasDisconnected) _onDisconnected();
+      _wasDisconnected = disconnected;
+    });
+  }
+
+  /// D-12: reset all armed/locked chips (zero send effects — the FSM
+  /// guarantees it) and forget the held cap so its up is skipped.
+  void _onDisconnected() {
+    _fsm.disconnected();
+    _heldCode = null;
+    if (mounted) setState(() {});
   }
 
   @override
@@ -69,6 +144,104 @@ class _KeyboardPanelState extends State<KeyboardPanel> {
         widget.imeFocusNode.unfocus();
       }
     }
+  }
+
+  @override
+  void dispose() {
+    _changesSub?.cancel();
+    super.dispose();
+  }
+
+  // ── Wiring: FSM effects + key-cap emissions -> the reliable path ─────────
+
+  void _sendEffects(List<ModifierEffect> effects) {
+    for (final effect in effects) {
+      switch (effect) {
+        case SendModifierDown(:final holdCode):
+          widget.send(KeyMsg(code: holdCode, action: 'down'));
+        case SendModifierUp(:final holdCode):
+          widget.send(KeyMsg(code: holdCode, action: 'up'));
+      }
+    }
+  }
+
+  void _onChipTap(Mod mod) {
+    unawaited(HapticFeedback.lightImpact());
+    _sendEffects(_fsm.tap(mod));
+    setState(() {});
+  }
+
+  void _onChipLongPress(Mod mod) {
+    unawaited(HapticFeedback.lightImpact());
+    _sendEffects(_fsm.longPress(mod));
+    setState(() {});
+  }
+
+  void _onKeyDown(String code) {
+    _heldCode = code;
+    widget.send(KeyMsg(code: code, action: 'down'));
+  }
+
+  void _onKeyUp(String code) {
+    // Only release a key whose down survived: a disconnect mid-hold clears
+    // _heldCode (D-12) and the up is skipped — the server already released.
+    if (_heldCode != code) return;
+    _heldCode = null;
+    widget.send(KeyMsg(code: code, action: 'up'));
+  }
+
+  void _onKeyTapWithMods(String code) {
+    widget.send(KeyMsg(code: code, action: 'tap', mods: _fsm.modsForTap()));
+    _fsm.onNonModifierTap();
+    setState(() {}); // armed chips visually auto-reset (D-10)
+  }
+
+  static const _chipMods = [
+    (Mod.ctrl, 'Ctrl'),
+    (Mod.alt, 'Alt'),
+    (Mod.shift, 'Shift'),
+    (Mod.win, 'Win'),
+  ];
+
+  Widget _rows() {
+    final group = ref.watch(keyRowGroupProvider);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Modifier-chip row (UI-SPEC: top of the panel, sm gaps).
+        Row(
+          children: [
+            for (final (mod, label) in _chipMods) ...[
+              if (mod != Mod.ctrl) const SizedBox(width: 8),
+              Expanded(
+                child: ModifierChip(
+                  label: label,
+                  state: _fsm.stateOf(mod),
+                  enabled: widget.enabled,
+                  onTap: () => _onChipTap(mod),
+                  onLongPress: () => _onChipLongPress(mod),
+                ),
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: 24), // lg gap (UI-SPEC)
+        KeyRowGroupSwitcher(
+          group: group,
+          onChanged: ref.read(keyRowGroupProvider.notifier).set,
+        ),
+        const SizedBox(height: 8),
+        KeyRows(
+          group: group,
+          enabled: widget.enabled,
+          onKeyDown: _onKeyDown,
+          onKeyUp: _onKeyUp,
+          onKeyTapWithMods: _onKeyTapWithMods,
+          hasArmedMods: () => _fsm.modsForTap().isNotEmpty,
+          onPressHaptic: HapticFeedback.lightImpact,
+        ),
+      ],
+    );
   }
 
   @override
@@ -100,8 +273,7 @@ class _KeyboardPanelState extends State<KeyboardPanel> {
                     ),
                   ),
                   padding: const EdgeInsets.all(16),
-                  child: widget.rows ??
-                      const Column(mainAxisSize: MainAxisSize.min),
+                  child: _rows(),
                 )
               : const SizedBox(width: double.infinity, height: 0),
         ),

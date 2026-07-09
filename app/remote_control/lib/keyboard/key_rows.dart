@@ -407,6 +407,7 @@ class _KeyCapState extends State<_KeyCap> {
           );
 
     final cap = GestureDetector(
+      key: ValueKey('cap-${widget.def.code}'),
       onTapDown: widget.enabled ? _onTapDown : null,
       onTapUp: widget.enabled ? _onTapUp : null,
       onTapCancel: widget.enabled ? _onTapCancel : null,

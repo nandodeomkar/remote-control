@@ -396,6 +396,14 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                 expanded: expanded,
                 imeFocusNode: _imeFocusNode,
                 producer: _imeProducer,
+                // 04-06 rows wiring: chips/caps gate on auth; all KeyMsg
+                // traffic rides the reliable path; the panel's own changes
+                // subscription drives the D-12 reset (fsm + held cap).
+                enabled: authed,
+                send: _service.sendReliable,
+                changes: _service.changes,
+                isDisconnected: () =>
+                    _service.chipStatus == ChipStatus.disconnected,
               ),
             ),
           ],
