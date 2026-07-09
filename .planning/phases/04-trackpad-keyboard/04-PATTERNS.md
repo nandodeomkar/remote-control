@@ -1,8 +1,8 @@
 # Phase 4: Trackpad & Keyboard - Pattern Map
 
 **Mapped:** 2026-07-09
-**Files analyzed:** 14 (6 modified, 8 new)
-**Analogs found:** 12 / 14
+**Files analyzed:** 19 (6 modified, 13 new — 5 added by the plan set, see Planning Addendum)
+**Analogs found:** 17 / 19
 
 This phase is "fill the real executors + build client producers." ~70% of the hard
 machinery (wire protocol, codecs, send paths, diff helper, dispatch/held-input) already
@@ -18,7 +18,7 @@ and lean on generic Flutter Material + the UI-SPEC contract.
 | `server/server-windows/src/executors/mouse_keys.rs` (MOD) | executor | request-response | itself (fill stubs, mirror `move_rel`/`scroll`) | exact (self) |
 | `server/server-windows/src/executors/keymap.rs` (NEW) | utility/mapping | transform | `dispatch/router.rs` macro-string tables (L315–329) | role-match |
 | `server/server-windows/Cargo.toml` (MOD) | config | — | itself (feature-flag list L11) | exact (self) |
-| `app/remote_control/lib/net/connection_service.dart` (MOD) | service | request-response + volatile | `sendMove` (L292–296) → new `sendScrollVolatile` | exact (self) |
+| `app/remote_control/lib/net/connection_service.dart` (MOD) | service | request-response + volatile | `sendMove` (L292–296) → new `sendScroll` | exact (self) |
 | `app/remote_control/lib/trackpad/move_sender.dart` (exists) | utility | streaming (sink) | already has `sendScroll` (L35–37) — no change | exact (self) |
 | `app/remote_control/lib/trackpad/gesture_classifier.dart` (NEW) | FSM/pure logic | event-driven | `net/reconnect_fsm.dart` / `handshake_fsm.dart` | role-match (house style) |
 | `app/remote_control/lib/trackpad/trackpad_screen.dart` (MOD) | component (screen) | event-driven | itself (Listener hot path, L59–90) | exact (self) |
@@ -28,6 +28,11 @@ and lean on generic Flutter Material + the UI-SPEC contract.
 | `app/remote_control/lib/keyboard/modifier_chip.dart` (NEW) | FSM + component | event-driven | `reconnect_fsm.dart` (FSM half) | role-match (FSM only) |
 | `app/remote_control/lib/keyboard/keyboard_panel.dart` (NEW) | component | — | none (generic Flutter panel) | no analog |
 | `app/remote_control/lib/keyboard/key_rows.dart` (NEW) | component | request-response | UI-SPEC contract | partial |
+| `app/remote_control/lib/trackpad/trackpad_driver.dart` (NEW) | intent executor (driver) | event-driven | `net/connection_service.dart` (`_schedule` seam + `_backoffGen`/`_livenessGen` generation guards) | role-match |
+| `app/remote_control/lib/trackpad/accel.dart` (NEW) | utility/pure fn | transform | `remote_protocol/src/diff_ops.dart` (pure top-level fn house style) | role-match |
+| `app/remote_control/lib/trackpad/tuning.dart` (NEW) | constants (D-06 one place) | — | `screens/connection_copy.dart` (centralized constants file) | role-match |
+| `app/remote_control/lib/settings/sensitivity.dart` (NEW) | store + provider | request-response | `store/device_list_store.dart` (shared_preferences) + `net/connection_providers.dart` (Riverpod 3 Notifier) | role-match |
+| `app/remote_control/lib/keyboard/modifier_fsm.dart` (NEW) | FSM/pure logic | event-driven | `net/reconnect_fsm.dart` (effects-out, IO-free) | role-match (house style) |
 
 ## Pattern Assignments
 
@@ -115,7 +120,7 @@ Add `Win32_UI_Input_KeyboardAndMouse` (SendInput/INPUT/MOUSEINPUT/MOUSEEVENTF_*)
 
 ### `app/remote_control/lib/net/connection_service.dart` (MOD — service, volatile path)
 
-**Analog:** itself. Add `sendScrollVolatile(dx, dy)` mirroring `sendMove` exactly (Open Q4).
+**Analog:** itself. Add `sendScroll(dx, dy)` mirroring `sendMove` exactly (Open Q4 — name locked by 04-03; earlier drafts said `sendScrollVolatile`).
 Scroll `0x02` frames are volatile like move — NOT reliable.
 
 **Shipped volatile method to mirror** (L292–296):
@@ -161,7 +166,7 @@ and ~250ms long-press timing (like `ConnectionService`'s `_nowMillis`, service L
 Land as named constants (RESEARCH Pitfall 4). On-device feel-check is an execution checkpoint.
 
 **Momentum loop** (RESEARCH Pattern 2): `Timer.periodic(16ms)` decaying velocity →
-`sendScrollVolatile`; ANY `onPointerDown` cancels the timer first (instant touch-stop).
+`sendScroll` (volatile); ANY `onPointerDown` cancels the timer first (instant touch-stop).
 
 ---
 
@@ -298,6 +303,30 @@ Re-encoding risks endianness/opcode/grapheme drift against the Rust decoder.
 **Source:** SPEC §12 (redaction-mandatory); `connection_service.dart` L26–28 token discipline.
 **Apply to:** `diff_ops.dart`, `hidden_text_input.dart`, server `type_text`/`backspace` arms.
 Never log `ins`/typed content.
+
+## Planning Addendum (2026-07-09, post plan-set)
+
+Five files introduced by plans 04-03..04-06 were added to the classification
+table above. Their analogs are the ones the plans already cite:
+
+- `trackpad_driver.dart` (04-04 T1): copies `ConnectionService`'s injected
+  `_schedule` timer seam and the `_backoffGen`/`_livenessGen`
+  generation-guard idiom for the momentum loop and long-press one-shot (the
+  schedule seam has no cancel handle).
+- `accel.dart` + `tuning.dart` (04-03 T1/T2): pure top-level fn + the ONE
+  centralized tunable-constants file (D-06), mirroring the
+  `connection_copy.dart` centralization pattern; no Flutter imports.
+- `settings/sensitivity.dart` (04-04 T3): shared_preferences store + Riverpod 3
+  unified Notifier, copying the `device_list_store.dart` /
+  `connection_providers.dart` house patterns (prefs key `pointer.sensitivity`).
+- `modifier_fsm.dart` (04-06 T1): the FSM half sketched under
+  `modifier_chip.dart` above is split into its own pure file per the
+  reconnect_fsm house style; `modifier_chip.dart` stays widget-only.
+
+Naming note: the volatile scroll method on `ConnectionService` is locked as
+`sendScroll` (04-03), mirroring `sendMove` — earlier drafts of this doc and
+RESEARCH Open Q4 called it `sendScrollVolatile`; `sendScroll` is the seam
+executors implement.
 
 ## No Analog Found
 

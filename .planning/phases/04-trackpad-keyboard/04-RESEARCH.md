@@ -234,7 +234,7 @@ void _onScrollFling(double vy) {
   _momentumTimer = Timer.periodic(const Duration(milliseconds: 16), (t) {
     v *= kMomentumDecay;                 // tunable
     if (v.abs() < kMomentumStop) { t.cancel(); return; }
-    _service.sendScrollVolatile(0, v);   // 0x02 frame; volatile path, no rebuild
+    _service.sendScroll(0, v);   // 0x02 frame; volatile path, no rebuild
   });
 }
 // Instant touch-stop: ANY onPointerDown cancels the timer before classifying.
@@ -389,24 +389,30 @@ See Pattern 1 — the `SubPixelAccumulator` call is unchanged; only the injectio
 
 **Note:** A7 — I verified enigo's *keyboard* `key()`/`text()` and the `Mouse::move_mouse`/`location`/`main_display` signatures from source, but did not open the exact `Mouse` button method name; confirm `button`/`Direction` vs a `MouseButton` helper when filling the click/drag executors.
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All four questions were resolved by the plan set (04-01..04-06). Original analysis kept below; each carries its plan-locked resolution.
 
 1. **Multi-monitor: solve (Pattern 1) or descope for MVP?**
    - What we know: enigo Abs is primary-monitor-only; raw SendInput with VIRTUALDESK is correct; the `windows` crate is already a dep.
    - What's unclear: whether the owner's laptop is ever docked to external displays.
    - Recommendation: implement Pattern 1 (raw SendInput) — it's ~30 lines, uses an existing dep, and permanently retires D-03. Verify on a two-monitor setup (drag cursor across the seam onto the secondary display and back; confirm no jump/clamp).
+   - **RESOLVED (plan 04-01):** Pattern 1 implemented — raw `SendInput(MOUSEEVENTF_ABSOLUTE|VIRTUALDESK)` behind a pure `normalize_virtual(x, y, metrics)` fn (unit-tested without a display). Multi-monitor is solved, not descoped; the seam-crossing check is deferred to the end-of-phase on-device gate (04-VALIDATION Manual-Only).
 
 2. **How do sticky modifiers interact with held-key autorepeat (KEY-03 × KEY-04)?**
    - What we know: `key_tap(code, mods)` carries mods (combo path); `key_down/up(code)` does NOT.
    - What's unclear: the exact client model for "hold a key while a modifier is locked."
    - Recommendation: LOCKED modifier → send `key {code, action:down}` for the modifier itself (mapped to enigo Control/Alt/Shift/Meta); release on unlock. ARMED (tap) modifier → included in the next `key {action:tap, mods:[…]}` then auto-reset. This keeps combos+repeat correct at the OS level and lets CONN-07/D-12 clean up. Planner should lock this model in the plan.
+   - **RESOLVED (plan 04-06):** locked exactly as recommended — a LOCKED modifier is a physical hold via `key {code: ControlLeft/AltLeft/ShiftLeft/WinLeft, action: down/up}` (so held-key combos autorepeat with the modifier, Pitfall 7 closed); an ARMED modifier rides the `mods` array on the next `tap` only, then auto-resets (`ModifierFsm`, 04-06 Task 1).
 
 3. **Lock the `key.code` string vocabulary.**
    - What we know: router.rs already uses terse strings ("F5","Right","Left","Esc","Tab","Plus","Minus","BrowserBack"); Phase-1 tests also used "KeyA"/"ShiftLeft"/"KeyW" (DOM-code-ish).
    - What's unclear: no single documented table exists; the two conventions conflict.
    - Recommendation: pick ONE (suggest terse, matching the existing macro tables, e.g. "F1".."F12","Home","End","PgUp","PgDn","Del","Esc","Tab","Up","Down","Left","Right","Num7"…,"Enter","."), document it once in `keymap.rs`, and make the Flutter key rows emit exactly those strings. Add a unit test asserting every emitted client code maps to `Some(Key)`.
+   - **RESOLVED (plan 04-02, consumed by 04-06):** the terse vocabulary is locked ONCE in `keymap.rs` as `CLIENT_KEY_CODES` (coverage-tested: `keymap_covers_all_codes`); the Flutter key rows mirror it byte-for-byte as `kClientKeyCodes` with a widget test asserting every emitted code is in the list.
 
-4. **Does `ConnectionService` need a `sendScrollVolatile`?** Yes — currently only `sendMove` is volatile-gated; scroll `0x02` frames need an identical volatile method. Trivial, but must be planned (touches the "one place" volatile gate).
+4. **Does `ConnectionService` need a volatile scroll method?** Yes — currently only `sendMove` is volatile-gated; scroll `0x02` frames need an identical volatile method. Trivial, but must be planned (touches the "one place" volatile gate).
+   - **RESOLVED (plan 04-03):** added as `ConnectionService.sendScroll(dx, dy)` — named to mirror `sendMove`; this doc's earlier working name `sendScrollVolatile` is superseded. Same `shouldSendVolatile()` gate + `_sender?.sendScroll` + probe tick, with pre-auth-drop and 0x02-opcode tests (04-03 Task 3).
 
 ## Environment Availability
 
