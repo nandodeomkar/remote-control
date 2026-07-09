@@ -115,7 +115,17 @@ Plans:
   4. Sticky modifiers (Ctrl/Alt/Shift/Win) show visible held state, send combos like Win+D, and auto-reset after the combo; they also reset safely on disconnect
   5. Holding a key autorepeats via server-side key-down/hold and stops immediately on release
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+
+- [ ] 04-01-PLAN.md — Server absolute pointer injection: normalize_virtual + SendInput(ABSOLUTE|VIRTUALDESK), ballistics bypass (D-01/D-02/D-03, PAD-01)
+- [ ] 04-02-PLAN.md — Server real executors: Cmd click/drag/key/text arms + keymap.rs locked key.code vocabulary (PAD-02/04, KEY-01..04 server halves)
+- [ ] 04-03-PLAN.md — Client pure logic: gesture classifier FSM + accel curve + tuning.dart constants + volatile sendScroll (PAD-01..04 logic halves)
+- [ ] 04-04-PLAN.md — Trackpad wiring: TrackpadDriver, L/M/R bar, drag-lock pill, momentum loop, sensitivity setting (PAD-01..04 end-to-end)
+- [ ] 04-05-PLAN.md — Typing slice: hidden IME field + grapheme diff-ops producer + expandable keyboard panel (KEY-01, D-07/D-08)
+- [ ] 04-06-PLAN.md — Key rows + sticky modifier chips + server-side autorepeat + D-12 disconnect reset (KEY-02/03/04, D-09/D-10/D-11)
+
 **UI hint**: yes
 
 ### Phase 5: Media, Power, Presenter & Browser
@@ -178,8 +188,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 |-------|----------------|--------|-----------|
 | 1. Protocol Contract & Server Core | 8/8 | Complete    | 2026-07-07 |
 | 2. End-to-End Cursor Spike | 4/4 | Complete — gate PASS (p50 6ms / p95 10ms) | 2026-07-08 |
-| 3. Discovery, Pairing & Connection | 6/7 | In Progress|  |
-| 4. Trackpad & Keyboard | 0/TBD | Not started | - |
+| 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
+| 4. Trackpad & Keyboard | 0/6 | Planned | - |
 | 5. Media, Power, Presenter & Browser | 0/TBD | Not started | - |
 | 6. Apps & Clipboard | 0/TBD | Not started | - |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |
