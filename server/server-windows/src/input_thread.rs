@@ -47,6 +47,44 @@ impl SubPixelAccumulator {
     }
 }
 
+/// Virtual-desktop geometry: origin (left/top edge, can be negative on
+/// multi-monitor setups) and total span across all monitors.
+///
+/// Plain `i32` fields ONLY — no `windows` types — so [`normalize_virtual`]
+/// compiles and unit-tests on any host without a display (D-03 verification
+/// without a second monitor).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct VirtualMetrics {
+    /// Virtual-desktop left edge (`SM_XVIRTUALSCREEN`; `< 0` when a monitor
+    /// sits left of the primary).
+    pub x: i32,
+    /// Virtual-desktop top edge (`SM_YVIRTUALSCREEN`).
+    pub y: i32,
+    /// Total width across all monitors (`SM_CXVIRTUALSCREEN`).
+    pub w: i32,
+    /// Total height across all monitors (`SM_CYVIRTUALSCREEN`).
+    pub h: i32,
+}
+
+/// Map a virtual-desktop pixel to the 0..65535 absolute-injection grid per
+/// the MS-documented convention `((p - origin) * 65535 + (span-1)/2) / (span-1)`
+/// (the `+(span-1)/2` term rounds to nearest).
+///
+/// Targets are clamped to the virtual desktop first, so the result is always
+/// within `0..=65535` — injection can never address outside the virtual
+/// desktop (threat T-04-01). Intermediate math is `i64` to avoid `i32`
+/// overflow on the `* 65535` multiply (RESEARCH Pattern 1).
+pub fn normalize_virtual(target_x: i32, target_y: i32, m: VirtualMetrics) -> (i32, i32) {
+    fn axis(target: i32, origin: i32, span: i32) -> i32 {
+        // `last` = index of the final pixel on this axis; guard degenerate
+        // metrics (span <= 1) against divide-by-zero.
+        let last = i64::from(span - 1).max(1);
+        let p = (i64::from(target) - i64::from(origin)).clamp(0, last);
+        ((p * 65535 + last / 2) / last) as i32
+    }
+    (axis(target_x, m.x, m.w), axis(target_y, m.y, m.h))
+}
+
 /// Run the input-injection loop until every `Sender<Cmd>` is dropped.
 ///
 /// MUST be called on a dedicated `std::thread` — `Enigo` is `!Sync` and this
