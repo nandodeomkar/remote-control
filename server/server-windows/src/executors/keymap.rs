@@ -38,6 +38,9 @@ use server_core::executors::{Button, KeyCode, Modifier};
 /// The canonical client `key.code` vocabulary — the single source of truth
 /// shared with the Flutter key rows' `kClientKeyCodes` (04-06) and the
 /// coverage test below. Every string here MUST map to `Some` in [`map_key`].
+// Contract artifact: consumed by the coverage tests and mirrored by the
+// Flutter client — no runtime reader exists by design (bin crate dead_code).
+#[allow(dead_code)]
 pub const CLIENT_KEY_CODES: &[&str] = &[
     // Nav cluster (UI-SPEC key rows: Nav group)
     "Esc", "Tab", "Home", "End", "PgUp", "PgDn", "Del",
@@ -57,15 +60,73 @@ pub const CLIENT_KEY_CODES: &[&str] = &[
 /// of the client key-row vocabulary. They must map too, or browser/present
 /// actions silently no-op ("F5"/"Right"/"Left"/"Esc" overlap
 /// [`CLIENT_KEY_CODES`] and are covered there).
+// Contract artifact: consumed by the coverage tests only (see above).
+#[allow(dead_code)]
 pub const ROUTER_MACRO_CODES: &[&str] =
     &["BrowserBack", "BrowserForward", "T", "W", "B", "Plus", "Minus"];
 
 /// Map a wire `key.code` string to the enigo key it injects.
 ///
 /// `None` = unknown code → the caller drops the command silently.
-pub fn map_key(_code: &KeyCode) -> Option<Key> {
-    // 04-02 Task 2 GREEN fills the vocabulary table.
-    None
+pub fn map_key(code: &KeyCode) -> Option<Key> {
+    Some(match code.0.as_str() {
+        // ── Nav cluster
+        "Esc" => Key::Escape,
+        "Tab" => Key::Tab,
+        "Home" => Key::Home,
+        "End" => Key::End,
+        "PgUp" => Key::PageUp,
+        "PgDn" => Key::PageDown,
+        "Del" => Key::Delete,
+        // ── Arrows
+        "Up" => Key::UpArrow,
+        "Down" => Key::DownArrow,
+        "Left" => Key::LeftArrow,
+        "Right" => Key::RightArrow,
+        // ── Function row
+        "F1" => Key::F1,
+        "F2" => Key::F2,
+        "F3" => Key::F3,
+        "F4" => Key::F4,
+        "F5" => Key::F5,
+        "F6" => Key::F6,
+        "F7" => Key::F7,
+        "F8" => Key::F8,
+        "F9" => Key::F9,
+        "F10" => Key::F10,
+        "F11" => Key::F11,
+        "F12" => Key::F12,
+        // ── Numpad
+        "Num0" => Key::Numpad0,
+        "Num1" => Key::Numpad1,
+        "Num2" => Key::Numpad2,
+        "Num3" => Key::Numpad3,
+        "Num4" => Key::Numpad4,
+        "Num5" => Key::Numpad5,
+        "Num6" => Key::Numpad6,
+        "Num7" => Key::Numpad7,
+        "Num8" => Key::Numpad8,
+        "Num9" => Key::Numpad9,
+        // enigo 0.6.1 has no distinct numpad-enter; VK_RETURN is correct.
+        "NumEnter" => Key::Return,
+        "NumDot" => Key::Decimal,
+        // ── Modifier HOLD codes (D-10 locked-modifier path; Meta = Win key)
+        "ControlLeft" => Key::Control,
+        "AltLeft" => Key::Alt,
+        "ShiftLeft" => Key::Shift,
+        "WinLeft" => Key::Meta,
+        // ── Router browser/present macro codes (Phase-1 tables via key_tap).
+        // Letters/signs ride Key::Unicode: enigo resolves the layout VK via
+        // VkKeyScanW so Ctrl+T / Ctrl+W / Ctrl+Plus chord correctly.
+        "BrowserBack" => Key::BrowserBack,
+        "BrowserForward" => Key::BrowserForward,
+        "T" => Key::Unicode('t'),
+        "W" => Key::Unicode('w'),
+        "B" => Key::Unicode('b'),
+        "Plus" => Key::Unicode('+'),
+        "Minus" => Key::Unicode('-'),
+        _ => return None, // unknown code → silent drop (T-04-02)
+    })
 }
 
 /// Map a protocol modifier to its enigo key (total — `Modifier` is a closed
