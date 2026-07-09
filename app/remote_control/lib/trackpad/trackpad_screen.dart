@@ -1,31 +1,43 @@
-/// The trackpad surface — a pure [ConnectionService] consumer (03-07, D-08).
+/// The trackpad surface — a pure [ConnectionService] consumer (03-07, D-08),
+/// grown in 04-04 into the full PAD-01..04 gesture surface.
 ///
-/// The Phase-2 spike scaffolding (connect/PIN UI, local channel + driver +
-/// probe plumbing, the debug latency overlay) is gone: connectivity is the
-/// service's job now. What remains:
+/// The raw pointer routes now feed the [GestureClassifier] (pure FSM) whose
+/// intents the [TrackpadDriver] executes: accelGain-scaled moves w/ the D-05
+/// sensitivity, tap/two-finger-tap clicks, momentum scroll with instant
+/// touch-stop, and long-press drag with drag-lock. Chrome added this plan:
+/// the [MouseButtonsBar] docked beneath the surface (PAD-02) and the
+/// drag-lock pill (top-center, PAD-04).
 ///
-/// - the full-bleed `#0E0F12` Listener surface — a raw pointer route with
-///   zero gesture arena and ZERO rebuild on the hot path: `onPointerMove`
-///   delegates straight to [ConnectionService.sendMove] (the service owns
-///   the volatile gate — pre-auth frames are dropped, never sent);
-/// - a `wakelock_plus` lock held while mounted so the screen never dims
-///   mid-drag;
-/// - the connection header chip (top-right, the old HUD position) and the
-///   reconnecting banner — both on their own throttled reads (the chip's
-///   500ms poll; the banner via the transition-only status provider). This
-///   screen holds NO stream subscription and NO per-move setState.
+/// HOT-PATH INVARIANT (Phase 2/3, preserved): the pointer routes are
+/// `classifier -> driver -> service` calls with ZERO setState — the per-event
+/// intent list is the only allocation. The pill rides its own
+/// [ValueNotifier] + [ValueListenableBuilder] (LOCALIZED rebuild — the
+/// Listener subtree and header chip never rebuild); the header chip keeps its
+/// 500ms poll; the banner/bar chrome watches the transition-only status
+/// provider. The screen holds ONE `changes` subscription solely for
+/// disconnect hygiene (driver.reset — no stale drag pill / momentum survives
+/// a drop; the server half is CONN-07 release_all).
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+
+import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
 import '../screens/connection_copy.dart';
 import '../widgets/connection_header.dart';
+import 'gesture_classifier.dart';
+import 'mouse_buttons.dart';
+import 'trackpad_driver.dart';
+import 'tuning.dart';
 
-/// The trackpad screen: hot-path surface + header chip + drop banner.
+/// The trackpad screen: hot-path surface + gesture chrome + header chip.
 class TrackpadScreen extends ConsumerStatefulWidget {
   /// Creates the trackpad screen.
   const TrackpadScreen({super.key});
@@ -39,25 +51,98 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
   /// path must not pay a provider lookup per pointer event.
   late final ConnectionService _service;
 
+  /// Pure gesture FSM (04-03) — constructed once, system clock seam.
+  late final GestureClassifier _classifier;
+
+  /// Intent executor (04-04 Task 1) — real seams wired below.
+  late final TrackpadDriver _driver;
+
+  /// Drives ONLY the drag-lock pill (ValueListenableBuilder — localized
+  /// rebuild; the Listener subtree and header chip never rebuild off this).
+  final ValueNotifier<bool> _dragLockPill = ValueNotifier<bool>(false);
+
+  /// Disconnect-hygiene subscription (transition detection, not UI).
+  StreamSubscription<void>? _changesSub;
+  ChipStatus _lastChip = ChipStatus.disconnected;
+
+  /// Cached D-05 sensitivity — the driver's getter reads THIS double; a
+  /// provider listener updates it on change (never a lookup per event).
+  // ignore: prefer_final_fields — mutated by the sensitivity wiring (Task 3).
+  double _sensitivity = kSensitivityDefault;
+
   @override
   void initState() {
     super.initState();
     _service = ref.read(connectionServiceProvider);
+    _classifier = GestureClassifier(
+      nowMillis: () => DateTime.now().millisecondsSinceEpoch,
+    );
+    _driver = TrackpadDriver(
+      onSendMove: _service.sendMove,
+      onSendScroll: _service.sendScroll,
+      onSendReliable: _service.sendReliable,
+      onHaptic: HapticFeedback.lightImpact,
+      onDragLockChanged: (locked) => _dragLockPill.value = locked,
+      // The timer fires back INTO the classifier; its verdict (drag start or
+      // stale no-op) round-trips through the driver like any other intent.
+      onLongPressElapsed: () => _driver.handle(_classifier.onLongPressFire()),
+      sensitivity: () => _sensitivity,
+      onReset: _classifier.reset,
+    );
+
+    // Disconnect hygiene: on the transition INTO disconnected, clear the
+    // client gesture state (drag pill, momentum, pending long-press). The
+    // server's held buttons are released by CONN-07 release_all.
+    _lastChip = _service.chipStatus;
+    _changesSub = _service.changes.listen((_) {
+      final chip = _service.chipStatus;
+      if (chip == ChipStatus.disconnected &&
+          _lastChip != ChipStatus.disconnected) {
+        _driver.reset();
+      }
+      _lastChip = chip;
+    });
+
     // Keep the screen awake so it never dims mid-drag.
     WakelockPlus.enable();
   }
 
   @override
   void dispose() {
+    _changesSub?.cancel();
+    _driver.dispose();
+    _dragLockPill.dispose();
     WakelockPlus.disable();
     super.dispose();
   }
 
-  // Hot path: raw 1:1 pointer delta -> service.sendMove (D-03, no
-  // sensitivity multiplier). The service owns gating (volatile drop unless
-  // authed) and the probe cadence — NO setState, NO allocation here.
-  void _onPointerMove(PointerMoveEvent event) {
-    _service.sendMove(event.delta.dx, event.delta.dy);
+  // Hot path: classifier -> driver -> service, NO setState, and the
+  // per-event intent list is the only allocation. The service owns gating
+  // (volatile drop unless authed) and the probe cadence.
+  void _onPointerDown(PointerDownEvent e) {
+    _driver.handle(
+      _classifier.onPointerDown(e.pointer, e.position.dx, e.position.dy),
+    );
+  }
+
+  void _onPointerMove(PointerMoveEvent e) {
+    _driver.handle(
+      _classifier.onPointerMove(e.pointer, e.position.dx, e.position.dy),
+    );
+  }
+
+  void _onPointerUp(PointerUpEvent e) {
+    _driver.handle(_classifier.onPointerUp(e.pointer));
+  }
+
+  void _onPointerCancel(PointerCancelEvent e) {
+    _driver.handle(_classifier.onPointerCancel(e.pointer));
+  }
+
+  // L/M/R bar press: reliable click + the same haptic tick as tap-clicks.
+  void _onMouseButton(String button) {
+    _service.sendReliable(ClickMsg(button: button));
+    unawaited(HapticFeedback.lightImpact());
   }
 
   @override
@@ -70,53 +155,123 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFF0E0F12),
       body: SafeArea(
-        child: Stack(
+        child: Column(
           children: [
-            // The full-bleed trackpad surface: Listener is a raw pointer
-            // route with zero gesture arena / rebuild on the hot path.
-            Positioned.fill(
-              child: Listener(
-                onPointerMove: _onPointerMove,
-                behavior: HitTestBehavior.opaque,
-                child: Container(
-                  color: const Color(0xFF0E0F12),
-                  alignment: Alignment.center,
-                  child: Text(
-                    authed ? kTrackpadHintAuthed : kTrackpadHintNotConnected,
-                    style: const TextStyle(color: Color(0xFF6B7280)),
-                  ),
-                ),
-              ),
-            ),
-
-            // Banner (full-width, under the safe-area top) + header chip
-            // (top-right — the old HUD slot). The chip ignores pointers so
-            // the trackpad surface stays uninterrupted beneath it.
-            Positioned(
-              top: 0,
-              left: 0,
-              right: 0,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+            Expanded(
+              child: Stack(
                 children: [
-                  ReconnectingBannerSlot(
-                    visible: status.chip == ChipStatus.reconnecting,
-                    onRetry: _service.retryNow,
+                  // The full-bleed trackpad surface: Listener is a raw pointer
+                  // route with zero gesture arena / rebuild on the hot path.
+                  Positioned.fill(
+                    child: Listener(
+                      onPointerDown: _onPointerDown,
+                      onPointerMove: _onPointerMove,
+                      onPointerUp: _onPointerUp,
+                      onPointerCancel: _onPointerCancel,
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        color: const Color(0xFF0E0F12),
+                        alignment: Alignment.center,
+                        child: Text(
+                          authed
+                              ? kTrackpadHintAuthed
+                              : kTrackpadHintNotConnected,
+                          style: const TextStyle(color: Color(0xFF6B7280)),
+                        ),
+                      ),
+                    ),
                   ),
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: IgnorePointer(
-                        child: ConnectionHeaderChip.forService(_service),
+
+                  // Banner (full-width, under the safe-area top) + header
+                  // chip (top-right — the old HUD slot). The chip ignores
+                  // pointers so the trackpad surface stays uninterrupted.
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        ReconnectingBannerSlot(
+                          visible: status.chip == ChipStatus.reconnecting,
+                          onRetry: _service.retryNow,
+                        ),
+                        Align(
+                          alignment: Alignment.topRight,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: IgnorePointer(
+                              child: ConnectionHeaderChip.forService(_service),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Drag-lock pill (PAD-04): top-center, visible ONLY while
+                  // drag-lock is engaged. Rides its own ValueNotifier so the
+                  // rebuild is LOCALIZED to this subtree — never the Listener
+                  // or the header chip.
+                  Positioned(
+                    top: 16,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: _dragLockPill,
+                        builder: (context, locked, _) => IgnorePointer(
+                          child: AnimatedOpacity(
+                            opacity: locked ? 1.0 : 0.0,
+                            duration: const Duration(milliseconds: 150),
+                            child: const _DragLockPill(),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
               ),
             ),
+
+            // L/M/R mouse buttons (PAD-02): docked, always visible, gated
+            // muted when not authed ("muted, not red").
+            MouseButtonsBar(onPress: _onMouseButton, enabled: authed),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The drag-lock indicator pill (UI-SPEC): `#16181D` fill, `#4C8DFF` 1px
+/// border, accent lock glyph + "Drag locked — tap to drop" (12/400).
+class _DragLockPill extends StatelessWidget {
+  const _DragLockPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFF16181D),
+        border: Border.all(color: const Color(0xFF4C8DFF)),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: const Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.lock, size: 14, color: Color(0xFF4C8DFF)),
+          SizedBox(width: 4),
+          Text(
+            'Drag locked — tap to drop',
+            style: TextStyle(
+              color: Color(0xFFE6E8EB),
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        ],
       ),
     );
   }
