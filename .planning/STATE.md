@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-07-09T20:18:57.635Z"
+stopped_at: Completed 04-06-PLAN.md
+last_updated: "2026-07-09T20:41:08.682Z"
 last_activity: 2026-07-09 -- Phase 04 execution started
 progress:
   total_phases: 7
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 25
-  completed_plans: 24
-  percent: 43
+  completed_plans: 25
+  percent: 57
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 04 (trackpad-keyboard) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Next: execute Phase 04 (/gsd-execute-phase 4)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -82,6 +82,7 @@ Progress: [████░░░░░░] 43% (3 of 7 phases complete)
 | Phase 04 P02 | 6min | 2 tasks | 4 files |
 | Phase 04 P04 | 25min (2 sessions) | 3 tasks | 6 files |
 | Phase 04 P05 | 18min | 3 tasks | 6 files |
+| Phase 04 P06 | 13min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,9 @@ Recent decisions affecting current work:
 - [Phase 04-04]: Tune sheet is a Consumer-scoped modal route outside the Listener subtree — tuning never rebuilds the trackpad surface or header chip
 - [Phase ?]: 04-05: IME-revision diff follows fixture 02 / computeDiff semantics (bs:1, ins:'e ') — plan's bs:3 expectation was a typo; computeDiff stays the only diff engine
 - [Phase ?]: 04-05: hidden IME field rides a ZWSP sentinel (8 x U+200B) so boundary backspaces keep emitting bs frames; HiddenTextInput mounted OUTSIDE the panel's AnimatedSize so toggling never detaches the input connection
+- [Phase 04-06]: LOCKED modifier = physical hold via keymap.rs hold codes (KeyMsg down/up) excluded from modsForTap (Pitfall 7 double-apply avoidance); ARMED rides the mods array of the next non-modifier tap only, then auto-resets
+- [Phase 04-06]: D-12: ModifierFsm.disconnected() resets with ZERO effects and the panel forgets its held key cap — CONN-07 release_all already freed real keys; a queued stale up must never flush into a NEW session
+- [Phase 04-06]: keyboard.rowGroup store rides the PrefsKv seam (device_store pattern) instead of raw SharedPreferencesAsync — its constructor throws StateError in tests without a platform instance
 
 ### Pending Todos
 
@@ -187,6 +191,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-09T20:18:48.046Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-07-09T20:41:08.667Z
+Stopped at: Completed 04-06-PLAN.md
 Resume file: None

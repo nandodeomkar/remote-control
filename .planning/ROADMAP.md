@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Protocol Contract & Server Core** - Lock the wire protocol (challenge-response auth, diff-ops text, golden fixtures) and build the fully CI-tested OS-agnostic server core with mock executors (completed 2026-07-07)
 - [x] **Phase 2: End-to-End Cursor Spike** - A finger on the phone moves the real Windows cursor visually instantly on real WiFi — retires the <30ms transport risk while the code is small (completed 2026-07-08 — hard gate PASS: p50 6ms / p95 10ms on real WiFi; UDP reconsideration NOT triggered)
 - [x] **Phase 3: Discovery, Pairing & Connection** - Phone finds the PC automatically, pairs once via PIN, then reconnects silently and recovers from WiFi drops and IP changes (completed 2026-07-09 — on-device E2E PASS on Xiaomi + Windows 11: all five success criteria)
-- [ ] **Phase 4: Trackpad & Keyboard** - The product-defining screens: full trackpad feel checklist and IME-correct typing with special-key rows, sticky modifiers, and autorepeat
+- [x] **Phase 4: Trackpad & Keyboard** - The product-defining screens: full trackpad feel checklist and IME-correct typing with special-key rows, sticky modifiers, and autorepeat (completed 2026-07-09)
 - [ ] **Phase 5: Media, Power, Presenter & Browser** - The everyday control-center extras: media/absolute volume, double-confirmed power actions, slide driving with timer, browser macros
 - [ ] **Phase 6: Apps & Clipboard** - Window/app management with live server push, and bidirectional clipboard with history and loop-safe auto-sync
 - [ ] **Phase 7: Server Shell, Dashboard & Polish** - Tray shell with settings/autostart/revoke, firewall and UIPI status surfacing, dashboard identity and final app polish
@@ -136,7 +136,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 04-06-PLAN.md — Key rows + sticky modifier chips + server-side autorepeat + D-12 disconnect reset (KEY-02/03/04, D-09/D-10/D-11)
+- [x] 04-06-PLAN.md — Key rows + sticky modifier chips + server-side autorepeat + D-12 disconnect reset (KEY-02/03/04, D-09/D-10/D-11)
 
 **UI hint**: yes
 
@@ -201,7 +201,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 1. Protocol Contract & Server Core | 8/8 | Complete    | 2026-07-07 |
 | 2. End-to-End Cursor Spike | 4/4 | Complete — gate PASS (p50 6ms / p95 10ms) | 2026-07-08 |
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
-| 4. Trackpad & Keyboard | 5/6 | In Progress|  |
+| 4. Trackpad & Keyboard | 6/6 | Complete   | 2026-07-09 |
 | 5. Media, Power, Presenter & Browser | 0/TBD | Not started | - |
 | 6. Apps & Clipboard | 0/TBD | Not started | - |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |
