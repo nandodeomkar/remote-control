@@ -198,15 +198,26 @@ class DeviceStore {
       await tokenFor(deviceKey) != null;
 
   /// All remembered devices, keyed by device key (empty map when none).
+  ///
+  /// Total by construction: a single corrupt or schema-drifted entry is
+  /// skipped rather than failing the whole load, matching the "never crash on
+  /// a stored read" posture used for tokens (Pitfall 5). Callers get the good
+  /// rows; a bad row simply won't appear until pairing rewrites it.
   Future<Map<String, DeviceMeta>> loadDevices() async {
     final raw = await _loadRawDevices();
-    return <String, DeviceMeta>{
-      for (final entry in raw.entries)
-        entry.key: DeviceMeta.fromJson(
+    final out = <String, DeviceMeta>{};
+    for (final entry in raw.entries) {
+      try {
+        out[entry.key] = DeviceMeta.fromJson(
           entry.key,
           (entry.value! as Map).cast<String, Object?>(),
-        ),
-    };
+        );
+      } on Object {
+        // Skip a corrupt/incomplete row (bad type, missing field) — do not let
+        // one dead entry break loading + adoption for every remembered device.
+      }
+    }
+    return out;
   }
 
   /// Inserts or replaces [meta] in the prefs `devices` JSON map.
@@ -264,7 +275,14 @@ class DeviceStore {
   Future<Map<String, Object?>> _loadRawDevices() async {
     final json = await _prefs.getString(_devicesPrefsKey);
     if (json == null) return <String, Object?>{};
-    return (jsonDecode(json) as Map).cast<String, Object?>();
+    try {
+      return (jsonDecode(json) as Map).cast<String, Object?>();
+    } on Object {
+      // Corrupt top-level blob (invalid JSON, wrong shape): degrade to "no
+      // remembered devices" rather than throwing into every caller. Pairing
+      // rewrites the key on the next successful connection.
+      return <String, Object?>{};
+    }
   }
 
   Future<void> _saveRawDevices(Map<String, Object?> raw) =>

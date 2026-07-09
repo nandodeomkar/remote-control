@@ -197,6 +197,30 @@ void main() {
       final devices = await store.loadDevices();
       expect(devices['guid-2']!.lastConnectedAt, isNull);
     });
+
+    test('WR-02: a corrupt row is skipped, good rows still load', () async {
+      // One valid entry plus a schema-drifted one (missing required fields).
+      prefs.backing['devices'] = jsonEncode({
+        'guid-good': {
+          'name': 'DESKTOP-ABC',
+          'host': '192.168.1.7',
+          'port': 17777,
+        },
+        'guid-bad': {'name': 'BROKEN'}, // no host/port -> fromJson would throw
+      });
+
+      final devices = await store.loadDevices();
+      expect(devices.keys, contains('guid-good'));
+      expect(devices.keys, isNot(contains('guid-bad')),
+          reason: 'a corrupt row is skipped, not fatal');
+      expect(devices['guid-good']!.host, '192.168.1.7');
+    });
+
+    test('WR-02: a corrupt top-level blob degrades to empty, never throws',
+        () async {
+      prefs.backing['devices'] = '{not valid json';
+      expect(await store.loadDevices(), isEmpty);
+    });
   });
 
   group('DeviceStore — last-device pointer (prefs "lastDeviceGuid")', () {

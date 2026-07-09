@@ -12,10 +12,15 @@
 /// deterministic in tests. The probe is the PERMANENT engine behind the
 /// header's live latency display AND dead-connection detection (D-08,
 /// CONN-06): [onIdleTick] keeps a ~2s ping cadence flowing while authed+idle,
-/// and [LatencyProbe.onDead] fires once when [LatencyProbe.missedPongLimit]
-/// consecutive pings go unanswered (~6s) so ConnectionService can declare the
-/// socket dead. The probe holds NO timers — ConnectionService owns the
-/// periodic tick; the probe stays clock-injected and test-deterministic.
+/// and [LatencyProbe.onDead] fires once when NO pong has returned for a
+/// wall-clock window ([LatencyProbe.missedPongLimit] × [idlePingIntervalMillis]
+/// ≈ 6s of true silence) so ConnectionService can declare the socket dead.
+/// Dead-detection is TIME-based, not ping-count based: fast move-driven pings
+/// under a drag emit far more than `missedPongLimit` pings per second, so a
+/// counter would false-positive on a live-but-laggy connection and tear it
+/// down mid-drag — only unbroken silence for the window fires [onDead]. The
+/// probe holds NO timers — ConnectionService owns the periodic tick; the probe
+/// stays clock-injected and test-deterministic.
 ///
 /// Percentile rule: NEAREST-RANK on the ascending-sorted window. For a window
 /// of N samples, the p-th percentile is the value at 1-indexed rank
@@ -48,19 +53,30 @@ class LatencyProbe {
   /// move-ping suppresses the idle ping).
   final int idlePingIntervalMillis;
 
-  /// Consecutive unanswered pings before [onDead] fires (~limit×interval of
-  /// silence declares the connection dead — CONN-06 liveness).
+  /// Number of idle intervals of unbroken silence before [onDead] fires: the
+  /// dead window is `missedPongLimit × idlePingIntervalMillis` of wall-clock
+  /// time with no pong (~6s at the defaults — CONN-06 liveness).
   final int missedPongLimit;
 
-  /// Fired EXACTLY once per dead episode when [missedPongLimit] consecutive
-  /// pings go unanswered; latched until [reset].
+  /// Fired EXACTLY once per dead episode when no pong returns for the dead
+  /// window (see [missedPongLimit]); latched until [reset].
   final void Function()? onDead;
+
+  /// RTT samples above this (or below zero) are rejected as implausible — an
+  /// echoed/hostile `ts` or a clock jump must not poison the percentile window
+  /// (WR-03). Generous vs. the ~6s dead window: a real pong always precedes it.
+  static const int _maxPlausibleRttMillis = 60000;
 
   final List<int> _window = <int>[];
   int _movesSincePing = 0;
   int? _lastPingAtMillis;
   int _pingsAwaited = 0;
   bool _deadFired = false;
+
+  /// Wall-clock anchor for the current unanswered-silence streak: set at the
+  /// first unanswered ping, cleared by any pong. Dead-detection measures
+  /// `now - _silenceSinceMillis` against the dead window (CR-01).
+  int? _silenceSinceMillis;
 
   /// Creates a probe.
   ///
@@ -134,18 +150,24 @@ class LatencyProbe {
   }
 
   /// Feed a decoded `pong`: record `now - ts` as one RTT sample into the
-  /// bounded rolling window, and zero the unanswered-ping counter (the
-  /// connection just proved alive).
+  /// bounded rolling window, and clear the liveness silence (the connection
+  /// just proved alive — the counter zeroing is unconditional even if the
+  /// sample itself is rejected).
   void onPong(PongMsg pong) {
     _pingsAwaited = 0;
+    _silenceSinceMillis = null; // a pong of any kind ends the silence streak
     final rtt = nowMillis() - pong.ts;
+    // WR-03: reject implausible samples (echoed/hostile ts, clock jump) so a
+    // single garbage reading can't skew p50/p95 for up to windowSize reads.
+    if (rtt < 0 || rtt > _maxPlausibleRttMillis) return;
     _window.add(rtt);
     if (_window.length > windowSize) {
       _window.removeAt(0);
     }
   }
 
-  /// Clears the liveness state: [pingsAwaited] and the dead-fired latch.
+  /// Clears the liveness state: [pingsAwaited], the silence anchor, and the
+  /// dead-fired latch.
   ///
   /// The RTT window and the ping-cadence baseline are deliberately KEPT —
   /// the probe is per-connection in ConnectionService, and keeping the
@@ -153,6 +175,7 @@ class LatencyProbe {
   /// teardown instead of flashing empty.
   void reset() {
     _pingsAwaited = 0;
+    _silenceSinceMillis = null;
     _deadFired = false;
   }
 
@@ -167,10 +190,15 @@ class LatencyProbe {
     _movesSincePing = 0;
     _lastPingAtMillis = now;
     _send(encodeMessage(PingMsg(ts: now)));
-    // Liveness: BOTH move-driven and idle pings route through here, so the
-    // unanswered counter increments in exactly one place.
+    // Liveness: BOTH move-driven and idle pings route through here. The
+    // unanswered counter is exposed for diagnostics, but dead-detection is
+    // TIME-based (CR-01): anchor the silence streak at the first unanswered
+    // ping and declare dead only after the full wall-clock window of true
+    // silence — fast move-pings advance the count, never the clock.
     _pingsAwaited++;
-    if (_pingsAwaited >= missedPongLimit && !_deadFired) {
+    _silenceSinceMillis ??= now;
+    final deadAfterMillis = missedPongLimit * idlePingIntervalMillis;
+    if (now - _silenceSinceMillis! >= deadAfterMillis && !_deadFired) {
       _deadFired = true;
       onDead?.call();
     }

@@ -474,7 +474,7 @@ void main() {
   });
 
   group('ConnectionService — idle-ping liveness (CONN-06)', () {
-    test('3 missed idle pings declare the connection dead -> backoff',
+    test('sustained idle silence declares the connection dead -> backoff',
         () async {
       final h = Harness();
       await connectAndAuth(h);
@@ -484,23 +484,63 @@ void main() {
       expect(tick.$1, const Duration(seconds: 2));
       final deadChannel = h.channel;
 
-      for (var i = 0; i < 3; i++) {
+      // Drive idle ticks until the wall-clock silence window (missedPongLimit ×
+      // idlePingInterval = 6s of unanswered pings, anchored at the first idle
+      // ping) trips onDead. Dead-detection is time-based, not count-based, so
+      // we loop on state rather than a hardcoded tick count (CR-01).
+      for (var i = 0;
+          i < 8 && h.service.fsmState == ReconnectState.authed;
+          i++) {
         h.now += 2000;
         tick.$2();
         await h.pump();
-        if (i < 2) {
+        if (h.service.fsmState == ReconnectState.authed) {
           tick = h.scheduled.last; // the tick reschedules itself while authed
           expect(tick.$1, const Duration(seconds: 2));
         }
       }
 
-      expect(deadChannel.sentMessages.whereType<PingMsg>().length, 3,
-          reason: 'one idle ping flowed per 2s tick');
+      expect(deadChannel.sentMessages.whereType<PingMsg>(), isNotEmpty,
+          reason: 'idle pings flowed on each 2s tick');
       expect(deadChannel.closed, isTrue,
           reason: 'dead connection is closed before the FSM is fed');
       expect(h.service.fsmState, ReconnectState.backoff,
           reason: 'onDead feeds transportFailed -> backoff redial');
       expect(h.service.chipStatus, ChipStatus.reconnecting);
+    });
+
+    test('WR-01: a superseded backoff timer does not fire a premature redial',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      // Drop -> backoff: timer1 scheduled for episode 1.
+      await h.channel.incoming.close();
+      await h.pump();
+      expect(h.service.fsmState, ReconnectState.backoff);
+      final timer1 = h.scheduled.last;
+
+      // Short-circuit out of backoff with a dial that fails fast -> the service
+      // re-enters backoff with a NEW timer (timer2). timer1 is now stale.
+      h.nextDialError = Exception('connect refused');
+      h.service.retryNow();
+      await h.pump();
+      expect(h.service.fsmState, ReconnectState.backoff,
+          reason: 'the fast-failed short-circuit dial re-enters backoff');
+      final dialsAfterRetry = h.dialed.length;
+      final timer2 = h.scheduled.last;
+
+      // Firing the STALE timer1 must no-op (generation guard) — NOT redial.
+      timer1.$2();
+      await h.pump();
+      expect(h.dialed.length, dialsAfterRetry,
+          reason: 'a superseded backoff timer must not trigger a dial (WR-01)');
+
+      // The CURRENT episode's timer still redials normally.
+      timer2.$2();
+      await h.pump();
+      expect(h.dialed.length, dialsAfterRetry + 1,
+          reason: 'the live backoff timer redials');
     });
 
     test('a pong keeps the connection alive (counter resets)', () async {

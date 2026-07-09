@@ -174,6 +174,12 @@ class ConnectionService {
   /// (the schedule seam has no cancel — stale ticks no-op on a gen mismatch).
   int _livenessGen = 0;
 
+  /// Backoff generation: the schedule seam has no cancel handle, so a scheduled
+  /// backoff timer captures this value and no-ops if it changed by fire time.
+  /// Bumped on every dial, so a short-circuit (Retry now / beacon / resume) out
+  /// of backoff cannot let a stale timer fire a premature redial (WR-01).
+  int _backoffGen = 0;
+
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
   /// Creates the service.
@@ -323,7 +329,9 @@ class ConnectionService {
         case DialEffect(:final target):
           await _dial(target);
         case StartBackoffEffect(:final delay):
+          final gen = _backoffGen;
           _schedule(delay, () {
+            if (gen != _backoffGen) return; // superseded episode — ignore
             unawaited(_applyStep(_fsm.backoffElapsed()));
           });
         case ClearTokenEffect(:final deviceKey):
@@ -340,6 +348,7 @@ class ConnectionService {
   }
 
   Future<void> _dial(DeviceTarget target) async {
+    _backoffGen++; // a dial supersedes any pending backoff timer (WR-01)
     _teardownChannel(); // a fresh dial never rides an old socket (idempotent)
 
     final addr = InternetAddress.tryParse(target.host);

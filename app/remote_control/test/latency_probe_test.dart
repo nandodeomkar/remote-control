@@ -242,10 +242,12 @@ void main() {
       expect(probe.sampleCount, 1);
     });
 
-    test('reaching missedPongLimit fires onDead EXACTLY once (latched)', () {
+    test('onDead fires once after the full silence window elapses (latched)',
+        () {
       final clock = _FakeClock();
       final sink = _RecordingSink();
       var deadCount = 0;
+      // Dead window = missedPongLimit(3) * idlePingIntervalMillis(2000) = 6000ms.
       final probe = LatencyProbe(
         nowMillis: clock.call,
         send: sink.add,
@@ -254,13 +256,14 @@ void main() {
         onDead: () => deadCount++,
       );
 
-      probe.onIdleTick(); // awaited 1
+      probe.onIdleTick(); // t=0: silence streak anchored here
+      clock.advance(2000);
+      probe.onIdleTick(); // t=2000, silence 2000 < 6000
+      clock.advance(2000);
+      probe.onIdleTick(); // t=4000, silence 4000 < 6000
       expect(deadCount, 0);
       clock.advance(2000);
-      probe.onIdleTick(); // awaited 2
-      expect(deadCount, 0);
-      clock.advance(2000);
-      probe.onIdleTick(); // awaited 3 -> dead
+      probe.onIdleTick(); // t=6000, silence 6000 >= 6000 -> dead
       expect(deadCount, 1);
 
       // Further unanswered pings do NOT re-fire until reset (latch).
@@ -271,8 +274,40 @@ void main() {
       expect(deadCount, 1);
     });
 
-    test('move-driven pings count toward the missed-pong limit too '
-        '(one shared awaited counter)', () {
+    test('CR-01: fast move-driven pings do NOT declare dead within the '
+        'silence window — only true wall-clock silence does', () {
+      final clock = _FakeClock();
+      final sink = _RecordingSink();
+      var deadCount = 0;
+      final probe = LatencyProbe(
+        nowMillis: clock.call,
+        send: sink.add,
+        movesPerPing: 1, // every move emits a ping (worst case)
+        idlePingIntervalMillis: 2000,
+        missedPongLimit: 3, // dead window 6000ms
+        onDead: () => deadCount++,
+      );
+
+      // A congested-WiFi drag: many pings emitted fast with no pong yet (an
+      // RTT spike). Old count-based logic tripped onDead at 3 pings (~sub-second);
+      // time-based must not, because only ~3s of wall clock has passed.
+      for (var t = 0; t <= 3000; t += 100) {
+        clock.now = t;
+        probe.onMove();
+      }
+      expect(probe.pingsAwaited, greaterThan(missedPongLimitDefault),
+          reason: 'far more than 3 unanswered pings were emitted');
+      expect(deadCount, 0,
+          reason: 'a live-but-laggy drag must NOT be torn down (CR-01)');
+
+      // Sustained silence past the window (finger lifted; idle ticks continue)
+      // still declares dead — liveness is preserved, just decoupled from count.
+      clock.now = 6000;
+      probe.onIdleTick();
+      expect(deadCount, 1);
+    });
+
+    test('a pong during a fast drag clears the silence streak', () {
       final clock = _FakeClock();
       final sink = _RecordingSink();
       var deadCount = 0;
@@ -280,21 +315,23 @@ void main() {
         nowMillis: clock.call,
         send: sink.add,
         movesPerPing: 1,
+        idlePingIntervalMillis: 2000,
         missedPongLimit: 3,
         onDead: () => deadCount++,
       );
 
-      clock.now = 0;
-      probe.onMove(); // ping 1
-      clock.now = 300;
-      probe.onMove(); // ping 2
-      clock.now = 600;
-      probe.onMove(); // ping 3 -> dead
-      expect(probe.pingsAwaited, 3);
-      expect(deadCount, 1);
+      // Drag with healthy pongs: each move-ping is answered, so the silence
+      // anchor keeps resetting and dead never fires no matter how long the drag.
+      for (var t = 0; t <= 20000; t += 100) {
+        clock.now = t;
+        probe.onMove();
+        probe.onPong(PongMsg(ts: t)); // ~0ms RTT, answered immediately
+      }
+      expect(deadCount, 0);
     });
 
-    test('reset clears pingsAwaited and re-arms onDead', () {
+    test('reset clears pingsAwaited, the silence anchor, and re-arms onDead',
+        () {
       final clock = _FakeClock();
       final sink = _RecordingSink();
       var deadCount = 0;
@@ -306,21 +343,56 @@ void main() {
         onDead: () => deadCount++,
       );
 
-      for (var i = 0; i < 3; i++) {
+      // Silence from t=0 to t=6000 -> dead.
+      for (var t = 0; t <= 6000; t += 2000) {
+        clock.now = t;
         probe.onIdleTick();
-        clock.advance(2000);
       }
       expect(deadCount, 1);
 
       probe.reset();
       expect(probe.pingsAwaited, 0);
 
-      // A fresh dead episode fires again after reset (re-armed latch).
-      for (var i = 0; i < 3; i++) {
+      // A fresh silence streak anchors at the post-reset clock and fires again.
+      for (var t = 100000; t <= 106000; t += 2000) {
+        clock.now = t;
         probe.onIdleTick();
-        clock.advance(2000);
       }
       expect(deadCount, 2);
     });
+
+    test('WR-03: onPong rejects implausible RTT (negative / clock jump) but '
+        'still proves liveness', () {
+      final clock = _FakeClock();
+      final probe = LatencyProbe(
+        nowMillis: clock.call,
+        send: (_) {},
+        idlePingIntervalMillis: 2000,
+      );
+
+      clock.now = 1000;
+      probe.onIdleTick(); // one unanswered ping
+      expect(probe.pingsAwaited, 1);
+
+      // Negative RTT: pong ts in the future (1000 - 5000 = -4000). Rejected as
+      // a sample, but the pong still zeroes the liveness counter.
+      probe.onPong(const PongMsg(ts: 5000));
+      expect(probe.sampleCount, 0);
+      expect(probe.p50, isNull);
+      expect(probe.pingsAwaited, 0, reason: 'a pong of any kind proves alive');
+
+      // Absurdly large RTT: ts far in the past (> 60s ceiling) — also rejected.
+      probe.onPong(const PongMsg(ts: -100000));
+      expect(probe.sampleCount, 0);
+
+      // A plausible sample IS recorded.
+      clock.now = 1042;
+      probe.onPong(const PongMsg(ts: 1000));
+      expect(probe.p50, 42);
+      expect(probe.sampleCount, 1);
+    });
   });
 }
+
+/// The default [LatencyProbe.missedPongLimit] used across the liveness tests.
+const int missedPongLimitDefault = 3;
