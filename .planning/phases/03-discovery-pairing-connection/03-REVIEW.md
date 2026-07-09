@@ -30,10 +30,19 @@ findings:
   warning: 3
   info: 3
   total: 7
-status: issues_found
+status: resolved
+resolution:
+  commit: 18360ac
+  fixed: [CR-01, WR-01, WR-02, WR-03]
+  deferred: [IN-01, IN-02, IN-03]
+  note: "All 4 confirmed findings fixed with regression tests (150/150 green, analyze clean). The 3 Info items are low-value/self-correcting and left as-is."
 ---
 
 # Phase 3: Code Review Report
+
+> **RESOLVED 2026-07-09 (commit 18360ac):** CR-01 (time-based dead-detection),
+> WR-01 (backoff generation guard), WR-02 (total device load), and WR-03 (RTT
+> sanity bound) are all fixed with regression tests. IN-01/02/03 (Info) deferred.
 
 **Reviewed:** 2026-07-09T12:22:52Z
 **Depth:** standard
