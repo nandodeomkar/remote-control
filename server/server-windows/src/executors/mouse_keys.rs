@@ -33,28 +33,29 @@ impl MouseKeys for EnigoMouseKeys {
     fn scroll(&self, dx: f32, dy: f32) {
         let _ = self.tx.send(Cmd::Scroll(dx, dy));
     }
-    fn click(&self, _button: Button) {
-        // Phase 4: fills this
+    fn click(&self, button: Button) {
+        let _ = self.tx.send(Cmd::Click(button));
     }
-    fn button_down(&self, _button: Button) {
-        // Phase 4: fills this
+    fn button_down(&self, button: Button) {
+        let _ = self.tx.send(Cmd::ButtonDown(button));
     }
-    fn button_up(&self, _button: Button) {
-        // Phase 4: fills this
+    fn button_up(&self, button: Button) {
+        let _ = self.tx.send(Cmd::ButtonUp(button));
     }
-    fn key_down(&self, _code: KeyCode) {
-        // Phase 4: fills this
+    fn key_down(&self, code: KeyCode) {
+        let _ = self.tx.send(Cmd::KeyDown(code));
     }
-    fn key_up(&self, _code: KeyCode) {
-        // Phase 4: fills this
+    fn key_up(&self, code: KeyCode) {
+        let _ = self.tx.send(Cmd::KeyUp(code));
     }
-    fn key_tap(&self, _code: KeyCode, _mods: &[Modifier]) {
-        // Phase 4: fills this
+    fn key_tap(&self, code: KeyCode, mods: &[Modifier]) {
+        let _ = self.tx.send(Cmd::KeyTap(code, mods.to_vec()));
     }
-    fn type_text(&self, _text: &str) {
-        // Phase 4: fills this
+    fn type_text(&self, text: &str) {
+        // NEVER log `text` — SPEC §12 redaction (T-04-03).
+        let _ = self.tx.send(Cmd::Type(text.to_string()));
     }
-    fn backspace(&self, _n: u32) {
-        // Phase 4: fills this
+    fn backspace(&self, n: u32) {
+        let _ = self.tx.send(Cmd::Backspace(n));
     }
 }

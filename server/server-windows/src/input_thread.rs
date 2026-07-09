@@ -14,7 +14,8 @@
 //! side holds only an `mpsc::Sender<Cmd>` (which is `Send + Sync`), so the
 //! sync `MouseKeys` hot path stays non-blocking (RESEARCH Pitfall 2).
 
-use enigo::{Axis, Enigo, Mouse, Settings};
+use enigo::{Axis, Direction, Enigo, Key, Keyboard, Mouse, Settings};
+use server_core::executors::{Button, KeyCode, Modifier};
 use windows::Win32::Foundation::POINT;
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_MOVE,
@@ -25,14 +26,36 @@ use windows::Win32::UI::WindowsAndMessaging::{
     SM_YVIRTUALSCREEN,
 };
 
+use crate::executors::keymap::{map_button, map_key, map_mod};
+
 /// Command sent from the [`crate::executors::mouse_keys::EnigoMouseKeys`]
 /// executor (hot path, non-blocking mpsc send) to the input thread.
-#[derive(Debug, Clone, Copy, PartialEq)]
+///
+/// NOT `Copy`: `KeyCode`/`String`/`Vec` variants own heap data; the mpsc
+/// send is a move, so `Clone` alone is sufficient.
+#[derive(Debug, Clone, PartialEq)]
 pub enum Cmd {
     /// Relative cursor move in fractional pixels.
     Move(f32, f32),
     /// Scroll in fractional wheel units (dx = horizontal, dy = vertical).
     Scroll(f32, f32),
+    /// Single click of a mouse button (PAD-02).
+    Click(Button),
+    /// Press-and-hold a mouse button (drag start, PAD-04).
+    ButtonDown(Button),
+    /// Release a held mouse button (drag end, PAD-04).
+    ButtonUp(Button),
+    /// Press-and-hold a key — Windows generates the autorepeat stream while
+    /// held (KEY-04, RESEARCH Pattern 5 / D-11).
+    KeyDown(KeyCode),
+    /// Release a held key (stops the OS autorepeat).
+    KeyUp(KeyCode),
+    /// Tap a key with modifiers held around it (KEY-03 combo path).
+    KeyTap(KeyCode, Vec<Modifier>),
+    /// Type literal text, layout-independent Unicode incl. emoji (KEY-01).
+    Type(String),
+    /// Delete `n` graphemes via n backspace clicks (KEY-01).
+    Backspace(u32),
 }
 
 /// Per-axis sub-pixel accumulator: carries the fractional remainder across
@@ -186,6 +209,52 @@ pub fn run_input_thread(rx: std::sync::mpsc::Receiver<Cmd>) {
                 }
                 if sx != 0 {
                     let _ = enigo.scroll(sx, Axis::Horizontal);
+                }
+            }
+            // Every arm below follows the non-fatal-drop rule (T-04-01):
+            // injection failures and unknown key codes drop, never panic.
+            Cmd::Click(b) => {
+                let _ = enigo.button(map_button(b), Direction::Click);
+            }
+            Cmd::ButtonDown(b) => {
+                let _ = enigo.button(map_button(b), Direction::Press);
+            }
+            Cmd::ButtonUp(b) => {
+                let _ = enigo.button(map_button(b), Direction::Release);
+            }
+            Cmd::KeyDown(c) => {
+                // Held press: Windows itself generates the key-repeat stream
+                // while the key stays down (KEY-04, RESEARCH Pattern 5).
+                if let Some(k) = map_key(&c) {
+                    let _ = enigo.key(k, Direction::Press);
+                }
+            }
+            Cmd::KeyUp(c) => {
+                if let Some(k) = map_key(&c) {
+                    let _ = enigo.key(k, Direction::Release);
+                }
+            }
+            Cmd::KeyTap(c, mods) => {
+                // Unknown code → drop the WHOLE command (never press mods
+                // around a key that won't fire; T-04-02 silent-drop rule).
+                if let Some(k) = map_key(&c) {
+                    for m in &mods {
+                        let _ = enigo.key(map_mod(*m), Direction::Press);
+                    }
+                    let _ = enigo.key(k, Direction::Click);
+                    for m in mods.iter().rev() {
+                        let _ = enigo.key(map_mod(*m), Direction::Release);
+                    }
+                }
+            }
+            Cmd::Type(s) => {
+                // Layout-independent Unicode incl. emoji (KEYEVENTF_UNICODE,
+                // KEY-01). NEVER log `s` — SPEC §12 redaction (T-04-03).
+                let _ = enigo.text(&s);
+            }
+            Cmd::Backspace(n) => {
+                for _ in 0..n {
+                    let _ = enigo.key(Key::Backspace, Direction::Click);
                 }
             }
         }
