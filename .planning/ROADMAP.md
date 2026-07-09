@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Protocol Contract & Server Core** - Lock the wire protocol (challenge-response auth, diff-ops text, golden fixtures) and build the fully CI-tested OS-agnostic server core with mock executors (completed 2026-07-07)
 - [x] **Phase 2: End-to-End Cursor Spike** - A finger on the phone moves the real Windows cursor visually instantly on real WiFi — retires the <30ms transport risk while the code is small (completed 2026-07-08 — hard gate PASS: p50 6ms / p95 10ms on real WiFi; UDP reconsideration NOT triggered)
-- [ ] **Phase 3: Discovery, Pairing & Connection** - Phone finds the PC automatically, pairs once via PIN, then reconnects silently and recovers from WiFi drops and IP changes
+- [x] **Phase 3: Discovery, Pairing & Connection** - Phone finds the PC automatically, pairs once via PIN, then reconnects silently and recovers from WiFi drops and IP changes (completed 2026-07-09 — on-device E2E PASS on Xiaomi + Windows 11: all five success criteria)
 - [ ] **Phase 4: Trackpad & Keyboard** - The product-defining screens: full trackpad feel checklist and IME-correct typing with special-key rows, sticky modifiers, and autorepeat
 - [ ] **Phase 5: Media, Power, Presenter & Browser** - The everyday control-center extras: media/absolute volume, double-confirmed power actions, slide driving with timer, browser macros
 - [ ] **Phase 6: Apps & Clipboard** - Window/app management with live server push, and bidirectional clipboard with history and loop-safe auto-sync
@@ -97,7 +97,7 @@ Plans:
 - [x] 03-04-PLAN.md — Client discovery: beacon codec + listener + MulticastLock + scoped cleartext swap; EARLY Xiaomi on-device check
 - [x] 03-05-PLAN.md — ConnectionService: FSM driver, token lifecycle, RFC1918 guard, idle-ping liveness, Riverpod providers
 - [x] 03-06-PLAN.md — Device list home + PIN pairing sheet + Connect-by-IP (UI-SPEC contract)
-- [ ] 03-07-PLAN.md — Header status/latency chip + banner, D-01 launch wiring, trackpad slimming, phase E2E gate
+- [x] 03-07-PLAN.md — Header status/latency chip + banner, D-01 launch wiring, trackpad slimming, phase E2E gate
 
 **UI hint**: yes
 

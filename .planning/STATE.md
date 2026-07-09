@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "03-06 complete (device list + pairing sheet + Connect-by-IP; 139 tests green). Next: 03-07 launch wiring"
-last_updated: "2026-07-08T19:49:31.399Z"
-last_activity: 2026-07-08 -- Phase 03 execution started
+stopped_at: "Phase 03 COMPLETE — on-device E2E approved (all 5 success criteria, Xiaomi + Windows 11). Next: Phase 04 (Trackpad & Keyboard)"
+last_updated: "2026-07-09"
+last_activity: 2026-07-09 -- Phase 03 complete (E2E passed on real hardware)
 progress:
   total_phases: 7
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 19
-  completed_plans: 18
-  percent: 29
+  completed_plans: 19
+  percent: 43
 ---
 
 # Project State
@@ -21,25 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-07)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 03 — discovery-pairing-connection
+**Current focus:** Phase 04 — Trackpad & Keyboard (Phase 03 complete)
 
 ## Current Position
 
-Phase: 03 (discovery-pairing-connection) — EXECUTING
-Plan: 6 of 7 complete (01, 02, 03, 04, 05 — next: 03-06 device list, then 03-07 wiring)
-  WiFi (Xiaomi Android 16 phone -> Windows 11 laptop): p50 = 6ms, p95 = 10ms, all four
-  PAD-05 criteria PASS. Transport locked (ws:// + TCP_NODELAY); the roadmap's
-  UDP-mouse-channel reconsideration is NOT triggered.
-Status: Ready to execute
-  (no 03 CONTEXT.md yet — discuss-phase first is the default route). Known issue from
-  the gate run: Windows "Enhance pointer precision" suppresses slow relative deltas —
-  workaround is disabling the setting; absolute-injection fix captured as a pending
-  todo (Phase 4 candidate). Spike removables (latency HUD, PIN shortcut, in-memory
-  token, manual IP entry) are Phase-3 items per D-09.
-  See: 02-04-GATE-RESULT.md, 02-04-SUMMARY.md, 02-VERIFICATION.md
-Last activity: 2026-07-08 -- Phase 03 execution started
+Phase: 03 (discovery-pairing-connection) — COMPLETE (all 7 plans; on-device E2E PASS)
+Next: Phase 04 (Trackpad & Keyboard) — needs discuss-phase (no 04 CONTEXT.md yet)
+  Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
+  (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
+  manual IP, live latency header with no hot-path hitching). See 03-VERIFICATION.md.
+  Carried Phase-4 item: Windows "Enhance pointer precision" suppresses slow relative
+  deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
+  is a pending todo (Phase 4 candidate).
+  See: 03-VERIFICATION.md, 03-07-SUMMARY.md
+Last activity: 2026-07-09 -- Phase 03 complete (E2E passed on real hardware)
 
-Progress: [███░░░░░░░] 29% (2 of 7 phases complete; transport risk retired)
+Progress: [████░░░░░░] 43% (3 of 7 phases complete)
 
 ## Performance Metrics
 
@@ -139,12 +136,17 @@ Recent decisions affecting current work:
 - [Phase 03-06]: Pairing sheet rebuilds via StreamBuilder over service.changes — needPin/failure transitions never alter the value-equal ConnectionStatus snapshot, so a provider watch alone would miss them
 - [Phase 03-06]: Post-authFail retry is one tap: the sheet stores the PIN as pending, fires a fresh connectTo, and auto-feeds it when the new handshake reaches needPin
 - [Phase 03-06]: Firewall-blocked copy requires BOTH a failed manual dial AND a currently-live beacon row at that host; otherwise the generic transport copy with ip:port renders
+- [Phase 03-07]: Header chip + banner poll their own Timer.periodic(kHudReadThrottle 500ms) — decoupled from the hot move path (Pitfall 9); the single latency/status surface for every connected-capable screen
+- [Phase 03-07]: attachBeacons wired into DeviceListNotifier so the D-06 beacon short-circuit is live end-to-end (03-05's attachBeacons had no caller otherwise); trackpad hint strings centralized in connection_copy.dart
+- [Phase 03-07]: D-01 launch kick runs post-first-frame in DeviceListScreen initState — silent reconnect to lastDeviceKey, NO nav on success (user stays on the list); explicit row-tap is the only path that navigates to the trackpad
 
 ### Pending Todos
 
-1 pending — see .planning/todos/pending/
+3 pending — see .planning/todos/pending/
 
 - Absolute pointer injection so slow drags survive Windows pointer acceleration (area: server; Phase 4 candidate) — from the 02-04 gate run
+- `noPairing` reason is overloaded: server returns authFail{noPairing} both for an unknown/revoked TOKEN (reconnect path) and for a PIN submitted with NO active pairing window (pairing path). The pairing-path case wrongly shows the revoked "no longer recognizes this phone" copy. A distinct reason code (e.g. `noPinWindow`) would let the copy say "ask your PC for a new PIN." (area: server protocol + client copy) — from the 03-07 E2E
+- Server supports ONE pairing per process run: the PIN-refresh loop breaks on is_paired() and a completed pair clears the active window, so re-pairing needs a server restart. Closes when Phase 7 adds persistent token storage. (area: server) — from the 03-07 E2E
 
 ### Blockers/Concerns
 
@@ -168,6 +170,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-08T19:49:13.063Z
-Stopped at: 03-06 complete (device list + pairing sheet + Connect-by-IP; 139 tests green). Next: 03-07 launch wiring
+Last session: 2026-07-09
+Stopped at: Phase 03 COMPLETE. 03-07 all 3 tasks done; on-device E2E approved (all 5 success criteria on Xiaomi + Windows 11). SUMMARY + VERIFICATION written, ROADMAP/STATE marked complete. Next: Phase 04 (Trackpad & Keyboard) — discuss-phase first (no 04 CONTEXT.md).
 Resume file: None
