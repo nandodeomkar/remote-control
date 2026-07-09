@@ -7,7 +7,10 @@
 /// touch-stop, and long-press drag with drag-lock. Chrome added this plan:
 /// the [MouseButtonsBar] docked beneath the surface (PAD-02), the drag-lock
 /// pill (top-center, PAD-04), and the tune affordance (bottom-right) that
-/// opens the D-05 sensitivity sheet.
+/// opens the D-05 sensitivity sheet. 04-05 adds the expandable
+/// [KeyboardPanel] (D-07) docked below the bar with its toggle in the
+/// bottom-right cluster — hidden-IME typing rides the reliable path via
+/// [ImeDiffProducer] (KEY-01, D-08).
 ///
 /// HOT-PATH INVARIANT (Phase 2/3, preserved): the pointer routes are
 /// `classifier -> driver -> service` calls with ZERO setState — the per-event
@@ -29,6 +32,8 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
 
+import '../keyboard/diff_ops.dart';
+import '../keyboard/keyboard_panel.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
 import '../screens/connection_copy.dart';
@@ -62,6 +67,17 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
   /// Drives ONLY the drag-lock pill (ValueListenableBuilder — localized
   /// rebuild; the Listener subtree and header chip never rebuild off this).
   final ValueNotifier<bool> _dragLockPill = ValueNotifier<bool>(false);
+
+  /// Drives ONLY the keyboard panel slot + the toggle icon (D-07). Same
+  /// localized-rebuild discipline: the Listener subtree is never a child of
+  /// this notifier's builders (Pitfall 6 — panel animation off the hot path).
+  final ValueNotifier<bool> _panelExpanded = ValueNotifier<bool>(false);
+
+  /// Focus of the hidden IME field — focusing raises the system keyboard.
+  final FocusNode _imeFocusNode = FocusNode(debugLabel: 'hidden-ime');
+
+  /// KEY-01 committed-text diff producer (emit -> reliable path).
+  late final ImeDiffProducer _imeProducer;
 
   /// Disconnect-hygiene subscription (transition detection, not UI).
   StreamSubscription<void>? _changesSub;
@@ -102,15 +118,22 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
       onReset: _classifier.reset,
     );
 
+    // KEY-01: hidden-IME diffs ride the reliable path (queued pre-auth,
+    // flushed on auth — SendPolicy owns the gating).
+    _imeProducer = ImeDiffProducer(emit: _service.sendReliable);
+
     // Disconnect hygiene: on the transition INTO disconnected, clear the
-    // client gesture state (drag pill, momentum, pending long-press). The
-    // server's held buttons are released by CONN-07 release_all.
+    // client gesture state (drag pill, momentum, pending long-press) AND the
+    // IME diff state (stale committed text must not skew the next diff). The
+    // server's held buttons are released by CONN-07 release_all. The panel
+    // may stay open; its keys render gated in 04-06.
     _lastChip = _service.chipStatus;
     _changesSub = _service.changes.listen((_) {
       final chip = _service.chipStatus;
       if (chip == ChipStatus.disconnected &&
           _lastChip != ChipStatus.disconnected) {
         _driver.reset();
+        _imeProducer.reset();
       }
       _lastChip = chip;
     });
@@ -124,6 +147,8 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
     _changesSub?.cancel();
     _driver.dispose();
     _dragLockPill.dispose();
+    _panelExpanded.dispose();
+    _imeFocusNode.dispose();
     WakelockPlus.disable();
     super.dispose();
   }
@@ -207,6 +232,9 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
     final authed = status.chip == ChipStatus.connected;
 
     return Scaffold(
+      // D-07: the raised system IME pushes the whole Column up — the
+      // trackpad shrinks above the panel but never hides, and stays live.
+      resizeToAvoidBottomInset: true,
       backgroundColor: const Color(0xFF0E0F12),
       body: SafeArea(
         child: Column(
@@ -285,33 +313,69 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                     ),
                   ),
 
-                  // Tune affordance (D-05): bottom-right, thumb-reachable,
-                  // above the L/M/R bar — the UI-SPEC panel-toggle pattern
-                  // (neutral at rest, accent only on active states).
+                  // Bottom-right floating cluster (above the L/M/R bar):
+                  // keyboard-panel toggle (D-07) over the tune affordance
+                  // (D-05). Both neutral at rest — never accent. Only the
+                  // toggle's icon rides the panel notifier (localized
+                  // rebuild; the Listener subtree never rebuilds off it).
                   Positioned(
                     bottom: 16,
                     right: 16,
-                    child: Tooltip(
-                      message: 'Pointer speed',
-                      child: Material(
-                        color: const Color(0xFF16181D),
-                        shape: const CircleBorder(
-                          side: BorderSide(color: Color(0xFF2A2D34)),
-                        ),
-                        child: InkWell(
-                          customBorder: const CircleBorder(),
-                          onTap: _openSensitivitySheet,
-                          child: const SizedBox(
-                            width: 48,
-                            height: 48,
-                            child: Icon(
-                              Icons.tune,
-                              size: 20,
-                              color: Color(0xFFE6E8EB),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ValueListenableBuilder<bool>(
+                          valueListenable: _panelExpanded,
+                          builder: (context, expanded, _) => Tooltip(
+                            message: expanded ? 'Hide keys' : 'Show keys',
+                            child: Material(
+                              color: const Color(0xFF16181D),
+                              shape: const CircleBorder(
+                                side: BorderSide(color: Color(0xFF2A2D34)),
+                              ),
+                              child: InkWell(
+                                customBorder: const CircleBorder(),
+                                onTap: () =>
+                                    _panelExpanded.value = !expanded,
+                                child: SizedBox(
+                                  width: 48,
+                                  height: 48,
+                                  child: Icon(
+                                    expanded
+                                        ? Icons.keyboard_hide
+                                        : Icons.keyboard,
+                                    size: 20,
+                                    color: const Color(0xFFE6E8EB),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),
-                      ),
+                        const SizedBox(height: 8),
+                        Tooltip(
+                          message: 'Pointer speed',
+                          child: Material(
+                            color: const Color(0xFF16181D),
+                            shape: const CircleBorder(
+                              side: BorderSide(color: Color(0xFF2A2D34)),
+                            ),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: _openSensitivitySheet,
+                              child: const SizedBox(
+                                width: 48,
+                                height: 48,
+                                child: Icon(
+                                  Icons.tune,
+                                  size: 20,
+                                  color: Color(0xFFE6E8EB),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -321,6 +385,19 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
             // L/M/R mouse buttons (PAD-02): docked, always visible, gated
             // muted when not authed ("muted, not red").
             MouseButtonsBar(onPress: _onMouseButton, enabled: authed),
+
+            // Keyboard panel (D-07): docked below the bar (trackpad -> bar
+            // -> panel -> system IME). ONLY this slot rides the notifier —
+            // the Expanded trackpad Stack above keeps its widget identity so
+            // panel animation never rebuilds the hot path (Pitfall 6).
+            ValueListenableBuilder<bool>(
+              valueListenable: _panelExpanded,
+              builder: (context, expanded, _) => KeyboardPanel(
+                expanded: expanded,
+                imeFocusNode: _imeFocusNode,
+                producer: _imeProducer,
+              ),
+            ),
           ],
         ),
       ),
