@@ -31,6 +31,12 @@ pub struct AuthManager {
     active_nonce: Option<[u8; 32]>,
 }
 
+impl Default for AuthManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AuthManager {
     /// Create a manager with no stored pairing and empty lockout tables.
     pub fn new() -> Self {
