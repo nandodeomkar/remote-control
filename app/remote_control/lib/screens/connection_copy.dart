@@ -80,6 +80,14 @@ String transportFailedCopy(String ip, int port) =>
     "Couldn't reach $ip:$port — check the address and that the server is "
     'running';
 
+// -- Trackpad hints (UI-SPEC Copywriting Contract rows) -------------------------
+
+/// Trackpad surface hint while authed.
+const String kTrackpadHintAuthed = 'Drag to move the cursor';
+
+/// Trackpad surface hint while not authed (muted, no spinner on the surface).
+const String kTrackpadHintNotConnected = 'Not connected';
+
 // -- Device row metadata lines (UI-SPEC "Device list row" states) --------------
 
 /// Metadata for a discovered, unpaired row.

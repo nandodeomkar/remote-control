@@ -265,6 +265,11 @@ class DeviceListNotifier extends Notifier<List<DeviceListEntry>> {
       model.onBeacon(b, DateTime.now().millisecondsSinceEpoch);
       _publish();
     });
+    // 03-07: the D-06 beacon short-circuit — a sighting of the CURRENT
+    // target's guid updates its last-known address and skips the remaining
+    // backoff (CONN-04 IP-change recovery). The service holds its own
+    // subscription; it is replaced on re-attach and cancelled on dispose.
+    service.attachBeacons(listener.stream);
     unawaited(
       listener.start().catchError((Object _) {
         // Bind failure is retryable (OEM quirk / port in use): the grayed

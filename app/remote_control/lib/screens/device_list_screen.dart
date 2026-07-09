@@ -24,10 +24,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../net/connection_providers.dart';
+import '../net/connection_service.dart' show ChipStatus;
 import '../net/handshake.dart';
 import '../net/reconnect_fsm.dart';
 import '../store/device_list_store.dart';
 import '../store/device_store.dart';
+import '../trackpad/trackpad_screen.dart';
+import '../widgets/connection_header.dart';
 import 'connection_copy.dart';
 import 'pairing_dialog.dart';
 
@@ -75,6 +78,12 @@ class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
   StreamSubscription<void>? _changesSub;
   bool _sheetOpen = false;
 
+  /// The device key of a USER-INITIATED connect awaiting auth: when it
+  /// reaches authed, the trackpad is pushed (explicit tap = explicit
+  /// navigation). Silent reconnects (D-01 launch kick, beacon/backoff)
+  /// never set this — the user stays on the list per UI-SPEC.
+  String? _pendingNavKey;
+
   // Previous-ping snapshots so the sheet opens on TRANSITIONS only (a
   // dismissed sheet must not reopen on unrelated pings).
   HandshakeStatus? _prevHandshake;
@@ -115,6 +124,21 @@ class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
     _prevHandshake = handshake;
     _prevFsm = fsm;
 
+    // Explicit tap = explicit navigation: a user-initiated connect reaching
+    // authed pushes the trackpad ONCE. Silent reconnects never set
+    // _pendingNavKey, so the D-01 launch kick keeps the user on the list.
+    if (service.isAuthed &&
+        _pendingNavKey != null &&
+        service.target?.key == _pendingNavKey) {
+      _pendingNavKey = null;
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const TrackpadScreen()),
+        ),
+      );
+      return;
+    }
+
     if (_sheetOpen || (!becameNeedPin && !becameRevoked)) return;
     final target = service.target;
     if (target == null) return;
@@ -130,44 +154,78 @@ class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
   @override
   Widget build(BuildContext context) {
     final entries = ref.watch(deviceListProvider);
+    // Transition-only snapshot (value-equal) — never pinged by the hot path.
+    final status = ref.watch(connectionStatusProvider);
+    final service = ref.read(connectionServiceProvider);
 
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
         backgroundColor: _bg,
         title: const Text(kDevicesTitle, style: _title),
+        actions: [
+          // The CONN-06 chip: status + p50 on its own 500ms poll.
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(child: ConnectionHeaderChip.forService(service)),
+          ),
+        ],
       ),
       body: SafeArea(
-        child: entries.isEmpty
-            ? _EmptyState(onConnectByIp: () => _showConnectByIpSheet(context))
-            : Column(
-                children: [
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: entries.length,
-                      itemBuilder: (context, i) => _DeviceRow(
-                        entry: entries[i],
-                        onTap: () => _onTapEntry(ref, entries[i]),
-                      ),
+        child: Column(
+          children: [
+            // D-04: the non-blocking drop strip under the app bar.
+            ReconnectingBannerSlot(
+              visible: status.chip == ChipStatus.reconnecting,
+              onRetry: service.retryNow,
+            ),
+            Expanded(
+              child: entries.isEmpty
+                  ? _EmptyState(
+                      onConnectByIp: () => _showConnectByIpSheet(context),
+                    )
+                  : Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: entries.length,
+                            itemBuilder: (context, i) => _DeviceRow(
+                              entry: entries[i],
+                              onTap: () => _onTapEntry(ref, entries[i]),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: _connectByIpButton(
+                            () => _showConnectByIpSheet(context),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.all(8),
-                    child: _connectByIpButton(
-                      () => _showConnectByIpSheet(context),
-                    ),
-                  ),
-                ],
-              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   /// Row tap (D-02): every state funnels into the SAME connect path. Paired
   /// and remembered rows connect silently; an unpaired live row's handshake
-  /// reaches needPin and the pairing sheet opens (Task 3 wiring).
+  /// reaches needPin and the pairing sheet opens. A tap that reaches authed
+  /// pushes the trackpad; the already-connected row pushes it directly.
   void _onTapEntry(WidgetRef ref, DeviceListEntry entry) {
+    if (entry.connected) {
+      // Already connected to this PC: straight to the trackpad.
+      unawaited(
+        Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const TrackpadScreen()),
+        ),
+      );
+      return;
+    }
     final service = ref.read(connectionServiceProvider);
+    _pendingNavKey = entry.key;
     unawaited(
       service.connectTo(
         DeviceTarget(

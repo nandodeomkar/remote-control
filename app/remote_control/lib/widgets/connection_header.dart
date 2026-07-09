@@ -1,10 +1,10 @@
 /// Connection header chip + reconnecting banner (CONN-06, D-04, D-08).
 ///
-/// [ConnectionHeaderChip] replaces the debug `LatencyHud`: a compact status
-/// dot + word + p50 readout for the app-bar/actions area of any
+/// [ConnectionHeaderChip] replaces the Phase-2 debug HUD overlay: a compact
+/// status dot + word + p50 readout for the app-bar/actions area of any
 /// connected-capable screen. It reads its suppliers on a
-/// [Timer.periodic]([kHudReadThrottle]) `setState` poll — the exact
-/// latency_hud.dart pattern — so the hot move path NEVER rebuilds it
+/// [Timer.periodic]([kHudReadThrottle]) `setState` poll — the throttled-read
+/// pattern inherited from that HUD — so the hot move path NEVER rebuilds it
 /// (RESEARCH Pitfall 9; the chip is never subscribed to per-frame events).
 ///
 /// [ReconnectingBanner] is the D-04 drop UX: a non-blocking strip under the
@@ -83,9 +83,8 @@ class _ConnectionHeaderChipState extends State<ConnectionHeaderChip> {
   @override
   void initState() {
     super.initState();
-    // Poll the suppliers on the throttle interval (latency_hud.dart pattern
-    // verbatim): the move path never calls setState — the hot loop stays
-    // rebuild-free.
+    // Poll the suppliers on the throttle interval: the move path never
+    // calls setState — the hot loop stays rebuild-free.
     _ticker = Timer.periodic(kHudReadThrottle, (_) {
       if (mounted) setState(() {});
     });
@@ -248,7 +247,7 @@ class ReconnectingBannerSlot extends StatelessWidget {
       duration: _kBannerSlideIn,
       transitionBuilder: (child, animation) => SizeTransition(
         sizeFactor: animation,
-        axisAlignment: -1,
+        alignment: const Alignment(-1, -1),
         child: SlideTransition(
           position: Tween<Offset>(
             begin: const Offset(0, -1),
