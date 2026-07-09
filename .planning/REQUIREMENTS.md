@@ -25,10 +25,10 @@
 
 ### Keyboard
 
-- [ ] **KEY-01**: User types with the phone keyboard including IME autocomplete and backspace (diff-op text messages)
-- [ ] **KEY-02**: User can press F1–F12, numpad, and nav cluster keys (Home/End/PgUp/PgDn/Del/Esc/Tab, arrows)
-- [ ] **KEY-03**: User can hold sticky modifiers (Ctrl/Alt/Shift/Win) to send combos like Ctrl+Alt+Del, Win+D
-- [ ] **KEY-04**: Held keys autorepeat correctly (server-side key-down/hold, not client tap-spam)
+- [x] **KEY-01**: User types with the phone keyboard including IME autocomplete and backspace (diff-op text messages)
+- [x] **KEY-02**: User can press F1–F12, numpad, and nav cluster keys (Home/End/PgUp/PgDn/Del/Esc/Tab, arrows)
+- [x] **KEY-03**: User can hold sticky modifiers (Ctrl/Alt/Shift/Win) to send combos like Ctrl+Alt+Del, Win+D
+- [x] **KEY-04**: Held keys autorepeat correctly (server-side key-down/hold, not client tap-spam)
 
 ### Media
 
@@ -124,10 +124,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PAD-03 | Phase 4 | Complete |
 | PAD-04 | Phase 4 | Complete |
 | PAD-05 | Phase 2 | Complete |
-| KEY-01 | Phase 4 | Pending |
-| KEY-02 | Phase 4 | Pending |
-| KEY-03 | Phase 4 | Pending |
-| KEY-04 | Phase 4 | Pending |
+| KEY-01 | Phase 4 | Complete |
+| KEY-02 | Phase 4 | Complete |
+| KEY-03 | Phase 4 | Complete |
+| KEY-04 | Phase 4 | Complete |
 | MED-01 | Phase 5 | Pending |
 | MED-02 | Phase 5 | Pending |
 | PWR-01 | Phase 5 | Pending |

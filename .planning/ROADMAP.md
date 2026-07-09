@@ -124,7 +124,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 04-02-PLAN.md — Server real executors: Cmd click/drag/key/text arms + keymap.rs locked key.code vocabulary (PAD-02/04, KEY-01..04 server halves)
+- [x] 04-02-PLAN.md — Server real executors: Cmd click/drag/key/text arms + keymap.rs locked key.code vocabulary (PAD-02/04, KEY-01..04 server halves)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -201,7 +201,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 1. Protocol Contract & Server Core | 8/8 | Complete    | 2026-07-07 |
 | 2. End-to-End Cursor Spike | 4/4 | Complete — gate PASS (p50 6ms / p95 10ms) | 2026-07-08 |
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
-| 4. Trackpad & Keyboard | 2/6 | In Progress|  |
+| 4. Trackpad & Keyboard | 3/6 | In Progress|  |
 | 5. Media, Power, Presenter & Browser | 0/TBD | Not started | - |
 | 6. Apps & Clipboard | 0/TBD | Not started | - |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |
