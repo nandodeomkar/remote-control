@@ -122,4 +122,64 @@ mod tests {
         assert_eq!(acc.step(-0.6, 0.0).0, 0, "frame 1: -0.6 has no integer part yet");
         assert_eq!(acc.step(-0.6, 0.0).0, -1, "frame 2: cumulative -1.2 flushes -1");
     }
+
+    /// Test A (D-01): a 1920x1080 primary at origin maps its corner pixels to
+    /// the exact ends of the 0..65535 absolute grid per the MS convention
+    /// `((p - origin) * 65535 + (span-1)/2) / (span-1)`, and the center
+    /// rounds to nearest (not truncates).
+    #[test]
+    fn normalize_virtual_primary_origin_maps_corners_and_center() {
+        let m = VirtualMetrics { x: 0, y: 0, w: 1920, h: 1080 };
+        assert_eq!(normalize_virtual(0, 0, m), (0, 0), "top-left pixel is grid origin");
+        assert_eq!(
+            normalize_virtual(1919, 1079, m),
+            (65535, 65535),
+            "bottom-right pixel is the grid max"
+        );
+        // 960*65535/1919 = 32784.575 -> 32785; 540*65535/1079 = 32797.868 -> 32798
+        assert_eq!(
+            normalize_virtual(960, 540, m),
+            (32785, 32798),
+            "center must round to nearest, not truncate"
+        );
+    }
+
+    /// Test B (D-03): a virtual desktop with a negative-origin left edge
+    /// (secondary at x=-1920, total span 3840x1080). Points anywhere on the
+    /// virtual desktop — including the negative-coordinate monitor — map
+    /// INSIDE 0..65535 instead of overshooting (the enigo 0.6.1
+    /// primary-monitor-only bug this fn exists to fix).
+    #[test]
+    fn normalize_virtual_negative_origin_secondary_maps_inside_grid() {
+        let m = VirtualMetrics { x: -1920, y: 0, w: 3840, h: 1080 };
+        assert_eq!(normalize_virtual(-1920, 0, m).0, 0, "leftmost virtual pixel -> nx=0");
+        assert_eq!(normalize_virtual(1919, 0, m).0, 65535, "rightmost virtual pixel -> nx=65535");
+        // A point on the right-hand (positive-x) monitor stays strictly inside.
+        let (nx, _) = normalize_virtual(500, 0, m);
+        assert!(
+            nx > 0 && nx < 65535,
+            "secondary-monitor point must map inside the grid, got {nx}"
+        );
+    }
+
+    /// Test C (T-04-01 clamp/no-overshoot): every in-bounds target stays in
+    /// 0..=65535 on both axes, and out-of-bounds targets (cursor at an edge
+    /// plus a delta) clamp to the grid ends — injection can never address
+    /// outside the virtual desktop.
+    #[test]
+    fn normalize_virtual_never_leaves_absolute_grid() {
+        let m = VirtualMetrics { x: -1920, y: -500, w: 3840, h: 1580 };
+        for tx in [-1920, -1919, -1, 0, 1, 960, 1918, 1919] {
+            for ty in [-500, -499, -1, 0, 1, 539, 1078, 1079] {
+                let (nx, ny) = normalize_virtual(tx, ty, m);
+                assert!(
+                    (0..=65535).contains(&nx) && (0..=65535).contains(&ny),
+                    "in-bounds target ({tx},{ty}) escaped the grid: ({nx},{ny})"
+                );
+            }
+        }
+        // Out-of-bounds targets clamp (never overshoot, never wrap).
+        assert_eq!(normalize_virtual(i32::MIN, i32::MIN, m), (0, 0));
+        assert_eq!(normalize_virtual(i32::MAX, i32::MAX, m), (65535, 65535));
+    }
 }
