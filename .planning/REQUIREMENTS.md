@@ -17,7 +17,7 @@
 
 ### Trackpad
 
-- [ ] **PAD-01**: User moves the PC cursor with one finger — velocity-based acceleration, sub-pixel accumulation on server
+- [x] **PAD-01**: User moves the PC cursor with one finger — velocity-based acceleration, sub-pixel accumulation on server
 - [ ] **PAD-02**: User clicks via tap (left), two-finger tap (right), and on-screen L/M/R buttons
 - [ ] **PAD-03**: User scrolls with two fingers — momentum with instant touch-stop
 - [ ] **PAD-04**: User drags via long-press drag with drag lock for screen-edge drags
@@ -119,7 +119,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONN-05 | Phase 3 | Complete |
 | CONN-06 | Phase 3 | Pending |
 | CONN-07 | Phase 1 | Complete |
-| PAD-01 | Phase 4 | Pending |
+| PAD-01 | Phase 4 | Complete |
 | PAD-02 | Phase 4 | Pending |
 | PAD-03 | Phase 4 | Pending |
 | PAD-04 | Phase 4 | Pending |

@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Phase 4 planned — 6 plans / 5 waves, plan-checker PASS, ready to execute
-last_updated: "2026-07-09T14:02:08.597Z"
-last_activity: 2026-07-09 -- Phase 03 complete (E2E passed on real hardware)
+stopped_at: Phase 4 planning complete — 6 plans verified, next /gsd-execute-phase 4
+last_updated: "2026-07-09T18:59:52.702Z"
+last_activity: 2026-07-09 -- Phase 04 execution started
 progress:
   total_phases: 7
   completed_phases: 3
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 25
+  completed_plans: 20
   percent: 43
 ---
 
@@ -21,11 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-07)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 04 — Trackpad & Keyboard (Phase 03 complete)
+**Current focus:** Phase 04 — trackpad-keyboard
 
 ## Current Position
 
-Phase: 04 (trackpad-keyboard) — PLANNED (6 plans, 5 waves; plan-checker PASS 2026-07-09)
+Phase: 04 (trackpad-keyboard) — EXECUTING
+Plan: 2 of 6
 Next: execute Phase 04 (/gsd-execute-phase 4)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -34,7 +35,7 @@ Next: execute Phase 04 (/gsd-execute-phase 4)
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-09 -- Phase 03 complete (E2E passed on real hardware)
+Last activity: 2026-07-09 -- Phase 04 execution started
 
 Progress: [████░░░░░░] 43% (3 of 7 phases complete)
 
@@ -76,6 +77,7 @@ Progress: [████░░░░░░] 43% (3 of 7 phases complete)
 | Phase 03 P04 | 11min + checkpoint | 3 tasks | 8 files |
 | Phase 03 P05 | ~25min (2 sessions) | 2 tasks | 5 files |
 | Phase 03 P06 | 17min | 3 tasks | 6 files |
+| Phase 04 P01 | 10min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -142,9 +144,9 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-3 pending — see .planning/todos/pending/
+2 pending — see .planning/todos/pending/
 
-- Absolute pointer injection so slow drags survive Windows pointer acceleration (area: server; Phase 4 candidate) — from the 02-04 gate run
+- ~~Absolute pointer injection~~ — DONE in 04-01 (raw SendInput ABSOLUTE|VIRTUALDESK; moved to todos/done/)
 - `noPairing` reason is overloaded: server returns authFail{noPairing} both for an unknown/revoked TOKEN (reconnect path) and for a PIN submitted with NO active pairing window (pairing path). The pairing-path case wrongly shows the revoked "no longer recognizes this phone" copy. A distinct reason code (e.g. `noPinWindow`) would let the copy say "ask your PC for a new PIN." (area: server protocol + client copy) — from the 03-07 E2E
 - Server supports ONE pairing per process run: the PIN-refresh loop breaks on is_paired() and a completed pair clears the active window, so re-pairing needs a server restart. Closes when Phase 7 adds persistent token storage. (area: server) — from the 03-07 E2E
 
@@ -170,6 +172,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-09 (resumed + completed planning)
+Last session: 2026-07-09T18:59:17.714Z
 Stopped at: Phase 4 planning complete — 6 plans verified, next /gsd-execute-phase 4
 Resume file: .planning/phases/04-trackpad-keyboard/
