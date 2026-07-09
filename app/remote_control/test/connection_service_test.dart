@@ -441,6 +441,33 @@ void main() {
           reason: 'sendMove drives the interleave cadence');
     });
 
+    test('sendScroll before authed puts NOTHING on the sink', () async {
+      final h = Harness();
+      await h.service.connectTo(kTarget); // handshaking, not authed
+      final before = h.channel.sent.length;
+
+      h.service.sendScroll(0, -3);
+
+      expect(h.channel.sent.length, before,
+          reason: 'scroll is volatile like move: dropped pre-auth, '
+              'never queued (PAD-03)');
+    });
+
+    test('sendScroll after authed emits one 9-byte binary frame with '
+        'opcode 0x02', () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      final before = h.channel.sent.length;
+      h.service.sendScroll(0, -3);
+      expect(h.channel.sent.length, before + 1);
+      final frame = h.channel.sent.last;
+      expect(frame, isA<List<int>>());
+      expect((frame as List<int>).length, 9);
+      expect(frame.first, 0x02,
+          reason: 'scroll frames carry the 0x02 opcode, not move\'s 0x01');
+    });
+
     test('sendReliable queues (<=10) while reconnecting, flushes FIFO on auth',
         () async {
       final h = Harness();

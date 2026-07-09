@@ -295,6 +295,16 @@ class ConnectionService {
     _probe?.onMove();
   }
 
+  /// Hot path: volatile scroll frame (PAD-03). Identical policy shape to
+  /// [sendMove]: 0x02 binary, dropped (never queued) unless authed — queued
+  /// deltas teleport-scroll on reconnect, same rule as moves. Scroll frames
+  /// ride the interleaved-ping cadence exactly like moves.
+  void sendScroll(double dx, double dy) {
+    if (!_policy.shouldSendVolatile()) return;
+    _sender?.sendScroll(dx, dy);
+    _probe?.onMove();
+  }
+
   /// Reliable-class message: sent immediately when authed, queued (bounded,
   /// FIFO, ≤10) during blips and flushed on auth (design spec §8).
   void sendReliable(RemoteMessage msg) {
