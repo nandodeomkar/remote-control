@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Phase 4 planning complete — 6 plans verified, next /gsd-execute-phase 4
-last_updated: "2026-07-09T18:59:52.702Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-07-09T19:16:08.804Z"
 last_activity: 2026-07-09 -- Phase 04 execution started
 progress:
   total_phases: 7
   completed_phases: 3
   total_plans: 25
-  completed_plans: 20
+  completed_plans: 21
   percent: 43
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 04 (trackpad-keyboard) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Next: execute Phase 04 (/gsd-execute-phase 4)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -78,6 +78,7 @@ Progress: [████░░░░░░] 43% (3 of 7 phases complete)
 | Phase 03 P05 | ~25min (2 sessions) | 2 tasks | 5 files |
 | Phase 03 P06 | 17min | 3 tasks | 6 files |
 | Phase 04 P01 | 10min | 2 tasks | 3 files |
+| Phase 04 P03 | 16min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -141,6 +142,9 @@ Recent decisions affecting current work:
 - [Phase 03-07]: Header chip + banner poll their own Timer.periodic(kHudReadThrottle 500ms) — decoupled from the hot move path (Pitfall 9); the single latency/status surface for every connected-capable screen
 - [Phase 03-07]: attachBeacons wired into DeviceListNotifier so the D-06 beacon short-circuit is live end-to-end (03-05's attachBeacons had no caller otherwise); trackpad hint strings centralized in connection_copy.dart
 - [Phase 03-07]: D-01 launch kick runs post-first-frame in DeviceListScreen initState — silent reconnect to lastDeviceKey, NO nav on success (user stays on the list); explicit row-tap is the only path that navigates to the trackpad
+- [Phase 04-03]: ScrollIntent carries delta/2 per move event (per-event average of the two pointers' deltas); fling velocity = in-window sample sum / (lift - oldest sample ts) so a pause naturally cancels the fling
+- [Phase 04-03]: Drag-lock edges: onLongPressFire while locked is a no-op, onPointerCancel keeps the lock (only reset() or tap-to-drop clears), second finger during a drag is ignored
+- [Phase 04-03]: Pre-slop pointer travel (<=kTapSlopPx) emits nothing — tap candidate preserved, <=10px startup motion intentionally dropped (standard trackpad behavior)
 
 ### Pending Todos
 
@@ -172,6 +176,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-09T18:59:17.714Z
-Stopped at: Phase 4 planning complete — 6 plans verified, next /gsd-execute-phase 4
-Resume file: .planning/phases/04-trackpad-keyboard/
+Last session: 2026-07-09T19:16:08.787Z
+Stopped at: Completed 04-03-PLAN.md
+Resume file: None

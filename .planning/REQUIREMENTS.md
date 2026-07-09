@@ -18,9 +18,9 @@
 ### Trackpad
 
 - [x] **PAD-01**: User moves the PC cursor with one finger — velocity-based acceleration, sub-pixel accumulation on server
-- [ ] **PAD-02**: User clicks via tap (left), two-finger tap (right), and on-screen L/M/R buttons
-- [ ] **PAD-03**: User scrolls with two fingers — momentum with instant touch-stop
-- [ ] **PAD-04**: User drags via long-press drag with drag lock for screen-edge drags
+- [x] **PAD-02**: User clicks via tap (left), two-finger tap (right), and on-screen L/M/R buttons
+- [x] **PAD-03**: User scrolls with two fingers — momentum with instant touch-stop
+- [x] **PAD-04**: User drags via long-press drag with drag lock for screen-edge drags
 - [x] **PAD-05**: Cursor response is visually instant on same LAN (<30ms end-to-end; TCP_NODELAY both ends, raw pointer events)
 
 ### Keyboard
@@ -120,9 +120,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONN-06 | Phase 3 | Pending |
 | CONN-07 | Phase 1 | Complete |
 | PAD-01 | Phase 4 | Complete |
-| PAD-02 | Phase 4 | Pending |
-| PAD-03 | Phase 4 | Pending |
-| PAD-04 | Phase 4 | Pending |
+| PAD-02 | Phase 4 | Complete |
+| PAD-03 | Phase 4 | Complete |
+| PAD-04 | Phase 4 | Complete |
 | PAD-05 | Phase 2 | Complete |
 | KEY-01 | Phase 4 | Pending |
 | KEY-02 | Phase 4 | Pending |
