@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Phase 4 UI-SPEC approved
-last_updated: "2026-07-09T13:05:12.558Z"
+status: Ready to execute
+stopped_at: Phase 4 planned — 6 plans / 5 waves, plan-checker PASS, ready to execute
+last_updated: "2026-07-09T14:02:08.597Z"
 last_activity: 2026-07-09 -- Phase 03 complete (E2E passed on real hardware)
 progress:
   total_phases: 7
@@ -25,8 +25,8 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 
 ## Current Position
 
-Phase: 03 (discovery-pairing-connection) — COMPLETE (all 7 plans; on-device E2E PASS)
-Next: Phase 04 (Trackpad & Keyboard) — needs discuss-phase (no 04 CONTEXT.md yet)
+Phase: 04 (trackpad-keyboard) — PLANNED (6 plans, 5 waves; plan-checker PASS 2026-07-09)
+Next: execute Phase 04 (/gsd-execute-phase 4)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
   manual IP, live latency header with no hot-path hitching). See 03-VERIFICATION.md.
@@ -170,6 +170,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-09T13:05:12.545Z
-Stopped at: Phase 4 UI-SPEC approved
-Resume file: .planning/phases/04-trackpad-keyboard/04-UI-SPEC.md
+Last session: 2026-07-09 (resumed + completed planning)
+Stopped at: Phase 4 planning complete — 6 plans verified, next /gsd-execute-phase 4
+Resume file: .planning/phases/04-trackpad-keyboard/

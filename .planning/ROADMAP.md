@@ -116,14 +116,26 @@ Plans:
   5. Holding a key autorepeats via server-side key-down/hold and stops immediately on release
 
 **Plans**: 6 plans
-
 Plans:
+**Wave 1**
 
 - [ ] 04-01-PLAN.md — Server absolute pointer injection: normalize_virtual + SendInput(ABSOLUTE|VIRTUALDESK), ballistics bypass (D-01/D-02/D-03, PAD-01)
-- [ ] 04-02-PLAN.md — Server real executors: Cmd click/drag/key/text arms + keymap.rs locked key.code vocabulary (PAD-02/04, KEY-01..04 server halves)
 - [ ] 04-03-PLAN.md — Client pure logic: gesture classifier FSM + accel curve + tuning.dart constants + volatile sendScroll (PAD-01..04 logic halves)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-02-PLAN.md — Server real executors: Cmd click/drag/key/text arms + keymap.rs locked key.code vocabulary (PAD-02/04, KEY-01..04 server halves)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 04-04-PLAN.md — Trackpad wiring: TrackpadDriver, L/M/R bar, drag-lock pill, momentum loop, sensitivity setting (PAD-01..04 end-to-end)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 04-05-PLAN.md — Typing slice: hidden IME field + grapheme diff-ops producer + expandable keyboard panel (KEY-01, D-07/D-08)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 04-06-PLAN.md — Key rows + sticky modifier chips + server-side autorepeat + D-12 disconnect reset (KEY-02/03/04, D-09/D-10/D-11)
 
 **UI hint**: yes
