@@ -90,8 +90,9 @@ final class ClickRightIntent extends GestureIntent {
   String toString() => 'ClickRightIntent()';
 }
 
-/// Scroll by the average of the two pointers' deltas (PAD-03). The driver
-/// converts px → wheel units ([kScrollUnitPerPx], [kScrollDirection]).
+/// Scroll by the per-event average across the live tracked pointers
+/// (PAD-03). The driver converts px → wheel units ([kScrollUnitPerPx],
+/// [kScrollDirection]).
 final class ScrollIntent extends GestureIntent {
   /// Averaged x delta in logical px.
   final double dx;
@@ -451,12 +452,17 @@ class GestureClassifier {
     _combinedTravel = 0;
   }
 
-  /// Records a velocity sample and returns the averaged scroll intent.
-  /// The average of the two pointers' deltas is delta/2 per event: only one
-  /// pointer moves per event, the other contributes zero.
+  /// Records a velocity sample and returns the scroll intent scaled to the
+  /// per-event average across the LIVE tracked pointers: n == 2 while both
+  /// fingers are down (only one pointer moves per event, the other
+  /// contributes zero), n == 1 after one finger lifts so the remaining
+  /// finger scrolls at full rate (WR-04). n >= 1 is structurally guaranteed:
+  /// `_emitScroll` is only reached from [onPointerMove] after the
+  /// `_pointers[pointer]` null-check.
   ScrollIntent _emitScroll(double dx, double dy) {
-    final sdx = dx / 2;
-    final sdy = dy / 2;
+    final n = _pointers.length;
+    final sdx = dx / n;
+    final sdy = dy / n;
     final now = _nowMillis();
     _samples.add(_Sample(now, sdx, sdy));
     while (_samples.isNotEmpty &&
