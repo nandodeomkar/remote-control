@@ -1,67 +1,60 @@
 ---
 phase: 04-trackpad-keyboard
-verified: 2026-07-10T07:53:15Z
-status: human_needed
+verified: 2026-07-10T10:03:29Z
+status: passed
 score: 5/5 roadmap success criteria verified
+human_verification_completed: 2026-07-10 — both gates passed on device (Xiaomi 25080RABDI): WiFi-kill re-test (Shift released within ~10s, chips reset on reconnect) and slow-PIN pairing (20-30s pause survived, pairing completed first connection)
 overrides_applied: 0
 re_verification:
-  previous_status: gaps_found
-  previous_score: 3/5
+  previous_status: human_needed
+  previous_score: 5/5
   gaps_closed:
-    - "Typing with the phone keyboard — including IME autocomplete revisions, emoji, and backspace — produces exactly the same text on the PC (SC2/KEY-01): CR-01 closed by 04-07 (commits 76ebb93, 43dcc3a) — atomic producer+controller IME reset on disconnect"
-    - "Holding a key autorepeats via server-side key-down/hold and stops immediately on release (SC5/KEY-04): CR-02 closed by 04-08 (commits d5844aa, e8effa0) — Set<String> _heldCodes rollover-safe tracking; IN-04 closed in the same plan — always-wired release handlers with _live guard"
-    - "Warning WR-04 (scroll rate halved after one-finger lift) closed by 04-09 (commits 941b40a, 7131c05) — scroll deltas scaled by live tracked-pointer count"
+    - "04-UAT Test 5 MAJOR gap (half-open WiFi kill leaves locked modifier held on the PC, SC4/SC5/KEY-04/T-04-04): closed by 04-10 — LIVENESS_TIMEOUT (10s post-auth) sleep_until branch in run_session's select! breaks 'read onto the existing straight-line CONN-07 release_all; commits baff15a (RED), d269c05 (fix), 71e5f59 (docs); regression test half_open_silence_releases_held_input green"
+    - "Review CR-01 (unconditional 10s deadline killed pre-auth sessions mid-PIN-entry — deterministic pairing regression): closed same session — deadline scales by auth state, PRE_AUTH_LIVENESS_TIMEOUT 90s (= PIN_TTL_SECS 60s + margin) pre-auth, 10s post-auth; commits e1c01d1 (RED), 213b8fd (fix), fead00a (docs); regression test pre_auth_silence_survives_pin_entry green"
   gaps_remaining: []
   regressions: []
 human_verification:
-  - test: "On the Windows laptop with 'Enhance pointer precision' ON: slow, small phone drag moves the cursor 1:1 (no ballistics suppression). On a dual-monitor PC, cross the seam onto the secondary display and back"
-    expected: "1:1 tracking regardless of the OS pointer-precision setting; no jump or clamp at the monitor seam"
-    why_human: "Requires real display hardware and OS pointer settings; SendInput behavior cannot be verified by grep or unit tests (deferred end-of-phase gate, 04-01)"
-  - test: "On device vs the Remote Mouse benchmark (D-05): move/tap/two-finger-tap/L-M-R buttons/scroll-momentum/drag-lock; drag-lock pill appears on long-press and a tap drops it; sensitivity slider changes feel live. Include the WR-04 path: lift one of two scrolling fingers and keep scrolling with the remaining finger"
-    expected: "Full gesture set works and feels at least as good as Remote Mouse; pill lifecycle correct; slider applies live and persists; post-lift scroll continues at full rate (04-09 fix)"
-    why_human: "Trackpad 'feel' (acceleration, momentum decay, thresholds) is subjective and device-dependent — the tuning.dart constants are explicitly on-device tuning starting points (deferred end-of-phase gate, 04-04; must run AFTER 04-09 so feel tuning happens against correct post-lift kinematics)"
-  - test: "Open the keyboard panel, type with autocomplete, insert a multi-codepoint emoji, rapid-backspace across it; verify the trackpad still moves the cursor while the panel + system IME are up. Then kill WiFi mid-typing, reconnect, and type one character"
-    expected: "PC text matches the phone exactly (autocomplete revisions, emoji as one grapheme, correct backspace counts); trackpad stays live while typing (D-07); after the reconnect the PC receives ONLY the new character — no replay of pre-disconnect text (CR-01 fix)"
-    why_human: "Real Android IME composing/committed behavior varies by keyboard app (RESEARCH A2) — cannot be simulated in widget tests (deferred end-of-phase gate, 04-05; must run AFTER 04-07 so it exercises the corrected disconnect path)"
-  - test: "Arm Win then tap D; lock Ctrl (long-press) then hold Right in a text editor; roll from held Right onto Down (press Down before releasing Right); kill the connection mid-lock"
-    expected: "Win+D shows the desktop and the Win chip auto-resets; Ctrl+Right repeats word-by-word while held and stops instantly on release; the rollover releases BOTH arrows — no key keeps autorepeating (CR-02 fix); after the drop, chips reset and no key stays held on the PC (CONN-07 + D-12)"
-    why_human: "OS-level combo execution, autorepeat cadence, and release_all behavior need a live Windows session (deferred end-of-phase gate, 04-02/04-06; must run AFTER 04-08 so it exercises the rollover-safe path)"
+  - test: "UAT Test 5 re-run (the 04-10 fix, on device): pair, lock a modifier (long-press Shift chip so it is physically held server-side), then kill the phone's WiFi abruptly (airplane mode / radio off — no graceful close). Watch the PC."
+    expected: "The PC releases Shift within ~10 seconds of the kill (LIVENESS_TIMEOUT), not after OS-TCP-timeout minutes; on reconnect the chips are reset and typing behaves normally"
+    why_human: "The regression test simulates the half-open socket byte-for-byte on loopback, but the real radio-kill path (Android WiFi stack, router behavior) is exactly what the original UAT caught that automation missed — the fix must be confirmed on the same hardware path that exposed the gap"
+  - test: "Slow-PIN pairing sanity check (the CR-01 fix, on device): forget the pairing (or use a fresh install), start pairing, and deliberately wait 20-30 seconds before typing the 6-digit PIN, then complete pairing on that same connection"
+    expected: "Pairing completes normally — the session is NOT dropped during the pause (no transport error, no new challenge/PIN churn); PIN entry has the full 60s window"
+    why_human: "The paused-clock test proves the server holds the session 30s pre-auth, but the end-to-end pairing UX (client backoff/redial behavior around a slow human) needs one real-device confirmation since the CR-01 failure mode was invisible to the original suite"
 ---
 
-# Phase 4: Trackpad & Keyboard — Verification Report (Re-verification)
+# Phase 4: Trackpad & Keyboard — Verification Report (Re-verification after 04-10 + review CR-01 fix)
 
 **Phase Goal:** The phone is a genuinely usable daily mouse and keyboard — trackpad feel (raw Listener classifier, acceleration, momentum, drag lock) and typing fidelity (IME diff-ops, special rows, sticky modifiers, server-side autorepeat) match a real laptop, not a toy
-**Phase User Story (from all six PLANs, MVP mode):** As a laptop owner, I want to use my phone as a precise mouse and full keyboard for my Windows laptop, so that it replaces a real trackpad and keyboard — not a toy.
-**Verified:** 2026-07-10T07:53:15Z
-**Status:** human_needed — all 5 roadmap success criteria verify programmatically; the 4 deferred on-device gates remain
-**Re-verification:** Yes — after gap closure (initial verification 2026-07-10: gaps_found, 3/5)
-
-> **MVP-mode note (carried from initial verification):** ROADMAP.md marks this phase `Mode: mvp` but its Goal field is prose, not User Story format. All six PLANs consistently embed the User Story above (which passes the canonical format), so verification proceeded against it. Flagged for hygiene: the ROADMAP Goal field should carry the User Story for MVP phases.
+**Phase User Story (from all PLANs, MVP mode):** As a laptop owner, I want to use my phone as a precise mouse and full keyboard for my Windows laptop, so that it replaces a real trackpad and keyboard — not a toy.
+**Verified:** 2026-07-10T10:03:29Z
+**Status:** passed — all 5 roadmap success criteria verified; on-device UAT complete including both post-fix re-checks (WiFi-kill stuck-key re-test PASSED, slow-PIN pairing PASSED, 2026-07-10)
+**Re-verification:** Yes — third pass. Initial (gaps_found 3/5) → gap plans 04-07/08/09 → second pass (human_needed 5/5) → on-device UAT (4/5, Test 5 MAJOR gap) → gap plan 04-10 + review CR-01 follow-up → this pass.
 
 ## Re-verification Summary
 
-Initial verification found two BLOCKER gaps (CR-01 breaking SC2, CR-02 breaking SC5) and one warning (WR-04). Three gap-closure plans (04-07, 04-08, 04-09) have since executed; all nine claimed commits verified in git history; working tree is clean (code on disk = HEAD). Every fix was independently confirmed in the code — not taken from SUMMARY claims — and each carries regression tests that are part of the now-238-test green suite.
+The prior verification passed 5/5 automated criteria with four deferred on-device gates. UAT then ran all four on real hardware: Tests 1-4 passed outright (cold start, ballistics/multi-monitor, full gesture set vs Remote Mouse, IME fidelity + no-replay), and Test 5 passed everything except its abrupt-disconnect leg — killing WiFi while Shift was locked left the key held on the PC. Root cause (confirmed by code read, not SUMMARY): CONN-07 `release_all` is straight-line code after the read loop, and a half-open TCP connection (no FIN/RST) never makes `stream.next()` yield — `run_session` had no liveness mechanism.
 
-| Gap | Fix plan | Commits | Independently confirmed in code | Regression tests |
-|-----|----------|---------|--------------------------------|------------------|
-| CR-01 (SC2): one-sided `_imeProducer.reset()` on disconnect → post-reconnect replay of stale text | 04-07 | 76ebb93 (RED), 43dcc3a (GREEN), 1f70729 (docs) | ✓ One-sided reset DELETED from trackpad_screen.dart disconnect listener (lines 135-142 now call only `_driver.reset()`); `KeyboardPanel._imeResetTick` ValueNotifier (keyboard_panel.dart:120) fired in `_onDisconnected` (line 147) and wired as `resetSignal` (line 273); `HiddenTextInput._onExternalReset` (hidden_text_input.dart:87-94) writes `producer.reseed()` back into the controller under the `_reseeding` guard in ONE synchronous callback; `reseed()` resets `_committed` to the sentinel AND returns the seed (diff_ops.dart:64-67) — the two sides can no longer desync. `didUpdateWidget` re-subscribes on signal identity change; listener removed before controller dispose | keyboard_panel_test.dart:261 (first post-reconnect keystroke emits ONLY the new char, controller wiped to exactly the sentinel, reset write-back emits nothing, `ins.contains('secret')` asserted false) + :302 (post-reconnect backspace emits bs:1 never an insert; boundary reseed still restores the full sentinel) |
-| CR-02 (SC5): single `String? _heldCode` slot swallowed the first key's up on rollover → stuck autorepeating key | 04-08 | d5844aa (RED), e8effa0 (GREEN), 4bdde4c (docs) | ✓ `final Set<String> _heldCodes` (keyboard_panel.dart:109); `_onKeyDown` adds + sends down (195-198); `_onKeyUp` sends up only if `_heldCodes.remove(code)` returns true (200-207) — one guard covers the D-12 stale-up skip AND IN-04 no-down releases; `_onDisconnected` clears the whole set with zero sends (146) | keyboard_panel_test.dart:339 (two concurrent pointers, rollover Right→Down: exact sequence `down:Right, down:Down, up:Right, up:Down` asserted) + :373 (disconnect mid-hold wipes ALL held caps; later release sends NO stale up) |
-| IN-04 (SC5-adjacent): `enabled` flip mid-press nulled the release handlers → same stuck-key class | 04-08 | same as CR-02 | ✓ `_KeyCap.onTapUp`/`onTapCancel` ALWAYS wired (key_rows.dart:428-429); only `onTapDown` gated on `widget.enabled` (422); `_live` press-lifecycle flag (366) set in `_onTapDown`, checked-and-cleared in both release paths — disabled-started presses stay inert, mid-press flips still release; a canceled non-deferred press still releases the held key (396) | key_rows_test.dart:122 (enabled flips false mid-press — release still fires `up:Right`); pre-existing gated-inert tests green unmodified |
-| WR-04 (warning, PAD-03 feel): constant `/2` scroll averaging halved rate after one-finger lift | 04-09 | 941b40a (RED), 7131c05 (GREEN), 3f28e8c (docs) | ✓ `_emitScroll` divides by `final n = _pointers.length` (gesture_classifier.dart:463-465); n==2 both fingers down (byte-identical to shipped averaging), n==1 post-lift (full rate); velocity samples record correctly-scaled deltas so fling seeds are unhalved; n>=1 structurally guaranteed by the `_pointers[pointer]` null-check upstream; tuning.dart untouched | gesture_classifier_test.dart:302 group, 3 exact-value tests (post-lift full rate -24 not -12; unhalved fling seed -2.4 not -1.2; tapPending2 slop-crossing full delta -30 not -15) |
+Gap plan 04-10 closed it; a same-session code review then caught that the fix itself broke pairing (unconditional 10s deadline vs the client's post-auth-only ping cadence), which was fixed by scaling the deadline by auth state. Every claim below was independently confirmed in the code and by running the suite — not taken from SUMMARY.md.
 
-**Regression check on previously-passed items:** `git diff --name-only 8db3a3c..HEAD -- app server` shows the gap-closure commits touched ONLY the five expected lib files and their three test files — zero server files changed, so the initial verification's 10/10 cargo test result stands. The cross-language key vocabulary was re-diffed programmatically after the key_rows.dart edit: 39 = 39, identical content AND order. `flutter analyze`: no issues. Full suite: 238/238 (230 initial + 2 CR-01 + 3 CR-02/IN-04 + 3 WR-04).
+| Gap | Fix | Commits | Independently confirmed in code | Regression test |
+|-----|-----|---------|--------------------------------|-----------------|
+| UAT Test 5 (MAJOR): half-open WiFi kill leaves held key stuck until OS TCP timeout | 04-10: `LIVENESS_TIMEOUT` (10s) + `last_inbound: tokio::time::Instant` + `sleep_until` select! branch → `break 'read` onto the EXISTING CONN-07 cleanup | baff15a (RED), d269c05 (fix), 71e5f59 (docs) | ✓ session.rs:60 (const, doc-commented with the 250ms/2s client cadence rationale — verified against latency_probe.dart:91,93 defaults), :111 (`last_inbound`), :127-131 (deadline branch breaking `'read`), :160 (refresh on EVERY `Some(Ok(m))` BEFORE the frame-type match so Text/Binary/WS-control all count; pause branch deliberately does not refresh), :217 (unchanged straight-line `release_all` — no new cleanup code). tokio Instant (not std) per the paused-clock house style (:23-26) | integration.rs:346 `half_open_silence_releases_held_input` — KeyDown barrier under real time, `pause()`, socket kept ALIVE and silent (never dropped — dropping is the graceful FIN path the sibling test at :284 covers), KeyUp asserted within a 60s virtual bound (comment pins the >10s coupling), `resume()` + real-time 2s session-end check per plan-checker flake note. PASSING |
+| Review CR-01 (Critical): unconditional 10s deadline killed pre-auth sessions mid-PIN-entry (client pings only start post-auth; server's own PIN window is 60s) | Deadline scales by auth state inside the same branch: `Authed` → 10s (UAT Test 5 contract — held input only exists post-auth); pre-auth → `PRE_AUTH_LIVENESS_TIMEOUT` 90s | e1c01d1 (RED), 213b8fd (fix), fead00a (docs) | ✓ session.rs:71 (`PRE_AUTH_LIVENESS_TIMEOUT = 90s`, doc comment cites `PIN_TTL_SECS` — verified: pin.rs:13 `= 60`, so 90 = window + margin, deadline can never race a still-valid PIN), :127-131 (`if ctx.auth_state == AuthState::Authed` selector). T-04-10-02 squatter hygiene relaxed 10s → 90s, still bounded | integration.rs:427 `pre_auth_silence_survives_pin_entry` — hello/challenge to AwaitingAuth, 30s paused-clock silence (past the old 10s kill, inside both the 60s PIN window and the 90s deadline), then PIN pairing completes on the SAME connection (`pairOk` asserted). PASSING |
+
+**Commit and scope audit:** all 6 claimed commits exist at the top of history in RED→GREEN→docs order (baff15a → d269c05 → 71e5f59 → [re-review 86cd9f5] → e1c01d1 → 213b8fd → fead00a); working tree clean (code on disk = HEAD). `git diff --name-only ade8536..HEAD -- app server protocol` = exactly `server/server-core/src/transport/session.rs` + `server/server-core/tests/integration.rs`. Zero changes under app/, protocol/, or server-windows/ — every Flutter-side result (238/238 tests, byte-identical 39-key vocabulary, hot-path/redaction/purity invariants, `flutter analyze` clean) and the server-windows 10/10 stand by immutability.
 
 ## User Flow Coverage (MVP mode)
 
 | Step | Expected | Evidence in codebase | Status |
 |------|----------|---------------------|--------|
-| Move a finger on the trackpad | PC cursor moves 1:1 with acceleration | Listener → GestureClassifier → TrackpadDriver.accelGain-scaled onSendMove → sendMove 0x01 → server absolute SendInput(VIRTUALDESK) | ✓ (feel needs human) |
-| Tap / two-finger tap / L-M-R bar | Left, right, and explicit clicks on the PC | ClickLeftIntent/ClickRightIntent → ClickMsg → router → Cmd::Click → enigo.button | ✓ |
-| Two-finger scroll, lift with velocity | Momentum scroll, new touch stops it instantly; post-lift single finger scrolls at full rate | ScrollIntent/FlingIntent + StopFlingIntent-first invariant; live-pointer-count divisor (04-09); generation-guarded momentum loop; sendScroll 0x02 volatile | ✓ |
-| Long-press, lift, drag to edge, tap | Drag lock survives lift; pill shows; tap drops | DragStart/DragEnd intents → DragMsg start/end → Cmd::ButtonDown/Up; ValueNotifier pill | ✓ |
-| Open panel, type with the phone IME | Exact same text on the PC — including across a disconnect | HiddenTextInput → ImeDiffProducer → computeDiff → TextMsg → Cmd::Type/Backspace; atomic producer+controller wipe on disconnect (04-07) | ✓ (device IME variance needs human) |
-| Press special keys / hold a key | Nav/Fn/Num act; hold autorepeats, release stops — including on rollover | key_rows down/up emission → KeyMsg → Cmd::KeyDown/KeyUp; Set-based held tracking + always-wired releases (04-08) | ✓ (autorepeat cadence needs human) |
-| Arm/lock modifiers, send combos | Win+D, Ctrl+Alt+Del; auto-reset; disconnect-safe | ModifierFsm armed/locked; KeyTap mods path; disconnected() zero-effect reset | ✓ |
+| Move a finger on the trackpad | PC cursor moves 1:1 with acceleration | Listener → GestureClassifier → TrackpadDriver → sendMove 0x01 → absolute SendInput; UAT Test 2 PASSED on device (ballistics + multi-monitor) | ✓ |
+| Tap / two-finger tap / L-M-R bar | Left, right, explicit clicks | Click intents → ClickMsg → router → enigo; UAT Test 3 PASSED on device (initial failure was a stale APK, diagnosed and cleared) | ✓ |
+| Two-finger scroll, momentum, post-lift | Full-rate scroll incl. after one-finger lift | Live-pointer-count divisor (04-09); UAT Test 3 PASSED including the WR-04 path | ✓ |
+| Long-press drag, drag lock | Pill shows, tap drops, edge drags work | Drag intents + ValueNotifier pill; UAT Test 3 PASSED | ✓ |
+| Type with the phone IME across a disconnect | Exact text on PC, no replay | Atomic producer+controller reset (04-07); UAT Test 4 PASSED incl. CR-01 no-replay on device | ✓ |
+| Hold keys, rollover, combos | Autorepeat, rollover releases all, Win+D | Set-based held tracking (04-08); UAT Test 5 PASSED the Win+D / Ctrl+Right / rollover legs on device | ✓ |
+| Kill WiFi while a modifier is locked | PC releases the key within ~10s | Liveness deadline → CONN-07 (04-10), regression-tested; on-device re-run PENDING (human gate 1) | ✓ code / human re-test pending |
+| Pair with a slow human PIN entry | Session survives the pause, pairing completes | Auth-state-scaled deadline (CR-01 fix), regression-tested; on-device sanity check PENDING (human gate 2) | ✓ code / human check pending |
 
 ## Goal Achievement
 
@@ -69,83 +62,58 @@ Initial verification found two BLOCKER gaps (CR-01 breaking SC2, CR-02 breaking 
 
 | # | Truth | Status | Evidence |
 |---|-------|--------|----------|
-| 1 | Full gesture set: accelerated move, tap=left, two-finger tap=right, L/M/R buttons, momentum scroll w/ instant touch-stop, long-press drag with drag lock | ✓ VERIFIED | GestureClassifier (21 tests incl. 3 WR-04), TrackpadDriver, MouseButtonsBar, drag-lock pill; wiring confirmed trackpad_screen.dart:162-180; WR-04 scroll-halving warning CLOSED (04-09). On-device feel deferred to human gate |
-| 2 | IME typing (autocomplete, emoji, backspace) produces exactly the same text on the PC | ✓ VERIFIED | Base pipeline verified initially (computeDiff never re-implemented, sentinel model, fixture-mirroring tests, Cmd::Type via enigo.text()). CR-01 CLOSED: one-sided producer reset deleted; panel-fired `_imeResetTick` → `_onExternalReset` atomic reseed (producer `_committed` + controller text both return to the sentinel in one synchronous callback); no-replay + backspace-stays-bs regression tests green |
-| 3 | F1–F12, numpad, nav cluster all work from toggleable key rows | ✓ VERIFIED | key_rows.dart 39-code kClientKeyCodes re-diffed post-04-08 against keymap.rs CLIENT_KEY_CODES: byte-identical content AND order; Nav/Fn/Num groups with persisted `keyboard.rowGroup`; server map_key covers all 39 + 7 router macro codes; coverage tests green both sides |
-| 4 | Sticky modifiers show held state, send combos, auto-reset, reset safely on disconnect | ✓ VERIFIED | ModifierFsm armed/locked two-level model (7 tests, file untouched by gap closure); hold codes exact; locked = physical hold excluded from modsForTap; disconnected() zero-effect reset proven via fake changes stream; D-12 test (keyboard_panel_test.dart:239) green |
-| 5 | Held keys autorepeat server-side and stop immediately on release | ✓ VERIFIED | Server halves unchanged (Cmd::KeyDown → enigo Press, KeyUp → Release). CR-02 CLOSED: `Set<String> _heldCodes` with remove()-guarded ups — rollover releases EVERY key (exact-sequence test); IN-04 CLOSED: always-wired onTapUp/onTapCancel with `_live` guard — mid-press enabled flip still releases; disconnect wipes all held caps with zero sends (D-12 preserved) |
+| 1 | Full gesture set: accelerated move, tap=left, two-finger tap=right, L/M/R buttons, momentum scroll w/ instant touch-stop, long-press drag with drag lock | ✓ VERIFIED | Unchanged since prior verification (zero app/ diffs); now ALSO confirmed on device — UAT Tests 2+3 passed against the Remote Mouse benchmark |
+| 2 | IME typing (autocomplete, emoji, backspace) produces exactly the same text on the PC | ✓ VERIFIED | Unchanged code; UAT Test 4 passed on device including multi-codepoint emoji, rapid backspace, and the CR-01 (IME) no-replay path |
+| 3 | F1–F12, numpad, nav cluster all work from toggleable key rows | ✓ VERIFIED | Unchanged code; 39-key vocabulary byte-identical across languages (carried); keymap coverage tests green in this run (server 10/10 windows-side) |
+| 4 | Sticky modifiers show held state, send combos, auto-reset, reset safely on disconnect | ✓ VERIFIED | UAT Test 5 passed Win+D auto-reset and locked-Ctrl combos on device. The "reset safely on disconnect" leg — which UAT FAILED under abrupt WiFi loss — is now closed: liveness deadline (session.rs:127-131) makes CONN-07 release_all (:217) reachable under half-open TCP; `half_open_silence_releases_held_input` green. On-device re-test is human gate 1 |
+| 5 | Held keys autorepeat server-side and stop immediately on release | ✓ VERIFIED | UAT Test 5 passed the hold/autorepeat/stop and CR-02 rollover legs on device; the stuck-key-on-silent-disconnect tail is closed by the same 04-10 mechanism (KEY-04 hardening) |
 
-**Score:** 5/5 roadmap success criteria verified (previous: 3/5)
+**Score:** 5/5 roadmap success criteria verified
 
-### Plan-Level Must-Have Truths (supporting detail)
+### Plan 04-10 Must-Have Truths
 
-| Plan | Truth | Status | Evidence |
-|------|-------|--------|----------|
-| 04-01 | Slow drag 1:1 despite pointer-precision; multi-monitor correct; sub-pixel carried; injection never panics | ✓ VERIFIED (unchanged) | No server files touched since initial verification; 10/10 cargo tests stand |
-| 04-02 | Click/drag/key/text executors real; every CLIENT_KEY_CODES maps Some; unknown drops | ✓ VERIFIED (unchanged) | No server files touched; vocabulary re-diffed: identical |
-| 04-03 | Deterministic classifier; fling seed + stop-first; monotonic accel; volatile sendScroll; all constants in tuning.dart | ✓ VERIFIED | 04-09 divisor uses live FSM state, not a new tunable (tuning.dart untouched); classifier still 0 Flutter imports; 21 classifier tests green |
-| 04-04 | Accelerated moves w/ persisted sensitivity; clicks; momentum w/ touch-stop; drag-lock pill; hot path setState-free | ✓ VERIFIED (unchanged) | trackpad_screen.dart edit was comment + deletion of the producer reset only; 0 non-comment setState on the hot path |
-| 04-05 | IME typing exact; boundary backspace via sentinel; panel over live trackpad; no logging of typed text | ✓ VERIFIED | Was PARTIAL (CR-01); now closed — atomic reset also PURGES pre-disconnect plaintext from the controller buffer (stronger T-04-03 closure); redaction grep still clean |
-| 04-06 | Rows work; armed/locked modifiers; hold autorepeat; D-12 reset; every emitted code in vocabulary | ✓ VERIFIED | Was PARTIAL (CR-02); now closed — set-based tracking + always-wired releases; D-12 semantics preserved for any number of held caps |
-| 04-07 | Atomic producer+controller IME reset on the disconnected transition; no replay, backspace stays bs | ✓ VERIFIED | Code + tests confirmed above (gap-closure plan) |
-| 04-08 | Rollover releases every key; disconnect wipes all held caps; mid-press enabled flip still releases; disabled-started press inert | ✓ VERIFIED | Code + tests confirmed above (gap-closure plan) |
-| 04-09 | Post-lift scroll at full rate; unhalved fling seed; two-finger averaging byte-identical | ✓ VERIFIED | Code + tests confirmed above (gap-closure plan) |
+| Truth | Status | Evidence |
+|-------|--------|----------|
+| A session that stops receiving inbound frames (half-open TCP) releases ALL held keys/buttons within the liveness deadline | ✓ VERIFIED | session.rs deadline branch → break 'read → drain-based idempotent release_all; `half_open_silence_releases_held_input` asserts KeyUp AND session termination; ran green in this verification |
+| Every graceful teardown path still releases held input exactly as before | ✓ VERIFIED | All 10 integration tests green including `disconnect_mid_drag_releases_held_input` (FIN/RST sibling), oversize, version-reject, pause paths; full suite has zero regressions |
+| A healthy connected client is NEVER disconnected by the liveness deadline | ✓ VERIFIED | 10s ≥ 5× the slowest healthy post-auth cadence (idlePingIntervalMillis = 2000, latency_probe.dart:93); pre-auth silence (the CR-01 hole in the original claim) now gets 90s > the 60s PIN window; `pre_auth_silence_survives_pin_entry` green; walking-skeleton and reconnect tests green |
 
 ### Required Artifacts
 
 | Artifact | Expected | Status | Details |
 |----------|----------|--------|---------|
-| `server/server-windows/src/input_thread.rs` | normalize_virtual + absolute move arm + 8 new Cmd arms | ✓ VERIFIED | Unchanged since initial verification |
-| `server/server-windows/Cargo.toml` | Win32 feature flags | ✓ VERIFIED | Unchanged |
-| `server/server-windows/src/executors/keymap.rs` | Locked vocabulary + map_key/map_mod/map_button | ✓ VERIFIED | Unchanged; re-diffed against Dart side |
-| `server/server-windows/src/executors/mouse_keys.rs` | All 8 stubs filled as Cmd sends | ✓ VERIFIED | Unchanged |
-| `app/remote_control/lib/trackpad/gesture_classifier.dart` | Pure IO-free FSM | ✓ VERIFIED | Still 0 Flutter imports; `_emitScroll` now divides by live `_pointers.length` (463-465) |
-| `app/remote_control/lib/trackpad/tuning.dart` | ONE constants file | ✓ VERIFIED | Untouched by 04-09 (verified: n is live FSM state, not a tunable) |
-| `app/remote_control/lib/trackpad/accel.dart` | accelGain pure fn | ✓ VERIFIED | Unchanged |
-| `app/remote_control/lib/net/connection_service.dart` | volatile sendScroll | ✓ VERIFIED | Unchanged |
-| `app/remote_control/lib/trackpad/trackpad_driver.dart` | Intent executor | ✓ VERIFIED | Unchanged |
-| `app/remote_control/lib/trackpad/mouse_buttons.dart` | L/M/R bar | ✓ VERIFIED | Unchanged |
-| `app/remote_control/lib/settings/sensitivity.dart` | Store + provider | ✓ VERIFIED | Unchanged |
-| `app/remote_control/lib/trackpad/trackpad_screen.dart` | Live surface + chrome | ✓ VERIFIED | Was HOLLOW at the CR-01 seam; the one-sided `_imeProducer.reset()` is GONE (disconnect listener 135-142 calls only `_driver.reset()`); comment redirects to the panel-owned atomic hygiene |
-| `app/remote_control/lib/keyboard/diff_ops.dart` | ImeDiffProducer + sentinel | ✓ VERIFIED | `reseed()` resets `_committed` AND returns the seed (64-67) — the atomic-wipe contract |
-| `app/remote_control/lib/keyboard/hidden_text_input.dart` | Zero-footprint IME field | ✓ VERIFIED | + `resetSignal` Listenable seam (35), `_onExternalReset` guarded write-back (87-94), `didUpdateWidget` re-subscription (64-72), listener removed before controller dispose (75-79); all original fidelity flags intact |
-| `app/remote_control/lib/keyboard/keyboard_panel.dart` | Panel shell + rows wiring | ✓ VERIFIED | Was HOLLOW at the CR-02 seam; now `Set<String> _heldCodes` (109) + remove()-guarded `_onKeyUp` (200-207) + `_imeResetTick` (120) fired in `_onDisconnected` (144-149), disposed (166), wired as resetSignal (273) |
-| `app/remote_control/lib/keyboard/modifier_fsm.dart` | Sticky-modifier FSM | ✓ VERIFIED | Unchanged |
-| `app/remote_control/lib/keyboard/modifier_chip.dart` | Chip visuals | ✓ VERIFIED | Unchanged |
-| `app/remote_control/lib/keyboard/key_rows.dart` | Rows + kClientKeyCodes | ✓ VERIFIED | Vocabulary untouched (re-diffed); `_KeyCap` now has `_live` guard (366) + always-wired onTapUp/onTapCancel (428-429), onTapDown still enabled-gated (422) |
+| `server/server-core/src/transport/session.rs` | `LIVENESS_TIMEOUT` const + `last_inbound` tracking + `sleep_until` liveness branch in run_session's select! | ✓ VERIFIED | Const :60 (10s) + `PRE_AUTH_LIVENESS_TIMEOUT` :71 (90s, CR-01); branch :127-131; refresh :160; module doc extended to name the half-open leg (:4-6); no logging of secrets (T-01-31 doc intact, no log calls in file) |
+| `server/server-core/tests/integration.rs` | `half_open_silence_releases_held_input` regression test | ✓ VERIFIED | :346, substantive (69 lines): real-time KeyDown barrier, paused-clock silent wait, KeyUp assertion, real-time session-end check; PLUS `pre_auth_silence_survives_pin_entry` :427 (CR-01) |
+| All 18 prior-verification artifacts (server-windows executors, classifier, tuning, driver, IME stack, key rows, FSM, chips…) | Unchanged | ✓ VERIFIED (carried) | Zero diffs outside the two files above since ade8536 |
 
 ### Key Link Verification
 
-All 16 key links from the initial verification re-confirmed unchanged, plus two new links introduced by the gap closure:
-
 | From | To | Via | Status | Details |
 |------|----|-----|--------|---------|
-| keyboard_panel `_onDisconnected` | hidden_text_input `_onExternalReset` | `_imeResetTick` ValueNotifier wired as `resetSignal` | ✓ WIRED | keyboard_panel.dart:147, 273 → hidden_text_input.dart:60, 87 |
-| hidden_text_input `_onExternalReset` | diff_ops `reseed()` | atomic write-back under `_reseeding` guard | ✓ WIRED | hidden_text_input.dart:89-93 → diff_ops.dart:64-67; zero emissions asserted by test |
-| key_rows `_KeyCap` releases | keyboard_panel `_onKeyUp` | always-wired onTapUp/onTapCancel → onKeyUp seam | ✓ WIRED | key_rows.dart:428-429, 386, 396 → keyboard_panel.dart:254, 200-207 |
-| trackpad_screen Listener | trackpad_driver | `_driver.handle(_classifier.onPointer*)` | ✓ WIRED | trackpad_screen.dart:162-180 (unchanged) |
-| All other initial links (input_thread, mouse_keys, keymap, tuning, sendScroll, accel, diff→reliable, vocabulary mirror, fsm→send, router) | — | — | ✓ WIRED | Files unchanged since initial verification; suite green |
+| run_session liveness branch (session.rs:127-131) | CONN-07 `ctx.held.release_all` (session.rs:217) | `break 'read` on deadline expiry — cleanup is the EXISTING unskippable straight-line path, no new cleanup code | ✓ WIRED | Break target confirmed; release_all is drain-based and idempotent (held.rs contract) so the pause-branch overlap is a no-op |
+| integration.rs half-open test | `CallLog::wait_for` (executors/mock.rs) | Notify-driven KeyUp assertion under paused tokio time | ✓ WIRED | :357-366 (KeyDown barrier), :384-393 (KeyUp); no polling loops |
+| Deadline selector | `ctx.auth_state` (dispatch::AuthState) | `if ctx.auth_state == AuthState::Authed` inside the sleep_until expression | ✓ WIRED | session.rs:127; the auth-state transitions (:279, :318, :340) are the same FSM the handshake owns — no new state introduced |
+| All 19 prior links (client pipelines, router, executors, vocabulary mirror) | — | — | ✓ WIRED (carried) | Files unchanged; suite green |
 
 ### Data-Flow Trace (Level 4)
 
 | Artifact | Data Variable | Source | Produces Real Data | Status |
 |----------|--------------|--------|--------------------|--------|
-| TrackpadDriver moves | dx,dy × accelGain | Raw Listener pointer events → classifier | Yes | ✓ FLOWING |
-| ScrollIntent stream | dx/n, dy/n | Live `_pointers.length` divisor | Yes — full rate post-lift (was half) | ✓ FLOWING (WR-04 closed) |
-| TextMsg stream | ImeDiffProducer._committed | HiddenTextInput controller ← system IME | Yes — INCLUDING across disconnects (atomic reseed keeps producer == controller) | ✓ FLOWING (CR-01 closed) |
-| KeyMsg stream | _heldCodes / fsm state | key caps + modifier chips | Yes — INCLUDING rollover and mid-press gating flips | ✓ FLOWING (CR-02/IN-04 closed) |
-| Server injection | Cmd channel | router → EnigoMouseKeys → input thread | Yes | ✓ FLOWING (unchanged) |
+| Liveness deadline | `last_inbound` | Refreshed on every `Some(Ok(m))` from `stream.next()` — real inbound socket bytes | Yes — Text, Binary, AND WS control frames count; pause toggles do not | ✓ FLOWING |
+| CONN-07 release | `ctx.held` | HeldInput populated by router on key/drag downs, drained by release_all | Yes — test observes real KeyUp calls on the mock executor | ✓ FLOWING |
+| All prior traces (moves, scroll, TextMsg, KeyMsg, server injection) | — | — | Unchanged | ✓ FLOWING (carried) |
 
 ### Behavioral Spot-Checks
 
 | Behavior | Command | Result | Status |
 |----------|---------|--------|--------|
-| Full Flutter suite (238 = 230 initial + 8 regression) | `flutter test` (run once) | 238 passed, "All tests passed!" | ✓ PASS |
-| Static analysis | `flutter analyze` | No issues found | ✓ PASS |
-| Cross-language vocabulary diff (post-04-08 key_rows edit) | Python comparison of kClientKeyCodes vs CLIENT_KEY_CODES | 39 = 39, identical content AND order | ✓ PASS |
-| Gap-fix commit hashes exist | git log inspection of all 9 claimed hashes (76ebb93, 43dcc3a, 1f70729, d5844aa, e8effa0, 4bdde4c, 941b40a, 7131c05, 3f28e8c) | All present at top of history; working tree clean | ✓ PASS |
-| Gap-closure blast radius | `git diff --name-only 8db3a3c..HEAD -- app server` | Exactly the 5 lib + 3 test files expected; zero server files | ✓ PASS |
-| Server suite | Not re-run — zero server files changed since the initial verification's `cargo test -p server-windows` (10 passed) | Result stands by immutability | ✓ PASS (carried) |
+| Full server workspace suite (run once) | `cargo test` in server/ | 115/115: 91 (server-core unit) + 4 (fixtures) + 10 (integration, incl. BOTH new regression tests by name) + 10 (server-windows) + 0 doc | ✓ PASS |
+| Half-open regression test present and passing | integration run output | `test half_open_silence_releases_held_input ... ok` (suite finished in 0.22s — paused-clock design works, no real 60s wait) | ✓ PASS |
+| Pre-auth PIN-entry regression present and passing | integration run output | `test pre_auth_silence_survives_pin_entry ... ok` | ✓ PASS |
+| All 6 claimed commits exist, RED precedes GREEN | `git log` inspection | baff15a→d269c05→71e5f59 and e1c01d1→213b8fd→fead00a in order; tree clean | ✓ PASS |
+| Blast radius | `git diff --name-only ade8536..HEAD -- app server protocol` | Exactly session.rs + integration.rs; zero app/protocol/server-windows changes | ✓ PASS |
+| Flutter suite (238/238), analyze, vocabulary diff | Not re-run — zero app/ files changed since the prior verification's green run | Results stand by immutability | ✓ PASS (carried) |
+| Deadline-rationale anchors | grep pin.rs / latency_probe.dart | `PIN_TTL_SECS = 60` (pin.rs:13); `pingIntervalMillis = 250` / `idlePingIntervalMillis = 2000` (latency_probe.dart:91,93) — the doc-comment math in session.rs is true | ✓ PASS |
 
 ### Probe Execution
 
@@ -155,46 +123,55 @@ SKIPPED — no `scripts/*/tests/probe-*.sh` probes exist in this project and no 
 
 | Requirement | Source Plan(s) | Description | Status | Evidence |
 |-------------|---------------|-------------|--------|----------|
-| PAD-01 | 04-01, 04-03, 04-04 | One-finger move, velocity acceleration, server sub-pixel accumulation | ✓ SATISFIED | Unchanged since initial verification |
-| PAD-02 | 04-02, 04-03, 04-04 | Tap = left, two-finger tap = right, L/M/R buttons | ✓ SATISFIED | Unchanged |
-| PAD-03 | 04-02, 04-03, 04-04, 04-09 | Two-finger scroll, momentum, instant touch-stop | ✓ SATISFIED | WR-04 feel warning closed — post-lift full-rate scroll + unhalved fling seed, test-proven |
-| PAD-04 | 04-02, 04-03, 04-04 | Long-press drag with drag lock | ✓ SATISFIED | Unchanged |
-| KEY-01 | 04-02, 04-05, 04-07 | IME typing incl. autocomplete + backspace via diff-ops | ✓ SATISFIED | CR-01 closed: atomic reset — no replay, backspace stays a backspace, both test-locked |
-| KEY-02 | 04-02, 04-06 | F1–F12, numpad, nav cluster from key rows | ✓ SATISFIED | Vocabulary re-diffed post-edit: identical |
-| KEY-03 | 04-02, 04-06 | Sticky modifiers, combos (Ctrl+Alt+Del, Win+D) | ✓ SATISFIED | Unchanged |
-| KEY-04 | 04-02, 04-06, 04-08 | Server-side autorepeat, stops on release | ✓ SATISFIED | CR-02 + IN-04 closed: rollover-safe set tracking, always-wired releases, both test-locked |
+| PAD-01 | 04-01, 04-03, 04-04 | One-finger move, velocity acceleration, sub-pixel accumulation | ✓ SATISFIED | Carried + UAT Tests 2-3 device pass |
+| PAD-02 | 04-02, 04-03, 04-04 | Tap = left, two-finger tap = right, L/M/R buttons | ✓ SATISFIED | Carried + UAT Test 3 device pass |
+| PAD-03 | 04-02, 04-03, 04-04, 04-09 | Two-finger scroll, momentum, instant touch-stop | ✓ SATISFIED | Carried + UAT Test 3 device pass incl. WR-04 path |
+| PAD-04 | 04-02, 04-03, 04-04 | Long-press drag with drag lock | ✓ SATISFIED | Carried + UAT Test 3 device pass |
+| KEY-01 | 04-02, 04-05, 04-07 | IME typing incl. autocomplete + backspace | ✓ SATISFIED | Carried + UAT Test 4 device pass incl. no-replay |
+| KEY-02 | 04-02, 04-06 | F1–F12, numpad, nav cluster | ✓ SATISFIED | Carried; vocabulary byte-identical; keymap tests green |
+| KEY-03 | 04-02, 04-06 | Sticky modifiers, combos | ✓ SATISFIED | Carried + UAT Test 5 device pass (Win+D, locked Ctrl) |
+| KEY-04 | 04-02, 04-06, 04-08, **04-10** | Server-side autorepeat, stops on release, held keys never stuck | ✓ SATISFIED | UAT Test 5 device pass for autorepeat/rollover; the abrupt-disconnect stuck-key tail closed by 04-10 (liveness → CONN-07), regression-tested; on-device re-test is human gate 1 |
 
-**Orphaned requirements:** None. REQUIREMENTS.md's `[x]` marks for KEY-01 and KEY-04 — flagged premature in the initial verification — are now accurate.
+**Orphaned requirements:** None. All 8 phase-4 IDs are claimed by plans and marked Complete in REQUIREMENTS.md (lines 122-130) — accurate given this verification.
 
 ### Anti-Patterns Found
 
 | File | Line | Pattern | Severity | Impact |
 |------|------|---------|----------|--------|
-| — | — | Initial CR-01 (one-sided reset), CR-02 (single-slot held tracking), WR-04 (constant /2) blockers/warning | — | ALL CLOSED (04-07/08/09) |
-| app/remote_control/lib/net/connection_service.dart | ~360-420 | No dial-generation guard on concurrent dials | ⚠️ Warning | WR-01, connection-layer — outside phase must-haves, untouched by design (carried) |
-| app/remote_control/lib/net/connection_service.dart | ~327-346 | dispose() doesn't invalidate pending backoff timers | ⚠️ Warning | WR-02, latent (carried) |
-| lib/settings/sensitivity.dart + lib/keyboard/key_rows.dart | — | Async prefs load can clobber a user set(); post-dispose state throw | ⚠️ Warning | WR-03, UI/storage disagreement until restart (carried) |
-| — | — | TBD/FIXME/XXX/TODO/HACK/PLACEHOLDER debt markers across lib/ | — | None found (fresh grep, zero matches) |
+| — | — | TBD/FIXME/XXX/TODO/HACK/PLACEHOLDER in server-core (incl. both modified files) | — | None found (fresh grep, zero matches) |
+| app/remote_control/lib/net/connection_service.dart | 259-266, 310-353, 547-550 | Reliable queue accumulates during terminal-disconnected states and survives target switches (re-review WR-01; matches the UAT "minor" offline-typing observation) | ⚠️ Warning | Connection-layer, outside phase-4 must-haves; UAT routed it to backlog/next-phase-planning as a design decision (keep-lossless vs drop-for-predictability) |
+| server/server-core/src/transport/session.rs | 174, 222 | `tx.send(frame).await` inside the read arm can starve the liveness branch if the peer stops draining its socket; `write_task.await` at teardown can block on a half-open peer (re-review WR-02) | ⚠️ Warning | Pre-existing structure (write path, not the read path 04-10 fixed); held input IS released before the teardown await; tracked in 04-REVIEW.md, explicitly out of 04-10 scope per review routing |
+| lib/settings/sensitivity.dart, lib/keyboard/key_rows.dart | — | Async prefs load can clobber a user set() (carried WR) | ⚠️ Warning | UI/storage disagreement until restart; carried |
+| — | — | UI polish: owner verdict "the ui is horrible" (UAT Test 3 note) | ℹ️ Info (cosmetic per UAT triage) | Functionality verified; routed to a UI review/polish pass (/gsd-ui-review) — does not block the phase goal, which UAT itself marked non-blocking |
 
-No logging of typed text anywhere in lib/keyboard/ (SPEC §12 redaction upheld). Security threats T-04-03 (info disclosure via replay/buffer) and T-04-04 (stuck-key) are addressed by 04-07/04-08 per their summaries — the 04-SECURITY.md re-audit (`/gsd-secure-phase 4`) can now flip both to closed.
+No logging of PIN/token/text anywhere in session.rs (T-01-31 upheld — the new code adds no log sinks). The review's new CR-01 is resolved in-phase (`resolved_in_phase` in 04-REVIEW.md frontmatter, commit 594331d); remaining review findings are warnings/infos, none blocking phase-goal truths.
 
 ### Human Verification Required
 
-The four deferred end-of-phase gates (human_verify_mode = end-of-phase) remain — see frontmatter `human_verification` for the structured list. They MUST now run against the corrected paths, and three have been extended to exercise the specific fixes:
+The prior verification's four deferred gates were executed as on-device UAT (4/5 passed — see 04-UAT.md). What remains is narrow: re-test the two fixes that landed after UAT, on the same hardware path that exposed the original gap.
 
-1. **Ballistics bypass + multi-monitor** — slow 1:1 drag with Enhance pointer precision ON; dual-monitor seam crossing (04-01)
-2. **Trackpad feel vs Remote Mouse** — full gesture set, drag-lock pill lifecycle, live sensitivity, AND post-lift scroll rate (04-04 + 04-09 fix)
-3. **IME fidelity on device** — autocomplete revisions, emoji, rapid backspace, trackpad live while typing, AND WiFi-drop → reconnect → no replay (04-05 + 04-07 fix, RESEARCH A2)
-4. **Combos, autorepeat, mid-combo disconnect** — Win+D, locked-Ctrl + held Right, arrow-key rollover releases both, connection kill mid-lock (04-02/04-06 + 04-08 fix)
+#### 1. WiFi-kill stuck-key re-test (UAT Test 5 re-run — the 04-10 fix)
+
+**Test:** Pair, long-press-lock Shift (chip shows locked, key held server-side), then kill the phone's WiFi abruptly (airplane mode / radio off — not an app close). Watch the PC.
+**Expected:** The PC releases Shift within ~10 seconds (LIVENESS_TIMEOUT), not minutes; on reconnect, chips are reset and input is normal.
+**Why human:** The regression test proves the half-open shape on loopback, but the real Android-radio-kill path is precisely what automation missed the first time.
+
+#### 2. Slow-PIN pairing sanity check (the CR-01 fix)
+
+**Test:** From an unpaired state, start pairing and deliberately wait 20-30 seconds before entering the 6-digit PIN; complete pairing.
+**Expected:** The session survives the pause — no transport error, no challenge/PIN churn; pairing completes on the first connection.
+**Why human:** Confirms the end-to-end pairing UX around a slow human (client backoff/redial interplay), which the paused-clock server test cannot cover.
 
 ### Gaps Summary
 
-None remaining. Both initial BLOCKER gaps (CR-01/SC2, CR-02/SC5) and the IN-04 and WR-04 findings are closed, each independently confirmed in code (not from SUMMARY claims) and locked by regression tests within the 238/238-green suite. No regressions in previously-passed items: server code is untouched since the initial verification, the key vocabulary remains byte-identical across languages, the hot-path/redaction/purity invariants all hold, and static analysis is clean.
+None remaining. The single UAT MAJOR gap (Test 5: half-open WiFi kill preserves held input) is closed by a named mechanism — `LIVENESS_TIMEOUT` (10s post-auth) driving the pre-existing straight-line CONN-07 `release_all` — and the fix's own critical regression (review CR-01: pre-auth PIN-entry sessions killed at 10s) is closed by the auth-state-scaled deadline (90s pre-auth, anchored to the 60s PIN TTL). Both are locked by socket-level regression tests inside a 115/115-green server suite; the client side is untouched (238/238 Flutter tests stand by immutability); blast radius is exactly the two declared files.
 
-All five roadmap success criteria now verify programmatically (5/5, previously 3/5). Status is `human_needed` rather than `passed` solely because the four deferred on-device gates (trackpad feel, real-IME fidelity, OS-level autorepeat/combo behavior, display ballistics) can only be validated by a human on real hardware — automated verification is exhausted.
+UAT's two non-blocking observations (UI polish verdict — cosmetic; offline-typed text flushing from the reliable FIFO — minor design decision) are routed to backlog per the UAT triage and do not gate the phase goal.
+
+Status is `human_needed` rather than `passed` solely because the two fixes above must be confirmed once on real hardware — the WiFi-kill re-run (the exact scenario automation missed before) and one slow-PIN pairing check. Automated verification is exhausted; all five roadmap success criteria verify programmatically and four of five were already confirmed on device.
 
 ---
 
-_Verified: 2026-07-10T07:53:15Z_
+_Verified: 2026-07-10T10:03:29Z_
 _Verifier: Claude (gsd-verifier)_
-_Re-verification after gap-closure plans 04-07, 04-08, 04-09_
+_Re-verification after gap-closure plan 04-10 and review CR-01 follow-up_
