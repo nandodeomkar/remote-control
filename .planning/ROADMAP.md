@@ -143,7 +143,7 @@ Plans:
 - [x] 04-07-PLAN.md — Atomic IME producer+controller sentinel reset on disconnect — closes CR-01 / T-04-03 (KEY-01, SC2)
 - [x] 04-09-PLAN.md — Scroll deltas scaled by live pointer count, unhalved fling seed — closes review WR-04 (PAD-03) [gap wave 1, parallel with 04-07]
 - [x] 04-08-PLAN.md — Set-based held-cap tracking + always-wired key-cap release (folds IN-04) — closes CR-02 / T-04-04 (KEY-04, SC5) [gap wave 2, after 04-07]
-- [ ] 04-10-PLAN.md — Session liveness deadline: half-open disconnect releases held input via existing CONN-07 cleanup — closes 04-UAT Test 5 major gap (KEY-04, SC4/SC5, T-04-04) [gap wave 3]
+- [x] 04-10-PLAN.md — Session liveness deadline: half-open disconnect releases held input via existing CONN-07 cleanup — closes 04-UAT Test 5 major gap (KEY-04, SC4/SC5, T-04-04) [gap wave 3]
 
 **UI hint**: yes
 
@@ -208,7 +208,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 1. Protocol Contract & Server Core | 8/8 | Complete    | 2026-07-07 |
 | 2. End-to-End Cursor Spike | 4/4 | Complete — gate PASS (p50 6ms / p95 10ms) | 2026-07-08 |
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
-| 4. Trackpad & Keyboard | 8/9 | In Progress|  |
+| 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 0/TBD | Not started | - |
 | 6. Apps & Clipboard | 0/TBD | Not started | - |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |
