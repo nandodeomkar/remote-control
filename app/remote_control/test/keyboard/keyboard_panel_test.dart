@@ -257,6 +257,84 @@ void main() {
     expect(sent.length, sendsBeforeDrop);
   });
 
+  testWidgets(
+      'CR-01: disconnect wipes producer and controller atomically — first '
+      'post-reconnect keystroke emits only the new char', (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    // Steady-state baseline: typed text diffs onto the wire.
+    await tester.enterText(find.byType(TextField), '${kImeSentinel}secret');
+    await tester.pump();
+    expect(emitted.last.ins, 'secret');
+
+    // The WiFi drop: chip flips to disconnected + a changes ping (D-12).
+    disconnected = true;
+    changes.add(null);
+    await tester.pumpAndSettle();
+
+    // The controller was wiped back to EXACTLY the sentinel — the atomic
+    // reseed purged the pre-disconnect text from the buffer (T-04-03).
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      kImeSentinel,
+    );
+    final emissionsAfterWipe = emitted.length;
+
+    // Reconnect: the true->false transition must NOT fire another reset,
+    // and neither the wipe write-back nor the ping emits anything.
+    disconnected = false;
+    changes.add(null);
+    await tester.pump();
+    expect(emitted.length, emissionsAfterWipe,
+        reason: 'the reset write-back itself must emit NO TextMsg');
+
+    // First post-reconnect keystroke: ONLY the new char — never a replay
+    // of the pre-disconnect text (KEY-01 across disconnects).
+    await tester.enterText(find.byType(TextField), '${kImeSentinel}x');
+    await tester.pump();
+    expect(emitted.last.bs, 0);
+    expect(emitted.last.ins, 'x');
+    expect(emitted.last.ins.contains('secret'), isFalse,
+        reason: 'pre-disconnect text must never replay after reconnect');
+  });
+
+  testWidgets('CR-01: post-reconnect backspace emits bs:1, never an insert',
+      (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), '${kImeSentinel}secret');
+    await tester.pump();
+    expect(emitted.last.ins, 'secret');
+
+    // Drop, then reconnect.
+    disconnected = true;
+    changes.add(null);
+    await tester.pumpAndSettle();
+    disconnected = false;
+    changes.add(null);
+    await tester.pump();
+
+    // A backspace on the wiped field: one trailing sentinel ZWSP shrinks.
+    await tester.enterText(
+      find.byType(TextField),
+      kImeSentinel.substring(0, kImeSentinel.length - 1),
+    );
+    await tester.pump();
+
+    // With the old one-sided reset this emitted ins:'secre' — an insert.
+    expect(emitted.last.bs, 1);
+    expect(emitted.last.ins, isEmpty);
+
+    // The boundary reseed then restored the FULL sentinel — the existing
+    // needsReseed/reseed path still works after the wipe.
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      kImeSentinel,
+    );
+  });
+
   testWidgets('gated panel renders chips and caps muted and inert',
       (tester) async {
     await tester.pumpWidget(host(expanded: true, enabled: false));
