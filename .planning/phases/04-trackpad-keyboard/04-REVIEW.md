@@ -36,11 +36,13 @@ files_reviewed_list:
   - server/server-windows/src/executors/mouse_keys.rs
   - server/server-windows/src/input_thread.rs
 findings:
-  critical: 1
+  critical: 0
   warning: 5
   info: 5
-  total: 11
+  total: 10
 status: issues_found
+resolved_in_phase:
+  - "CR-01 (pre-auth liveness kill): fixed by commits e1c01d1 (RED test) + 213b8fd (fix) — see Resolution note in CR-01 section"
 ---
 
 # Phase 04: Code Review Report (re-review after gap closure)
@@ -96,6 +98,8 @@ const PRE_AUTH_LIVENESS_TIMEOUT: Duration = Duration::from_secs(75);
 ```
 
 (Alternative: have the client send protocol `ping`s during the handshake — but the server-side fix is one expression and needs no protocol change. Add an integration test that holds a session in `AwaitingAuth` for >10s virtual time and asserts it survives to a late `pin` submit.)
+
+**Resolution (2026-07-10, same session):** Fixed as recommended. `PRE_AUTH_LIVENESS_TIMEOUT` (90s = `PIN_TTL_SECS` 60s + margin) applies to all pre-auth states; `Authed` keeps the 10s deadline (UAT Test 5 held-input contract). RED regression test `pre_auth_silence_survives_pin_entry` reproduced the kill (`ConnectionAborted` at 10s, 30s into the PIN window), green after fix. Full workspace suite green (115 tests). Commits: `e1c01d1` (test), `213b8fd` (fix), `fead00a` (summary doc).
 
 ## Warnings
 
