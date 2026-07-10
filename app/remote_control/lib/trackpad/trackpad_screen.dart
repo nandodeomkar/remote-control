@@ -123,17 +123,20 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
     _imeProducer = ImeDiffProducer(emit: _service.sendReliable);
 
     // Disconnect hygiene: on the transition INTO disconnected, clear the
-    // client gesture state (drag pill, momentum, pending long-press) AND the
-    // IME diff state (stale committed text must not skew the next diff). The
-    // server's held buttons are released by CONN-07 release_all. The panel
-    // may stay open; its keys render gated in 04-06.
+    // client gesture state (drag pill, momentum, pending long-press) here.
+    // The server's held buttons are released by CONN-07 release_all. IME
+    // disconnect hygiene now lives in KeyboardPanel + HiddenTextInput: the
+    // panel's reset signal reseeds the diff producer AND its controller
+    // atomically (CR-01) — resetting the producer alone from this listener
+    // desynced it from the hidden field's text and replayed pre-disconnect
+    // typing into the next session. The panel may stay open; its keys
+    // render gated in 04-06.
     _lastChip = _service.chipStatus;
     _changesSub = _service.changes.listen((_) {
       final chip = _service.chipStatus;
       if (chip == ChipStatus.disconnected &&
           _lastChip != ChipStatus.disconnected) {
         _driver.reset();
-        _imeProducer.reset();
       }
       _lastChip = chip;
     });

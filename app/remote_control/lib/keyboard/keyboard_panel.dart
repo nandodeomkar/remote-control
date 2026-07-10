@@ -35,9 +35,11 @@
 /// ping stream + [isDisconnected] probe — the service seams, injectable so
 /// the widget test drives a fake stream), the panel calls
 /// [ModifierFsm.disconnected] (zero effects — the socket is gone; CONN-07
-/// release_all already freed the real keys) and forgets any held key cap so
-/// no stale `up` is ever flushed into a NEW session. No phantom input
-/// survives a mid-combo drop.
+/// release_all already freed the real keys), forgets any held key cap so
+/// no stale `up` is ever flushed into a NEW session, and fires the CR-01
+/// IME reset tick so the hidden field atomically reseeds its diff producer
+/// AND controller to the sentinel — pre-disconnect typed text can never
+/// replay after reconnect (T-04-03). No phantom input survives a drop.
 library;
 
 import 'dart:async';
@@ -108,6 +110,13 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
   StreamSubscription<void>? _changesSub;
   bool _wasDisconnected = false;
 
+  /// The CR-01 atomic-IME-wipe trigger: incrementing it makes the
+  /// [HiddenTextInput] purge pre-disconnect typed text (potentially a
+  /// password) from BOTH the diff baseline and the controller buffer in one
+  /// synchronous callback, so no post-reconnect diff can replay it through
+  /// sendReliable (T-04-03).
+  final ValueNotifier<int> _imeResetTick = ValueNotifier<int>(0);
+
   @override
   void initState() {
     super.initState();
@@ -127,10 +136,13 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
   }
 
   /// D-12: reset all armed/locked chips (zero send effects — the FSM
-  /// guarantees it) and forget the held cap so its up is skipped.
+  /// guarantees it), forget the held cap so its up is skipped, and fire the
+  /// CR-01 IME wipe so the hidden field's producer + controller both return
+  /// to the sentinel atomically.
   void _onDisconnected() {
     _fsm.disconnected();
     _heldCode = null;
+    _imeResetTick.value++;
     if (mounted) setState(() {});
   }
 
@@ -149,6 +161,7 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
   @override
   void dispose() {
     _changesSub?.cancel();
+    _imeResetTick.dispose();
     super.dispose();
   }
 
@@ -254,6 +267,7 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
         HiddenTextInput(
           producer: widget.producer,
           focusNode: widget.imeFocusNode,
+          resetSignal: _imeResetTick,
         ),
 
         // The animating chrome: 200ms ease slide between zero height and

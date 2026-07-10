@@ -27,11 +27,19 @@ class HiddenTextInput extends StatefulWidget {
   /// Owned by the panel/screen — focusing it raises the system IME.
   final FocusNode focusNode;
 
+  /// Fired by the owner on the disconnected transition. The State answers
+  /// with an ATOMIC producer-reseed + controller write-back: both the diff
+  /// baseline and the controller buffer return to [kImeSentinel] in the same
+  /// synchronous callback, purging pre-disconnect typed text (possibly a
+  /// password) so no post-reconnect diff can replay it (CR-01 / T-04-03).
+  final Listenable? resetSignal;
+
   /// Creates the hidden input.
   const HiddenTextInput({
     super.key,
     required this.producer,
     required this.focusNode,
+    this.resetSignal,
   });
 
   @override
@@ -49,12 +57,40 @@ class _HiddenTextInputState extends State<HiddenTextInput> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.producer.seedText);
+    widget.resetSignal?.addListener(_onExternalReset);
+  }
+
+  @override
+  void didUpdateWidget(HiddenTextInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Re-subscribe when the signal identity changes — a stale subscription
+    // on a replaced notifier would silently drop resets (IN-05-class hazard).
+    if (!identical(widget.resetSignal, oldWidget.resetSignal)) {
+      oldWidget.resetSignal?.removeListener(_onExternalReset);
+      widget.resetSignal?.addListener(_onExternalReset);
+    }
   }
 
   @override
   void dispose() {
+    widget.resetSignal?.removeListener(_onExternalReset);
     _controller.dispose();
     super.dispose();
+  }
+
+  /// CR-01 / T-04-03: the owner saw the disconnected transition. Reseed the
+  /// producer AND write the seed back into the controller in this ONE
+  /// synchronous callback — `producer.reseed()` resets the committed text to
+  /// the sentinel and returns the seed, so the two sides can never desync.
+  /// The [_reseeding] guard mirrors the boundary-reseed write-back below: the
+  /// reset itself emits NO diff.
+  void _onExternalReset() {
+    _reseeding = true;
+    _controller.value = TextEditingValue(
+      text: widget.producer.reseed(),
+      selection: TextSelection.collapsed(offset: kImeSentinel.length),
+    );
+    _reseeding = false;
   }
 
   void _onChanged(String value) {
