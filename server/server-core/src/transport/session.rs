@@ -2,7 +2,8 @@
 //! `dispatch::router` behind the auth/pause gates, write half fed by an mpsc
 //! queue, and the UNSKIPPABLE post-loop cleanup that releases held input
 //! (CONN-07 — structured so cleanup runs after the loop exits on clean
-//! close, socket error, and abort alike).
+//! close, socket error, abort, AND liveness-deadline expiry — the half-open
+//! TCP leg after an abrupt WiFi loss, where no FIN/RST ever arrives).
 //!
 //! The handshake FSM (AwaitingHello → AwaitingAuth → Authed, SPEC §3) is
 //! owned HERE, not in dispatch: `hello`/`pin`/`auth` never reach
@@ -14,10 +15,15 @@
 
 use std::net::IpAddr;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, watch};
+// tokio's Instant (not std's) so the paused-clock regression test
+// (`tokio::time::pause` + auto-advance) can drive the liveness deadline
+// deterministically. Outside a test runtime it is std's Instant.
+use tokio::time::{Instant, sleep_until};
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::Message;
 
@@ -37,6 +43,21 @@ use crate::executors::Executors;
 /// beacon's `proto` field references it instead of duplicating the literal.
 pub(crate) const SERVER_PROTO_VERSION: &str = "1.0";
 const SERVER_PROTO_MAJOR: u64 = 1;
+
+/// Liveness deadline: a session receiving NO inbound frames for this long
+/// breaks its read loop so the CONN-07 cleanup releases held input.
+///
+/// Rationale: the client emits protocol pings every ~250ms under move load
+/// and ~2s idle (latency_probe.dart `pingIntervalMillis` /
+/// `idlePingIntervalMillis`), so 10s is ≥ 5× the slowest healthy inbound
+/// cadence — a live client can never trip this. Without it, a half-open TCP
+/// connection after an abrupt WiFi kill (no FIN, no RST) keeps
+/// `stream.next()` pending for OS-timeout minutes while held input stays
+/// stuck (04-UAT Test 5, threat class T-04-04). Side-effect hardening: a
+/// silent pre-hello socket squatter also dies in 10s instead of holding a
+/// session task forever. Private on purpose — nothing else needs it; the
+/// integration test hard-codes a longer wait and names the coupling.
+const LIVENESS_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Run one connection to completion: write task + read loop + handshake FSM
 /// + unconditional held-input cleanup (CONN-07).
@@ -74,9 +95,22 @@ pub(super) async fn run_session(
     // The pause watch sender may drop before the session ends; disable the
     // branch then (`changed()` would return Err forever and busy-loop).
     let mut pause_alive = true;
+    // Last time ANY inbound bytes arrived from the peer; drives the
+    // liveness deadline branch below.
+    let mut last_inbound = Instant::now();
 
     'read: loop {
         tokio::select! {
+            // Liveness deadline (04-UAT Test 5): no inbound frames for
+            // LIVENESS_TIMEOUT means the peer is gone (half-open TCP after
+            // an abrupt WiFi kill never yields None/Err from stream.next()).
+            // Breaking 'read lands on the EXISTING straight-line CONN-07
+            // cleanup below the loop — no new cleanup code, that is the
+            // entire point of the straight-line structure. Constructing the
+            // sleep_until future fresh each iteration is correct: select!
+            // re-creates non-pinned futures per pass, and the loop rate is
+            // bounded by the inbound frame rate.
+            () = sleep_until(last_inbound + LIVENESS_TIMEOUT) => break 'read,
             changed = pause.changed(), if pause_alive => {
                 match changed {
                     Ok(()) => {
@@ -99,6 +133,13 @@ pub(super) async fn run_session(
                     Some(Err(_)) => break 'read,
                     Some(Ok(m)) => m,
                 };
+                // ANY inbound bytes prove the peer is alive — refreshed
+                // BEFORE the frame-type match so Text, Binary, and WS
+                // control frames (Ping/Pong in the `_` arm) all count.
+                // The pause branch above deliberately does NOT refresh:
+                // a server-side pause toggle says nothing about the
+                // phone's reachability.
+                last_inbound = Instant::now();
                 match msg {
                     Message::Text(text) => {
                         let (replies, close_after) = handle_text(
