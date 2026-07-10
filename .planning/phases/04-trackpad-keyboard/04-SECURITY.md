@@ -1,8 +1,8 @@
 ---
 phase: 04
 slug: trackpad-keyboard
-status: blocked
-threats_open: 2
+status: pass
+threats_open: 0
 asvs_level: 1
 created: 2026-07-10
 ---
@@ -31,8 +31,8 @@ created: 2026-07-10
 |-----------|----------|-----------|-------------|------------|--------|
 | T-04-01 | DoS / Tampering | input_thread.rs absolute inject + click/key/text arms | mitigate | `normalize_virtual` clamps to virtual screen (input_thread.rs:121, property-tested incl. i32::MIN/MAX); GetCursorPos failure drops frame; all 12 enigo calls `let _ =` — never panic | closed |
 | T-04-02 | Tampering / Input Validation | keymap.rs map_key + kClientKeyCodes mirror | mitigate | Unknown code → None → silent whole-command drop (keymap.rs:128, input_thread.rs:240); coverage tests both sides; mirror verified byte-identical 39/39 this audit | closed |
-| T-04-03 | Information Disclosure | Cmd::Type arm + ImeDiffProducer/HiddenTextInput | mitigate | Redaction verified (zero typed-text logging either side; ExcludeSemantics at hidden_text_input.dart:79) — BUT CR-01: one-sided `_imeProducer.reset()` (trackpad_screen.dart:136) desyncs producer from controller; first post-reconnect keystroke replays ALL pre-disconnect typed text (potentially a password) into the new session via guaranteed-delivery sendReliable | **open** |
-| T-04-04 | DoS local (stuck input) | held key/button, locked modifiers, held caps | mitigate | Declared mitigations present (session.rs:86,158 release_all; D-12 client reset; enigo release_keys_when_dropped) but all fire only at session end — CR-02: single `_heldCode` slot (keyboard_panel.dart:105) swallows first key's `up` on rollover; key stays autorepeating for remainder of live session. Fold IN-04 (key_rows.dart:409-413 mid-press `enabled` flip) into same fix | **open** |
+| T-04-03 | Information Disclosure | Cmd::Type arm + ImeDiffProducer/HiddenTextInput | mitigate | Redaction verified (zero typed-text logging either side; ExcludeSemantics at hidden_text_input.dart:79) — BUT CR-01: one-sided `_imeProducer.reset()` (trackpad_screen.dart:136) desyncs producer from controller; first post-reconnect keystroke replays ALL pre-disconnect typed text (potentially a password) into the new session via guaranteed-delivery sendReliable — CLOSED by 04-07 (43dcc3a): atomic producer+controller reseed via _imeResetTick; no-replay + backspace regression tests green | closed |
+| T-04-04 | DoS local (stuck input) | held key/button, locked modifiers, held caps | mitigate | Declared mitigations present (session.rs:86,158 release_all; D-12 client reset; enigo release_keys_when_dropped) but all fire only at session end — CR-02: single `_heldCode` slot (keyboard_panel.dart:105) swallows first key's `up` on rollover; key stays autorepeating for remainder of live session. Fold IN-04 (key_rows.dart:409-413 mid-press `enabled` flip) into same fix — CLOSED by 04-08 (e8effa0): Set<String> _heldCodes rollover-safe tracking + always-wired onTapUp/onTapCancel with _live guard; rollover/D-12/IN-04 regression tests green | closed |
 | T-04-05 | Spoofing / EoP | pre-auth input frames | mitigate | `shouldSendVolatile()` gates sendMove+sendScroll (connection_service.dart:293,303); sendReliable auth-gated bounded FIFO ≤10 (send_policy.dart:38-52); server router.rs:64-77 pre-auth + pause gates | closed |
 | T-04-06 | DoS local | fling/momentum loop, long-press timers | mitigate | StopFlingIntent unconditionally first on pointer-down (gesture_classifier.dart:283); generation-guarded timers, cancel on reset/dispose, self-stop below kMomentumStopVelocity (trackpad_driver.dart:119-189) | closed |
 | T-04-07 | Tampering (stale held state) | drag-lock across disconnect | mitigate | driver.reset() on ChipStatus.disconnected (trackpad_screen.dart:133-135) clears client state, sends nothing; server release_all unconditional on session end | closed |
@@ -78,7 +78,7 @@ created: 2026-07-10
 
 - [x] All threats have a disposition (mitigate / accept / transfer)
 - [x] Accepted risks documented in Accepted Risks Log
-- [ ] `threats_open: 0` confirmed — **blocked: T-04-03 (CR-01), T-04-04 (CR-02) open pending gap closure**
+- [x] `threats_open: 0` confirmed — T-04-03 closed by 04-07 (CR-01 fix), T-04-04 closed by 04-08 (CR-02 + IN-04 fix)
 - [ ] `status: verified` set in frontmatter
 
 **Approval:** pending — fix CR-01/CR-02 (see 04-REVIEW.md for patches + regression tests), then re-run `/gsd-secure-phase 4`
