@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 04-06-PLAN.md
-last_updated: "2026-07-10T04:42:18.579Z"
-last_activity: 2026-07-09 -- Phase 04 execution started
+stopped_at: Completed 04-09-PLAN.md
+last_updated: "2026-07-10T04:52:35.209Z"
+last_activity: 2026-07-10 -- Phase 04 execution started
 progress:
   total_phases: 7
-  completed_phases: 4
-  total_plans: 25
-  completed_plans: 25
-  percent: 57
+  completed_phases: 3
+  total_plans: 28
+  completed_plans: 26
+  percent: 43
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 04 (trackpad-keyboard) — EXECUTING
-Plan: 3 of 6
+Plan: 2 of 9
 Next: execute Phase 04 (/gsd-execute-phase 4)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -35,7 +35,7 @@ Next: execute Phase 04 (/gsd-execute-phase 4)
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-09 -- Phase 04 execution started
+Last activity: 2026-07-10 -- Phase 04 execution started
 
 Progress: [████░░░░░░] 43% (3 of 7 phases complete)
 
@@ -83,6 +83,7 @@ Progress: [████░░░░░░] 43% (3 of 7 phases complete)
 | Phase 04 P04 | 25min (2 sessions) | 3 tasks | 6 files |
 | Phase 04 P05 | 18min | 3 tasks | 6 files |
 | Phase 04 P06 | 13min | 3 tasks | 8 files |
+| Phase 04 P09 | 3min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,7 @@ Recent decisions affecting current work:
 - [Phase 04-06]: LOCKED modifier = physical hold via keymap.rs hold codes (KeyMsg down/up) excluded from modsForTap (Pitfall 7 double-apply avoidance); ARMED rides the mods array of the next non-modifier tap only, then auto-resets
 - [Phase 04-06]: D-12: ModifierFsm.disconnected() resets with ZERO effects and the panel forgets its held key cap — CONN-07 release_all already freed real keys; a queued stale up must never flush into a NEW session
 - [Phase 04-06]: keyboard.rowGroup store rides the PrefsKv seam (device_store pattern) instead of raw SharedPreferencesAsync — its constructor throws StateError in tests without a platform instance
+- [Phase 04]: 04-09: Phase-04-03 scroll decision refined: ScrollIntent carries delta/n over LIVE tracked pointers (n=2 both fingers down — byte-identical averaging; n=1 after a lift = full rate, WR-04 closed); no new tuning constant, classifier stays pure FSM
 
 ### Pending Todos
 
@@ -191,6 +193,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-09T20:41:08.667Z
-Stopped at: Completed 04-06-PLAN.md
+Last session: 2026-07-10T04:52:35.196Z
+Stopped at: Completed 04-09-PLAN.md
 Resume file: None
