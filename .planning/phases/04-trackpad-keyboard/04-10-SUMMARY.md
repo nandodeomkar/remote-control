@@ -100,10 +100,24 @@ None - no external service configuration required.
 - Human re-check pending at UAT re-run (not a blocking checkpoint): kill WiFi while Shift is locked — the PC should release Shift within ~10s
 - Phase 04 is ready to close after the on-device re-test
 
+## Review Follow-Up: CR-01 (Critical, fixed)
+
+**Finding (code review, post-execution):** the unconditional 10s `LIVENESS_TIMEOUT` was armed from connection start in every auth state — but the client's ping cadence only exists post-auth. During pairing the user reads the PIN off the PC toast and types 6 digits (routinely >10s of silence; the server's own PIN window budgets 60s), so the deadline slammed the socket mid-PIN-entry: a deterministic pairing regression against the Phase 3 pairing criterion.
+
+**Fix shape (same minimal style):** the deadline now scales by auth state inside the same `select!` branch — `Authed` keeps the 10s UAT Test 5 contract (held input only exists post-auth); any pre-auth state uses `PRE_AUTH_LIVENESS_TIMEOUT` (90s = 60s `PIN_TTL_SECS` window + margin, so the deadline can never race a still-valid PIN). Pre-hello squatter hygiene (T-04-10-02) relaxes 10s → 90s, still bounded.
+
+**Regression test:** `pre_auth_silence_survives_pin_entry` — 30s of paused-clock pre-auth silence, then PIN pairing must complete on the same connection. RED failed with `ConnectionAborted` (the CR-01 failure mode exactly); GREEN passes with the full workspace suite green (91 + 4 + 10 + 10).
+
+**Commits:**
+- `e1c01d1`: test(04-10): add failing pre-auth PIN-entry liveness regression (review CR-01)
+- `213b8fd`: fix(04-10): scale liveness deadline by auth state — pre-auth survives PIN entry (review CR-01)
+
+**Out of scope (per review routing):** WR-02 — `tx.send(frame).await` inside the read loop can starve the liveness branch if the peer stops draining the socket; pre-existing structure, tracked as a warning.
+
 ## Self-Check: PASSED
 
 - SUMMARY file exists on disk
-- Task commits `baff15a` (test) and `d269c05` (fix) verified in git log
+- Task commits `baff15a` (test) and `d269c05` (fix) verified in git log; CR-01 follow-up commits `e1c01d1` (test) and `213b8fd` (fix) verified in git log
 - Plan diff scope: exactly the two declared files (session.rs, integration.rs); no diff under app/, protocol/, or server-windows/
 
 ---
