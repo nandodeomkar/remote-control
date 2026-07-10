@@ -413,6 +413,43 @@ async fn half_open_silence_releases_held_input() {
     }
 }
 
+/// Review CR-01 regression: the liveness deadline must NOT kill a pre-auth
+/// session mid-PIN-entry. During pairing the user reads the PIN off the PC
+/// toast and types 6 digits — routinely >10s of inbound silence (the client
+/// sends nothing while waiting for PIN input; protocol pings only start
+/// post-auth), and the server's own PIN window budgets 60s (PIN_TTL_SECS)
+/// for exactly this. An unconditional 10s deadline slams the socket before
+/// the pin frame arrives — a deterministic pairing regression. Pre-auth
+/// sessions get the longer PRE_AUTH_LIVENESS_TIMEOUT; the 10s UAT Test 5
+/// contract applies only once Authed (held input only exists post-auth —
+/// the sibling test above keeps that leg pinned).
+#[tokio::test]
+async fn pre_auth_silence_survives_pin_entry() {
+    let h = start_server().await;
+    let pin = h.auth.lock().unwrap().begin_pairing();
+
+    let mut ws = connect(h.addr).await;
+    let _nonce = hello_challenge(&mut ws).await; // state: AwaitingAuth
+
+    // Simulate the human PIN-entry gap: 30s of inbound silence — well past
+    // the 10s post-auth deadline, comfortably inside both the 60s PIN
+    // window (PIN expiry rides the tokio clock, so virtual time counts
+    // against it too) and the pre-auth liveness deadline (90s). Paused
+    // clock: the wait costs ~0 wall-clock via auto-advance.
+    tokio::time::pause();
+    tokio::time::sleep(Duration::from_secs(30)).await;
+    tokio::time::resume();
+
+    // The session must still be alive: PIN submission completes pairing on
+    // the SAME connection.
+    send_json(&mut ws, json!({"t": "pin", "seq": 2, "p": {"pin": pin}})).await;
+    let pair_ok = recv_json(&mut ws).await;
+    assert_eq!(
+        pair_ok["t"], "pairOk",
+        "pre-auth liveness deadline killed the session mid-PIN-entry, got: {pair_ok}"
+    );
+}
+
 /// SPEC §6 at socket level (T-01-27): pre-auth executor-bound traffic —
 /// JSON and binary alike — never reaches an executor, and the gate does not
 /// poison the session: pairing on the SAME connection then routes normally.
