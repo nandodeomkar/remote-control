@@ -115,7 +115,7 @@ Plans:
   4. Sticky modifiers (Ctrl/Alt/Shift/Win) show visible held state, send combos like Win+D, and auto-reset after the combo; they also reset safely on disconnect
   5. Holding a key autorepeats via server-side key-down/hold and stops immediately on release
 
-**Plans**: 6 plans
+**Plans**: 9 plans (6 original + 3 gap closure)
 Plans:
 **Wave 1**
 
@@ -137,6 +137,12 @@ Plans:
 **Wave 5** *(blocked on Wave 4 completion)*
 
 - [x] 04-06-PLAN.md — Key rows + sticky modifier chips + server-side autorepeat + D-12 disconnect reset (KEY-02/03/04, D-09/D-10/D-11)
+
+**Gap closure** *(from 04-VERIFICATION.md, status: gaps_found)*
+
+- [ ] 04-07-PLAN.md — Atomic IME producer+controller sentinel reset on disconnect — closes CR-01 / T-04-03 (KEY-01, SC2)
+- [ ] 04-09-PLAN.md — Scroll deltas scaled by live pointer count, unhalved fling seed — closes review WR-04 (PAD-03) [gap wave 1, parallel with 04-07]
+- [ ] 04-08-PLAN.md — Set-based held-cap tracking + always-wired key-cap release (folds IN-04) — closes CR-02 / T-04-04 (KEY-04, SC5) [gap wave 2, after 04-07]
 
 **UI hint**: yes
 
