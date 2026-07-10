@@ -25,7 +25,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use server_core::auth::AuthManager;
 use server_core::auth::challenge::auth_proof;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
-use server_core::executors::Button;
+use server_core::executors::{Button, KeyCode};
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
 use server_core::transport::ServerDeps;
 
@@ -333,6 +333,84 @@ async fn disconnect_mid_drag_releases_held_input() {
         !after.contains(&Call::ButtonUp(Button::Left)),
         "phantom ButtonUp in the fresh session — held state leaked across sessions: {after:?}"
     );
+}
+
+/// 04-UAT Test 5 (MAJOR gap, threat class T-04-04): a HALF-OPEN connection
+/// — abrupt WiFi kill, no FIN, no RST — must not preserve held input. The
+/// sibling test above covers the graceful path (dropping the client sends
+/// FIN/RST on loopback); HERE the socket stays open and silent, which is
+/// byte-for-byte what the server sees after the phone vanishes
+/// mid-keypress. The server's liveness deadline must break the read loop
+/// so the EXISTING straight-line CONN-07 cleanup releases the held key.
+#[tokio::test]
+async fn half_open_silence_releases_held_input() {
+    let h = start_server().await;
+    let mut ws = authed_client(&h).await;
+
+    // Real-time phase: hold Shift and PROVE it reached the executor BEFORE
+    // any clock games (no sleep-and-hope).
+    send_json(
+        &mut ws,
+        json!({"t": "key", "seq": 3, "p": {"code": "ShiftLeft", "action": "down"}}),
+    )
+    .await;
+    assert!(
+        h.log
+            .wait_for(
+                |calls| calls.contains(&Call::KeyDown(KeyCode("ShiftLeft".into()))),
+                RECV_TIMEOUT,
+            )
+            .await,
+        "key hold never reached the mock; calls: {:?}",
+        h.log.calls()
+    );
+
+    // From here the clock is virtual: auto-advance jumps to the next
+    // pending timer whenever the runtime idles, so the silent wait below
+    // costs ~0 wall-clock. (Requires the current-thread test flavor.)
+    tokio::time::pause();
+
+    // Half-open simulation: keep `ws` ALIVE and BOUND — do NOT drop it,
+    // do NOT close it, send NOTHING. Dropping would emit FIN/RST on
+    // loopback (the already-passing graceful path above); pure silence is
+    // the abrupt-WiFi-kill shape: the server's stream.next() stays
+    // pending forever.
+
+    // The liveness deadline must release the held key. The 60s bound must
+    // exceed session.rs LIVENESS_TIMEOUT (10s): under paused time the
+    // EARLIEST pending timer fires first, so a shorter wait (e.g.
+    // RECV_TIMEOUT = 2s) would expire before the server's deadline and
+    // false-fail.
+    assert!(
+        h.log
+            .wait_for(
+                |calls| calls.contains(&Call::KeyUp(KeyCode("ShiftLeft".into()))),
+                Duration::from_secs(60),
+            )
+            .await,
+        "half-open silence never released the held key (phantom Shift); calls: {:?}",
+        h.log.calls()
+    );
+
+    // Back to REAL time for the session-end check: tokio auto-advance does
+    // not block-wait on IO, so a virtual timeout could expire before the
+    // kernel delivers the loopback FIN and flake (plan-checker note).
+    tokio::time::resume();
+
+    // The server must terminate the half-open session (read loop broke →
+    // socket halves dropped) — the client observes close/EOF/error. Any of
+    // the three proves the session task exited rather than leaking.
+    // Awaiting ws.next() here also keeps `ws` alive through the assertions
+    // above (ownership never dropped early).
+    let end = tokio::time::timeout(RECV_TIMEOUT, ws.next())
+        .await
+        .expect("timed out waiting for the server to drop the half-open session");
+    match end {
+        None | Some(Ok(Message::Close(_))) | Some(Err(_)) => {}
+        Some(Ok(other)) => {
+            panic!("expected the half-open session to end, got: {other:?}")
+        }
+    }
 }
 
 /// SPEC §6 at socket level (T-01-27): pre-auth executor-bound traffic —
