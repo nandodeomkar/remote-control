@@ -359,9 +359,16 @@ class _KeyCapState extends State<_KeyCap> {
   /// the release fires the tap+mods combo instead of an up.
   bool _deferred = false;
 
+  /// True while a press that FIRED its press-down branch (down sent, or a
+  /// deferred combo captured) still owes a release. The guard that lets
+  /// [_onTapUp]/[_onTapCancel] be always-wired (IN-04) without making
+  /// presses that STARTED disabled emit anything.
+  bool _live = false;
+
   void _onTapDown(TapDownDetails _) {
     setState(() => _pressed = true);
     widget.onPressHaptic?.call();
+    _live = true;
     _deferred = widget.hasArmedMods();
     if (!_deferred) {
       // D-11: real key down — Windows autorepeats until the release's up.
@@ -371,6 +378,8 @@ class _KeyCapState extends State<_KeyCap> {
 
   void _onTapUp(TapUpDetails _) {
     setState(() => _pressed = false);
+    if (!_live) return;
+    _live = false;
     if (_deferred) {
       widget.onKeyTapWithMods(widget.def.code); // combo path (D-10)
     } else {
@@ -380,6 +389,8 @@ class _KeyCapState extends State<_KeyCap> {
 
   void _onTapCancel() {
     setState(() => _pressed = false);
+    if (!_live) return;
+    _live = false;
     // A canceled non-deferred press MUST still release the held key; a
     // canceled deferred press simply never fires its combo.
     if (!_deferred) widget.onKeyUp(widget.def.code);
@@ -409,8 +420,13 @@ class _KeyCapState extends State<_KeyCap> {
     final cap = GestureDetector(
       key: ValueKey('cap-${widget.def.code}'),
       onTapDown: widget.enabled ? _onTapDown : null,
-      onTapUp: widget.enabled ? _onTapUp : null,
-      onTapCancel: widget.enabled ? _onTapCancel : null,
+      // Release handlers are ALWAYS wired (IN-04): a mid-press `enabled`
+      // flip used to null these out, swallowing the up and leaving the key
+      // held server-side (stuck-key). Only the press ENTRY is
+      // permission-gated; the _live guard keeps disabled-started presses
+      // inert.
+      onTapUp: _onTapUp,
+      onTapCancel: _onTapCancel,
       child: Container(
         width: widget.width,
         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),

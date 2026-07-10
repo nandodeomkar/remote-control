@@ -35,7 +35,7 @@
 /// ping stream + [isDisconnected] probe — the service seams, injectable so
 /// the widget test drives a fake stream), the panel calls
 /// [ModifierFsm.disconnected] (zero effects — the socket is gone; CONN-07
-/// release_all already freed the real keys), forgets any held key cap so
+/// release_all already freed the real keys), forgets ALL held key caps so
 /// no stale `up` is ever flushed into a NEW session, and fires the CR-01
 /// IME reset tick so the hidden field atomically reseeds its diff producer
 /// AND controller to the sentinel — pre-disconnect typed text can never
@@ -100,11 +100,13 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
   /// The ONE sticky-modifier FSM (chips poll stateOf after each event).
   final ModifierFsm _fsm = ModifierFsm();
 
-  /// The key cap currently held down server-side (a `down` was sent and its
-  /// `up` is still owed), or null. Cleared WITHOUT an up on disconnect —
-  /// CONN-07 already released it and a queued stale up would leak into the
-  /// next session.
-  String? _heldCode;
+  /// The key caps currently held down server-side (each sent a `down` whose
+  /// `up` is still owed). Multiple caps can be concurrently held — rollover
+  /// between arrow keys is the normal pattern (CR-02): each _KeyCap has its
+  /// own GestureDetector and pointers are tracked independently. Cleared
+  /// WITHOUT ups on disconnect (D-12) — CONN-07 release_all already freed
+  /// the real keys and queued stale ups must never leak into a new session.
+  final Set<String> _heldCodes = <String>{};
 
   /// D-12 transition detection off the changes pings.
   StreamSubscription<void>? _changesSub;
@@ -136,12 +138,12 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
   }
 
   /// D-12: reset all armed/locked chips (zero send effects — the FSM
-  /// guarantees it), forget the held cap so its up is skipped, and fire the
-  /// CR-01 IME wipe so the hidden field's producer + controller both return
-  /// to the sentinel atomically.
+  /// guarantees it), forget ALL held caps so their ups are skipped, and fire
+  /// the CR-01 IME wipe so the hidden field's producer + controller both
+  /// return to the sentinel atomically.
   void _onDisconnected() {
     _fsm.disconnected();
-    _heldCode = null;
+    _heldCodes.clear();
     _imeResetTick.value++;
     if (mounted) setState(() {});
   }
@@ -191,15 +193,16 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
   }
 
   void _onKeyDown(String code) {
-    _heldCode = code;
+    _heldCodes.add(code);
     widget.send(KeyMsg(code: code, action: 'down'));
   }
 
   void _onKeyUp(String code) {
-    // Only release a key whose down survived: a disconnect mid-hold clears
-    // _heldCode (D-12) and the up is skipped — the server already released.
-    if (_heldCode != code) return;
-    _heldCode = null;
+    // Only release a key whose down survived: remove() returning false
+    // covers both the D-12 disconnect wipe (the server already released)
+    // AND releases forwarded by the always-wired cap handlers when no down
+    // ever fired (IN-04).
+    if (!_heldCodes.remove(code)) return;
     widget.send(KeyMsg(code: code, action: 'up'));
   }
 
