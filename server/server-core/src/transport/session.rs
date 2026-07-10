@@ -44,8 +44,9 @@ use crate::executors::Executors;
 pub(crate) const SERVER_PROTO_VERSION: &str = "1.0";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
-/// Liveness deadline: a session receiving NO inbound frames for this long
-/// breaks its read loop so the CONN-07 cleanup releases held input.
+/// POST-auth liveness deadline: an Authed session receiving NO inbound
+/// frames for this long breaks its read loop so the CONN-07 cleanup
+/// releases held input.
 ///
 /// Rationale: the client emits protocol pings every ~250ms under move load
 /// and ~2s idle (latency_probe.dart `pingIntervalMillis` /
@@ -53,11 +54,21 @@ const SERVER_PROTO_MAJOR: u64 = 1;
 /// cadence — a live client can never trip this. Without it, a half-open TCP
 /// connection after an abrupt WiFi kill (no FIN, no RST) keeps
 /// `stream.next()` pending for OS-timeout minutes while held input stays
-/// stuck (04-UAT Test 5, threat class T-04-04). Side-effect hardening: a
-/// silent pre-hello socket squatter also dies in 10s instead of holding a
-/// session task forever. Private on purpose — nothing else needs it; the
-/// integration test hard-codes a longer wait and names the coupling.
+/// stuck (04-UAT Test 5, threat class T-04-04). Private on purpose —
+/// nothing else needs it; the integration test hard-codes a longer wait
+/// and names the coupling.
 const LIVENESS_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// PRE-auth liveness deadline (review CR-01): before `Authed`, the client
+/// sends NOTHING while the user reads the PIN off the PC toast and types 6
+/// digits — protocol pings only start post-auth — so pre-auth silence is
+/// the NORMAL pairing shape, routinely >10s. The auth PIN window budgets
+/// 60s ([`crate::auth::pin::PIN_TTL_SECS`]) for exactly this; 90s = that
+/// window + margin, so the deadline can never race a still-valid PIN.
+/// Held input only exists post-auth, so the UAT Test 5 contract (10s)
+/// loses nothing here; a silent pre-hello socket squatter still dies in
+/// 90s instead of holding a session task forever (T-04-10-02, relaxed).
+const PRE_AUTH_LIVENESS_TIMEOUT: Duration = Duration::from_secs(90);
 
 /// Run one connection to completion: write task + read loop + handshake FSM
 /// + unconditional held-input cleanup (CONN-07).
@@ -101,16 +112,23 @@ pub(super) async fn run_session(
 
     'read: loop {
         tokio::select! {
-            // Liveness deadline (04-UAT Test 5): no inbound frames for
-            // LIVENESS_TIMEOUT means the peer is gone (half-open TCP after
-            // an abrupt WiFi kill never yields None/Err from stream.next()).
+            // Liveness deadline (04-UAT Test 5): no inbound frames for the
+            // deadline means the peer is gone (half-open TCP after an
+            // abrupt WiFi kill never yields None/Err from stream.next()).
             // Breaking 'read lands on the EXISTING straight-line CONN-07
             // cleanup below the loop — no new cleanup code, that is the
             // entire point of the straight-line structure. Constructing the
             // sleep_until future fresh each iteration is correct: select!
             // re-creates non-pinned futures per pass, and the loop rate is
-            // bounded by the inbound frame rate.
-            () = sleep_until(last_inbound + LIVENESS_TIMEOUT) => break 'read,
+            // bounded by the inbound frame rate. The deadline scales by
+            // auth state (review CR-01): pre-auth silence is the normal
+            // pairing shape (the user typing the PIN, no client pings yet),
+            // so only Authed sessions get the tight 10s held-input contract.
+            () = sleep_until(last_inbound + if ctx.auth_state == AuthState::Authed {
+                LIVENESS_TIMEOUT
+            } else {
+                PRE_AUTH_LIVENESS_TIMEOUT
+            }) => break 'read,
             changed = pause.changed(), if pause_alive => {
                 match changed {
                     Ok(()) => {
