@@ -335,6 +335,71 @@ void main() {
     );
   });
 
+  testWidgets(
+      'CR-02: rollover — press Right, press Down, release Right, release '
+      'Down sends up for BOTH keys', (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    // Both caps sit in the arrow cluster below the 600px test viewport.
+    final rightCap = find.byKey(const ValueKey('cap-Right'));
+    final downCap = find.byKey(const ValueKey('cap-Down'));
+    await tester.ensureVisible(rightCap);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(downCap);
+    await tester.pumpAndSettle();
+
+    // Two concurrent pointers — each _KeyCap has its own GestureDetector so
+    // both tap arenas win independently. Pump past the 100ms press deadline
+    // after each press so onTapDown fires eagerly (the scrollable's drag
+    // recognizer shares the arena and would otherwise defer it to release).
+    final g1 = await tester.startGesture(tester.getCenter(rightCap));
+    await tester.pump(const Duration(milliseconds: 150));
+    final g2 = await tester.startGesture(tester.getCenter(downCap));
+    await tester.pump(const Duration(milliseconds: 150));
+    await g1.up();
+    await tester.pump();
+    await g2.up();
+    await tester.pump();
+
+    // Pre-fix, the single-slot _heldCode was overwritten by down:Down and
+    // up:Right was swallowed — Right autorepeated on the PC indefinitely.
+    expect(
+      sentKeys().map((k) => '${k.action}:${k.code}').toList(),
+      ['down:Right', 'down:Down', 'up:Right', 'up:Down'],
+    );
+  });
+
+  testWidgets(
+      'CR-02/D-12: disconnect mid-hold clears ALL held caps — a later '
+      'release sends NO stale up', (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    final rightCap = find.byKey(const ValueKey('cap-Right'));
+    await tester.ensureVisible(rightCap);
+    await tester.pumpAndSettle();
+
+    final gesture = await tester.startGesture(tester.getCenter(rightCap));
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(sentKeys(), hasLength(1));
+    expect(sentKeys().single.action, 'down');
+
+    // The service drops mid-hold: the D-12 transition wipes the held set.
+    disconnected = true;
+    changes.add(null);
+    await tester.pumpAndSettle();
+    final before = sent.length;
+
+    await gesture.up();
+    await tester.pump();
+
+    // The release found remove('Right') false — no stale up rides into the
+    // next session (CONN-07 release_all already freed the real key).
+    expect(sent.length, before);
+    expect(sentKeys().last.action, 'down');
+  });
+
   testWidgets('gated panel renders chips and caps muted and inert',
       (tester) async {
     await tester.pumpWidget(host(expanded: true, enabled: false));

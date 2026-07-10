@@ -119,6 +119,28 @@ void main() {
       expect(events, isEmpty);
     });
 
+    testWidgets(
+        'IN-04: enabled flips false mid-press — the release still fires '
+        'up:Right', (tester) async {
+      await tester.pumpWidget(host());
+
+      // Pump past the 100ms press deadline so onTapDown fires before the
+      // rebuild (the scrollable's drag recognizer shares the arena).
+      final gesture =
+          await tester.startGesture(tester.getCenter(rightArrowCap()));
+      await tester.pump(const Duration(milliseconds: 150));
+
+      // Mid-press flip: pre-fix this rebuild nulled onTapUp/onTapCancel and
+      // the up was swallowed — the key stayed held (stuck-key door).
+      await tester.pumpWidget(host(enabled: false));
+      await tester.pump();
+
+      await gesture.up();
+      await tester.pump();
+
+      expect(events, ['haptic', 'down:Right', 'up:Right']);
+    });
+
     testWidgets('caps meet the 48px touch-target floor', (tester) async {
       await tester.pumpWidget(host());
 
