@@ -1,8 +1,8 @@
 ---
 phase: 04-trackpad-keyboard
-reviewed: 2026-07-10T03:43:01Z
+reviewed: 2026-07-10T09:48:33Z
 depth: standard
-files_reviewed: 29
+files_reviewed: 31
 files_reviewed_list:
   - app/remote_control/lib/keyboard/diff_ops.dart
   - app/remote_control/lib/keyboard/hidden_text_input.dart
@@ -28,229 +28,190 @@ files_reviewed_list:
   - app/remote_control/test/trackpad/mouse_buttons_test.dart
   - app/remote_control/test/trackpad/trackpad_driver_test.dart
   - server/server-core/src/auth/mod.rs
+  - server/server-core/src/transport/session.rs
+  - server/server-core/tests/integration.rs
   - server/server-windows/Cargo.toml
   - server/server-windows/src/executors/keymap.rs
   - server/server-windows/src/executors/mod.rs
   - server/server-windows/src/executors/mouse_keys.rs
   - server/server-windows/src/input_thread.rs
 findings:
-  critical: 2
-  warning: 4
+  critical: 1
+  warning: 5
   info: 5
   total: 11
 status: issues_found
 ---
 
-# Phase 04: Code Review Report
+# Phase 04: Code Review Report (re-review after gap closure)
 
-**Reviewed:** 2026-07-10T03:43:01Z
+**Reviewed:** 2026-07-10T09:48:33Z
 **Depth:** standard
-**Files Reviewed:** 29
+**Files Reviewed:** 31
 **Status:** issues_found
 
 ## Summary
 
-Reviewed the Phase 4 trackpad + keyboard surface: the pure gesture classifier and intent-executor driver, the acceleration/tuning constants, the hidden-IME diff pipeline, the modifier FSM and key rows, the connection service, and the Windows-side keymap/input thread. The pure-FSM/driver split is clean and well tested; the sub-pixel accumulator, virtual-desktop normalization, and modifier FSM all check out against their contracts, and the Dart `kClientKeyCodes` list is a byte-for-byte match of the Rust `CLIENT_KEY_CODES` (39 entries each).
+Re-review of the Phase 4 trackpad + keyboard surface after gap-closure plans 04-07..04-10, plus a fresh review of the new session-liveness deadline in `session.rs`.
 
-Two Critical defects were found, both in the keyboard path and both producing phantom/stuck input on the host — exactly the failure class D-12 exists to prevent:
+**All four targeted prior findings are verified closed:**
 
-1. The disconnect-hygiene `_imeProducer.reset()` desynchronizes the producer's committed text from the hidden field's controller, so the first keystroke after a reconnect **replays all previously typed text** into the new session.
-2. `KeyboardPanel` tracks at most ONE held key cap (`_heldCode` is a single `String?`), so ordinary key rollover (press cap B before releasing cap A) permanently swallows cap A's `up` — the key stays held and autorepeating on the PC.
+| Prior finding | Status | Evidence |
+|---|---|---|
+| CR-01 (IME sentinel replay on disconnect) | **CLOSED** | `KeyboardPanel._onDisconnected` fires `_imeResetTick` (keyboard_panel.dart:144-149); `HiddenTextInput._onExternalReset` reseeds producer AND controller in one synchronous callback (hidden_text_input.dart:87-94); covered by two regression tests (keyboard_panel_test.dart:260-336) including the delete-becomes-insert variant |
+| CR-02 (held-cap rollover leak) | **CLOSED** | `_heldCodes` is now a `Set<String>` (keyboard_panel.dart:109); `_onKeyUp` gates on `remove()` (200-207); rollover + disconnect-mid-hold regression tests (keyboard_panel_test.dart:338-401) |
+| WR-04 (post-lift scroll halving) | **CLOSED** | `_emitScroll` divides by live `_pointers.length` (gesture_classifier.dart:462-473); n >= 1 structurally guaranteed via the `onPointerMove` null-check; three regression tests incl. fling seed and tapPending2 (gesture_classifier_test.dart:302-372) |
+| IN-04 (mid-press release wiring) | **CLOSED** | `onTapUp`/`onTapCancel` always wired; only `onTapDown` gated on `enabled`; the `_live` flag keeps disabled-started presses inert (key_rows.dart:361-397, 420-429); mid-press flip test (key_rows_test.dart:122-142) |
 
-Four warnings cover a dial-generation race in `ConnectionService`, a post-`dispose()` redial leak, a persisted-setting load race duplicated in two Notifiers, and a scroll-rate halving when one of two scrolling fingers lifts. Verified before flagging: `text.bs` is capped at 10,000 in `router.rs` before reaching `Cmd::Backspace` (not a DoS), and `session.rs` passes its own per-session copy of the server-issued nonce to `verify_auth` (no replay hole — but see IN-01 for the dead field).
+Also re-verified: the Dart `kClientKeyCodes` and Rust `CLIENT_KEY_CODES` remain byte-for-byte identical (39 entries each), and the half-open integration test correctly pins its 60s virtual-time bound above the server's 10s deadline.
+
+**However, the new liveness code introduces one Critical defect:** the 10s `LIVENESS_TIMEOUT` applies uniformly to ALL session states, including `AwaitingAuth` during first-time pairing — where the client sends nothing while the human reads the PIN off the PC and types it, and the server's own `PIN_TTL_SECS` grants 60 seconds. Any PIN entry slower than 10s gets its session killed mid-entry. The code comment's core invariant ("a live client can never trip this") is false pre-auth.
+
+Additionally, three Warnings and four Infos from the prior review were NOT addressed by the gap plans and remain open (carried forward below with fresh IDs), plus two new findings (reliable-queue phantom flush; liveness deadline starvation via the blocked reply path) and one new Info.
+
+## Narrative Findings (AI reviewer)
 
 ## Critical Issues
 
-### CR-01: IME reset on disconnect desyncs producer from controller — stale text replays into the next session
+### CR-01: 10s liveness deadline kills pairing sessions mid-PIN-entry — pre-auth, the client sends nothing and the server's own PIN window is 60s
 
-**File:** `app/remote_control/lib/trackpad/trackpad_screen.dart:137` (with `app/remote_control/lib/keyboard/diff_ops.dart:71-73`, `app/remote_control/lib/keyboard/hidden_text_input.dart:42-58`)
+**File:** `server/server-core/src/transport/session.rs:60, 113` (with `app/remote_control/lib/net/connection_service.dart:467, 511-522` and `server/server-core/src/auth/pin.rs:13`)
 
-**Issue:** On the transition into disconnected, the screen calls `_imeProducer.reset()`, which sets the producer's `_committed` back to `kImeSentinel`. But the `HiddenTextInput`'s `TextEditingController` still holds the pre-disconnect text (e.g., `sentinel + "hello"`) — the panel stays mounted across disconnects (by design, Pitfall 6) and nothing re-seeds the controller. The producer and the field are now desynchronized:
+**Issue:** `LIVENESS_TIMEOUT = 10s` breaks the read loop after 10s of NO inbound frames, in **every** auth state. The rationale comment claims "the client emits protocol pings every ~250ms under move load and ~2s idle... a live client can never trip this" — but that cadence exists **only while authed**: `_startLiveness()` is called exclusively from `_onAuthed` (connection_service.dart:467), `probe.onMove()` only fires on authed volatile sends, `HandshakeDriver` sends no pings, and the Dart WebSocket's `pingInterval` is never set (no WS-level keepalive either). During first-time pairing the sequence is: connect → `hello` → `challenge` → **silence while the human walks to the PC, reads the PIN toast, and types 6 digits**. The server's own pairing window (`PIN_TTL_SECS = 60`) explicitly budgets 60 seconds for this — yet the liveness deadline tears the socket down at 10s. Every PIN entry slower than 10s is deterministically killed mid-entry: the client sees a transport failure, backs off, redials, gets a **new** challenge, and the pairing sheet state churns (a PIN submitted into the 1s backoff gap is silently swallowed by `_driver?.feedPin`). This is a regression of the primary pairing flow introduced by the liveness change; 04-UAT and the integration suite never exercise a >10s human pause pre-auth (the tests submit the PIN within milliseconds).
 
-- Next keystroke `'x'` → `onChanged(sentinel + "hellox")` → `computeDiff(sentinel, sentinel+"hellox")` → `TextMsg(bs: 0, ins: "hellox")`. The entire pre-disconnect committed text (possibly a password typed into the PC before the drop) is **retyped into whatever window is focused in the new session**.
-- Worse, a backspace after reconnect → `onChanged(sentinel + "hell")` → `ins: "hell"` — a delete becomes an insert.
+**Fix:** Scale the deadline by auth state — held-input hygiene (the reason the timeout exists) only matters once input can be held, i.e. post-auth:
 
-This is the inverse of the stated goal ("stale committed text must not skew the next diff"): *without* the reset, committed == controller text and the next diff is correct; the reset itself introduces the skew. Note the KEY-01 reliable path also queues during blips, so the corrupted `TextMsg` reliably flushes into the fresh session.
+```rust
+const LIVENESS_TIMEOUT: Duration = Duration::from_secs(10);
+// Pre-auth: cover PIN_TTL_SECS (60s) + margin. Still bounds socket
+// squatters, without racing the human PIN entry the 60s TTL budgets for.
+const PRE_AUTH_LIVENESS_TIMEOUT: Duration = Duration::from_secs(75);
 
-**Fix:** Keep the producer and controller atomically in sync. Simplest correct option — remove the reset from the disconnect path (committed text already equals the controller text, so subsequent diffs are correct):
-
-```dart
-// trackpad_screen.dart — disconnect hygiene listener
-if (chip == ChipStatus.disconnected && _lastChip != ChipStatus.disconnected) {
-  _driver.reset();
-  // Do NOT reset _imeProducer alone: committed must stay equal to the
-  // hidden field's controller text or the next diff replays stale input.
-}
+// in the select! loop:
+() = sleep_until(last_inbound + if ctx.auth_state == AuthState::Authed {
+    LIVENESS_TIMEOUT
+} else {
+    PRE_AUTH_LIVENESS_TIMEOUT
+}) => break 'read,
 ```
 
-If a true wipe is wanted (privacy hygiene), reset BOTH sides: expose a reseed hook from `HiddenTextInput` (e.g., a `ValueNotifier`/callback the screen fires) that sets `_controller.value` back to `producer.reseed()` under the `_reseeding` guard, in the same frame as `producer.reset()`.
-
-### CR-02: Single `_heldCode` slot — key rollover leaks a stuck, autorepeating key on the host
-
-**File:** `app/remote_control/lib/keyboard/keyboard_panel.dart:105, 180-191`
-
-**Issue:** `_heldCode` is a single `String?`. Each `_KeyCap` has its own `GestureDetector`, and Flutter tracks each pointer independently — two caps can be pressed concurrently (rollover is the *normal* pattern for arrow keys: press Down before releasing Right). Sequence:
-
-1. Press cap `Right` → `down:Right` sent, `_heldCode = 'Right'`.
-2. Press cap `Down` (finger 2, before releasing) → `down:Down` sent, `_heldCode = 'Down'` (overwritten).
-3. Release `Right` → `_onKeyUp('Right')`: `_heldCode != 'Right'` → **return, no `up` sent**.
-4. Release `Down` → `up:Down` sent.
-
-`Right` is now held server-side indefinitely — Windows autorepeats it into the focused app until the user figures out they must press-and-release `Right` again, or the connection drops (CONN-07 `release_all`). Sustained unintended keystroke injection into the host from a routine gesture. The widget tests only ever press one cap at a time, so this path is untested.
-
-**Fix:** Track held caps as a set:
-
-```dart
-final Set<String> _heldCodes = <String>{};
-
-void _onKeyDown(String code) {
-  _heldCodes.add(code);
-  widget.send(KeyMsg(code: code, action: 'down'));
-}
-
-void _onKeyUp(String code) {
-  // Only skip ups whose down did NOT survive (D-12 cleared it).
-  if (!_heldCodes.remove(code)) return;
-  widget.send(KeyMsg(code: code, action: 'up'));
-}
-
-void _onDisconnected() {
-  _fsm.disconnected();
-  _heldCodes.clear();
-  if (mounted) setState(() {});
-}
-```
+(Alternative: have the client send protocol `ping`s during the handshake — but the server-side fix is one expression and needs no protocol change. Add an integration test that holds a session in `AwaitingAuth` for >10s virtual time and asserts it survives to a late `pin` submit.)
 
 ## Warnings
 
-### WR-01: No dial generation — concurrent dials can bind the session to the wrong target
+### WR-01: Reliable queue flushes stale input from a disconnected epoch into the next session — including a different device
+
+**File:** `app/remote_control/lib/net/connection_service.dart:259-266, 310-312, 349-353, 547-550` (with `app/remote_control/lib/keyboard/hidden_text_input.dart:96-108`, `app/remote_control/lib/trackpad/trackpad_screen.dart:250-256`)
+
+**Issue:** The reliable queue (≤10, flushed on auth) is scoped wider than the "blip" the design intends, creating a phantom-input channel that survives a drop — the exact invariant D-12/CR-01 declared ("no phantom input survives a drop"):
+
+1. **Typing while fully disconnected queues and replays.** `HiddenTextInput` has no `enabled` gate (unlike chips, caps, and the L/M/R bar): with the panel expanded and chip = disconnected, the system IME stays up, `_onChanged` still emits diffs, and `sendReliable` queues them. On the next successful auth — minutes later — up to 10 `TextMsg`s type into whatever window is focused on the PC (T-04-03-adjacent).
+2. **Trackpad taps while disconnected queue ClickMsg/DragMsg.** The `Listener` surface is never gated; taps route classifier → driver → `sendReliable`. Queued clicks fire at the cursor position on reconnect.
+3. **Queue survives `disconnect()` and target switches.** Only `AuthStopEffect` calls `_policy.clear()`. A user-requested `disconnect()` (CloseEffect) and a `connectTo(differentTarget)` both keep the queue — stale messages destined for device A flush into device B's fresh session on auth.
+
+The queue-during-blip behavior (chip = reconnecting) is spec'd (§8) and correct; the defect is that the same queue also accumulates during `idle`/`needPairing` and across explicit disconnect/target-switch boundaries.
+
+**Fix:** Clear the reliable queue whenever the FSM lands in a terminal-disconnected state and on every fresh `connectTo`:
+
+```dart
+Future<void> connectTo(DeviceTarget target) async {
+  _lastDialError = null;
+  _lastAuthFailure = null;
+  _policy.clear(); // a new episode never inherits another epoch's queue
+  ...
+}
+```
+
+and gate the IME emission path on connection state (e.g. the panel passes `enabled` into `HiddenTextInput`, or `_onChanged` no-ops when `isDisconnected()`), matching the gating every other input surface already has.
+
+### WR-02: Liveness deadline can be starved — a blocked reply send wedges the read loop with no deadline
+
+**File:** `server/server-core/src/transport/session.rs:154-160, 203-204`
+
+**Issue:** `tx.send(frame).await` runs inside the `incoming` select arm, not under the select. If the mpsc channel (cap 64) fills because the write task is blocked in `sink.send` (peer sends but never reads — its TCP receive window closes), the read loop parks inside the arm body and the `sleep_until` liveness branch is **never polled again**: the session hangs indefinitely, and post-auth any held input stays held — the exact stuck-key class the deadline was added to eliminate, reachable through the write path instead of the read path. This also defeats the stated side-benefit ("a silent pre-hello socket squatter also dies in 10s"): a squatter that spams `pin` frames and never reads its `authFail` replies holds the session task and socket forever. Same shape at teardown: `write_task.await` (line 204) can block for the full OS TCP timeout on a half-open peer with queued replies (held input IS released first, so impact there is only a leaked task).
+
+**Fix:** Bound the reply send and the write-task join:
+
+```rust
+// replies loop:
+if tokio::time::timeout(LIVENESS_TIMEOUT, tx.send(frame)).await.is_err() {
+    break 'read; // peer not draining replies -> treat as dead
+}
+// (the inner send Err already breaks)
+
+// teardown:
+drop(tx);
+let _ = tokio::time::timeout(LIVENESS_TIMEOUT, write_task).await;
+```
+
+### WR-03: No dial generation — concurrent dials can bind the session to the wrong target (carried forward, unaddressed)
 
 **File:** `app/remote_control/lib/net/connection_service.dart:360-420` (staleness check at 392-396)
 
-**Issue:** `_dial`'s post-await staleness check is `if (_fsm.state != ReconnectState.connecting)`, which cannot distinguish *which* dial the `connecting` state belongs to. Sequence: `connectTo(A)` starts dial A (awaiting `_connect`); user calls `connectTo(B)` → FSM re-enters `connecting`, dial B starts (its `_teardownChannel()` runs before A has a channel, so it tears down nothing). If A's connect resolves first, it passes the check (`state == connecting`), assigns `_channel = channelA`, and drives `socketConnected()` → `handshaking`. B's connect then resolves, sees `handshaking`, and closes itself. Result: the service is handshaking against **target A's socket** while `_fsm.target` is **B** — `_hadStoredToken` reflects A's token read, and a successful pairing would persist under B's key with A's session. `_backoffGen` guards stale backoff timers but nothing guards stale dial awaits.
+**Issue:** Unchanged from the prior review (2026-07-10T03:43Z, WR-01 there). `_dial`'s post-await staleness check `_fsm.state != ReconnectState.connecting` cannot distinguish WHICH dial owns the `connecting` state. `connectTo(A)` awaiting `_connect`, then `connectTo(B)`: if A's connect resolves first it passes the check, installs `channelA`, and drives `socketConnected()` — the service handshakes against target A's socket while `_fsm.target` is B and `_hadStoredToken` reflects A's token read; a successful pairing persists under B's key with A's session. `_backoffGen` guards stale timers but nothing guards stale dial awaits.
 
-**Fix:** Add a dial generation counter (same idiom as `_backoffGen`):
+**Fix:** Add a `_dialGen` counter (same idiom as `_backoffGen`): capture `final gen = ++_dialGen;` at dial entry and discard the channel when `gen != _dialGen` after the await.
 
-```dart
-int _dialGen = 0;
+### WR-04: `dispose()` does not invalidate pending backoff timers — post-dispose redial opens an unclosed socket (carried forward, unaddressed)
 
-Future<void> _dial(DeviceTarget target) async {
-  final gen = ++_dialGen;
-  ...
-  channel = await _connect(...);
-  ...
-  if (gen != _dialGen || _fsm.state != ReconnectState.connecting) {
-    unawaited(channel.sink.close());
-    return;
-  }
-```
+**File:** `app/remote_control/lib/net/connection_service.dart:327-332, 342-346`
 
-### WR-02: `dispose()` does not invalidate pending backoff timers — post-dispose redial opens an unclosed socket
+**Issue:** Unchanged from the prior review (WR-02 there). `dispose()` tears down the channel and closes `_changes` but does not bump `_backoffGen`; a pending backoff timer fires afterward, passes its generation check, and `_dial` opens a real socket on the disposed service that is never torn down again. Low impact while the service is an app-lifetime singleton, but the "Releases everything" contract is violated.
 
-**File:** `app/remote_control/lib/net/connection_service.dart:327-332, 341-346`
+**Fix:** `_backoffGen++;` (and `_dialGen++` with WR-03) at the top of `dispose()`.
 
-**Issue:** `dispose()` cancels the beacon sub, tears down the channel, and closes `_changes`, but does not bump `_backoffGen` or set a disposed flag. A backoff timer scheduled before dispose fires afterward, passes its `gen == _backoffGen` check, feeds `backoffElapsed()` → `DialEffect` → `_dial` runs, `_connect` opens a **real socket** on the disposed service, and the handshake driver starts. `_notify()` is guarded against the closed controller, but the channel is never torn down again. Low impact today (the service is an app-lifetime singleton) but the API contract ("Releases everything") is violated and any future scoped use leaks a live connection.
+### WR-05: Async prefs load can clobber a user `set()`; `state =` after dispose throws unhandled (carried forward, unaddressed)
 
-**Fix:**
+**File:** `app/remote_control/lib/settings/sensitivity.dart:85-87`, `app/remote_control/lib/keyboard/key_rows.dart:112-114`
 
-```dart
-void dispose() {
-  _backoffGen++;      // stale backoff timers no-op
-  _dialGen++;         // (with WR-01) in-flight dials discard their channel
-  _beaconSub?.cancel();
-  _beaconSub = null;
-  _teardownChannel();
-  _changes.close();
-}
-```
+**Issue:** Unchanged from the prior review (WR-03 there), in both Notifiers sharing the pattern: `unawaited(_load(...))` assigns `state = await store.load()` unconditionally. (1) A user `set()` racing the slow platform-channel load gets overwritten by the stale persisted value; (2) `state =` after provider disposal throws `StateError` inside an unawaited future.
 
-### WR-03: Async prefs load can clobber a user `set()`; `state =` after dispose throws unhandled
-
-**File:** `app/remote_control/lib/settings/sensitivity.dart:76-97`, `app/remote_control/lib/keyboard/key_rows.dart:103-122`
-
-**Issue:** Both Notifiers fire `unawaited(_load(...))` from `build()` and assign `state = await store.load()` when it resolves, unconditionally. Two defects in the shared pattern:
-
-1. **Clobber race:** if the user calls `set()` before the load future resolves (slow platform channel, first-frame slider drag), the resolving load overwrites the user's fresh value with the old persisted one — while the user's `save()` may have already persisted the new value, leaving UI and storage disagreeing until restart.
-2. **Post-dispose throw:** `state =` after the provider container is disposed throws `StateError` inside an unawaited future — an unhandled async error at teardown.
-
-**Fix:** Guard the load result against a subsequent user write (and swallow post-dispose):
-
-```dart
-bool _userSet = false;
-
-Future<void> _load(SensitivityStore store) async {
-  final loaded = await store.load();
-  if (_userSet) return;          // a live set() wins over the stale load
-  try { state = loaded; } on StateError { /* provider disposed */ }
-}
-
-void set(double value) {
-  _userSet = true;
-  ...
-}
-```
-
-### WR-04: Scroll deltas halve when one of two scrolling fingers lifts
-
-**File:** `app/remote_control/lib/trackpad/gesture_classifier.dart:391-392, 397-403, 457-467`
-
-**Issue:** `_emitScroll` divides every delta by 2 on the stated assumption that "only one pointer moves per event, the other contributes zero" — valid while two fingers are down. But in `_Phase.scrolling`, when the first finger lifts (`onPointerUp` returns `const []` and stays in `scrolling` because `_pointers.isNotEmpty`), the remaining single finger keeps streaming through `_emitScroll`, still halved. The scroll rate abruptly drops to half the finger's travel mid-gesture, and the fling seed built from those samples is halved too. Same halving applies in `tapPending2` → `scrolling` when only one tracked finger remains.
-
-**Fix:** Scale by the live tracked-pointer count instead of a constant 2:
-
-```dart
-ScrollIntent _emitScroll(double dx, double dy) {
-  final n = _pointers.length;          // 2 while both down, 1 after a lift
-  final sdx = dx / n;
-  final sdy = dy / n;
-  ...
-}
-```
+**Fix:** Set a `_userSet` flag in `set()` and have `_load` return early when it is true; wrap the assignment in `try { state = loaded; } on StateError {}`.
 
 ## Info
 
-### IN-01: `AuthManager.active_nonce` is written but never read — dead security-relevant state
+### IN-01: `AuthManager.active_nonce` is written but never read — dead security-relevant state (carried forward)
 
-**File:** `server/server-core/src/auth/mod.rs:31, 84-87, 93-97`
+**File:** `server/server-core/src/auth/mod.rs:31, 84-88, 93-97`
 
-**Issue:** `issue_challenge` stores the nonce in `active_nonce`, but `verify_auth` takes the nonce as a caller parameter and never consults the field. Verified: `session.rs:218-219, 275-278` keeps its own per-session copy of the server-issued nonce and passes that — so there is no replay hole — but the field is dead state whose doc comment ("Most recently issued challenge nonce") implies it is the enforcement point. It also couldn't work as one: it is a single slot shared across concurrent sessions.
+**Issue:** Unchanged. `issue_challenge` stores the nonce; `verify_auth` takes the nonce as a parameter and never consults the field. Verified again: `session.rs:91, 316-320` binds verification to the per-session copy, so there is no replay hole — but the field's doc comment implies it is the enforcement point, and as a single cross-session slot it could never be one.
 
-**Fix:** Delete the field (and its writes) or add a comment stating nonce binding lives on the session, so a future refactor doesn't "helpfully" start verifying against this cross-session slot.
+**Fix:** Delete the field, or document that nonce binding lives on the session.
 
-### IN-02: No cross-language contract test for the locked key vocabulary
+### IN-02: No cross-language contract test for the locked key vocabulary (carried forward)
 
 **File:** `app/remote_control/lib/keyboard/key_rows.dart:36-48` vs `server/server-windows/src/executors/keymap.rs:44-56`
 
-**Issue:** The two 39-entry lists match today (verified), but each side's test only checks internal consistency (Dart: caps ⊆ `kClientKeyCodes`; Rust: `CLIENT_KEY_CODES` maps to `Some`). A typo'd addition mirrored on the Dart side would pass both suites and produce a silently dead key (the exact T-04-02 failure the comments warn about).
+**Issue:** Unchanged. The 39-entry lists match today (re-verified), but each suite only checks internal consistency; a mirrored typo passes both and produces a silently dead key (T-04-02).
 
-**Fix:** Emit the vocabulary into `protocol/fixtures/` (the existing shared-fixture mechanism) and have both suites assert equality against the fixture file.
+**Fix:** Emit the vocabulary into `protocol/fixtures/` and assert equality from both suites.
 
-### IN-03: `connectNoDelay` leaks one `HttpClient` per dial
+### IN-03: `connectNoDelay` leaks one `HttpClient` per dial (carried forward)
 
 **File:** `app/remote_control/lib/net/connection_service.dart:80-96`
 
-**Issue:** `buildNoDelayHttpClient()` constructs a fresh `HttpClient` per connect attempt and never calls `client.close()`. Repeated backoff redials accumulate clients with idle-connection timers. Small, but unbounded across a long reconnect episode.
+**Issue:** Unchanged. A fresh `HttpClient` per connect attempt, never closed; unbounded accumulation across a long backoff episode.
 
-**Fix:** Hoist one shared `HttpClient` to a top-level `final`, or `close(force: false)` the client after `channel.ready` completes (the upgraded socket is already detached).
+**Fix:** One shared top-level client, or `client.close(force: false)` after `channel.ready`.
 
-### IN-04: Mid-press `enabled` flip swallows a key-cap's `up` client-side
+### IN-04: `KeyboardPanel`'s `changes` subscription is captured once and never re-subscribed (carried forward)
 
-**File:** `app/remote_control/lib/keyboard/key_rows.dart:409-413`
+**File:** `app/remote_control/lib/keyboard/keyboard_panel.dart:132-137, 151-161`
 
-**Issue:** `onTapUp`/`onTapCancel` are conditionally `null` when `enabled` is false. If auth drops while a cap is held, the rebuild nulls the handlers and the release produces no `up`. Today this is masked because losing `authed` coincides with socket loss → server CONN-07 `release_all`, and the D-12 reset clears held state — but the correctness depends on that coincidence, not on this widget. Also `_pressed` can be left stuck `true` visually.
+**Issue:** Unchanged (IN-05 in the prior review). `didUpdateWidget` handles `expanded` but not a replaced `changes` stream or `isDisconnected` probe. Notably, `HiddenTextInput.didUpdateWidget` (hidden_text_input.dart:64-72) DID gain exactly this re-subscribe for `resetSignal` — citing "IN-05-class hazard" — while the panel one file up still has the hazard for its own seams.
 
-**Fix:** Keep `onTapUp`/`onTapCancel` always wired and gate only `onTapDown` on `enabled`; the up path already no-ops when nothing is held (especially after CR-02's set-based fix).
+**Fix:** Re-subscribe in `didUpdateWidget` when `widget.changes` is not identical to `oldWidget.changes`, or document that the seams must be State-lifetime-stable.
 
-### IN-05: `changes` stream on `KeyboardPanel` is captured once and never re-subscribed
+### IN-05: `_MouseButton` release handlers gated on `enabled` — mid-press disable leaves `_pressed` stuck true
 
-**File:** `app/remote_control/lib/keyboard/keyboard_panel.dart:122-127, 138-147`
+**File:** `app/remote_control/lib/trackpad/mouse_buttons.dart:129-132`
 
-**Issue:** The `_changesSub` is created in `initState` from `widget.changes`; `didUpdateWidget` handles `expanded` but not a changed `changes` stream or `isDisconnected` probe. Safe with the current app-lifetime service singleton, but the injectable-seam design invites reconfiguration that would silently keep listening to the old stream.
+**Issue:** The same conditional-null pattern the IN-04 key-cap fix removed: `onTapUp`/`onTapCancel` are `null` when `enabled` is false, so a mid-press auth drop swallows the release and `_pressed` stays `true`. No wire-state impact (the click fires on tap-down, nothing is held server-side), but on re-enable the button renders the accent pressed state without being touched, until the next interaction.
 
-**Fix:** In `didUpdateWidget`, if `widget.changes != oldWidget.changes`, cancel and re-subscribe (or document that the seams must be stable for the State's lifetime).
+**Fix:** Mirror the key-cap pattern — always wire `onTapUp: (_) => _release()` and `onTapCancel: _release`; gate only `onTapDown` on `enabled`.
 
 ---
 
-_Reviewed: 2026-07-10T03:43:01Z_
+_Reviewed: 2026-07-10T09:48:33Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
