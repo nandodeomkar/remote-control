@@ -142,7 +142,7 @@ Plans:
 
 - [x] 04-07-PLAN.md — Atomic IME producer+controller sentinel reset on disconnect — closes CR-01 / T-04-03 (KEY-01, SC2)
 - [x] 04-09-PLAN.md — Scroll deltas scaled by live pointer count, unhalved fling seed — closes review WR-04 (PAD-03) [gap wave 1, parallel with 04-07]
-- [ ] 04-08-PLAN.md — Set-based held-cap tracking + always-wired key-cap release (folds IN-04) — closes CR-02 / T-04-04 (KEY-04, SC5) [gap wave 2, after 04-07]
+- [x] 04-08-PLAN.md — Set-based held-cap tracking + always-wired key-cap release (folds IN-04) — closes CR-02 / T-04-04 (KEY-04, SC5) [gap wave 2, after 04-07]
 - [ ] 04-10-PLAN.md — Session liveness deadline: half-open disconnect releases held input via existing CONN-07 cleanup — closes 04-UAT Test 5 major gap (KEY-04, SC4/SC5, T-04-04) [gap wave 3]
 
 **UI hint**: yes
