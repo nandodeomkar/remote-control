@@ -298,4 +298,76 @@ void main() {
       expect(all.whereType<ClickRightIntent>(), hasLength(1));
     });
   });
+
+  group('GestureClassifier — WR-04: post-lift scroll rate (PAD-03)', () {
+    test(
+        'WR-04: one finger lifts mid-scroll — remaining finger scrolls at '
+        'FULL delta (no halving)', () {
+      final (c, clock) = make();
+      c.onPointerDown(1, 100, 200);
+      clock.now = 10;
+      c.onPointerDown(2, 140, 200);
+
+      clock.now = 20;
+      expect(c.onPointerMove(1, 100, 170), const [ScrollIntent(0, -15)],
+          reason: 'two fingers down: raw dy -30 averages to -15 (n=2) — '
+              'byte-identical to the shipped 04-03 behavior');
+
+      clock.now = 30;
+      expect(c.onPointerUp(1), isEmpty,
+          reason: 'one pointer remains — the phase stays scrolling');
+
+      clock.now = 40;
+      expect(c.onPointerMove(2, 140, 176), const [ScrollIntent(0, -24)],
+          reason: 'n=1 after the lift: raw dy -24 passes at FULL rate '
+              '(the halving bug emitted -12)');
+    });
+
+    test('WR-04: fling seeded after a one-finger lift uses full-rate samples',
+        () {
+      final (c, clock) = make();
+      c.onPointerDown(1, 100, 200);
+      clock.now = 10;
+      c.onPointerDown(2, 140, 200);
+
+      clock.now = 20;
+      c.onPointerMove(1, 100, 170); // engage scrolling (sample -15 at t=20)
+
+      clock.now = 25;
+      expect(c.onPointerUp(1), isEmpty); // one finger remains
+
+      // Four fast single-finger swipes starting past kVelocityWindowMs so
+      // the two-finger t=20 sample prunes out of the fling window.
+      var y = 200.0;
+      for (final t in [200, 210, 220, 230]) {
+        clock.now = t;
+        y -= 24;
+        c.onPointerMove(2, 140, y);
+      }
+
+      clock.now = 240;
+      // In-window samples: 4 x (-24/1) = -96 over span 240-200 = 40ms ->
+      // vy = -2.4 (>= kFlingMinVelocityPxMs) — exactly DOUBLE the -1.2 the
+      // halving bug seeded from the same finger travel.
+      expect(c.onPointerUp(2), const [FlingIntent(0, -2.4)]);
+    });
+
+    test(
+        'WR-04: tapPending2 with one finger left — slop-crossing move emits '
+        'FULL delta', () {
+      final (c, clock) = make();
+      c.onPointerDown(1, 100, 100);
+      clock.now = 10;
+      c.onPointerDown(2, 140, 100);
+
+      clock.now = 20;
+      expect(c.onPointerUp(1), isEmpty,
+          reason: 'tapPending2 persists — one pointer left, no slop crossed');
+
+      clock.now = 30;
+      expect(c.onPointerMove(2, 140, 70), const [ScrollIntent(0, -30)],
+          reason: 'raw dy -30 flips tapPending2 -> scrolling with n=1: '
+              'FULL -30 (the bug emitted -15)');
+    });
+  });
 }
