@@ -1,10 +1,11 @@
 ---
 phase: 5
 slug: media-power-presenter-browser
-status: mapped
-nyquist_compliant: false
+status: planned
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-07-10
+wave_0_mapped: "Wave-0 tests embedded as RED-first TDD tasks in plans 05-01 (volume fixtures), 05-03 (vol_ integration), 05-06 (confirm_track_fsm), 05-04 (presenter_timer), 05-07 (volume_store)"
 ---
 
 # Phase 5 — Validation Strategy
