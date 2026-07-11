@@ -209,7 +209,7 @@ Plans:
 **Wave 2** *(after 06-01)*
 
 - [x] 06-02-PLAN.md — Apps thread + WinApps executor: real windows, Alt-Tab filter, icons, focus/close/launch
-- [ ] 06-03-PLAN.md — Apps client: screen + favorites (pin-from-window) store + hub tile
+- [x] 06-03-PLAN.md — Apps client: screen + favorites (pin-from-window) store + hub tile
 
 **Wave 3** *(06-04 after 06-01/02; 06-05 after 06-03)*
 

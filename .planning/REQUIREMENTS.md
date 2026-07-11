@@ -133,9 +133,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PWR-01 | Phase 5 | Complete |
 | PWR-02 | Phase 5 | Complete |
 | PWR-03 | Phase 5 | Complete |
-| APPS-01 | Phase 6 | In progress (06-01 contract: bool actions → err{windowGone\|launchFailed}) |
-| APPS-02 | Phase 6 | In progress (06-01 contract: WindowInfo.icon/path, protocol 1.2) |
-| APPS-03 | Phase 6 | In progress (06-01 contract: apps.changed authed-gated push seam) |
+| APPS-01 | Phase 6 | Code complete (06-01 contract + 06-02 WinApps + 06-03 client: focus/close + err→toast); on-device UAT 06-07 |
+| APPS-02 | Phase 6 | Code complete (06-03 client: pin-from-window favorites, relaunch by server path); on-device UAT 06-07 |
+| APPS-03 | Phase 6 | Code complete (06-03 client: live apps.changed refresh, no manual refresh); on-device UAT 06-07 |
 | CLIP-01 | Phase 6 | Pending |
 | CLIP-02 | Phase 6 | Pending |
 | CLIP-03 | Phase 6 | Pending |

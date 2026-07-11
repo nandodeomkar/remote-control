@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 06-01-PLAN.md (Apps contract layer — protocol 1.2, apps.changed push seam)
-last_updated: "2026-07-11T13:55:48.692Z"
-last_activity: 2026-07-11 -- Completed 06-01 (Apps wire contract + apps.changed push seam)
+stopped_at: Completed 06-03-PLAN.md (Apps client screen — favorites grid + open-windows list + hub tile)
+last_updated: "2026-07-11T14:30:00.000Z"
+last_activity: 2026-07-11 -- Completed 06-03 (Apps client: WindowInfo mirror, AppsSnapshot/err arms, favorites store, Apps screen + hub tile)
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 43
-  completed_plans: 38
-  percent: 71
+  completed_plans: 40
+  percent: 74
 ---
 
 # Project State
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 06 (apps-clipboard) — EXECUTING
-Plan: 3 of 7
-Next: 06-02-PLAN.md (Apps thread + WinApps executor: real windows, Alt-Tab filter, icons, focus/close/launch) and 06-03 (Apps client screen). 06-01 delivered the contract layer these build against.
+Plan: 4 of 7
+Next: 06-04-PLAN.md (Clipboard send/fetch: clip thread + WinClipboard + clip.changed seam) and 06-05 (Clipboard client). The Apps track (06-01 contract + 06-02 WinApps + 06-03 client) is code-complete; on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -36,9 +36,9 @@ Next: 06-02-PLAN.md (Apps thread + WinApps executor: real windows, Alt-Tab filte
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-11 -- Completed 06-01 (Apps wire contract + apps.changed push seam)
+Last activity: 2026-07-11 -- Completed 06-03 (Apps client screen + favorites store + hub tile)
 
-Progress: [███████░░░] 73% (5 of 7 phases complete; 37 of 43 plans)
+Progress: [███████░░░] 74% (5 of 7 phases complete; 40 of 43 plans)
 
 ## Performance Metrics
 
@@ -96,6 +96,7 @@ Progress: [███████░░░] 73% (5 of 7 phases complete; 37 of 43
 | Phase 05 P07 | ~20min | 2 tasks | 5 files |
 | Phase 06 P01 | ~20min | 3 tasks | 12 files |
 | Phase 06 P02 | 25min | 3 tasks | 7 files |
+| Phase 06 P03 | ~30min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -201,6 +202,10 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 06-02]: Apps enumeration runs on a dedicated OS thread (audio_thread clone) — EnumWindows Z-order + 5-point Alt-Tab filter (visible/titled/tool-app/owner-root/DWM-uncloaked); pure is_alt_tab_window predicate unit-tested without OS calls; list capped 50 + push_if_changed anti-flood (APPS-03)
 - [Phase ?]: [Phase 06-02]: Icon pipeline SHGetFileInfoW(by exe path, owned->DestroyIcon) with WM_GETICON/class-icon fallback(borrowed->kept) -> GetDIBits 32bpp BGRA -> RGBA -> png -> hand-rolled base64, cached by exe path; encodes the bitmap's ACTUAL dims (GetObjectW) since GetDIBits cannot rescale
 - [Phase ?]: [Phase 06-02]: WinApps validates focus/close ids against the current snapshot BEFORE sending (stale id -> false -> err{windowGone}); the apps thread's own IsWindow is the second-line same-tick-recycle guard (T-06-13 accept); UWP/ApplicationFrameHost/WindowsApps paths -> path=None (non-pinnable, focus/close still work)
+- [Phase 06-03]: Dart WindowInfo mirrors protocol 1.2 (optional icon/path via _opt tolerant parse + skip-none toJson + value ==); ConnectionService parks a value-equal AppsSnapshot from apps.changed AND the apps.list reply, plus _lastError from err — the err arm is parked but NOT returned early so err{versionMismatch} still reaches handshake_fsm's terminal-fail path
+- [Phase 06-03]: AppsSnapshot/AppsViewState equality is hand-rolled element-wise — no package:collection dependency added (not a direct dep; T-06-SC no-new-packages held); FavoritesStore.load returns a GROWABLE list (never const []) so pin/unpin mutate in place (bug caught by the RED suite)
+- [Phase 06-03]: FavoritesStore (PrefsKv key apps.favorites, non-secret D-02) pins ONLY a running window's server-resolved WindowInfo.path (T-06-04, no manual-path field), rejects UWP path==null (Flag 1), dedupes by path, corruption-tolerant; Apps screen surfaces err toasts off the raw service.changes stream (identity-tracked) because the value-equal view never rebuilds on an err park
+- [Phase 06-03]: Apps hub tile (Icons.apps) inserted after Media, before Power -> order Trackpad, Media, Apps, Power, Presenter, Browser (06-UI-SPEC placement)
 
 ### Pending Todos
 
@@ -234,6 +239,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T13:54:41.347Z
-Stopped at: Completed 06-01-PLAN.md (Apps contract layer — protocol 1.2, apps.changed push seam)
-Resume file: .planning/phases/06-apps-clipboard/06-02-PLAN.md
+Last session: 2026-07-11T14:30:00.000Z
+Stopped at: Completed 06-03-PLAN.md (Apps client screen — favorites grid + open-windows list + hub tile)
+Resume file: .planning/phases/06-apps-clipboard/06-04-PLAN.md
