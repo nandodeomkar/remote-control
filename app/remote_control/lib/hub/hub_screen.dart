@@ -33,6 +33,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../browser/browser_screen.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../presenter/presenter_screen.dart';
 import '../trackpad/trackpad_screen.dart';
 import '../widgets/connection_header.dart';
 
@@ -70,6 +71,14 @@ final List<HubTileSpec> kHubTiles = [
     label: 'Trackpad',
     icon: Icons.touch_app,
     builder: (_) => const TrackpadScreen(),
+  ),
+  // 05-04: Presenter sits between Trackpad and Browser (the final phase
+  // reading order is Trackpad, Media, Power, Presenter, Browser once
+  // 05-06/05-07 insert Media/Power ahead of it).
+  HubTileSpec(
+    label: 'Presenter',
+    icon: Icons.slideshow,
+    builder: (_) => const PresenterScreen(),
   ),
   HubTileSpec(
     label: 'Browser',

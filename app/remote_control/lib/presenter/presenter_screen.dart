@@ -1,0 +1,469 @@
+/// The Presenter screen (PRES-01/02, D-07/08/09) — full-screen split tap
+/// zones + a bottom bar with the manual elapsed timer.
+///
+/// D-07 layout: a slim "Presenter" app bar (header chip, D-02) over a
+/// reconnecting-banner slot and a full-bleed `#0E0F12` body. The body is two
+/// tap zones split by a 1px `#2A2D34` hairline — Prev on the left third,
+/// Next on the right two-thirds. A press-down on either zone sends
+/// `present {prev|next}` on the reliable path, fires a haptic tick
+/// (press-down, not release — the Phase-4 rule), and flashes the zone's
+/// chevron accent (`#4C8DFF`) for 100ms. The 64px bottom bar (top hairline)
+/// carries "Start show" / "End show" / the "Blank" toggle and the
+/// right-aligned mm:ss timer.
+///
+/// D-08 timer: [PresenterTimer] is the client-local FSM (never a wire
+/// message). "Start show" sends `present {start}` AND calls
+/// `timer.startShow()`; "End show" sends `present {end}` and leaves the timer
+/// untouched (manual control only). The timer text taps to pause/resume and
+/// long-presses to reset. A single widget-local 1s `Timer.periodic` — created
+/// lazily on the first Start show and CANCELLED in dispose (Pitfall 13) —
+/// drives the mm:ss re-render; the FSM itself owns no timer.
+///
+/// D-09 keep-awake: the wakelock is enabled in initState and disabled in
+/// dispose — it must never leak past this screen.
+///
+/// Every send is gated: when the header chip is not connected the zones and
+/// bar controls render muted (`#6B7280`) and inert — never red. The Blank
+/// toggle is optimistic local state (the wire has no blank readback): tapping
+/// either state sends `present {blank}` and flips locally.
+library;
+
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
+
+import 'package:remote_protocol/remote_protocol.dart';
+
+import '../net/connection_providers.dart';
+import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../widgets/connection_header.dart';
+import 'presenter_timer.dart';
+
+// UI-SPEC locked palette.
+const Color _bg = Color(0xFF0E0F12);
+const Color _surface = Color(0xFF16181D);
+const Color _hairline = Color(0xFF2A2D34);
+const Color _text = Color(0xFFE6E8EB);
+const Color _accent = Color(0xFF4C8DFF);
+const Color _muted = Color(0xFF6B7280);
+
+/// The presenter remote (D-07): split tap zones, bottom bar, manual timer.
+class PresenterScreen extends ConsumerStatefulWidget {
+  /// Creates the presenter screen.
+  const PresenterScreen({super.key});
+
+  @override
+  ConsumerState<PresenterScreen> createState() => _PresenterScreenState();
+}
+
+class _PresenterScreenState extends ConsumerState<PresenterScreen> {
+  /// Cached once — app-lifetime singleton (house pattern).
+  late final ConnectionService _service;
+
+  /// Client-local elapsed timer FSM (D-08). System clock in production.
+  late final PresenterTimer _timer;
+
+  /// Widget-local 1s re-render ticker — created lazily on the first Start
+  /// show, cancelled in dispose (Pitfall 13). The FSM holds no timer.
+  Timer? _ticker;
+
+  /// Optimistic blank state (no wire readback — D-07/UI-SPEC).
+  bool _blanked = false;
+
+  /// 100ms chevron accent flash flags (per zone).
+  bool _prevFlash = false;
+  bool _nextFlash = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _service = ref.read(connectionServiceProvider);
+    _timer = PresenterTimer(
+      nowMillis: () => DateTime.now().millisecondsSinceEpoch,
+    );
+    // D-09: keep the phone awake while presenting.
+    WakelockPlus.enable();
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    // D-09: release the wakelock — it must never leak past this screen.
+    WakelockPlus.disable();
+    super.dispose();
+  }
+
+  // The 1s ticker only needs to exist while a show has been started; the
+  // display is otherwise static. Created once, then reused.
+  void _ensureTicker() {
+    _ticker ??= Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  // Prev/Next zone taps: each sends its own present macro (a distinct
+  // advance per the PRES-01 vocabulary) with a haptic tick per advance.
+  void _onPrev() => _onZone(const PresentMsg(action: 'prev'), true);
+
+  void _onNext() => _onZone(const PresentMsg(action: 'next'), false);
+
+  // Zone tap (press-down): reliable present + haptic tick + 100ms accent
+  // flash of the tapped chevron.
+  void _onZone(PresentMsg msg, bool isPrev) {
+    _service.sendReliable(msg);
+    unawaited(HapticFeedback.lightImpact());
+    setState(() {
+      if (isPrev) {
+        _prevFlash = true;
+      } else {
+        _nextFlash = true;
+      }
+    });
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (!mounted) return;
+      setState(() {
+        if (isPrev) {
+          _prevFlash = false;
+        } else {
+          _nextFlash = false;
+        }
+      });
+    });
+  }
+
+  // "Start show": present {start} AND start the local timer (D-08).
+  void _onStartShow() {
+    _service.sendReliable(const PresentMsg(action: 'start'));
+    unawaited(HapticFeedback.lightImpact());
+    _timer.startShow();
+    _ensureTicker();
+    setState(() {});
+  }
+
+  // "End show": present {end} only — the timer is manual, left untouched
+  // (D-08).
+  void _onEndShow() {
+    _service.sendReliable(const PresentMsg(action: 'end'));
+    unawaited(HapticFeedback.lightImpact());
+  }
+
+  // "Blank" toggle: present {blank} + optimistic local flip (no readback).
+  void _onBlank() {
+    _service.sendReliable(const PresentMsg(action: 'blank'));
+    unawaited(HapticFeedback.lightImpact());
+    setState(() => _blanked = !_blanked);
+  }
+
+  // Timer text tap = pause/resume; long-press = reset (client-local, D-08).
+  void _onTimerTap() {
+    _timer.tap();
+    setState(() {});
+  }
+
+  void _onTimerReset() {
+    _timer.reset();
+    unawaited(HapticFeedback.lightImpact());
+    setState(() {});
+  }
+
+  String _fmtElapsed(int ms) {
+    final totalSec = ms ~/ 1000;
+    final m = (totalSec ~/ 60).toString().padLeft(2, '0');
+    final s = (totalSec % 60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
+  Color _timerColor() {
+    switch (_timer.state) {
+      case PresenterTimerState.running:
+        return _accent;
+      case PresenterTimerState.paused:
+        return _text;
+      case PresenterTimerState.stopped:
+        return _muted;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Transition-only snapshot — rebuilds on lifecycle changes, never a hot
+    // path here (all sends are discrete taps).
+    final status = ref.watch(connectionStatusProvider);
+    final authed = status.chip == ChipStatus.connected;
+
+    return Scaffold(
+      backgroundColor: _bg,
+      appBar: AppBar(
+        backgroundColor: _bg,
+        title: const Text(
+          'Presenter',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: _text,
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(child: ConnectionHeaderChip.forService(_service)),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // D-02: non-blocking drop strip under the app bar.
+            ReconnectingBannerSlot(
+              visible: status.chip == ChipStatus.reconnecting,
+              onRetry: _service.retryNow,
+            ),
+            // Split tap zones — Prev (left third) | hairline | Next (right
+            // two-thirds).
+            Expanded(
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 1,
+                    child: _TapZone(
+                      icon: Icons.chevron_left,
+                      caption: 'Previous',
+                      flashing: _prevFlash,
+                      enabled: authed,
+                      onTapDown: _onPrev,
+                    ),
+                  ),
+                  const SizedBox(
+                    width: 1,
+                    height: double.infinity,
+                    child: ColoredBox(color: _hairline),
+                  ),
+                  Expanded(
+                    flex: 2,
+                    child: _TapZone(
+                      icon: Icons.chevron_right,
+                      caption: 'Next',
+                      flashing: _nextFlash,
+                      enabled: authed,
+                      onTapDown: _onNext,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            _buildBottomBar(authed),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomBar(bool authed) {
+    return Container(
+      height: 64,
+      decoration: const BoxDecoration(
+        color: _bg,
+        border: Border(top: BorderSide(color: _hairline)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          _BarButton(
+            label: 'Start show',
+            enabled: authed,
+            onPressed: _onStartShow,
+          ),
+          const SizedBox(width: 8),
+          _BarButton(
+            label: 'End show',
+            enabled: authed,
+            onPressed: _onEndShow,
+          ),
+          const SizedBox(width: 8),
+          _BlankToggle(
+            active: _blanked,
+            enabled: authed,
+            onPressed: _onBlank,
+          ),
+          const Spacer(),
+          // Manual elapsed timer (client-local — always interactive).
+          Tooltip(
+            message: 'Tap to pause, hold to reset',
+            child: GestureDetector(
+              onTap: _onTimerTap,
+              onLongPress: _onTimerReset,
+              behavior: HitTestBehavior.opaque,
+              child: Container(
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                alignment: Alignment.centerRight,
+                child: Text(
+                  _fmtElapsed(_timer.elapsedMs()),
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                    color: _timerColor(),
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One split tap zone: a big chevron + caption. Press-down fires [onTapDown]
+/// (the send/haptic/flash live in the parent). The chevron flashes accent
+/// while [flashing]; it renders muted when [enabled] is false (gated, never
+/// red).
+class _TapZone extends StatelessWidget {
+  final IconData icon;
+  final String caption;
+  final bool flashing;
+  final bool enabled;
+  final VoidCallback onTapDown;
+
+  const _TapZone({
+    required this.icon,
+    required this.caption,
+    required this.flashing,
+    required this.enabled,
+    required this.onTapDown,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = !enabled
+        ? _muted
+        : flashing
+            ? _accent
+            : _muted;
+    return GestureDetector(
+      onTapDown: enabled ? (_) => onTapDown() : null,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        color: _bg,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 48, color: color),
+            const SizedBox(height: 4),
+            Text(
+              caption,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// A bottom-bar text button ("Start show" / "End show"): key-cap chrome,
+/// gated muted (never red) when disabled.
+class _BarButton extends StatelessWidget {
+  final String label;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _BarButton({
+    required this.label,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: _surface,
+      shape: RoundedRectangleBorder(
+        side: const BorderSide(color: _hairline),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        onTap: enabled ? onPressed : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: enabled ? _text : _muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// The "Blank" toggle: armed-chip outline pattern when [active] (`#4C8DFF`
+/// border + accent label); gated muted when disabled.
+class _BlankToggle extends StatelessWidget {
+  final bool active;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _BlankToggle({
+    required this.active,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final Color borderColor;
+    final Color fgColor;
+    if (!enabled) {
+      borderColor = _hairline;
+      fgColor = _muted;
+    } else if (active) {
+      borderColor = _accent;
+      fgColor = _accent;
+    } else {
+      borderColor = _hairline;
+      fgColor = _text;
+    }
+    return Material(
+      color: _surface,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: borderColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        onTap: enabled ? onPressed : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.crop_din, size: 18, color: fgColor),
+              const SizedBox(width: 6),
+              Text(
+                'Blank',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: fgColor,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
