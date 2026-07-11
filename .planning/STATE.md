@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
 stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-07-11T01:39:58.948Z"
+last_updated: "2026-07-11T01:51:31.005Z"
 last_activity: 2026-07-11 -- Phase 05 execution resumed (wave continue)
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 36
-  completed_plans: 30
+  completed_plans: 31
   percent: 57
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 05 (media-power-presenter-browser) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Next: plan Phase 05 (/gsd-plan-phase 5)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -86,6 +86,7 @@ Progress: [██████░░░░] 57% (4 of 7 phases complete)
 | Phase 04 P09 | 3min | 2 tasks | 2 files |
 | Phase 04 P10 | 11min | 2 tasks | 2 files |
 | Phase 05 P01 | 7min | 3 tasks | 14 files |
+| Phase 05 P02 | 8min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -168,6 +169,9 @@ Recent decisions affecting current work:
 - [Phase 04-10]: Half-open socket tests keep the client alive and silent (drop/close emits FIN/RST on loopback); paused clock for the deadline wait, tokio::time::resume() before real-IO session-end assertions (auto-advance races kernel FIN)
 - [Phase 05-01]: VolChangedPayload uses u64 value + bool muted with NO Option — serde missing-field is the hard decode error fixture 03 demands
 - [Phase 05-01]: clientProtoVersion in handshake_fsm.dart references the remote_protocol protoVersion constant so minor bumps cannot leave a stale lib literal; remaining '1.0' test literals are commented historical wire pins (Pitfall 10)
+- [Phase ?]: 05-02: Browser grid rows derive from kBrowserActions with a data-driven pairing rule (refresh full-width) — the 7-action list stays the single source of truth vs router.rs
+- [Phase ?]: 05-02: kHubTiles ordered registry IS the hub render order (Trackpad first, full-width primary); later plans insert HubTileSpec entries with zero grid changes
+- [Phase ?]: 05-02: Hub tiles + browser keys fire callbacks on tap-down via the MouseButtonsBar house pattern — widget tests never touch the Navigator or a service fake
 
 ### Pending Todos
 
@@ -199,6 +203,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T01:39:58.932Z
+Last session: 2026-07-11T01:51:15.310Z
 Stopped at: Completed 05-01-PLAN.md
 Resume file: None

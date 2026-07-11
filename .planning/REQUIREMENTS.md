@@ -61,7 +61,7 @@
 
 ### Browser
 
-- [ ] **BROW-01**: User can send browser controls — back/forward, new/close tab, refresh, zoom in/out (key macros on focused browser)
+- [x] **BROW-01**: User can send browser controls — back/forward, new/close tab, refresh, zoom in/out (key macros on focused browser)
 
 ### Server Shell
 
@@ -142,7 +142,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLIP-04 | Phase 6 | Pending |
 | PRES-01 | Phase 5 | Pending |
 | PRES-02 | Phase 5 | Pending |
-| BROW-01 | Phase 5 | Pending |
+| BROW-01 | Phase 5 | Complete |
 | SRV-01 | Phase 7 | Pending |
 | SRV-02 | Phase 7 | Pending |
 | SRV-03 | Phase 7 | Pending |
