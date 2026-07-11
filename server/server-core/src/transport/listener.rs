@@ -20,10 +20,7 @@ const MAX_WS_MESSAGE_BYTES: usize = 65536;
 /// runs as its own session task; a failed TCP accept or WebSocket handshake
 /// never kills the loop.
 pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
-    // `volume` is held here (kept alive so producers can send) until the
-    // session-side select! branch lands; sessions get a clone in Task-2
-    // wiring of plan 05-03.
-    let ServerDeps { executors, auth, pause, volume: _volume } = deps;
+    let ServerDeps { executors, auth, pause, volume } = deps;
 
     loop {
         let (stream, peer) = match listener.accept().await {
@@ -49,6 +46,7 @@ pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
         let executors = executors.clone();
         let auth = Arc::clone(&auth);
         let pause = pause.clone();
+        let volume = volume.clone();
         tokio::spawn(async move {
             let ws =
                 match tokio_tungstenite::accept_async_with_config(stream, Some(config)).await {
@@ -57,7 +55,7 @@ pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
                     // was held, nothing to clean up.
                     Err(_) => return,
                 };
-            session::run_session(ws, peer.ip(), executors, auth, pause).await;
+            session::run_session(ws, peer.ip(), executors, auth, pause, volume).await;
         });
     }
 }

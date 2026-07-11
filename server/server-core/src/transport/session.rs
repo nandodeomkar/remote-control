@@ -29,8 +29,10 @@ use tokio_tungstenite::tungstenite::Message;
 
 use crate::auth::AuthManager;
 use crate::auth::pin::PinOutcome;
+use super::VolumeState;
 use crate::codec::json::{
     AuthFailPayload, AuthOkPayload, ChallengePayload, ErrPayload, Msg, PairOkPayload,
+    VolChangedPayload,
 };
 use crate::codec::{binary, json};
 use crate::dispatch::AuthState;
@@ -39,9 +41,12 @@ use crate::dispatch::router::{self, SessionCtx};
 use crate::executors::Executors;
 
 /// The server's protocol version (SPEC §2). Only the MAJOR component is
-/// compared against the client's `hello.protoVersion`. `pub(crate)` so the
-/// beacon's `proto` field references it instead of duplicating the literal.
-pub(crate) const SERVER_PROTO_VERSION: &str = "1.0";
+/// compared against the client's `hello.protoVersion`. `pub` (re-exported
+/// via [`super`]) so the beacon's `proto` field AND tests asserting "the
+/// current server version" reference it instead of duplicating the literal.
+/// 1.1 adds the additive `vol.changed` S→C push (MED-02, D-03) — minor
+/// bump: 1.0 clients are still accepted (§2).
+pub const SERVER_PROTO_VERSION: &str = "1.1";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
 /// POST-auth liveness deadline: an Authed session receiving NO inbound
@@ -78,6 +83,7 @@ pub(super) async fn run_session(
     executors: Executors,
     auth: Arc<Mutex<AuthManager>>,
     mut pause: watch::Receiver<bool>,
+    mut volume: watch::Receiver<VolumeState>,
 ) {
     let (mut sink, mut stream) = ws.split();
 
@@ -106,6 +112,9 @@ pub(super) async fn run_session(
     // The pause watch sender may drop before the session ends; disable the
     // branch then (`changed()` would return Err forever and busy-loop).
     let mut pause_alive = true;
+    // Same discipline for the volume watch (MED-02): producer dropped →
+    // disable the branch, never busy-loop.
+    let mut volume_alive = true;
     // Last time ANY inbound bytes arrived from the peer; drives the
     // liveness deadline branch below.
     let mut last_inbound = Instant::now();
@@ -141,6 +150,26 @@ pub(super) async fn run_session(
                     Err(_) => pause_alive = false,
                 }
             }
+            // MED-02 live push (D-03), authed-gated: the volume watch fires
+            // for EVERY session, but only Authed ones may see host state —
+            // the guard is what stands between host state and an unauthed
+            // socket (threat T-05-05 / RESEARCH Pitfall 8). watch is
+            // latest-value-only (no backlog to flood, T-05-06); frames ride
+            // the same bounded write queue as replies.
+            changed = volume.changed(), if volume_alive && ctx.auth_state == AuthState::Authed => {
+                match changed {
+                    Ok(()) => {
+                        // borrow_and_update clears the changed flag so this
+                        // branch and the after-auth snapshot below never
+                        // double-fire on the same state.
+                        let state = *volume.borrow_and_update();
+                        if tx.send(vol_changed_frame(state)).await.is_err() {
+                            break 'read; // write task gone → session over
+                        }
+                    }
+                    Err(_) => volume_alive = false,
+                }
+            }
             incoming = stream.next() => {
                 let msg = match incoming {
                     // Clean close: the client finished the WS close
@@ -160,6 +189,10 @@ pub(super) async fn run_session(
                 last_inbound = Instant::now();
                 match msg {
                     Message::Text(text) => {
+                        // Captured BEFORE handle_text so the D-03 snapshot
+                        // below fires exactly at the two Authed transitions
+                        // (pairOk and authOk) — never on later frames.
+                        let was_authed = ctx.auth_state == AuthState::Authed;
                         let (replies, close_after) = handle_text(
                             text.as_str(),
                             &mut ctx,
@@ -181,6 +214,17 @@ pub(super) async fn run_session(
                             // close frame, then the session ends.
                             let _ = tx.send(Message::Close(None)).await;
                             break 'read;
+                        }
+                        // D-03 "right after auth": exactly one vol.changed
+                        // snapshot, queued AFTER the pairOk/authOk reply
+                        // (mpsc preserves order). borrow_and_update here AND
+                        // in the branch above prevents an immediate
+                        // duplicate branch-fire on a pre-auth state change.
+                        if !was_authed && ctx.auth_state == AuthState::Authed {
+                            let state = *volume.borrow_and_update();
+                            if tx.send(vol_changed_frame(state)).await.is_err() {
+                                break 'read;
+                            }
                         }
                     }
                     Message::Binary(bytes) => {
@@ -358,6 +402,19 @@ fn handle_text(
             ),
         },
     }
+}
+
+/// Encode one `vol.changed` push frame (S→C, protoVersion 1.1) from the
+/// core-owned [`VolumeState`] — used by both the live watch branch and the
+/// D-03 after-auth snapshot so the wire shape can never diverge.
+fn vol_changed_frame(state: VolumeState) -> Message {
+    Message::text(json::encode_msg(
+        &Msg::VolChanged(VolChangedPayload {
+            value: u64::from(state.value),
+            muted: state.muted,
+        }),
+        None,
+    ))
 }
 
 /// Build an `authFail` reply with the SPEC §5 reason string and its

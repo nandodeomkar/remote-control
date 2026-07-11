@@ -27,7 +27,7 @@ use server_core::auth::challenge::auth_proof;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
 use server_core::executors::{Button, KeyCode};
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
-use server_core::transport::{ServerDeps, VolumeState};
+use server_core::transport::{SERVER_PROTO_VERSION, ServerDeps, VolumeState};
 
 /// Every recv (and the connect) is wrapped in this timeout so a silent
 /// server fails the test in seconds, never hangs it.
@@ -92,6 +92,8 @@ async fn walking_skeleton_pair_auth_input() {
     .expect("websocket connect failed");
 
     // 1. hello → expect challenge with a 64-lowercase-hex nonce.
+    // "1.0" here is a HISTORICAL WIRE PIN, kept deliberately: a 1.0 client
+    // against the 1.1 server exercises SPEC §2 minor-mismatch acceptance.
     ws.send(Message::text(
         json!({"t": "hello", "seq": 1, "p": {"protoVersion": "1.0", "device": "itest"}})
             .to_string(),
@@ -200,6 +202,8 @@ async fn send_json(ws: &mut WsClient, v: Value) {
 }
 
 /// hello → challenge; returns the challenge nonce (64 lowercase hex).
+/// "1.0" is a HISTORICAL WIRE PIN, kept deliberately: a 1.0 client against
+/// the 1.1 server exercises SPEC §2 minor-mismatch acceptance.
 async fn hello_challenge(ws: &mut WsClient) -> String {
     send_json(
         ws,
@@ -237,9 +241,13 @@ async fn pair_client(h: &Harness) -> (WsClient, String) {
 }
 
 /// Fully authed client via the pairing path, for tests that don't need the
-/// token.
+/// token. The D-03 `vol.changed` snapshot arriving right after pairOk is
+/// drained here so callers start with a clean stream; the vol_ suite uses
+/// `pair_client` directly when the snapshot itself is under test.
 async fn authed_client(h: &Harness) -> WsClient {
-    pair_client(h).await.0
+    let mut ws = pair_client(h).await.0;
+    let _snapshot = recv_vol_changed(&mut ws).await;
+    ws
 }
 
 /// A 9-byte binary move frame ready to send (SPEC §9).
@@ -575,7 +583,10 @@ async fn version_major_mismatch_rejected() {
     let err = recv_json(&mut ws).await;
     assert_eq!(err["t"], "err", "expected err after major mismatch, got: {err}");
     assert_eq!(err["p"]["code"], "versionMismatch");
-    assert_eq!(err["p"]["serverVersion"], "1.0", "D-06: err must carry serverVersion");
+    assert_eq!(
+        err["p"]["serverVersion"], SERVER_PROTO_VERSION,
+        "D-06: err must carry the CURRENT serverVersion"
+    );
     assert_eq!(err["p"]["clientVersion"], "2.0", "D-06: err must carry clientVersion");
 
     // The connection then closes (SPEC §2).

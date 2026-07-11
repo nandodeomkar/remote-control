@@ -15,6 +15,11 @@ pub mod beacon;
 mod listener;
 mod session;
 
+/// Re-exported so tests (and any composition root) asserting "the current
+/// server version" reference the constant instead of duplicating the
+/// literal (RESEARCH Pitfall 10).
+pub use session::SERVER_PROTO_VERSION;
+
 use std::sync::{Arc, Mutex};
 
 use crate::auth::AuthManager;
