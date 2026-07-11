@@ -30,6 +30,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../apps/apps_screen.dart';
 import '../browser/browser_screen.dart';
 import '../media/media_screen.dart';
 import '../net/connection_providers.dart';
@@ -80,6 +81,13 @@ final List<HubTileSpec> kHubTiles = [
     label: 'Media',
     icon: Icons.music_note,
     builder: (_) => const MediaScreen(),
+  ),
+  // 06-03: Apps inserted after Media, before Power (06-UI-SPEC placement) —
+  // reading order Trackpad, Media, Apps, Power, Presenter, Browser.
+  HubTileSpec(
+    label: 'Apps',
+    icon: Icons.apps,
+    builder: (_) => const AppsScreen(),
   ),
   // 05-06: Power sits between Media and Presenter.
   HubTileSpec(
