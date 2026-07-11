@@ -41,6 +41,8 @@ windows = { version = "0.62", features = [
     "Win32_Graphics_Gdi",
     # ShellExecuteW (launch), SHGetFileInfoW (icon-by-path) (Flag 2 / APPS-02)
     "Win32_UI_Shell",
+    # FILE_FLAGS_AND_ATTRIBUTES — SHGetFileInfoW's dwFileAttributes param type (Flag 2)
+    "Win32_Storage_FileSystem",
 ] }
 tokio = { version = "1.52", features = ["rt-multi-thread", "net", "sync", "time", "macros"] }
 tracing = "0.1"
