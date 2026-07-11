@@ -208,7 +208,7 @@ Plans:
 
 **Wave 2** *(after 06-01)*
 
-- [ ] 06-02-PLAN.md — Apps thread + WinApps executor: real windows, Alt-Tab filter, icons, focus/close/launch
+- [x] 06-02-PLAN.md — Apps thread + WinApps executor: real windows, Alt-Tab filter, icons, focus/close/launch
 - [ ] 06-03-PLAN.md — Apps client: screen + favorites (pin-from-window) store + hub tile
 
 **Wave 3** *(06-04 after 06-01/02; 06-05 after 06-03)*
@@ -253,5 +253,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
-| 6. Apps & Clipboard | 1/7 | Executing — 06-01 contract layer done | - |
+| 6. Apps & Clipboard | 2/7 | In Progress|  |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |

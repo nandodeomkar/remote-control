@@ -43,9 +43,9 @@
 
 ### Apps
 
-- [ ] **APPS-01**: User sees running windows and can focus or close them
-- [ ] **APPS-02**: User can launch pinned favorite apps
-- [ ] **APPS-03**: App list stays current via server push (apps.changed)
+- [x] **APPS-01**: User sees running windows and can focus or close them
+- [x] **APPS-02**: User can launch pinned favorite apps
+- [x] **APPS-03**: App list stays current via server push (apps.changed)
 
 ### Clipboard
 

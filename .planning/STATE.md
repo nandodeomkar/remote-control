@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 06
-stopped_at: Completed 06-01-PLAN.md (Apps contract layer)
-last_updated: "2026-07-11T13:18:55.507Z"
+status: Ready to execute
+stopped_at: Completed 06-01-PLAN.md (Apps contract layer — protocol 1.2, apps.changed push seam)
+last_updated: "2026-07-11T13:55:48.692Z"
 last_activity: 2026-07-11 -- Completed 06-01 (Apps wire contract + apps.changed push seam)
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 43
-  completed_plans: 37
-  percent: 73
+  completed_plans: 38
+  percent: 71
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 06 (apps-clipboard) — EXECUTING
-Plan: 2 of 7
+Plan: 3 of 7
 Next: 06-02-PLAN.md (Apps thread + WinApps executor: real windows, Alt-Tab filter, icons, focus/close/launch) and 06-03 (Apps client screen). 06-01 delivered the contract layer these build against.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
@@ -95,6 +95,7 @@ Progress: [███████░░░] 73% (5 of 7 phases complete; 37 of 43
 | Phase 05 P06 | ~7min | 2 tasks | 5 files |
 | Phase 05 P07 | ~20min | 2 tasks | 5 files |
 | Phase 06 P01 | ~20min | 3 tasks | 12 files |
+| Phase 06 P02 | 25min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -197,6 +198,9 @@ Recent decisions affecting current work:
 - [Phase 06-01]: apps.changed has NO after-auth snapshot (unlike vol.changed) — the client pulls the initial list via apps.list on screen open, so the authed-gated select! branch is the SOLE apps-push site; the == AuthState::Authed guard is the T-06-01 privacy backstop (clone of the volume branch)
 - [Phase 06-01]: Apps::focus/close/launch return bool → router emits err{windowGone} (focus/close) / err{launchFailed} (launch) on false, silent on true; err msg strings are operator-facing prose that NEVER embed the HWND id or exe path (T-06-12), asserted in the FailingApps router test
 - [Phase 06-01]: A pending pre-auth apps watch change is delivered as the FIRST post-auth push once the authed-gated branch enables (after the D-03 vol snapshot) — used as the positive control in apps_no_push_preauth proving the pre-auth silence was the auth gate, not a dead channel
+- [Phase ?]: [Phase 06-02]: Apps enumeration runs on a dedicated OS thread (audio_thread clone) — EnumWindows Z-order + 5-point Alt-Tab filter (visible/titled/tool-app/owner-root/DWM-uncloaked); pure is_alt_tab_window predicate unit-tested without OS calls; list capped 50 + push_if_changed anti-flood (APPS-03)
+- [Phase ?]: [Phase 06-02]: Icon pipeline SHGetFileInfoW(by exe path, owned->DestroyIcon) with WM_GETICON/class-icon fallback(borrowed->kept) -> GetDIBits 32bpp BGRA -> RGBA -> png -> hand-rolled base64, cached by exe path; encodes the bitmap's ACTUAL dims (GetObjectW) since GetDIBits cannot rescale
+- [Phase ?]: [Phase 06-02]: WinApps validates focus/close ids against the current snapshot BEFORE sending (stale id -> false -> err{windowGone}); the apps thread's own IsWindow is the second-line same-tick-recycle guard (T-06-13 accept); UWP/ApplicationFrameHost/WindowsApps paths -> path=None (non-pinnable, focus/close still work)
 
 ### Pending Todos
 
@@ -230,6 +234,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T12:04:22.580Z
+Last session: 2026-07-11T13:54:41.347Z
 Stopped at: Completed 06-01-PLAN.md (Apps contract layer — protocol 1.2, apps.changed push seam)
 Resume file: .planning/phases/06-apps-clipboard/06-02-PLAN.md
