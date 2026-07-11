@@ -137,6 +137,15 @@ pub struct MediaPayload {
     pub value: Option<u8>,
 }
 
+/// `vol.changed` payload (S→C push, protoVersion 1.1, D-03): server volume
+/// state. BOTH fields required — a missing field is a hard decode error
+/// (fixture 03), unlike `media.value` which is conditionally required.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct VolChangedPayload {
+    pub value: u64,
+    pub muted: bool,
+}
+
 /// `power` payload (C→S): `"lock" | "sleep" | "restart" | "shutdown"`.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PowerPayload {
@@ -259,6 +268,7 @@ pub enum Msg {
     Key(KeyPayload),
     Text(TextPayload),
     Media(MediaPayload),
+    VolChanged(VolChangedPayload),
     Power(PowerPayload),
     Confirm(ConfirmPayload),
     AppsList(AppsListPayload),
@@ -308,6 +318,7 @@ pub fn decode_text(s: &str) -> Result<Decoded, CodecError> {
         "key" => Msg::Key(payload(p)?),
         "text" => Msg::Text(payload(p)?),
         "media" => Msg::Media(payload(p)?),
+        "vol.changed" => Msg::VolChanged(payload(p)?),
         "power" => Msg::Power(payload(p)?),
         "confirm" => Msg::Confirm(payload(p)?),
         "apps.list" => Msg::AppsList(payload(p)?),
@@ -373,6 +384,7 @@ pub fn encode_msg(msg: &Msg, seq: Option<u64>) -> String {
         Msg::Key(pl) => ("key", val(pl)),
         Msg::Text(pl) => ("text", val(pl)),
         Msg::Media(pl) => ("media", val(pl)),
+        Msg::VolChanged(pl) => ("vol.changed", val(pl)),
         Msg::Power(pl) => ("power", val(pl)),
         Msg::Confirm(pl) => ("confirm", val(pl)),
         Msg::AppsList(pl) => ("apps.list", val(pl)),

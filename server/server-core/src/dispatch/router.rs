@@ -253,6 +253,7 @@ pub fn route(
         | Msg::AuthFail(_)
         | Msg::AppsChanged(_)
         | Msg::ClipChanged(_)
+        | Msg::VolChanged(_)
         | Msg::Pong(_)
         | Msg::Err(_) => Vec::new(),
     }
