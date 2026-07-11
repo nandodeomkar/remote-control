@@ -1,8 +1,8 @@
 ---
 phase: 05-media-power-presenter-browser
 verified: 2026-07-11T06:38:28Z
-status: human_needed
-score: 5/5 must-haves verified (code layer); on-device confirmation pending
+status: passed
+score: 5/5 must-haves verified (code layer); on-device confirmation COMPLETE via 05-UAT.md (6/6 passed 2026-07-11)
 overrides_applied: 0
 human_verification:
   - test: "Media transport controls whatever is playing system-wide (MED-01, SC1)"
