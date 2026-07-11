@@ -23,14 +23,16 @@ void main() {
       'aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899';
 
   group('HandshakeFsm — start', () {
-    test('start emits hello(protoVersion 1.0, device) and awaits challenge',
+    test('start emits hello(current protoVersion, device) and awaits challenge',
         () {
       final fsm = HandshakeFsm();
       final out = fsm.start('Pixel');
 
       expect(out.emit, isA<HelloMsg>());
       final hello = out.emit! as HelloMsg;
-      expect(hello.protoVersion, '1.0');
+      // The CURRENT protocol version the client sends in hello — must track
+      // the remote_protocol constant, never a pinned literal (Pitfall 10).
+      expect(hello.protoVersion, protoVersion);
       expect(hello.device, 'Pixel');
       expect(fsm.state, HandshakeState.awaitingChallenge);
       expect(out.effect, isNull);
@@ -187,6 +189,8 @@ void main() {
       final fsm = HandshakeFsm();
       fsm.start('Pixel');
 
+      // '1.0' here pins HISTORICAL wire bytes of a hypothetical mismatched
+      // server's err payload — NOT the current client version (Pitfall 10).
       final out = fsm.receive(const ErrMsg(
         code: 'versionMismatch',
         msg: 'server speaks 1.0; client sent 2.0',

@@ -18,8 +18,9 @@ library;
 import 'package:remote_protocol/remote_protocol.dart';
 
 /// The client protocol version (SPEC section 2); only MAJOR is compared
-/// server-side.
-const String clientProtoVersion = '1.0';
+/// server-side. References the remote_protocol constant so a protocol
+/// minor bump (e.g. 1.1's vol.changed, D-03) never leaves a stale literal.
+const String clientProtoVersion = protoVersion;
 
 /// Handshake FSM states (SPEC section 3, client mirror of the server FSM).
 enum HandshakeState {

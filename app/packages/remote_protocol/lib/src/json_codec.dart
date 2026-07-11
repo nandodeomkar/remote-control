@@ -373,6 +373,30 @@ final class MediaMsg extends RemoteMessage {
       };
 }
 
+/// `vol.changed` (S→C push, protoVersion 1.1, D-03): server volume state.
+/// BOTH fields required — a missing field is a hard decode error (fixture
+/// 03), unlike `media.value` which is conditionally required.
+final class VolChangedMsg extends RemoteMessage {
+  /// Absolute volume 0-100.
+  final int value;
+
+  /// Whether the server output is muted.
+  final bool muted;
+
+  /// Creates a vol.changed message.
+  const VolChangedMsg({required this.value, required this.muted});
+
+  /// Decodes the `vol.changed` payload.
+  factory VolChangedMsg.fromPayload(Map<String, dynamic> p) => VolChangedMsg(
+      value: _req<int>(p, 'value'), muted: _req<bool>(p, 'muted'));
+
+  @override
+  String get t => 'vol.changed';
+
+  @override
+  Map<String, Object?> toPayload() => {'value': value, 'muted': muted};
+}
+
 /// `power` (C→S): requires follow-up `confirm`.
 final class PowerMsg extends RemoteMessage {
   /// `"lock" | "sleep" | "restart" | "shutdown"`.
@@ -752,6 +776,7 @@ final class UnknownMsg extends RemoteMessage {
     'key' => KeyMsg.fromPayload(p),
     'text' => TextMsg.fromPayload(p),
     'media' => MediaMsg.fromPayload(p),
+    'vol.changed' => VolChangedMsg.fromPayload(p),
     'power' => PowerMsg.fromPayload(p),
     'confirm' => ConfirmMsg.fromPayload(p),
     'apps.list' => AppsListMsg.fromPayload(p),

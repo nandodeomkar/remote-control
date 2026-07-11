@@ -5,10 +5,13 @@
 library;
 
 /// The full protocol version string carried in `hello`.
-const String protoVersion = '1.0';
+///
+/// 1.1 (D-03): adds the S→C `vol.changed {value, muted}` push — a minor
+/// bump; `"1.0"` peers remain fully interoperable (SPEC section 2).
+const String protoVersion = '1.1';
 
 /// Major protocol version — the only component peers compare.
 const int protoMajor = 1;
 
 /// Minor protocol version — informational; mismatches are accepted.
-const int protoMinor = 0;
+const int protoMinor = 1;

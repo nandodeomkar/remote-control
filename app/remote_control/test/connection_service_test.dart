@@ -367,6 +367,8 @@ void main() {
         guid: kGuid,
         name: 'OMKAR-LAPTOP',
         port: 17800,
+        // HISTORICAL wire pin: a '1.0' beacon must still be accepted —
+        // minor mismatch is fine per SPEC section 2 (Pitfall 10).
         proto: '1.0',
         source: InternetAddress('192.168.1.99'),
       ));
