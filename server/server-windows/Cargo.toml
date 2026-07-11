@@ -43,6 +43,10 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
     # FILE_FLAGS_AND_ATTRIBUTES — SHGetFileInfoW's dwFileAttributes param type (Flag 2)
     "Win32_Storage_FileSystem",
+    # ── Phase 6 (06-04) clip thread ──
+    # RegisterClipboardFormatW, IsClipboardFormatAvailable — sensitive-clip
+    # exclusion-format presence check (Flag 3 / CLIP-03)
+    "Win32_System_DataExchange",
 ] }
 tokio = { version = "1.52", features = ["rt-multi-thread", "net", "sync", "time", "macros"] }
 tracing = "0.1"
@@ -57,3 +61,10 @@ tauri-winrt-notification = "0.8"
 # Encode extracted 32x32 window icons to compact PNG for the wire (image-rs org,
 # audited T-06-SC); base64 is hand-rolled (pure fn) to keep the dep set minimal.
 png = "0.18"
+# Clipboard get/set on the dedicated clip thread (06-04, CLIP-01/02/03). Locked
+# by CLAUDE.md; 1Password lineage, audited T-06-SC. Must stay on one OS thread.
+arboard = "3.6"
+# Content-hash fingerprint for clip echo suppression (D-05). Same major as
+# server-core's token hashing — RustCrypto, already in tree (no new supply-chain
+# surface, T-06-SC).
+sha2 = "0.11"
