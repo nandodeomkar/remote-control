@@ -133,9 +133,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PWR-01 | Phase 5 | Complete |
 | PWR-02 | Phase 5 | Complete |
 | PWR-03 | Phase 5 | Complete |
-| APPS-01 | Phase 6 | Pending |
-| APPS-02 | Phase 6 | Pending |
-| APPS-03 | Phase 6 | Pending |
+| APPS-01 | Phase 6 | In progress (06-01 contract: bool actions → err{windowGone\|launchFailed}) |
+| APPS-02 | Phase 6 | In progress (06-01 contract: WindowInfo.icon/path, protocol 1.2) |
+| APPS-03 | Phase 6 | In progress (06-01 contract: apps.changed authed-gated push seam) |
 | CLIP-01 | Phase 6 | Pending |
 | CLIP-02 | Phase 6 | Pending |
 | CLIP-03 | Phase 6 | Pending |

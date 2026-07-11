@@ -204,7 +204,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 06-01-PLAN.md — Apps wire contract (WindowInfo icon/path, protocol 1.2) + apps.changed push seam
+- [x] 06-01-PLAN.md — Apps wire contract (WindowInfo icon/path, protocol 1.2) + apps.changed push seam
 
 **Wave 2** *(after 06-01)*
 
@@ -253,5 +253,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
-| 6. Apps & Clipboard | 0/7 | Planned — ready to execute | - |
+| 6. Apps & Clipboard | 1/7 | Executing — 06-01 contract layer done | - |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |

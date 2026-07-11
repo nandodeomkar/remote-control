@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 6 context gathered
-last_updated: "2026-07-11T08:08:46.151Z"
-last_activity: 2026-07-11 -- Phase 05 complete (UAT 6/6 + security pass); advanced to Phase 6
+status: Executing Phase 06
+stopped_at: Completed 06-01-PLAN.md (Apps contract layer)
+last_updated: "2026-07-11T13:18:55.507Z"
+last_activity: 2026-07-11 -- Completed 06-01 (Apps wire contract + apps.changed push seam)
 progress:
   total_phases: 7
   completed_phases: 5
-  total_plans: 36
-  completed_plans: 36
-  percent: 71
+  total_plans: 43
+  completed_plans: 37
+  percent: 73
 ---
 
 # Project State
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 6 — Apps & Clipboard
+**Current focus:** Phase 06 — apps-clipboard
 
 ## Current Position
 
-Phase: 6 (apps-&-clipboard) — Ready to plan
-Plan: Not started
-Next: Phase 06 (Apps & Clipboard) — window/app management with live server push + bidirectional clipboard with history and loop-safe auto-sync. Start with /gsd-discuss-phase 6 or /gsd-plan-phase 6.
+Phase: 06 (apps-clipboard) — EXECUTING
+Plan: 2 of 7
+Next: 06-02-PLAN.md (Apps thread + WinApps executor: real windows, Alt-Tab filter, icons, focus/close/launch) and 06-03 (Apps client screen). 06-01 delivered the contract layer these build against.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -36,9 +36,9 @@ Next: Phase 06 (Apps & Clipboard) — window/app management with live server pus
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-11 -- Phase 05 complete (UAT 6/6 + security pass); advanced to Phase 6
+Last activity: 2026-07-11 -- Completed 06-01 (Apps wire contract + apps.changed push seam)
 
-Progress: [███████░░░] 71% (5 of 7 phases complete)
+Progress: [███████░░░] 73% (5 of 7 phases complete; 37 of 43 plans)
 
 ## Performance Metrics
 
@@ -94,6 +94,7 @@ Progress: [███████░░░] 71% (5 of 7 phases complete)
 | Phase 05 P05 | 12min | 3 tasks | 8 files |
 | Phase 05 P06 | ~7min | 2 tasks | 5 files |
 | Phase 05 P07 | ~20min | 2 tasks | 5 files |
+| Phase 06 P01 | ~20min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -192,6 +193,10 @@ Recent decisions affecting current work:
 - [Phase 05-06]: Power hub tile (Icons.power_settings_new) inserted between Trackpad and Presenter → order Trackpad, Power, Presenter, Browser; the bare-grid hub test surface was enlarged to 800x1400 for the 4th tile (production HubScreen scrolls the grid)
 - [Phase 05-07]: VolumeSliderPolicy is a pure clock-injected D-04 finger-wins policy — leading-edge kSetvolThrottleMs=50 throttle, dragStart resets throttle bookkeeping so each fresh drag's first update sends, dragEnd flushes final iff it differs from last sent ([10,30] no-dup / [10,30,45] throttled-tail both unit-proven), unauthed drops-never-queues (Pitfall 12); injected seams are public fields per presenter_timer convention
 - [Phase 05-07]: VolChangedMsg parks a value-equal VolumeSnapshot on ConnectionService (branch after PongMsg, before driver routing, no payload logged) → changes ping → VolumeNotifier (cloned from ConnectionStatusNotifier); Media screen renders slider + mute from the pushed snapshot only (mute has NO optimistic flip, follows next push); Media hub tile (Icons.music_note) inserted ahead of Power → FINAL 5-tile order Trackpad, Media, Power, Presenter, Browser (D-01 complete)
+- [Phase 06-01]: WindowInfo.icon/path are additive Option<String> with serde default + skip_serializing_if (mirrors the Phase-5 1.1 vol amendment) → legacy windows still decode and re-encode without the keys, Eq derive preserved; SERVER_PROTO_VERSION 1.1→1.2 (additive minor, 1.0/1.1 clients accepted) and the shared beacon fixture proto bumped in lockstep (D-09 single source of truth)
+- [Phase 06-01]: apps.changed has NO after-auth snapshot (unlike vol.changed) — the client pulls the initial list via apps.list on screen open, so the authed-gated select! branch is the SOLE apps-push site; the == AuthState::Authed guard is the T-06-01 privacy backstop (clone of the volume branch)
+- [Phase 06-01]: Apps::focus/close/launch return bool → router emits err{windowGone} (focus/close) / err{launchFailed} (launch) on false, silent on true; err msg strings are operator-facing prose that NEVER embed the HWND id or exe path (T-06-12), asserted in the FailingApps router test
+- [Phase 06-01]: A pending pre-auth apps watch change is delivered as the FIRST post-auth push once the authed-gated branch enables (after the D-03 vol snapshot) — used as the positive control in apps_no_push_preauth proving the pre-auth silence was the auth gate, not a dead channel
 
 ### Pending Todos
 
@@ -225,6 +230,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T08:08:46.140Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-apps-clipboard/06-CONTEXT.md
+Last session: 2026-07-11T12:04:22.580Z
+Stopped at: Completed 06-01-PLAN.md (Apps contract layer — protocol 1.2, apps.changed push seam)
+Resume file: .planning/phases/06-apps-clipboard/06-02-PLAN.md
