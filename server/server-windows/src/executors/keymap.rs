@@ -124,8 +124,13 @@ pub fn map_key(code: &KeyCode) -> Option<Key> {
         "ShiftLeft" => Key::Shift,
         "WinLeft" => Key::Meta,
         // ── Router browser/present macro codes (Phase-1 tables via key_tap).
-        // Letters/signs ride Key::Unicode: enigo resolves the layout VK via
-        // VkKeyScanW so Ctrl+T / Ctrl+W / Ctrl+Plus chord correctly.
+        // Letters ride Key::Unicode: enigo resolves the layout VK via
+        // VkKeyScanW so Ctrl+T / Ctrl+W chord correctly. The wire code "Plus"
+        // deliberately resolves to '=' (unshifted), NOT '+', because on a US
+        // layout '+' is Shift+'=' and enigo's VkKeyScanW('+') = 0x01BB
+        // shift-flag path yields a zero scancode and drops the tap (RESEARCH
+        // Pitfall 11); Ctrl+'=' is the universal browser zoom-in chord
+        // (Chrome/Edge/Firefox).
         "BrowserBack" => Key::BrowserBack,
         "BrowserForward" => Key::BrowserForward,
         // ── Media transport keys (MED-01): VK_MEDIA_* route system-wide via
@@ -136,7 +141,7 @@ pub fn map_key(code: &KeyCode) -> Option<Key> {
         "T" => Key::Unicode('t'),
         "W" => Key::Unicode('w'),
         "B" => Key::Unicode('b'),
-        "Plus" => Key::Unicode('+'),
+        "Plus" => Key::Unicode('='),
         "Minus" => Key::Unicode('-'),
         _ => return None, // unknown code → silent drop (T-04-02)
     })
