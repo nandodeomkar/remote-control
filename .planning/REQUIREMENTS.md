@@ -49,10 +49,10 @@
 
 ### Clipboard
 
-- [ ] **CLIP-01**: User can send phone clipboard to PC
-- [ ] **CLIP-02**: User can fetch PC clipboard to phone
+- [x] **CLIP-01**: User can send phone clipboard to PC
+- [x] **CLIP-02**: User can fetch PC clipboard to phone
 - [ ] **CLIP-03**: Auto-sync works within platform limits — PC→phone pushed live, phone→PC synced on app resume (Android 10+ restriction), echo suppression via content hash
-- [ ] **CLIP-04**: User sees last-5 clipboard history
+- [x] **CLIP-04**: User sees last-5 clipboard history
 
 ### Presenter
 
@@ -136,10 +136,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | APPS-01 | Phase 6 | Code complete (06-01 contract + 06-02 WinApps + 06-03 client: focus/close + err→toast); on-device UAT 06-07 |
 | APPS-02 | Phase 6 | Code complete (06-03 client: pin-from-window favorites, relaunch by server path); on-device UAT 06-07 |
 | APPS-03 | Phase 6 | Code complete (06-03 client: live apps.changed refresh, no manual refresh); on-device UAT 06-07 |
-| CLIP-01 | Phase 6 | Pending |
-| CLIP-02 | Phase 6 | Pending |
+| CLIP-01 | Phase 6 | Complete |
+| CLIP-02 | Phase 6 | Complete |
 | CLIP-03 | Phase 6 | Pending |
-| CLIP-04 | Phase 6 | Pending |
+| CLIP-04 | Phase 6 | Complete |
 | PRES-01 | Phase 5 | Complete |
 | PRES-02 | Phase 5 | Complete |
 | BROW-01 | Phase 5 | Complete |

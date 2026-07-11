@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 06-04-PLAN.md (Clipboard send/fetch — clip thread + WinClipboard + clip.changed seam + sensitive/echo skip)
-last_updated: "2026-07-11T18:20:31.000Z"
-last_activity: 2026-07-11 -- Completed 06-04 (clip thread + WinClipboard + clip.changed authed-gated seam; sensitive/16 KiB/echo skip; StubClipboard removed, stubs.rs deleted)
+stopped_at: "Completed 06-05-PLAN.md (Clipboard client: Send/Fetch + last-5 history + hub tile)"
+last_updated: "2026-07-11T18:38:15.230Z"
+last_activity: 2026-07-11 -- Completed 06-04 (clip thread + WinClipboard + clip.changed authed-gated seam; StubClipboard removed)
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 43
   completed_plans: 41
-  percent: 74
+  percent: 71
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 06 (apps-clipboard) — EXECUTING
-Plan: 5 of 7
+Plan: 6 of 7
 Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
@@ -98,6 +98,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 06 P02 | 25min | 3 tasks | 7 files |
 | Phase 06 P03 | ~30min | 3 tasks | 8 files |
 | Phase 06 P04 | ~30min | 3 tasks | 11 files |
+| Phase 06 P05 | ~30min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -211,6 +212,8 @@ Recent decisions affecting current work:
 - [Phase 06-04]: ClipCmd::Set NEVER pushes to the watch — the clip thread writes arboard + records the set fingerprint, and the next poll's read-back is echo-suppressed when its sha2 fingerprint matches (Pitfall 5, D-05). Consequence (plan-mandated): WinClipboard::get() returns the last EXTERNAL mirrored value, not the just-set value (harmless — the phone already holds what it set)
 - [Phase 06-04]: Sensitive-clip skip is fail-open — a 0 exclude_id (RegisterClipboardFormatW failure) or a source app that sets no ExcludeClipboardContentFromMonitorProcessing format is treated non-sensitive (RESEARCH A3 residual risk); >16 KiB skip uses String::len() UTF-8 bytes with > 16384 (exactly 16 KiB allowed). No CoInitializeEx on the clip thread (arboard needs no COM, unlike the audio thread)
 - [Phase 06-04]: StubClipboard removed + stubs.rs deleted — all five server_core executor traits (MouseKeys/Media/Power/Apps/Clipboard) now have real Windows backends
+- [Phase 06]: [Phase 06-05]: clipFetchReply stays a String? getter but is identity-tracked by ClipNotifier — each clip.set reply decodes to a fresh String, so an unrelated changes ping (identical reference) is never consumed as a Fetch reply; no seq/counter added
+- [Phase 06]: [Phase 06-05]: HistoryStore.record does move-to-head dedupe (remove existing equal, prepend, cap 5) — the only design satisfying BOTH consecutive dedupe AND reuse-moves-to-head (D-06); clipTextTooLarge caps on UTF-8 BYTES not code units (T-06-16b); Clipboard hub tile after Apps -> Trackpad, Media, Apps, Clipboard, Power, Presenter, Browser
 
 ### Pending Todos
 
@@ -244,6 +247,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T18:20:31.000Z
-Stopped at: Completed 06-04-PLAN.md (Clipboard send/fetch — clip thread + WinClipboard + clip.changed seam + sensitive/echo skip)
-Resume file: .planning/phases/06-apps-clipboard/06-05-PLAN.md
+Last session: 2026-07-11T18:38:03.563Z
+Stopped at: Completed 06-05-PLAN.md (Clipboard client: Send/Fetch + last-5 history + hub tile)
+Resume file: .planning/phases/06-apps-clipboard/06-06-PLAN.md
