@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 06-03-PLAN.md (Apps client screen — favorites grid + open-windows list + hub tile)
-last_updated: "2026-07-11T14:30:00.000Z"
-last_activity: 2026-07-11 -- Completed 06-03 (Apps client: WindowInfo mirror, AppsSnapshot/err arms, favorites store, Apps screen + hub tile)
+stopped_at: Completed 06-04-PLAN.md (Clipboard send/fetch — clip thread + WinClipboard + clip.changed seam + sensitive/echo skip)
+last_updated: "2026-07-11T18:20:31.000Z"
+last_activity: 2026-07-11 -- Completed 06-04 (clip thread + WinClipboard + clip.changed authed-gated seam; sensitive/16 KiB/echo skip; StubClipboard removed, stubs.rs deleted)
 progress:
   total_phases: 7
   completed_phases: 5
   total_plans: 43
-  completed_plans: 40
+  completed_plans: 41
   percent: 74
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 06 (apps-clipboard) — EXECUTING
-Plan: 4 of 7
-Next: 06-04-PLAN.md (Clipboard send/fetch: clip thread + WinClipboard + clip.changed seam) and 06-05 (Clipboard client). The Apps track (06-01 contract + 06-02 WinApps + 06-03 client) is code-complete; on-device UAT is 06-07.
+Plan: 5 of 7
+Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -36,9 +36,9 @@ Next: 06-04-PLAN.md (Clipboard send/fetch: clip thread + WinClipboard + clip.cha
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-11 -- Completed 06-03 (Apps client screen + favorites store + hub tile)
+Last activity: 2026-07-11 -- Completed 06-04 (clip thread + WinClipboard + clip.changed authed-gated seam; StubClipboard removed)
 
-Progress: [███████░░░] 74% (5 of 7 phases complete; 40 of 43 plans)
+Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43 plans)
 
 ## Performance Metrics
 
@@ -97,6 +97,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 40 of 43
 | Phase 06 P01 | ~20min | 3 tasks | 12 files |
 | Phase 06 P02 | 25min | 3 tasks | 7 files |
 | Phase 06 P03 | ~30min | 3 tasks | 8 files |
+| Phase 06 P04 | ~30min | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -206,6 +207,10 @@ Recent decisions affecting current work:
 - [Phase 06-03]: AppsSnapshot/AppsViewState equality is hand-rolled element-wise — no package:collection dependency added (not a direct dep; T-06-SC no-new-packages held); FavoritesStore.load returns a GROWABLE list (never const []) so pin/unpin mutate in place (bug caught by the RED suite)
 - [Phase 06-03]: FavoritesStore (PrefsKv key apps.favorites, non-secret D-02) pins ONLY a running window's server-resolved WindowInfo.path (T-06-04, no manual-path field), rejects UWP path==null (Flag 1), dedupes by path, corruption-tolerant; Apps screen surfaces err toasts off the raw service.changes stream (identity-tracked) because the value-equal view never rebuilds on an err park
 - [Phase 06-03]: Apps hub tile (Icons.apps) inserted after Media, before Power -> order Trackpad, Media, Apps, Power, Presenter, Browser (06-UI-SPEC placement)
+- [Phase 06-04]: clip.changed has NO after-auth snapshot AND no unconditional snapshot analog (volume drains one even at default) — the PC clipboard is never dumped implicitly; a freshly-authed phone gets nothing until a real external change, pulling current value via clip.get (Pitfall 8 / T-06-05). Tested by leaving the watch at default and asserting silence (contrast with the drained vol snapshot)
+- [Phase 06-04]: ClipCmd::Set NEVER pushes to the watch — the clip thread writes arboard + records the set fingerprint, and the next poll's read-back is echo-suppressed when its sha2 fingerprint matches (Pitfall 5, D-05). Consequence (plan-mandated): WinClipboard::get() returns the last EXTERNAL mirrored value, not the just-set value (harmless — the phone already holds what it set)
+- [Phase 06-04]: Sensitive-clip skip is fail-open — a 0 exclude_id (RegisterClipboardFormatW failure) or a source app that sets no ExcludeClipboardContentFromMonitorProcessing format is treated non-sensitive (RESEARCH A3 residual risk); >16 KiB skip uses String::len() UTF-8 bytes with > 16384 (exactly 16 KiB allowed). No CoInitializeEx on the clip thread (arboard needs no COM, unlike the audio thread)
+- [Phase 06-04]: StubClipboard removed + stubs.rs deleted — all five server_core executor traits (MouseKeys/Media/Power/Apps/Clipboard) now have real Windows backends
 
 ### Pending Todos
 
@@ -239,6 +244,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T14:30:00.000Z
-Stopped at: Completed 06-03-PLAN.md (Apps client screen — favorites grid + open-windows list + hub tile)
-Resume file: .planning/phases/06-apps-clipboard/06-04-PLAN.md
+Last session: 2026-07-11T18:20:31.000Z
+Stopped at: Completed 06-04-PLAN.md (Clipboard send/fetch — clip thread + WinClipboard + clip.changed seam + sensitive/echo skip)
+Resume file: .planning/phases/06-apps-clipboard/06-05-PLAN.md
