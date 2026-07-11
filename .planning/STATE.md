@@ -35,7 +35,7 @@ Next: Phase 05 end-of-phase on-device manual gate (05-VALIDATION Manual-Only: SC
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-11 -- Completed 05-06 (power control slice)
+Last activity: 2026-07-11 -- Completed quick task 260711-huz (browser zoom-in keymap fix; Google Slides presenter limitation documented)
 
 Progress: [██████░░░░] 57% (4 of 7 phases complete)
 
@@ -204,12 +204,14 @@ Recent decisions affecting current work:
 - [Phase 3 — RESOLVED 2026-07-08]: Android UDP broadcast reception CONFIRMED on the owner's Xiaomi 25080RABDI (Android 16 / HyperOS) at the 03-04 early on-device checkpoint — beacons listed within seconds, continuous 2s-interval reception, no MulticastLock failure, no OEM filtering. Cleartext ws:// also proven under the new network_security_config. See 03-04-SUMMARY.md.
 - [Phase 6]: apps.focus foreground-lock workarounds and EnumWindows filtering flagged as highest-fiddliness area — research recommends a phase-level spike during planning
 - [Phase 2 — RESOLVED 2026-07-08]: Hard transport gate PASSED on-device (p50 = 6ms, p95 = 10ms on real WiFi, all four PAD-05 criteria). TCP_NODELAY empirical verification also resolved — sub-6ms p50 under continuous load with no traffic-pattern-dependent hitching. UDP-channel reconsideration NOT triggered. See 02-04-GATE-RESULT.md.
+- [Phase 05 — KNOWN LIMITATION]: The presenter "start show" macro sends F5, which starts the slideshow in the PowerPoint desktop app (the locked SC4 target — works) but reloads the page in a web browser. Google Slides' present shortcut is Ctrl+F5, so starting a show from web Google Slides is out of scope for v1. This is a known limitation, not a bug — PowerPoint desktop is the supported presenter surface. (from quick task 260711-huz)
 
 ### Quick Tasks Completed
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260708-ejx | Fix WR-01 — pairing window re-pair loop | 2026-07-08 | 54cfcff | [260708-ejx-fix-wr-01-pairing-window-re-pair-loop](./quick/260708-ejx-fix-wr-01-pairing-window-re-pair-loop/) |
+| 260711-huz | Fix browser zoom-in keymap (Plus → '=') + doc Google Slides presenter limitation | 2026-07-11 | b27f617 | [260711-huz-fix-browser-zoom-in-keymap-plus-document](./quick/260711-huz-fix-browser-zoom-in-keymap-plus-document/) |
 
 ## Deferred Items
 
