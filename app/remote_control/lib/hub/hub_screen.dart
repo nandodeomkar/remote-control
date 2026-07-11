@@ -31,6 +31,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../browser/browser_screen.dart';
+import '../media/media_screen.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
 import '../power/power_screen.dart';
@@ -73,9 +74,14 @@ final List<HubTileSpec> kHubTiles = [
     icon: Icons.touch_app,
     builder: (_) => const TrackpadScreen(),
   ),
-  // 05-06: Power sits ahead of Presenter (the final phase reading order is
-  // Trackpad, Media, Power, Presenter, Browser once 05-07 inserts Media ahead
-  // of Power).
+  // 05-07: Media inserted ahead of Power — the final UI-SPEC reading order is
+  // now Trackpad, Media, Power, Presenter, Browser (D-01 complete at 5 tiles).
+  HubTileSpec(
+    label: 'Media',
+    icon: Icons.music_note,
+    builder: (_) => const MediaScreen(),
+  ),
+  // 05-06: Power sits between Media and Presenter.
   HubTileSpec(
     label: 'Power',
     icon: Icons.power_settings_new,

@@ -40,11 +40,16 @@ const int kSetvolThrottleMs = 50;
 ///
 /// State: [value] (0..100), [muted], [hasSnapshot] (a push has landed at least
 /// once), [dragging]. All mutation goes through the event methods; the injected
-/// [_send] is invoked only for authed `setvol` emissions.
+/// [send] is invoked only for authed `setvol` emissions.
 class VolumeSliderPolicy {
-  final int Function() _nowMillis;
-  final bool Function() _isAuthed;
-  final void Function(int value) _send;
+  /// Throttle clock (millis since epoch).
+  final int Function() nowMillis;
+
+  /// Auth gate — every send is dropped (never queued) while this returns false.
+  final bool Function() isAuthed;
+
+  /// Emits a clamped `setvol` value.
+  final void Function(int value) send;
 
   /// The current slider value (0..100). During a drag this is the finger
   /// position; otherwise the last authoritative push.
@@ -69,12 +74,10 @@ class VolumeSliderPolicy {
   /// every send (drop-never-queue when false), [send] emits a clamped setvol
   /// value.
   VolumeSliderPolicy({
-    required int Function() nowMillis,
-    required bool Function() isAuthed,
-    required void Function(int value) send,
-  })  : _nowMillis = nowMillis,
-        _isAuthed = isAuthed,
-        _send = send;
+    required this.nowMillis,
+    required this.isAuthed,
+    required this.send,
+  });
 
   /// A `vol.changed` push. Ignored WHOLE while dragging (the finger wins,
   /// D-04); otherwise value + mute are authoritative and [hasSnapshot] latches.
@@ -100,9 +103,9 @@ class VolumeSliderPolicy {
   void dragUpdate(int newValue) {
     final v = _clamp(newValue);
     value = v;
-    if (!_isAuthed()) return; // Pitfall 12: drop, never queue
+    if (!isAuthed()) return; // Pitfall 12: drop, never queue
     _pendingValue = v;
-    final now = _nowMillis();
+    final now = nowMillis();
     if (_lastSentAt == null || now - _lastSentAt! >= kSetvolThrottleMs) {
       _emit(v, now);
     }
@@ -114,14 +117,14 @@ class VolumeSliderPolicy {
     dragging = false;
     final pending = _pendingValue;
     _pendingValue = null;
-    if (!_isAuthed()) return; // drop, never queue
+    if (!isAuthed()) return; // drop, never queue
     if (pending != null && pending != _lastSentValue) {
-      _emit(pending, _nowMillis());
+      _emit(pending, nowMillis());
     }
   }
 
   void _emit(int v, int now) {
-    _send(v);
+    send(v);
     _lastSentValue = v;
     _lastSentAt = now;
   }
