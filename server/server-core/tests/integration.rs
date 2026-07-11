@@ -27,7 +27,7 @@ use server_core::auth::challenge::auth_proof;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
 use server_core::executors::{Button, KeyCode, WindowInfo};
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
-use server_core::transport::{SERVER_PROTO_VERSION, ServerDeps, VolumeState};
+use server_core::transport::{ClipState, SERVER_PROTO_VERSION, ServerDeps, VolumeState};
 
 /// Every recv (and the connect) is wrapped in this timeout so a silent
 /// server fails the test in seconds, never hangs it.
@@ -76,12 +76,15 @@ async fn walking_skeleton_pair_auth_input() {
     let (_volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
     // Same discipline for the apps watch (APPS-03): keep the sender alive.
     let (_apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
+    // Same discipline for the clip watch (CLIP-03): keep the sender alive.
+    let (_clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
         pause: pause_rx,
         volume: volume_rx,
         apps: apps_rx,
+        clip: clip_rx,
     };
 
     let (addr, _server) = spawn_test_server(deps).await;
@@ -174,6 +177,9 @@ struct Harness {
     /// Test-owned producer end of the apps watch (APPS-03): the apps_ suite
     /// drives `apps.changed` pushes through it.
     apps_tx: tokio::sync::watch::Sender<Vec<WindowInfo>>,
+    /// Test-owned producer end of the clip watch (CLIP-03): the clip_ suite
+    /// drives `clip.changed` pushes through it.
+    clip_tx: tokio::sync::watch::Sender<ClipState>,
     _server: tokio::task::JoinHandle<()>,
 }
 
@@ -183,15 +189,17 @@ async fn start_server() -> Harness {
     let (pause_tx, pause_rx) = tokio::sync::watch::channel(false);
     let (volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
     let (apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
+    let (clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
         pause: pause_rx,
         volume: volume_rx,
         apps: apps_rx,
+        clip: clip_rx,
     };
     let (addr, server) = spawn_test_server(deps).await;
-    Harness { addr, log, auth, pause_tx, volume_tx, apps_tx, _server: server }
+    Harness { addr, log, auth, pause_tx, volume_tx, apps_tx, clip_tx, _server: server }
 }
 
 async fn connect(addr: SocketAddr) -> WsClient {
@@ -690,6 +698,17 @@ async fn recv_vol_changed(ws: &mut WsClient) -> (u64, bool) {
     )
 }
 
+/// Receive the next frame, requiring a `clip.changed` push; returns the
+/// clipboard text.
+async fn recv_clip_changed(ws: &mut WsClient) -> String {
+    let v = recv_json(ws).await;
+    assert_eq!(v["t"], "clip.changed", "expected a clip.changed push, got: {v}");
+    v["p"]["text"]
+        .as_str()
+        .expect("clip.changed must carry p.text")
+        .to_string()
+}
+
 /// Receive the next frame, requiring an `apps.changed` push; returns the
 /// `windows` JSON array for field-level assertions.
 async fn recv_apps_changed(ws: &mut WsClient) -> Vec<Value> {
@@ -899,4 +918,89 @@ async fn apps_changed_after_auth() {
 
     // Exactly one: no duplicate push on the same state.
     assert_no_frame(&mut ws, "duplicate apps.changed after a single change").await;
+}
+
+// ──────────────── clip.changed push gating (CLIP-03) ───────────────────
+
+/// T-06-05 / RESEARCH Pitfall 8: a clipboard change while the session is
+/// still pre-auth must push NOTHING to the unauthenticated peer. Positive
+/// control on the SAME connection: once paired, the pending pre-auth change
+/// is delivered via the now-enabled clip branch (after the D-03 vol snapshot)
+/// — proving the silence above was the auth gate, not a dead channel.
+#[tokio::test]
+async fn clip_no_push_preauth() {
+    let h = start_server().await;
+    let pin = h.auth.lock().unwrap().begin_pairing();
+
+    let mut ws = connect(h.addr).await;
+    let _nonce = hello_challenge(&mut ws).await; // state: AwaitingAuth
+
+    // Clipboard changes while unauthed → total silence.
+    h.clip_tx
+        .send(ClipState { text: "secret-preauth".into() })
+        .expect("clip watch alive");
+    assert_no_frame(&mut ws, "clip.changed leaked to an unauthed session").await;
+
+    // Positive control: pair on the SAME connection → pairOk, then the D-03
+    // vol.changed snapshot, then the pending clip change fires.
+    send_json(&mut ws, json!({"t": "pin", "seq": 2, "p": {"pin": pin}})).await;
+    let pair_ok = recv_json(&mut ws).await;
+    assert_eq!(
+        pair_ok["t"], "pairOk",
+        "expected pairOk after correct pin, got: {pair_ok}"
+    );
+    let _snapshot = recv_vol_changed(&mut ws).await; // D-03 vol snapshot
+    let text = recv_clip_changed(&mut ws).await;
+    assert_eq!(
+        text, "secret-preauth",
+        "post-auth push must carry the clip set while unauthed"
+    );
+}
+
+/// CLIP-03 live push: once authed (snapshot drained), a clipboard change
+/// produces exactly one clip.changed frame carrying the new text.
+#[tokio::test]
+async fn clip_changed_after_auth() {
+    let h = start_server().await;
+    let mut ws = authed_client(&h).await; // drains the D-03 vol snapshot
+
+    // A clipboard change now produces exactly one clip.changed.
+    h.clip_tx
+        .send(ClipState { text: "hello from PC".into() })
+        .expect("clip watch alive");
+    let text = recv_clip_changed(&mut ws).await;
+    assert_eq!(text, "hello from PC", "push must carry the new clip text");
+
+    // Exactly one: no duplicate push on the same state.
+    assert_no_frame(&mut ws, "duplicate clip.changed after a single change").await;
+}
+
+/// T-06-05 / RESEARCH Pitfall 8 — the privacy contract that distinguishes
+/// clip from volume. Volume emits an UNCONDITIONAL after-auth snapshot: even
+/// with the watch at its default/unchanged value, `authed_client` drains one
+/// vol.changed at the transition. Clip must emit NO such snapshot: with the
+/// clip watch never changed, a freshly-authed client receives NOTHING at the
+/// transition — the PC clipboard is never dumped implicitly. Only a REAL
+/// change thereafter pushes (proving the silence was the no-snapshot policy,
+/// not a dead channel). The client pulls the current value via `clip.get`.
+#[tokio::test]
+async fn clip_no_snapshot_after_auth() {
+    let h = start_server().await;
+
+    // Auth with the clip watch left at its default (NEVER sent): the volume
+    // branch still delivers its unconditional snapshot (drained inside
+    // authed_client), but the clip branch has no analog.
+    let mut ws = authed_client(&h).await; // drains ONLY the D-03 vol snapshot
+
+    // No after-auth clip snapshot at the transition — the whole point of the
+    // Pitfall-8 privacy contract (volume just sent one; clip sends nothing).
+    assert_no_frame(&mut ws, "clip snapshot leaked at the auth transition (privacy)").await;
+
+    // A subsequent real change still pushes — proving the silence above was
+    // the no-snapshot policy, not a dead channel.
+    h.clip_tx
+        .send(ClipState { text: "fresh-change".into() })
+        .expect("clip watch alive");
+    let text = recv_clip_changed(&mut ws).await;
+    assert_eq!(text, "fresh-change", "a real post-auth change must still push");
 }

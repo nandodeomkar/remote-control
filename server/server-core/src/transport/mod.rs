@@ -37,6 +37,23 @@ pub struct VolumeState {
     pub muted: bool,
 }
 
+/// Server-side clipboard text pushed to authed sessions as `clip.changed`
+/// (CLIP-03). Core-owned plain data — ZERO OS deps, so server-core keeps
+/// compiling on CI Linux; the Windows clip thread (06-04) is merely a
+/// producer on the other end of the watch channel.
+///
+/// Unlike [`VolumeState`] there is DELIBERATELY no after-auth snapshot:
+/// dumping the PC clipboard to every connecting phone is a privacy leak
+/// (RESEARCH Pitfall 8). Clip is pull-only (`clip.get`) plus change-push,
+/// and sensitive/oversized clips are skipped by the producer BEFORE they
+/// ever reach this state. Not `Copy` (owns a `String`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct ClipState {
+    /// The current PC clipboard text (already filtered by the producer:
+    /// sensitive and >16 KiB clips never enter this snapshot).
+    pub text: String,
+}
+
 /// Everything the transport needs, injected by the composition root (the
 /// Phase-2 binary, or a test).
 ///
@@ -59,6 +76,14 @@ pub struct ServerDeps {
     /// all `String`s), so server-core keeps compiling on CI Linux; the
     /// Windows apps thread (06-02) is merely a producer on the other end.
     pub apps: tokio::sync::watch::Receiver<Vec<WindowInfo>>,
+    /// Latest PC clipboard text (CLIP-03): authed sessions receive a
+    /// `clip.changed` push on every change. Unlike volume there is NO
+    /// after-auth snapshot — dumping the PC clipboard to a connecting phone
+    /// is a privacy leak (RESEARCH Pitfall 8); the client pulls the current
+    /// value via `clip.get`. The producer (06-04 clip thread) skips
+    /// sensitive/oversized clips before they reach this watch, so a push is
+    /// always a policy-clean text change.
+    pub clip: tokio::sync::watch::Receiver<ClipState>,
 }
 
 /// Run the accept loop on an already-bound listener until the task is

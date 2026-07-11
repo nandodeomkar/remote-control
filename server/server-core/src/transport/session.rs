@@ -29,10 +29,10 @@ use tokio_tungstenite::tungstenite::Message;
 
 use crate::auth::AuthManager;
 use crate::auth::pin::PinOutcome;
-use super::VolumeState;
+use super::{ClipState, VolumeState};
 use crate::codec::json::{
-    AppsChangedPayload, AuthFailPayload, AuthOkPayload, ChallengePayload, ErrPayload, Msg,
-    PairOkPayload, VolChangedPayload,
+    AppsChangedPayload, AuthFailPayload, AuthOkPayload, ChallengePayload, ClipChangedPayload,
+    ErrPayload, Msg, PairOkPayload, VolChangedPayload,
 };
 use crate::codec::{binary, json};
 use crate::dispatch::AuthState;
@@ -87,6 +87,7 @@ pub(super) async fn run_session(
     mut pause: watch::Receiver<bool>,
     mut volume: watch::Receiver<VolumeState>,
     mut apps: watch::Receiver<Vec<WindowInfo>>,
+    mut clip: watch::Receiver<ClipState>,
 ) {
     let (mut sink, mut stream) = ws.split();
 
@@ -121,6 +122,9 @@ pub(super) async fn run_session(
     // Same discipline for the apps watch (APPS-03): producer dropped →
     // disable the branch, never busy-loop.
     let mut apps_alive = true;
+    // Same discipline for the clip watch (CLIP-03): producer dropped →
+    // disable the branch, never busy-loop.
+    let mut clip_alive = true;
     // Last time ANY inbound bytes arrived from the peer; drives the
     // liveness deadline branch below.
     let mut last_inbound = Instant::now();
@@ -194,6 +198,28 @@ pub(super) async fn run_session(
                         }
                     }
                     Err(_) => apps_alive = false,
+                }
+            }
+            // CLIP-03 live push, authed-gated: identical privacy backstop to
+            // the volume/apps branches (threat T-06-05 / RESEARCH Pitfall 8) —
+            // the PC clipboard must never cross to an unauthed socket. watch is
+            // latest-value-only (no backlog flood). Like apps — and UNLIKE
+            // volume — there is NO after-auth snapshot: dumping the PC
+            // clipboard to a connecting phone is a privacy leak (Pitfall 8), so
+            // this branch is the ONLY clip push site. The client pulls the
+            // current value via `clip.get`. The producer already skips
+            // sensitive/oversized/echo clips before they reach this watch.
+            changed = clip.changed(), if clip_alive && ctx.auth_state == AuthState::Authed => {
+                match changed {
+                    Ok(()) => {
+                        // ClipState owns a String (not Copy): clone the
+                        // borrowed snapshot. borrow_and_update clears the flag.
+                        let text = clip.borrow_and_update().text.clone();
+                        if tx.send(clip_changed_frame(text)).await.is_err() {
+                            break 'read; // write task gone → session over
+                        }
+                    }
+                    Err(_) => clip_alive = false,
                 }
             }
             incoming = stream.next() => {
@@ -449,6 +475,17 @@ fn vol_changed_frame(state: VolumeState) -> Message {
 fn apps_changed_frame(windows: Vec<WindowInfo>) -> Message {
     Message::text(json::encode_msg(
         &Msg::AppsChanged(AppsChangedPayload { windows }),
+        None,
+    ))
+}
+
+/// Encode one `clip.changed` push frame (S→C, protoVersion 1.2, CLIP-03)
+/// from the core-owned clipboard text. The sole clip-push encoder — no
+/// after-auth snapshot analog (the client pulls via `clip.get`; dumping the
+/// clipboard at auth would be a privacy leak, RESEARCH Pitfall 8).
+fn clip_changed_frame(text: String) -> Message {
+    Message::text(json::encode_msg(
+        &Msg::ClipChanged(ClipChangedPayload { text }),
         None,
     ))
 }

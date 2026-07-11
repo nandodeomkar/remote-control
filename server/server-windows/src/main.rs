@@ -14,7 +14,7 @@ use anyhow::Context;
 use server_core::auth::pin::PIN_TTL_SECS;
 use server_core::auth::AuthManager;
 use server_core::executors::{Executors, WindowInfo};
-use server_core::transport::{ServerDeps, VolumeState};
+use server_core::transport::{ClipState, ServerDeps, VolumeState};
 use server_core::transport::beacon::{self, BeaconIdentity};
 use tracing_subscriber::EnvFilter;
 
@@ -70,6 +70,13 @@ async fn main() -> anyhow::Result<()> {
     let (apps_cmd_tx, apps_cmd_rx) = std::sync::mpsc::channel::<AppsCmd>();
     let (apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
     std::thread::spawn(move || apps_thread::run_apps_thread(apps_cmd_rx, apps_tx));
+
+    // 3c. Interim clip watch placeholder (06-04 Task 1): server-core now
+    //     requires a `clip` receiver in ServerDeps. The REAL producer (the
+    //     dedicated clip thread + WinClipboard) arrives in 06-04 Task 3,
+    //     replacing this default-state channel. Held here so server-windows
+    //     compiles with the new ServerDeps shape before the thread lands.
+    let (_clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
 
     // 4. Executor bundle: real enigo mouse + real media/power (05-05) + real
     //    apps (06-02); Clipboard stays on a stub until 06-04. WinMedia holds
@@ -137,6 +144,7 @@ async fn main() -> anyhow::Result<()> {
         pause: pause_rx,
         volume: volume_rx,
         apps: apps_rx,
+        clip: clip_rx,
     };
 
     // 7. Bind the LAN interface (tests bind 127.0.0.1:0; the real binary
