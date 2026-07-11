@@ -505,10 +505,17 @@ mod tests {
     fn round_trip_apps_list_request_and_reply() {
         // Request form: windows absent.
         round_trip(Msg::AppsList(AppsListPayload { windows: None }), Some(7));
-        // Reply form: windows present.
+        // Reply form: windows present. Legacy window — neither optional
+        // field set (icon/path None): round-trips and re-encodes without
+        // the icon/path keys (skip_serializing_if, protocol-1.2 back-compat).
         round_trip(
             Msg::AppsList(AppsListPayload {
-                windows: Some(vec![WindowInfo { id: 1, title: "Notepad".into() }]),
+                windows: Some(vec![WindowInfo {
+                    id: 1,
+                    title: "Notepad".into(),
+                    icon: None,
+                    path: None,
+                }]),
             }),
             None,
         );
@@ -523,11 +530,24 @@ mod tests {
 
     #[test]
     fn round_trip_apps_changed() {
+        // Mixed: one window carries icon+path (protocol-1.2, D-07/APPS-02),
+        // the other is legacy (both None) — proves all four fields survive
+        // the round trip AND the optional keys are omitted when absent.
         round_trip(
             Msg::AppsChanged(AppsChangedPayload {
                 windows: vec![
-                    WindowInfo { id: 1, title: "Firefox".into() },
-                    WindowInfo { id: 2, title: "Terminal".into() },
+                    WindowInfo {
+                        id: 1,
+                        title: "Firefox".into(),
+                        icon: Some("iVBORw0KGgoAAAANSUhEUg".into()),
+                        path: Some("C:\\Program Files\\Mozilla Firefox\\firefox.exe".into()),
+                    },
+                    WindowInfo {
+                        id: 2,
+                        title: "Terminal".into(),
+                        icon: None,
+                        path: None,
+                    },
                 ],
             }),
             None,

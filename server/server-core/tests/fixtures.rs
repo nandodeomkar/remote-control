@@ -157,6 +157,15 @@ fn codec_fixtures_volume() {
 }
 
 #[test]
+fn codec_fixtures_window_info() {
+    // protocol 1.2 (APPS-02/APPS-03): the with-icon-path fixture round-trips
+    // all four WindowInfo fields and drops an unknown per-window field (D-05);
+    // the legacy fixture decodes with icon/path None and re-encodes without
+    // the optional keys.
+    run_json_family("window_info");
+}
+
+#[test]
 fn auth_proof_fixture() {
     let path = Path::new(FIXTURES_ROOT).join("handshake/05-auth-proof.json");
     let fixture = load(&path);

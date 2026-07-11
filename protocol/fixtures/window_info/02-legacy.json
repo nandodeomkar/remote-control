@@ -1,0 +1,20 @@
+{
+  "name": "window-info-legacy",
+  "description": "S→C apps.list reply whose single window carries neither icon nor path (a legacy 1.0/1.1 window). Decodes with icon=None, path=None and re-encodes WITHOUT the optional keys (skip_serializing_if) — proving the protocol-1.2 amendment stays back-compatible (§2 minor bump).",
+  "wire": {
+    "t": "apps.list",
+    "p": {
+      "windows": [
+        { "id": 1, "title": "Notepad" }
+      ]
+    }
+  },
+  "expect": {
+    "t": "apps.list",
+    "p": {
+      "windows": [
+        { "id": 1, "title": "Notepad" }
+      ]
+    }
+  }
+}

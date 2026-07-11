@@ -194,8 +194,18 @@ impl Apps for MockExecutors {
     /// `list` — it is a read-only query, observable via its reply.
     fn list(&self) -> Vec<WindowInfo> {
         vec![
-            WindowInfo { id: 1, title: "Mock Window One".to_string() },
-            WindowInfo { id: 2, title: "Mock Window Two".to_string() },
+            WindowInfo {
+                id: 1,
+                title: "Mock Window One".to_string(),
+                icon: None,
+                path: None,
+            },
+            WindowInfo {
+                id: 2,
+                title: "Mock Window Two".to_string(),
+                icon: None,
+                path: None,
+            },
         ]
     }
     fn launch(&self, path: &str) {

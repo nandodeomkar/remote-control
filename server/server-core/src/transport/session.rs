@@ -45,8 +45,10 @@ use crate::executors::Executors;
 /// via [`super`]) so the beacon's `proto` field AND tests asserting "the
 /// current server version" reference it instead of duplicating the literal.
 /// 1.1 adds the additive `vol.changed` S→C push (MED-02, D-03) — minor
-/// bump: 1.0 clients are still accepted (§2).
-pub const SERVER_PROTO_VERSION: &str = "1.1";
+/// bump: 1.0 clients are still accepted (§2). 1.2 adds the additive
+/// `WindowInfo.icon`/`.path` fields + the `apps.changed` S→C push (APPS-02,
+/// APPS-03) — still a minor bump, so 1.0/1.1 clients remain accepted (§2).
+pub const SERVER_PROTO_VERSION: &str = "1.2";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
 /// POST-auth liveness deadline: an Authed session receiving NO inbound

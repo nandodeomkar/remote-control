@@ -1,0 +1,31 @@
+{
+  "name": "window-info-with-icon-path",
+  "description": "S→C apps.changed push carrying one WindowInfo with icon (base64 PNG 32x32) + path (resolved exe). protocol 1.2 additive amendment (D-07 icon / APPS-02 path). The unknown field `future` inside the window object must be IGNORED on decode (D-05); the canonical re-encode drops it, mirroring the volume/01-vol-changed precedent.",
+  "wire": {
+    "t": "apps.changed",
+    "p": {
+      "windows": [
+        {
+          "id": 7,
+          "title": "Firefox",
+          "icon": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+          "path": "C:\\Program Files\\Mozilla Firefox\\firefox.exe",
+          "future": "ignored"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "t": "apps.changed",
+    "p": {
+      "windows": [
+        {
+          "id": 7,
+          "title": "Firefox",
+          "icon": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+          "path": "C:\\Program Files\\Mozilla Firefox\\firefox.exe"
+        }
+      ]
+    }
+  }
+}

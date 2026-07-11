@@ -37,10 +37,20 @@ pub enum Modifier {
 
 /// One entry of the `apps.list` / `apps.changed` window table. `id` is an
 /// opaque protocol-level identifier (NEVER an HWND-shaped OS type).
+///
+/// `icon`/`path` are the protocol-1.2 additive amendment (D-07 / APPS-02):
+/// both are `Option` with `skip_serializing_if` so a legacy 1.0/1.1 window
+/// (neither field) still decodes and re-encodes without emitting the keys.
+/// `icon` is a base64 PNG (32×32); `path` is the resolved exe path (`None`
+/// for non-pinnable/UWP windows). `Option<String>` keeps the `Eq` derive.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct WindowInfo {
     pub id: u64,
     pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
 }
 
 /// Mouse + keyboard injection.
