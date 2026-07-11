@@ -65,6 +65,14 @@ pub const CLIENT_KEY_CODES: &[&str] = &[
 pub const ROUTER_MACRO_CODES: &[&str] =
     &["BrowserBack", "BrowserForward", "T", "W", "B", "Plus", "Minus"];
 
+/// Media transport `key.code`s injected by [`crate::executors::media::WinMedia`]
+/// through the input thread (MED-01). System-wide by SMTC design: the OS routes
+/// `VK_MEDIA_*` to whatever session is playing (Spotify, browsers, players).
+/// Every entry MUST map to `Some` in [`map_key`] (see `media_key_codes_covered`).
+// Contract artifact: consumed by the coverage test + WinMedia's send calls.
+#[allow(dead_code)]
+pub const MEDIA_KEY_CODES: &[&str] = &["MediaPlayPause", "MediaNextTrack", "MediaPrevTrack"];
+
 /// Map a wire `key.code` string to the enigo key it injects.
 ///
 /// `None` = unknown code → the caller drops the command silently.
@@ -162,6 +170,18 @@ mod tests {
             assert!(
                 map_key(&KeyCode((*code).to_string())).is_some(),
                 "CLIENT_KEY_CODES entry {code:?} must map to Some(enigo Key)"
+            );
+        }
+    }
+
+    /// MED-01 coverage gate: every media transport code maps to a real enigo
+    /// media key — no silently dropped play/pause/next/prev.
+    #[test]
+    fn media_key_codes_covered() {
+        for code in MEDIA_KEY_CODES {
+            assert!(
+                map_key(&KeyCode((*code).to_string())).is_some(),
+                "MEDIA_KEY_CODES entry {code:?} must map to Some(enigo Key)"
             );
         }
     }
