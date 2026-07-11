@@ -131,6 +131,30 @@ class VolumeSnapshot {
   int get hashCode => Object.hash(value, muted);
 }
 
+/// The last server-pushed window list (APPS-03 `apps.changed` / `apps.list`
+/// reply). Value-equal over element equality so the apps Notifier suppresses
+/// no-op rebuilds on identical pushes (mirrors [VolumeSnapshot] discipline).
+class AppsSnapshot {
+  /// The window list in server Z-order (no client sort — D-07).
+  final List<WindowInfo> windows;
+
+  /// Creates a snapshot over [windows].
+  const AppsSnapshot(this.windows);
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! AppsSnapshot) return false;
+    if (other.windows.length != windows.length) return false;
+    for (var i = 0; i < windows.length; i++) {
+      if (other.windows[i] != windows[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hashAll(windows);
+}
+
 /// True when [a] is an RFC1918 private IPv4 address or 169.254/16 link-local
 /// (phone-hotspot cases). IPv4 only — everything else is refused.
 ///
@@ -191,6 +215,8 @@ class ConnectionService {
   FailedEffect? _lastAuthFailure;
   Object? _lastDialError;
   VolumeSnapshot? _volumeSnapshot;
+  AppsSnapshot? _appsSnapshot;
+  ErrMsg? _lastError;
 
   /// Liveness generation: bumping it invalidates any in-flight tick chain
   /// (the schedule seam has no cancel — stale ticks no-op on a gen mismatch).
@@ -272,6 +298,15 @@ class ConnectionService {
   /// The last server-pushed volume state (D-03), or null before the first
   /// `vol.changed`. The volume store reads this off a [changes] ping.
   VolumeSnapshot? get volumeSnapshot => _volumeSnapshot;
+
+  /// The last server-pushed window list (APPS-03 `apps.changed` / `apps.list`
+  /// reply), or null before the first push. The apps store reads this off a
+  /// [changes] ping.
+  AppsSnapshot? get appsSnapshot => _appsSnapshot;
+
+  /// The last `err` frame the server sent (windowGone / launchFailed etc.),
+  /// or null. Screens surface it as a transient toast off a [changes] ping.
+  ErrMsg? get lastError => _lastError;
 
   /// Pinged after every state-affecting transition; the hot move path NEVER
   /// pings it (UI reads snapshots off this via the providers).
@@ -466,6 +501,29 @@ class ConnectionService {
       _volumeSnapshot = VolumeSnapshot(value: msg.value, muted: msg.muted);
       _notify();
       return;
+    }
+    if (msg is AppsChangedMsg) {
+      // APPS-03 live window list push: park the value-equal snapshot and ping
+      // the apps store. S→C only — never routed to the driver, no payload
+      // logged (SPEC §12).
+      _appsSnapshot = AppsSnapshot(msg.windows);
+      _notify();
+      return;
+    }
+    if (msg is AppsListMsg) {
+      // apps.list reply (the screen-open prime): park the same snapshot. A
+      // request has no `windows`; a reply always does — default to empty.
+      _appsSnapshot = AppsSnapshot(msg.windows ?? const []);
+      _notify();
+      return;
+    }
+    if (msg is ErrMsg) {
+      // err{windowGone|launchFailed|...}: park for toast surfacing. The
+      // code/msg are operator-facing prose and carry no HWND/path (T-06-14).
+      // NOT returned early — a handshake-phase err{versionMismatch} must still
+      // reach the driver below (handshake_fsm terminal-fail path).
+      _lastError = msg;
+      _notify();
     }
     final driver = _driver;
     if (driver == null) return;

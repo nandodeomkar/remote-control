@@ -42,7 +42,11 @@ T? _opt<T>(Map<String, dynamic> p, String key) {
   return v;
 }
 
-/// Parse a `windows` array of `{id, title}` entries.
+/// Parse a `windows` array of `{id, title, icon?, path?}` entries.
+///
+/// `icon`/`path` are optional (protocol 1.2, D-05 tolerant): absent → null,
+/// unknown extra fields ignored. A present value with the wrong type is a
+/// decode error (via [_opt]).
 List<WindowInfo> _windowList(Object? v, String key) {
   if (v is! List) {
     throw FormatException('field $key must be an array');
@@ -51,7 +55,12 @@ List<WindowInfo> _windowList(Object? v, String key) {
     if (e is! Map<String, dynamic>) {
       throw FormatException('entries of $key must be objects');
     }
-    return WindowInfo(id: _req<int>(e, 'id'), title: _req<String>(e, 'title'));
+    return WindowInfo(
+      id: _req<int>(e, 'id'),
+      title: _req<String>(e, 'title'),
+      icon: _opt<String>(e, 'icon'),
+      path: _opt<String>(e, 'path'),
+    );
   }).toList();
 }
 
@@ -63,11 +72,41 @@ class WindowInfo {
   /// Window title.
   final String title;
 
-  /// Creates a window entry.
-  const WindowInfo({required this.id, required this.title});
+  /// Base64 PNG icon (32×32), or null for legacy/iconless windows
+  /// (protocol 1.2 additive field).
+  final String? icon;
 
-  /// Canonical JSON form: `{id, title}`.
-  Map<String, Object?> toJson() => {'id': id, 'title': title};
+  /// Resolved executable path, or null when unresolved (UWP → non-pinnable,
+  /// protocol 1.2 additive field).
+  final String? path;
+
+  /// Creates a window entry.
+  const WindowInfo({
+    required this.id,
+    required this.title,
+    this.icon,
+    this.path,
+  });
+
+  /// Canonical JSON form: `{id, title}` plus `icon`/`path` only when non-null
+  /// (mirrors the Rust `skip_serializing_if = "Option::is_none"`).
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'title': title,
+        if (icon != null) 'icon': icon,
+        if (path != null) 'path': path,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      other is WindowInfo &&
+      other.id == id &&
+      other.title == title &&
+      other.icon == icon &&
+      other.path == path;
+
+  @override
+  int get hashCode => Object.hash(id, title, icon, path);
 }
 
 /// Every message type in the protoVersion 1.0 registry (SPEC section 7),
