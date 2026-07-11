@@ -198,8 +198,31 @@ Plans:
   4. With auto-sync enabled, a PC copy appears on the phone live and a phone copy syncs on app resume (Android 10+ limit surfaced honestly) — with no sync loops thanks to content-hash echo suppression
   5. The last 5 clipboard entries are visible and reusable from history
 
-**Plans**: TBD
+**Plans**: 7 plans
 **UI hint**: yes
+
+Plans:
+**Wave 1**
+
+- [ ] 06-01-PLAN.md — Apps wire contract (WindowInfo icon/path, protocol 1.2) + apps.changed push seam
+
+**Wave 2** *(after 06-01)*
+
+- [ ] 06-02-PLAN.md — Apps thread + WinApps executor: real windows, Alt-Tab filter, icons, focus/close/launch
+- [ ] 06-03-PLAN.md — Apps client: screen + favorites (pin-from-window) store + hub tile
+
+**Wave 3** *(06-04 after 06-01/02; 06-05 after 06-03)*
+
+- [ ] 06-04-PLAN.md — Clipboard send/fetch: clip thread + WinClipboard + clip.changed seam + sensitive/echo skip
+- [ ] 06-05-PLAN.md — Clipboard client: send/fetch + last-5 history + hub tile
+
+**Wave 4** *(after 06-04/05)*
+
+- [ ] 06-06-PLAN.md — Clipboard auto-sync + client echo suppression + Android 10+ resume-sync
+
+**Wave 5** *(after all)*
+
+- [ ] 06-07-PLAN.md — On-device UAT gate (SC1–SC5 + wire-size guard)
 
 ### Phase 7: Server Shell, Dashboard & Polish
 
@@ -230,5 +253,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
-| 6. Apps & Clipboard | 0/TBD | Not started | - |
+| 6. Apps & Clipboard | 0/7 | Planned — ready to execute | - |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |
