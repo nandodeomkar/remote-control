@@ -12,7 +12,7 @@ use anyhow::Context;
 use server_core::auth::pin::PIN_TTL_SECS;
 use server_core::auth::AuthManager;
 use server_core::executors::Executors;
-use server_core::transport::ServerDeps;
+use server_core::transport::{ServerDeps, VolumeState};
 use server_core::transport::beacon::{self, BeaconIdentity};
 use tracing_subscriber::EnvFilter;
 
@@ -93,10 +93,16 @@ async fn main() -> anyhow::Result<()> {
 
     // 6. Server-side pause flag (SPEC §11) — no pause UI in the spike.
     let (_pause_tx, pause_rx) = tokio::sync::watch::channel(false);
+    // 6a. Volume watch seam (MED-02, D-03): interim default-state channel.
+    //     The `_volume_tx` binding is DELIBERATELY named (not a bare `_`,
+    //     which would drop the sender immediately and disable the session
+    //     branch); 05-05 moves this sender onto the real audio thread.
+    let (_volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
     let deps = ServerDeps {
         executors,
         auth,
         pause: pause_rx,
+        volume: volume_rx,
     };
 
     // 7. Bind the LAN interface (tests bind 127.0.0.1:0; the real binary

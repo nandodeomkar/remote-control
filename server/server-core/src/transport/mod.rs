@@ -20,6 +20,18 @@ use std::sync::{Arc, Mutex};
 use crate::auth::AuthManager;
 use crate::executors::Executors;
 
+/// Server-side volume state pushed to authed sessions as `vol.changed`
+/// (MED-02, D-03). Core-owned plain data — ZERO OS deps, so server-core
+/// keeps compiling on CI Linux; the Windows audio thread (05-05) is merely
+/// a producer on the other end of the watch channel.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct VolumeState {
+    /// Master volume percent, 0..=100.
+    pub value: u8,
+    /// Master mute flag.
+    pub muted: bool,
+}
+
 /// Everything the transport needs, injected by the composition root (the
 /// Phase-2 binary, or a test).
 ///
@@ -32,6 +44,9 @@ pub struct ServerDeps {
     pub auth: Arc<Mutex<AuthManager>>,
     /// Server-side pause flag; sessions observe changes live (SPEC §11).
     pub pause: tokio::sync::watch::Receiver<bool>,
+    /// Latest server volume state (D-03): authed sessions receive one
+    /// `vol.changed` snapshot right after auth and a push on every change.
+    pub volume: tokio::sync::watch::Receiver<VolumeState>,
 }
 
 /// Run the accept loop on an already-bound listener until the task is

@@ -27,7 +27,7 @@ use server_core::auth::challenge::auth_proof;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
 use server_core::executors::{Button, KeyCode};
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
-use server_core::transport::ServerDeps;
+use server_core::transport::{ServerDeps, VolumeState};
 
 /// Every recv (and the connect) is wrapped in this timeout so a silent
 /// server fails the test in seconds, never hangs it.
@@ -71,10 +71,14 @@ async fn walking_skeleton_pair_auth_input() {
     let pin = auth.lock().unwrap().begin_pairing();
 
     let (_pause_tx, pause_rx) = tokio::sync::watch::channel(false);
+    // Named binding (not `_`): dropping the sender would disable the
+    // session's volume branch.
+    let (_volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
         pause: pause_rx,
+        volume: volume_rx,
     };
 
     let (addr, _server) = spawn_test_server(deps).await;
@@ -159,6 +163,9 @@ struct Harness {
     log: CallLog,
     auth: Arc<Mutex<AuthManager>>,
     pause_tx: tokio::sync::watch::Sender<bool>,
+    /// Test-owned producer end of the volume watch (MED-02): the vol_ suite
+    /// drives `vol.changed` pushes through it.
+    volume_tx: tokio::sync::watch::Sender<VolumeState>,
     _server: tokio::task::JoinHandle<()>,
 }
 
@@ -166,13 +173,15 @@ async fn start_server() -> Harness {
     let (executors, log) = MockExecutors::recording();
     let auth = Arc::new(Mutex::new(AuthManager::new()));
     let (pause_tx, pause_rx) = tokio::sync::watch::channel(false);
+    let (volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
         pause: pause_rx,
+        volume: volume_rx,
     };
     let (addr, server) = spawn_test_server(deps).await;
-    Harness { addr, log, auth, pause_tx, _server: server }
+    Harness { addr, log, auth, pause_tx, volume_tx, _server: server }
 }
 
 async fn connect(addr: SocketAddr) -> WsClient {
@@ -643,4 +652,140 @@ async fn oversized_message_handled() {
         "server must keep accepting connections after an oversized frame; calls: {:?}",
         h.log.calls()
     );
+}
+
+// ──────────────── vol.changed push gating (MED-02, D-03) ───────────────
+
+/// "No frame arrives" window: long enough for a wrongly-pushed frame to
+/// cross loopback, short enough not to drag the suite.
+const SILENCE_WINDOW: Duration = Duration::from_millis(400);
+
+/// Receive the next frame, requiring a `vol.changed` push; returns
+/// `(value, muted)`.
+async fn recv_vol_changed(ws: &mut WsClient) -> (u64, bool) {
+    let v = recv_json(ws).await;
+    assert_eq!(v["t"], "vol.changed", "expected a vol.changed push, got: {v}");
+    (
+        v["p"]["value"].as_u64().expect("vol.changed must carry p.value"),
+        v["p"]["muted"].as_bool().expect("vol.changed must carry p.muted"),
+    )
+}
+
+/// Assert NO frame of any kind arrives within [`SILENCE_WINDOW`].
+async fn assert_no_frame(ws: &mut WsClient, why: &str) {
+    match tokio::time::timeout(SILENCE_WINDOW, ws.next()).await {
+        Err(_) => {} // silence — expected
+        Ok(frame) => panic!("{why}: expected silence, got: {frame:?}"),
+    }
+}
+
+/// RESEARCH Pitfall 8 / threat T-05-05: a volume change while the session
+/// is still pre-auth must push NOTHING to the unauthenticated peer.
+/// Positive control on the SAME connection: once paired, the D-03 snapshot
+/// arrives — proving the silence above was the auth gate, not a dead
+/// channel.
+#[tokio::test]
+async fn vol_no_push_preauth() {
+    let h = start_server().await;
+    let pin = h.auth.lock().unwrap().begin_pairing();
+
+    let mut ws = connect(h.addr).await;
+    let _nonce = hello_challenge(&mut ws).await; // state: AwaitingAuth
+
+    // Volume changes while the session is unauthed → total silence.
+    h.volume_tx
+        .send(VolumeState { value: 40, muted: false })
+        .expect("volume watch alive");
+    assert_no_frame(&mut ws, "vol.changed leaked to an unauthed session").await;
+
+    // Positive control: pairing on the SAME connection → pairOk, then the
+    // snapshot carrying the state pushed while unauthed.
+    send_json(&mut ws, json!({"t": "pin", "seq": 2, "p": {"pin": pin}})).await;
+    let pair_ok = recv_json(&mut ws).await;
+    assert_eq!(
+        pair_ok["t"], "pairOk",
+        "expected pairOk after correct pin, got: {pair_ok}"
+    );
+    let (value, muted) = recv_vol_changed(&mut ws).await;
+    assert_eq!(
+        (value, muted),
+        (40, false),
+        "post-auth snapshot must carry the state set while unauthed"
+    );
+}
+
+/// D-03 "right after auth", pairing path: exactly ONE vol.changed snapshot
+/// immediately after pairOk, carrying the watch channel's current state.
+#[tokio::test]
+async fn vol_snapshot_after_pair_auth() {
+    let h = start_server().await;
+    // Non-default state BEFORE the client connects, so the snapshot
+    // assertion can't pass vacuously on Default.
+    h.volume_tx
+        .send(VolumeState { value: 37, muted: true })
+        .expect("volume watch alive");
+
+    let (mut ws, _token) = pair_client(&h).await; // asserts pairOk inside
+    let (value, muted) = recv_vol_changed(&mut ws).await;
+    assert_eq!((value, muted), (37, true), "snapshot must carry current state");
+
+    // EXACTLY one: the select! branch must not re-fire on the same state
+    // right after the transition snapshot (borrow_and_update discipline).
+    assert_no_frame(&mut ws, "duplicate vol.changed after the pair-path snapshot").await;
+}
+
+/// D-03 "right after auth", challenge-response reconnect path: exactly ONE
+/// vol.changed snapshot immediately after authOk.
+#[tokio::test]
+async fn vol_snapshot_after_token_auth() {
+    let h = start_server().await;
+
+    // Pair once for the token, then disconnect.
+    let (mut ws, token) = pair_client(&h).await;
+    ws.close(None).await.expect("clean close after pairing");
+    drop(ws);
+
+    h.volume_tx
+        .send(VolumeState { value: 82, muted: false })
+        .expect("volume watch alive");
+
+    // Reconnect via HMAC proof (same construction as the reconnect test).
+    let mut ws = connect(h.addr).await;
+    let nonce_hex = hello_challenge(&mut ws).await;
+    let token_bytes = hex::decode(&token).expect("token is hex");
+    let nonce_bytes = hex::decode(&nonce_hex).expect("nonce is hex");
+    let mac = auth_proof(&token_bytes, &nonce_bytes);
+    send_json(&mut ws, json!({"t": "auth", "seq": 2, "p": {"mac": mac}})).await;
+    let auth_ok = recv_json(&mut ws).await;
+    assert_eq!(
+        auth_ok["t"], "authOk",
+        "expected authOk for a valid proof, got: {auth_ok}"
+    );
+
+    let (value, muted) = recv_vol_changed(&mut ws).await;
+    assert_eq!((value, muted), (82, false), "snapshot must carry current state");
+    assert_no_frame(&mut ws, "duplicate vol.changed after the auth-path snapshot").await;
+}
+
+/// MED-02 live push: once authed (snapshot drained), every watch change —
+/// including a mute-only change — produces a vol.changed frame.
+#[tokio::test]
+async fn vol_push_on_change_when_authed() {
+    let h = start_server().await;
+    let (mut ws, _token) = pair_client(&h).await;
+    // Drain the D-03 after-auth snapshot (default state).
+    let _snapshot = recv_vol_changed(&mut ws).await;
+
+    h.volume_tx
+        .send(VolumeState { value: 55, muted: false })
+        .expect("volume watch alive");
+    let (value, muted) = recv_vol_changed(&mut ws).await;
+    assert_eq!((value, muted), (55, false), "push must carry the new value");
+
+    // Mute-only change pushes too (value unchanged).
+    h.volume_tx
+        .send(VolumeState { value: 55, muted: true })
+        .expect("volume watch alive");
+    let (value, muted) = recv_vol_changed(&mut ws).await;
+    assert_eq!((value, muted), (55, true), "push must carry the new muted flag");
 }

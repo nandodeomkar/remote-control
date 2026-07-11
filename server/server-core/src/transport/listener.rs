@@ -20,7 +20,10 @@ const MAX_WS_MESSAGE_BYTES: usize = 65536;
 /// runs as its own session task; a failed TCP accept or WebSocket handshake
 /// never kills the loop.
 pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
-    let ServerDeps { executors, auth, pause } = deps;
+    // `volume` is held here (kept alive so producers can send) until the
+    // session-side select! branch lands; sessions get a clone in Task-2
+    // wiring of plan 05-03.
+    let ServerDeps { executors, auth, pause, volume: _volume } = deps;
 
     loop {
         let (stream, peer) = match listener.accept().await {
