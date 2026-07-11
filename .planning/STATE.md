@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-07-11T00:01:33.807Z"
-last_activity: 2026-07-10 -- Phase 04 execution started
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-07-11T01:39:58.948Z"
+last_activity: 2026-07-11 -- Phase 05 execution resumed (wave continue)
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 29
-  completed_plans: 29
+  total_plans: 36
+  completed_plans: 30
   percent: 57
 ---
 
@@ -21,11 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-07)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 04 — trackpad-keyboard
+**Current focus:** Phase 05 — media-power-presenter-browser
 
 ## Current Position
 
-Phase: 04 (trackpad-keyboard) — COMPLETE (verification passed 2026-07-10, both human gates confirmed on device)
+Phase: 05 (media-power-presenter-browser) — EXECUTING
+Plan: 2 of 7
 Next: plan Phase 05 (/gsd-plan-phase 5)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -34,7 +35,7 @@ Next: plan Phase 05 (/gsd-plan-phase 5)
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-10 -- Phase 04 execution started
+Last activity: 2026-07-11 -- Phase 05 execution resumed (wave continue)
 
 Progress: [██████░░░░] 57% (4 of 7 phases complete)
 
@@ -84,6 +85,7 @@ Progress: [██████░░░░] 57% (4 of 7 phases complete)
 | Phase 04 P06 | 13min | 3 tasks | 8 files |
 | Phase 04 P09 | 3min | 2 tasks | 2 files |
 | Phase 04 P10 | 11min | 2 tasks | 2 files |
+| Phase 05 P01 | 7min | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -164,6 +166,8 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-09: Phase-04-03 scroll decision refined: ScrollIntent carries delta/n over LIVE tracked pointers (n=2 both fingers down — byte-identical averaging; n=1 after a lift = full rate, WR-04 closed); no new tuning constant, classifier stays pure FSM
 - [Phase 04-10]: Liveness deadline via sleep_until(last_inbound + LIVENESS_TIMEOUT 10s) select! branch in run_session — expiry breaks 'read onto the EXISTING CONN-07 cleanup; last_inbound refreshes on ANY inbound frame (Text/Binary/WS control), never on pause toggles
 - [Phase 04-10]: Half-open socket tests keep the client alive and silent (drop/close emits FIN/RST on loopback); paused clock for the deadline wait, tokio::time::resume() before real-IO session-end assertions (auto-advance races kernel FIN)
+- [Phase 05-01]: VolChangedPayload uses u64 value + bool muted with NO Option — serde missing-field is the hard decode error fixture 03 demands
+- [Phase 05-01]: clientProtoVersion in handshake_fsm.dart references the remote_protocol protoVersion constant so minor bumps cannot leave a stale lib literal; remaining '1.0' test literals are commented historical wire pins (Pitfall 10)
 
 ### Pending Todos
 
@@ -195,6 +199,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-10T15:06:28.366Z
-Stopped at: Phase 5 UI-SPEC approved
-Resume file: .planning/phases/05-media-power-presenter-browser/05-UI-SPEC.md
+Last session: 2026-07-11T01:39:58.932Z
+Stopped at: Completed 05-01-PLAN.md
+Resume file: None

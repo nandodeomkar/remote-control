@@ -167,7 +167,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Protocol 1.1 amendment: vol.changed golden fixtures + Rust/Dart codecs + version bump (MED-02 wire contract, D-03)
+- [x] 05-01-PLAN.md — Protocol 1.1 amendment: vol.changed golden fixtures + Rust/Dart codecs + version bump (MED-02 wire contract, D-03)
 - [ ] 05-02-PLAN.md — Hub screen (D-01/D-02 reroute) + Browser tool screen end-to-end (BROW-01)
 
 **Wave 2** *(05-03 after 05-01; 05-04 after 05-02)*
@@ -229,6 +229,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 2. End-to-End Cursor Spike | 4/4 | Complete — gate PASS (p50 6ms / p95 10ms) | 2026-07-08 |
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
-| 5. Media, Power, Presenter & Browser | 0/7 | Planned | - |
+| 5. Media, Power, Presenter & Browser | 1/7 | In Progress|  |
 | 6. Apps & Clipboard | 0/TBD | Not started | - |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |
