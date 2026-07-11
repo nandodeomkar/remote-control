@@ -177,7 +177,7 @@ Plans:
 
 **Wave 3** *(05-05 after 05-03; 05-06 after 05-04)*
 
-- [ ] 05-05-PLAN.md — Real Windows executors: enigo media keys + IAudioEndpointVolume audio thread + WinPower (MED-01/02, PWR-01..03 server halves)
+- [x] 05-05-PLAN.md — Real Windows executors: enigo media keys + IAudioEndpointVolume audio thread + WinPower (MED-01/02, PWR-01..03 server halves)
 - [ ] 05-06-PLAN.md — Power client slice: ConfirmTrackFsm + slide-to-confirm tracks + red countdown dialog + hub tile (PWR-01..03, D-05/D-06)
 
 **Wave 4** *(after 05-01/03/05/06)*

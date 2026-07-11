@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-07-11T02:40:00.000Z"
-last_activity: 2026-07-11 -- Completed 05-04 (Presenter slice)
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-07-11T02:44:51.000Z"
+last_activity: 2026-07-11 -- Completed 05-05 (real Media/Power executors)
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 36
-  completed_plans: 35
+  completed_plans: 36
   percent: 57
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 05 (media-power-presenter-browser) — EXECUTING
-Plan: 4 of 7 complete (05-04 Presenter slice landed)
+Plan: 5 of 7 complete (05-05 real Windows Media/Power executors landed — whole server side of the phase now real)
 Next: continue Phase 05 execution
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -35,7 +35,7 @@ Next: continue Phase 05 execution
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-11 -- Completed 05-04 (Presenter slice)
+Last activity: 2026-07-11 -- Completed 05-05 (real Media/Power executors)
 
 Progress: [██████░░░░] 57% (4 of 7 phases complete)
 
@@ -89,6 +89,7 @@ Progress: [██████░░░░] 57% (4 of 7 phases complete)
 | Phase 05 P02 | 8min | 3 tasks | 5 files |
 | Phase 05 P03 | 9min | 2 tasks | 6 files |
 | Phase 05 P04 | 12min | 2 tasks | 4 files |
+| Phase 05 P05 | 12min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -177,6 +178,10 @@ Recent decisions affecting current work:
 - [Phase 05-04]: PresenterTimer is a pure clock-injected FSM (stopped/running/paused) over nowMillis — elapsed excludes paused gaps (accumulated + live span while running); startShow resets from ANY state; no timers/IO/Flutter in the FSM (D-08, Pitfall 13)
 - [Phase 05-04]: The presenter mm:ss ticker is a widget-local 1s Timer.periodic created LAZILY on first Start show (no rebuild loop before a show) and cancelled in dispose; the timer text tap/long-press stays interactive even when disconnected because the elapsed clock is strictly client-local (D-08)
 - [Phase 05-04]: PresenterScreen gates only the present-sending controls (zones, Start/End/Blank) on auth (muted, never red); Blank is optimistic local state (no wire readback) rendered with the armed-chip outline; WakelockPlus scoped initState->dispose (D-09); Presenter tile inserted between Trackpad and Browser in kHubTiles
+- [Phase 05-05]: First COM usage in the repo — dedicated audio thread owns the apartment (CoInitializeEx MTA), re-acquires MMDeviceEnumerator→default endpoint→IAudioEndpointVolume FRESH every 250ms pass so default-device switches survive with zero notification plumbing (Pitfall 6); every HRESULT `.ok()?`-drops, never unwraps
+- [Phase 05-05]: IMMDevice::Activate is feature-gated on Win32_System_Com_StructuredStorage + Win32_System_Variant (PROPVARIANT param) beyond the 7 RESEARCH-listed windows features — cargo surfaced both (A3)
+- [Phase 05-05]: enable_shutdown_privilege() checks GetLastError() != ERROR_NOT_ALL_ASSIGNED so a silent partial grant is failure (Pitfall 1); every WinPower method thread::spawns (SetSuspendState may block until resume — never a tokio worker, Pitfall 4); sleep=SetSuspendState(false)=SUSPEND not hibernate (SC2); shutdown=EWX_POWEROFF|EWX_FORCEIFHUNG + non-zero planned dwReason (never the unconditional force flag — data loss)
+- [Phase 05-05]: WinMedia holds only two senders (input_tx media taps MED-01, audio_tx volume MED-02) — send-and-forget, no COM on the caller (Pitfall 5); pct_from_scalar rounds+clamps for a lossless 0..=100 round trip (Pitfall 7); StubMedia/StubPower gone, only StubApps/StubClipboard remain for Phase 6
 
 ### Pending Todos
 
@@ -208,6 +213,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T02:40:00.000Z
-Stopped at: Completed 05-04-PLAN.md
+Last session: 2026-07-11T02:44:51.000Z
+Stopped at: Completed 05-05-PLAN.md
 Resume file: None
