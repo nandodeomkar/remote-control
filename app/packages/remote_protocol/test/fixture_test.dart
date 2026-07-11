@@ -173,4 +173,13 @@ void main() {
   group('volume fixtures', () {
     runJsonFamily('volume');
   });
+
+  // protocol 1.2 (06-01/06-03): WindowInfo gains optional icon (base64 PNG) +
+  // path (resolved exe). 01-with-icon-path decodes both fields and drops the
+  // unknown `future` field on re-encode (D-05); 02-legacy decodes icon==null /
+  // path==null and re-encodes WITHOUT the optional keys (skip_serializing_if
+  // mirror). Both round-trip through the shared harness.
+  group('window_info fixtures', () {
+    runJsonFamily('window_info');
+  });
 }

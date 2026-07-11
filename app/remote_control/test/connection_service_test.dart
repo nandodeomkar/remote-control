@@ -502,6 +502,72 @@ void main() {
     });
   });
 
+  group('ConnectionService — apps snapshot + err arms (06-03)', () {
+    test('apps.changed parks a value-equal AppsSnapshot and pings changes',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      var pings = 0;
+      final sub = h.service.changes.listen((_) => pings++);
+
+      const windows = [
+        WindowInfo(id: 7, title: 'Firefox', icon: 'AA==', path: r'C:\ff.exe'),
+        WindowInfo(id: 8, title: 'Notepad'),
+      ];
+      h.channel.feed(const AppsChangedMsg(windows: windows));
+      await h.pump();
+
+      final snap = h.service.appsSnapshot;
+      expect(snap, isNotNull);
+      expect(snap!.windows, hasLength(2));
+      expect(snap.windows.first.icon, 'AA==');
+      expect(snap.windows.first.path, r'C:\ff.exe');
+      expect(pings, greaterThan(0), reason: 'the push pings changes');
+
+      // Value-equality: a second identical push produces an equal snapshot.
+      final first = h.service.appsSnapshot;
+      h.channel.feed(const AppsChangedMsg(windows: windows));
+      await h.pump();
+      expect(h.service.appsSnapshot, first,
+          reason: 'two identical pushes are value-equal (no spurious rebuild)');
+
+      await sub.cancel();
+    });
+
+    test('apps.list reply parks the same AppsSnapshot', () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      h.channel.feed(const AppsListMsg(windows: [
+        WindowInfo(id: 1, title: 'Explorer'),
+      ]));
+      await h.pump();
+
+      expect(h.service.appsSnapshot?.windows.single.title, 'Explorer');
+    });
+
+    test('an err frame parks lastError and pings changes', () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      var pings = 0;
+      final sub = h.service.changes.listen((_) => pings++);
+
+      h.channel.feed(const ErrMsg(
+        code: 'windowGone',
+        msg: 'That window is no longer open.',
+      ));
+      await h.pump();
+
+      expect(h.service.lastError?.code, 'windowGone');
+      expect(h.service.lastError?.msg, 'That window is no longer open.');
+      expect(pings, greaterThan(0));
+
+      await sub.cancel();
+    });
+  });
+
   group('ConnectionService — idle-ping liveness (CONN-06)', () {
     test('sustained idle silence declares the connection dead -> backoff',
         () async {
