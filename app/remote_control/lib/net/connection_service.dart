@@ -155,6 +155,26 @@ class AppsSnapshot {
   int get hashCode => Object.hashAll(windows);
 }
 
+/// The last server-pushed clipboard state (D-03 `clip.changed`). Value-equal so
+/// the clipboard Notifier suppresses no-op rebuilds on identical pushes
+/// (mirrors [VolumeSnapshot] discipline). Distinct from the fetch reply below:
+/// this follows the live auto-sync push, the reply follows an explicit
+/// `clip.get`.
+class ClipSnapshot {
+  /// The pushed clipboard text.
+  final String text;
+
+  /// Creates a snapshot over [text].
+  const ClipSnapshot(this.text);
+
+  @override
+  bool operator ==(Object other) =>
+      other is ClipSnapshot && other.text == text;
+
+  @override
+  int get hashCode => text.hashCode;
+}
+
 /// True when [a] is an RFC1918 private IPv4 address or 169.254/16 link-local
 /// (phone-hotspot cases). IPv4 only — everything else is refused.
 ///
@@ -216,6 +236,8 @@ class ConnectionService {
   Object? _lastDialError;
   VolumeSnapshot? _volumeSnapshot;
   AppsSnapshot? _appsSnapshot;
+  ClipSnapshot? _clipSnapshot;
+  String? _clipFetchReply;
   ErrMsg? _lastError;
 
   /// Liveness generation: bumping it invalidates any in-flight tick chain
@@ -303,6 +325,18 @@ class ConnectionService {
   /// reply), or null before the first push. The apps store reads this off a
   /// [changes] ping.
   AppsSnapshot? get appsSnapshot => _appsSnapshot;
+
+  /// The last server-pushed clipboard state (D-03 `clip.changed`), or null
+  /// before the first push. The clipboard store reads this off a [changes]
+  /// ping. Distinct from [clipFetchReply] — this is the live auto-sync push.
+  ClipSnapshot? get clipSnapshot => _clipSnapshot;
+
+  /// The last `clip.get` reply text (the server answers with a `clip.set`
+  /// frame), or null before any Fetch. Kept SEPARATE from [clipSnapshot] so an
+  /// explicit Fetch is never confused with an auto-sync push. Each reply frame
+  /// decodes to a fresh String instance, so the clipboard store identity-tracks
+  /// this to know a NEW reply landed (vs a stale, unrelated `changes` ping).
+  String? get clipFetchReply => _clipFetchReply;
 
   /// The last `err` frame the server sent (windowGone / launchFailed etc.),
   /// or null. Screens surface it as a transient toast off a [changes] ping.
@@ -514,6 +548,23 @@ class ConnectionService {
       // apps.list reply (the screen-open prime): park the same snapshot. A
       // request has no `windows`; a reply always does — default to empty.
       _appsSnapshot = AppsSnapshot(msg.windows ?? const []);
+      _notify();
+      return;
+    }
+    if (msg is ClipChangedMsg) {
+      // D-03 live clipboard push: park the value-equal snapshot and ping the
+      // clipboard store. S→C only — never routed to the driver, no payload
+      // logged (SPEC §12, T-06-09).
+      _clipSnapshot = ClipSnapshot(msg.text);
+      _notify();
+      return;
+    }
+    if (msg is ClipSetMsg) {
+      // The clip.get reply arrives as a clip.set frame (router replies
+      // Msg::ClipSet{text}). Park it in the DISTINCT fetch-reply slot — kept
+      // separate from the live push so an explicit Fetch is not confused with
+      // an auto-sync push. S→C only, no payload logged (T-06-09).
+      _clipFetchReply = msg.text;
       _notify();
       return;
     }
