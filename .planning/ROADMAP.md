@@ -182,7 +182,7 @@ Plans:
 
 **Wave 4** *(after 05-01/03/05/06)*
 
-- [ ] 05-07-PLAN.md — Media client slice: VolChangedMsg wiring + D-04 volume store + Media screen + final 5-tile hub (MED-01/02)
+- [x] 05-07-PLAN.md — Media client slice: VolChangedMsg wiring + D-04 volume store + Media screen + final 5-tile hub (MED-01/02)
 
 ### Phase 6: Apps & Clipboard
 
@@ -229,6 +229,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 2. End-to-End Cursor Spike | 4/4 | Complete — gate PASS (p50 6ms / p95 10ms) | 2026-07-08 |
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
-| 5. Media, Power, Presenter & Browser | 4/7 | In Progress|  |
+| 5. Media, Power, Presenter & Browser | 7/7 | Complete|  |
 | 6. Apps & Clipboard | 0/TBD | Not started | - |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |

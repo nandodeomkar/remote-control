@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 05-06-PLAN.md
-last_updated: "2026-07-11T02:57:16.000Z"
-last_activity: 2026-07-11 -- Completed 05-06 (power control slice)
+stopped_at: Completed 05-07-PLAN.md
+last_updated: "2026-07-11T03:11:25.000Z"
+last_activity: 2026-07-11 -- Completed 05-07 (media/volume client vertical — phase 05 execution complete)
 progress:
   total_phases: 7
   completed_phases: 4
@@ -25,9 +25,9 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 
 ## Current Position
 
-Phase: 05 (media-power-presenter-browser) — EXECUTING
-Plan: 6 of 7 complete (05-06 power control slice landed — four actions behind slide-to-confirm + red countdown dialog, driving the live 05-05 WinPower executor; wave 3 done)
-Next: continue Phase 05 execution (05-07 Media slice — the last plan)
+Phase: 05 (media-power-presenter-browser) — EXECUTION COMPLETE (all 7 plans; on-device manual gate pending)
+Plan: 7 of 7 complete (05-07 media/volume client vertical landed — VolChangedMsg → VolumeSnapshot → D-04 VolumeSliderPolicy → Media screen; hub now 5 tiles Trackpad, Media, Power, Presenter, Browser; wave 4 done)
+Next: Phase 05 end-of-phase on-device manual gate (05-VALIDATION Manual-Only: SC1 media+volume-follow, SC2 sleep-suspends, SC3 restart/shutdown two-gesture, SC4 PowerPoint+timer, SC5 browser macros), then Phase 06 (Apps & Clipboard)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
   manual IP, live latency header with no hot-path hitching). See 03-VERIFICATION.md.
@@ -90,6 +90,8 @@ Progress: [██████░░░░] 57% (4 of 7 phases complete)
 | Phase 05 P03 | 9min | 2 tasks | 6 files |
 | Phase 05 P04 | 12min | 2 tasks | 4 files |
 | Phase 05 P05 | 12min | 3 tasks | 8 files |
+| Phase 05 P06 | ~7min | 2 tasks | 5 files |
+| Phase 05 P07 | ~20min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -186,6 +188,8 @@ Recent decisions affecting current work:
 - [Phase 05-06]: The single-action-path gate (T-05-12/PWR-03) is structural: SendPower is always effect[0], a single `if (isDestructive)` picks the second effect, so the FSM can never emit SendConfirm for restart/shutdown — unit-proven; PowerMsg is sent from exactly one screen site, ConfirmMsg from exactly two (lock/sleep effect + dialog button)
 - [Phase 05-06]: D-05 lock/sleep completion sends power+confirm same-tick (FIFO held by the reliable queue); D-06 restart/shutdown open the app's ONE modal — a red countdown dialog with a dialog-local 1s ticker seeded from kPowerConfirmWindowSeconds=10 (server CONFIRM_WINDOW mirror); auto-dismiss at 0 / Cancel / barrier send nothing, late confirm's err{noPendingAction} silently ignored, post-confirm disconnect is banner-only (RESEARCH Pattern 5)
 - [Phase 05-06]: Power hub tile (Icons.power_settings_new) inserted between Trackpad and Presenter → order Trackpad, Power, Presenter, Browser; the bare-grid hub test surface was enlarged to 800x1400 for the 4th tile (production HubScreen scrolls the grid)
+- [Phase 05-07]: VolumeSliderPolicy is a pure clock-injected D-04 finger-wins policy — leading-edge kSetvolThrottleMs=50 throttle, dragStart resets throttle bookkeeping so each fresh drag's first update sends, dragEnd flushes final iff it differs from last sent ([10,30] no-dup / [10,30,45] throttled-tail both unit-proven), unauthed drops-never-queues (Pitfall 12); injected seams are public fields per presenter_timer convention
+- [Phase 05-07]: VolChangedMsg parks a value-equal VolumeSnapshot on ConnectionService (branch after PongMsg, before driver routing, no payload logged) → changes ping → VolumeNotifier (cloned from ConnectionStatusNotifier); Media screen renders slider + mute from the pushed snapshot only (mute has NO optimistic flip, follows next push); Media hub tile (Icons.music_note) inserted ahead of Power → FINAL 5-tile order Trackpad, Media, Power, Presenter, Browser (D-01 complete)
 
 ### Pending Todos
 
@@ -217,6 +221,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T02:44:51.000Z
-Stopped at: Completed 05-05-PLAN.md
+Last session: 2026-07-11T03:11:25.000Z
+Stopped at: Completed 05-07-PLAN.md
 Resume file: None
