@@ -169,4 +169,8 @@ void main() {
   group('text fixtures', () {
     runJsonFamily('text');
   });
+
+  group('volume fixtures', () {
+    runJsonFamily('volume');
+  });
 }
