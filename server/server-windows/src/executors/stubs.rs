@@ -1,37 +1,12 @@
-//! Runtime no-op executors for the four non-mouse traits so `Executors`
-//! can be constructed in the spike binary.
+//! Runtime no-op executors for the two remaining non-mouse traits so
+//! `Executors` can be constructed in the binary.
 //!
-//! NOT the core `MockExecutors` (that is a test recorder) — these are the
-//! seed implementations that Phases 4-6 grow into real Windows backends
-//! (D-08 kept-as-foundation): Media/Power via key macros (Phase 5), Apps
-//! and Clipboard via the `windows` crate (Phase 6).
+//! NOT the core `MockExecutors` (that is a test recorder) — these are the seed
+//! implementations that Phase 6 grows into real Windows backends: Apps and
+//! Clipboard via the `windows` crate. (Media/Power became real in Phase 5 —
+//! see [`super::media::WinMedia`] / [`super::power::WinPower`].)
 
-use server_core::executors::{Apps, Clipboard, Media, Power, WindowInfo};
-
-/// No-op `Media` executor. Phase 5 fills this with enigo media keys +
-/// `IAudioEndpointVolume` absolute volume.
-pub struct StubMedia;
-
-impl Media for StubMedia {
-    fn play_pause(&self) {}
-    fn next(&self) {}
-    fn prev(&self) {}
-    fn vol_up(&self) {}
-    fn vol_down(&self) {}
-    fn mute(&self) {}
-    fn set_volume(&self, _pct: u8) {}
-}
-
-/// No-op `Power` executor. Phase 5 fills this with `LockWorkStation` /
-/// shutdown APIs (always behind the double-confirm gate).
-pub struct StubPower;
-
-impl Power for StubPower {
-    fn lock(&self) {}
-    fn sleep(&self) {}
-    fn restart(&self) {}
-    fn shutdown(&self) {}
-}
+use server_core::executors::{Apps, Clipboard, WindowInfo};
 
 /// No-op `Apps` executor. Phase 6 fills this with `EnumWindows` /
 /// `ShellExecuteW`.

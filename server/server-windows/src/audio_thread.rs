@@ -29,7 +29,6 @@ use windows::Win32::System::Com::{
 /// Command sent from [`crate::executors::media::WinMedia`] (hot-path,
 /// non-blocking mpsc send) to the audio thread.
 #[derive(Debug, Clone, PartialEq)]
-#[allow(dead_code)] // constructed by WinMedia (05-05 Task 2/3); wired in main.
 pub enum AudioCmd {
     /// Set the default render endpoint to exactly N% (absolute, MED-02).
     SetVol(u8),
@@ -128,7 +127,6 @@ fn push_if_changed(tx: &Sender<VolumeState>, last: &mut Option<VolumeState>) {
 /// dropped. MUST be called on a dedicated `std::thread` (COM apartment
 /// affinity): `CoInitializeEx` is called once here and the endpoint objects
 /// live and die on this thread, exactly like `Enigo` on the input thread.
-#[allow(dead_code)] // spawned by main.rs composition root (05-05 Task 3).
 pub fn run_audio_thread(rx: Receiver<AudioCmd>, tx: Sender<VolumeState>) {
     // SAFETY: initialize the MTA apartment once on this thread. A failed init
     // is dropped (`.ok()`); the loop's per-tick acquisitions then simply fail

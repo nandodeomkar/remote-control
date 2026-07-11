@@ -17,8 +17,11 @@ use server_core::transport::{ServerDeps, VolumeState};
 use server_core::transport::beacon::{self, BeaconIdentity};
 use tracing_subscriber::EnvFilter;
 
+use audio_thread::AudioCmd;
+use executors::media::WinMedia;
 use executors::mouse_keys::EnigoMouseKeys;
-use executors::stubs::{StubApps, StubClipboard, StubMedia, StubPower};
+use executors::power::WinPower;
+use executors::stubs::{StubApps, StubClipboard};
 use input_thread::Cmd;
 
 /// Default WebSocket port. The spec leaves the port configurable (settings
@@ -46,11 +49,24 @@ async fn main() -> anyhow::Result<()> {
     let (tx, rx) = std::sync::mpsc::channel::<Cmd>();
     std::thread::spawn(move || input_thread::run_input_thread(rx));
 
-    // 4. Executor bundle: real enigo mouse path + Phase 4-6 stub seeds.
+    // 3a. Dedicated COM audio thread (05-05, MED-02): owns all WASAPI/COM
+    //     objects and is the REAL producer for the 05-03 volume watch seam.
+    //     The watch Sender MOVES onto the thread (replacing 05-03's interim
+    //     default-state sender); `volume_rx` feeds ServerDeps below. Endpoint
+    //     is re-acquired per poll tick, so device switches survive (Pitfall 6).
+    let (audio_tx, audio_rx) = std::sync::mpsc::channel::<AudioCmd>();
+    let (volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
+    std::thread::spawn(move || audio_thread::run_audio_thread(audio_rx, volume_tx));
+
+    // 4. Executor bundle: real enigo mouse + real media/power (05-05);
+    //    Apps/Clipboard stay on stubs (Phase 6). WinMedia holds the
+    //    input-thread sender (media transport keys, MED-01) and the
+    //    audio-thread sender (absolute volume/mute, MED-02); `tx` is cloned
+    //    for the mouse path BEFORE it moves into WinMedia.
     let executors = Executors {
-        mouse_keys: Arc::new(EnigoMouseKeys::new(tx)),
-        media: Arc::new(StubMedia),
-        power: Arc::new(StubPower),
+        mouse_keys: Arc::new(EnigoMouseKeys::new(tx.clone())),
+        media: Arc::new(WinMedia::new(tx, audio_tx)),
+        power: Arc::new(WinPower),
         apps: Arc::new(StubApps),
         clipboard: Arc::new(StubClipboard),
     };
@@ -93,12 +109,9 @@ async fn main() -> anyhow::Result<()> {
     });
 
     // 6. Server-side pause flag (SPEC §11) — no pause UI in the spike.
+    //    (The volume watch is now driven by the real audio thread spawned in
+    //    step 3a; its `volume_rx` is consumed below.)
     let (_pause_tx, pause_rx) = tokio::sync::watch::channel(false);
-    // 6a. Volume watch seam (MED-02, D-03): interim default-state channel.
-    //     The `_volume_tx` binding is DELIBERATELY named (not a bare `_`,
-    //     which would drop the sender immediately and disable the session
-    //     branch); 05-05 moves this sender onto the real audio thread.
-    let (_volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
     let deps = ServerDeps {
         executors,
         auth,
