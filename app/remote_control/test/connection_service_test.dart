@@ -568,6 +568,63 @@ void main() {
     });
   });
 
+  group('ConnectionService — clip snapshot + fetch-reply arms (06-05)', () {
+    test('ClipSnapshot value-equality', () {
+      expect(const ClipSnapshot('a'), const ClipSnapshot('a'));
+      expect(const ClipSnapshot('a').hashCode, const ClipSnapshot('a').hashCode);
+      expect(const ClipSnapshot('a'), isNot(const ClipSnapshot('b')));
+    });
+
+    test('clip.changed parks a value-equal ClipSnapshot and pings changes',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      var pings = 0;
+      final sub = h.service.changes.listen((_) => pings++);
+
+      h.channel.feed(const ClipChangedMsg(text: 'hello pc'));
+      await h.pump();
+
+      final snap = h.service.clipSnapshot;
+      expect(snap, isNotNull);
+      expect(snap!.text, 'hello pc');
+      expect(pings, greaterThan(0), reason: 'the push pings changes');
+
+      // Value-equality: a second identical push produces an equal snapshot
+      // (no spurious rebuild).
+      final first = h.service.clipSnapshot;
+      h.channel.feed(const ClipChangedMsg(text: 'hello pc'));
+      await h.pump();
+      expect(h.service.clipSnapshot, first,
+          reason: 'two identical pushes are value-equal');
+
+      await sub.cancel();
+    });
+
+    test('clip.set (the clip.get reply) parks the fetch reply and pings changes',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      var pings = 0;
+      final sub = h.service.changes.listen((_) => pings++);
+
+      // The server replies to clip.get with a clip.set frame (router replies
+      // Msg::ClipSet{text}); it must land in the DISTINCT fetch-reply slot, not
+      // the live clipSnapshot (which follows clip.changed only).
+      h.channel.feed(const ClipSetMsg(text: 'from pc clipboard'));
+      await h.pump();
+
+      expect(h.service.clipFetchReply, 'from pc clipboard');
+      expect(h.service.clipSnapshot, isNull,
+          reason: 'a clip.set reply must not populate the live snapshot');
+      expect(pings, greaterThan(0));
+
+      await sub.cancel();
+    });
+  });
+
   group('ConnectionService — idle-ping liveness (CONN-06)', () {
     test('sustained idle silence declares the connection dead -> backoff',
         () async {
