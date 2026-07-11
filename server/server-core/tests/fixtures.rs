@@ -152,6 +152,11 @@ fn codec_fixtures_text() {
 }
 
 #[test]
+fn codec_fixtures_volume() {
+    run_json_family("volume");
+}
+
+#[test]
 fn auth_proof_fixture() {
     let path = Path::new(FIXTURES_ROOT).join("handshake/05-auth-proof.json");
     let fixture = load(&path);
