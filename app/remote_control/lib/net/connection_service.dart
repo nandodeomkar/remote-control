@@ -110,6 +110,27 @@ enum ChipStatus {
   disconnected,
 }
 
+/// The last server-pushed volume state (D-03 `vol.changed`). Value-equal so
+/// the volume Notifier suppresses no-op rebuilds on identical pushes (mirrors
+/// [ChipStatus]/ConnectionStatus discipline).
+class VolumeSnapshot {
+  /// Absolute volume 0..100.
+  final int value;
+
+  /// Server-authoritative mute state.
+  final bool muted;
+
+  /// Creates a snapshot.
+  const VolumeSnapshot({required this.value, required this.muted});
+
+  @override
+  bool operator ==(Object other) =>
+      other is VolumeSnapshot && other.value == value && other.muted == muted;
+
+  @override
+  int get hashCode => Object.hash(value, muted);
+}
+
 /// True when [a] is an RFC1918 private IPv4 address or 169.254/16 link-local
 /// (phone-hotspot cases). IPv4 only — everything else is refused.
 ///
@@ -169,6 +190,7 @@ class ConnectionService {
 
   FailedEffect? _lastAuthFailure;
   Object? _lastDialError;
+  VolumeSnapshot? _volumeSnapshot;
 
   /// Liveness generation: bumping it invalidates any in-flight tick chain
   /// (the schedule seam has no cancel — stale ticks no-op on a gen mismatch).
@@ -246,6 +268,10 @@ class ConnectionService {
 
   /// The last dial error: guard refusal or connect exception, or null.
   Object? get lastDialError => _lastDialError;
+
+  /// The last server-pushed volume state (D-03), or null before the first
+  /// `vol.changed`. The volume store reads this off a [changes] ping.
+  VolumeSnapshot? get volumeSnapshot => _volumeSnapshot;
 
   /// Pinged after every state-affecting transition; the hot move path NEVER
   /// pings it (UI reads snapshots off this via the providers).
@@ -431,6 +457,14 @@ class ConnectionService {
     }
     if (msg is PongMsg) {
       _probe?.onPong(msg);
+      return;
+    }
+    if (msg is VolChangedMsg) {
+      // D-03 server volume push: park the value-equal snapshot and ping the
+      // volume store via changes. S→C only — never routed to the driver, no
+      // payload logged (SPEC §12).
+      _volumeSnapshot = VolumeSnapshot(value: msg.value, muted: msg.muted);
+      _notify();
       return;
     }
     final driver = _driver;
