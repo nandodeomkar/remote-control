@@ -12,19 +12,18 @@ Phone controls the laptop over WiFi with zero friction: instant cursor response,
 
 ### Validated
 
-(None yet — ship to validate)
+- ✓ Trackpad: cursor move, left/middle/right click, tap-to-click, two-finger scroll, drag — Phase 4
+- ✓ Keyboard: free text typing, F1–F12, numpad, arrows/nav cluster, sticky modifiers for combos — Phase 4
+- ✓ LAN auto-discovery + one-time PIN pairing, remembered devices reconnect silently — Phase 3
+- ✓ Media controls: play/pause, next/prev, absolute volume slider, mute — Phase 5 (on-device UAT 6/6, security pass)
+- ✓ Power controls: lock, sleep, restart, shutdown behind slide-to-confirm — Phase 5
+- ✓ Presentation remote: next/prev, start/end show, blank screen, elapsed timer — Phase 5 (PowerPoint desktop; web Google Slides out of scope — known limitation)
+- ✓ Browser controls: back/forward, new/close tab, refresh, zoom (key macros) — Phase 5
 
 ### Active
 
-- [ ] Trackpad: cursor move, left/middle/right click, tap-to-click, two-finger scroll, drag
-- [ ] Keyboard: free text typing, F1–F12, numpad, arrows/nav cluster, sticky modifiers for combos
-- [ ] Media controls: play/pause, next/prev, absolute volume slider, mute
-- [ ] Power controls: lock, sleep, restart, shutdown behind slide-to-confirm
 - [ ] App launcher/switcher: running windows (focus/close), pinned favorites (launch)
 - [ ] Cross-device clipboard: manual send/fetch both ways, optional auto-sync, last-5 history
-- [ ] Presentation remote: next/prev, start/end show, blank screen, elapsed timer
-- [ ] Browser controls: back/forward, new/close tab, refresh, zoom (key macros)
-- [ ] LAN auto-discovery + one-time PIN pairing, remembered devices reconnect silently
 - [ ] Windows tray server: auto-start, settings window, pause input, paired-device revoke
 
 ### Out of Scope
@@ -80,4 +79,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-07-07 after initialization*
+*Last updated: 2026-07-11 after Phase 5*

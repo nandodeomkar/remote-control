@@ -32,7 +32,7 @@
 
 ### Media
 
-- [ ] **MED-01**: User can play/pause, next, previous system-wide
+- [x] **MED-01**: User can play/pause, next, previous system-wide
 - [x] **MED-02**: User sets absolute volume via slider and mute; slider stays accurate via server volume-state push (on connect and external change)
 
 ### Power
@@ -128,7 +128,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KEY-02 | Phase 4 | Complete |
 | KEY-03 | Phase 4 | Complete |
 | KEY-04 | Phase 4 | Complete |
-| MED-01 | Phase 5 | Pending |
+| MED-01 | Phase 5 | Complete |
 | MED-02 | Phase 5 | Complete |
 | PWR-01 | Phase 5 | Complete |
 | PWR-02 | Phase 5 | Complete |

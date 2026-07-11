@@ -2,32 +2,33 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 05-07-PLAN.md
-last_updated: "2026-07-11T03:11:25.000Z"
-last_activity: 2026-07-11 -- Completed 05-07 (media/volume client vertical — phase 05 execution complete)
+status: Ready to plan
+stopped_at: Phase 5 complete (UAT + security passed), ready to plan Phase 6
+last_updated: "2026-07-11T08:00:00.000Z"
+last_activity: 2026-07-11 -- Phase 05 complete; advanced to Phase 6
 progress:
   total_phases: 7
-  completed_phases: 4
-  total_plans: 37
-  completed_plans: 37
-  percent: 57
+  completed_phases: 5
+  total_plans: 36
+  completed_plans: 36
+  percent: 71
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-07)
+See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 05 — media-power-presenter-browser
+**Current focus:** Phase 6 — Apps & Clipboard
 
 ## Current Position
 
-Phase: 05 (media-power-presenter-browser) — EXECUTION COMPLETE (all 7 plans; on-device manual gate pending)
-Plan: 7 of 7 complete (05-07 media/volume client vertical landed — VolChangedMsg → VolumeSnapshot → D-04 VolumeSliderPolicy → Media screen; hub now 5 tiles Trackpad, Media, Power, Presenter, Browser; wave 4 done)
-Next: Phase 05 end-of-phase on-device manual gate (05-VALIDATION Manual-Only: SC1 media+volume-follow, SC2 sleep-suspends, SC3 restart/shutdown two-gesture, SC4 PowerPoint+timer, SC5 browser macros), then Phase 06 (Apps & Clipboard)
+Phase: 6 (apps-&-clipboard) — Ready to plan
+Plan: Not started
+Next: Phase 06 (Apps & Clipboard) — window/app management with live server push + bidirectional clipboard with history and loop-safe auto-sync. Start with /gsd-discuss-phase 6 or /gsd-plan-phase 6.
+  Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
   manual IP, live latency header with no hot-path hitching). See 03-VERIFICATION.md.
@@ -35,15 +36,15 @@ Next: Phase 05 end-of-phase on-device manual gate (05-VALIDATION Manual-Only: SC
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-11 -- Completed quick task 260711-huz (browser zoom-in keymap fix; Google Slides presenter limitation documented)
+Last activity: 2026-07-11 -- Phase 05 complete (UAT 6/6 + security pass); advanced to Phase 6
 
-Progress: [██████░░░░] 57% (4 of 7 phases complete)
+Progress: [███████░░░] 71% (5 of 7 phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 8
+- Total plans completed: 15
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -52,6 +53,7 @@ Progress: [██████░░░░] 57% (4 of 7 phases complete)
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 01 | 8 | - | - |
+| 05 | 7 | - | - |
 
 **Recent Trend:**
 
@@ -223,6 +225,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T03:11:25.000Z
-Stopped at: Completed 05-07-PLAN.md
+Last session: 2026-07-11T08:00:00.000Z
+Stopped at: Phase 5 complete (UAT + security passed), ready to plan Phase 6
 Resume file: None
