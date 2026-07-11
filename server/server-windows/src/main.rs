@@ -21,11 +21,12 @@ use tracing_subscriber::EnvFilter;
 
 use apps_thread::AppsCmd;
 use audio_thread::AudioCmd;
+use clip_thread::ClipCmd;
 use executors::apps::WinApps;
+use executors::clipboard::WinClipboard;
 use executors::media::WinMedia;
 use executors::mouse_keys::EnigoMouseKeys;
 use executors::power::WinPower;
-use executors::stubs::StubClipboard;
 use input_thread::Cmd;
 
 /// Default WebSocket port. The spec leaves the port configurable (settings
@@ -72,25 +73,30 @@ async fn main() -> anyhow::Result<()> {
     let (apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
     std::thread::spawn(move || apps_thread::run_apps_thread(apps_cmd_rx, apps_tx));
 
-    // 3c. Interim clip watch placeholder (06-04 Task 1): server-core now
-    //     requires a `clip` receiver in ServerDeps. The REAL producer (the
-    //     dedicated clip thread + WinClipboard) arrives in 06-04 Task 3,
-    //     replacing this default-state channel. Held here so server-windows
-    //     compiles with the new ServerDeps shape before the thread lands.
-    let (_clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
+    // 3c. Dedicated clip thread (06-04, CLIP-01/02/03): owns the single arboard
+    //     instance + the sensitive/large/echo gates, and is the REAL producer
+    //     for the 06-04 clip.changed watch seam (replacing the Task-1 interim
+    //     placeholder). The watch Sender MOVES onto the thread; `clip_rx` feeds
+    //     both WinClipboard (snapshot reads) and ServerDeps (the authed-gated
+    //     push branch) below. NO CoInitializeEx — arboard needs no COM.
+    let (clip_cmd_tx, clip_cmd_rx) = std::sync::mpsc::channel::<ClipCmd>();
+    let (clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
+    std::thread::spawn(move || clip_thread::run_clip_thread(clip_cmd_rx, clip_tx));
 
     // 4. Executor bundle: real enigo mouse + real media/power (05-05) + real
-    //    apps (06-02); Clipboard stays on a stub until 06-04. WinMedia holds
-    //    the input-thread sender (media transport keys, MED-01) and the
-    //    audio-thread sender (absolute volume/mute, MED-02); `tx` is cloned
-    //    for the mouse path BEFORE it moves into WinMedia. WinApps holds the
-    //    apps-thread command sender + a snapshot receiver clone (list reads).
+    //    apps (06-02) + real clipboard (06-04) — every trait now has a Windows
+    //    backend (the stubs module is gone). WinMedia holds the input-thread
+    //    sender (media transport keys, MED-01) and the audio-thread sender
+    //    (absolute volume/mute, MED-02); `tx` is cloned for the mouse path
+    //    BEFORE it moves into WinMedia. WinApps holds the apps-thread command
+    //    sender + a snapshot receiver clone (list reads); WinClipboard holds
+    //    the clip-thread command sender + a snapshot receiver clone (get reads).
     let executors = Executors {
         mouse_keys: Arc::new(EnigoMouseKeys::new(tx.clone())),
         media: Arc::new(WinMedia::new(tx, audio_tx)),
         power: Arc::new(WinPower),
         apps: Arc::new(WinApps::new(apps_cmd_tx, apps_rx.clone())),
-        clipboard: Arc::new(StubClipboard),
+        clipboard: Arc::new(WinClipboard::new(clip_cmd_tx, clip_rx.clone())),
     };
 
     // 5. Auth: real Phase 1 pairing (D-01/D-02) — show the PIN via a
