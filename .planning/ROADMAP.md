@@ -172,7 +172,7 @@ Plans:
 
 **Wave 2** *(05-03 after 05-01; 05-04 after 05-02)*
 
-- [ ] 05-03-PLAN.md — Server-core volume push seam: VolumeState watch + authed-gated session branch + after-auth snapshot + server "1.1" (MED-02)
+- [x] 05-03-PLAN.md — Server-core volume push seam: VolumeState watch + authed-gated session branch + after-auth snapshot + server "1.1" (MED-02)
 - [ ] 05-04-PLAN.md — Presenter slice: timer FSM + split-zone screen + wakelock + hub tile (PRES-01/02, D-07/D-08/D-09)
 
 **Wave 3** *(05-05 after 05-03; 05-06 after 05-04)*
@@ -229,6 +229,6 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 2. End-to-End Cursor Spike | 4/4 | Complete — gate PASS (p50 6ms / p95 10ms) | 2026-07-08 |
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
-| 5. Media, Power, Presenter & Browser | 2/7 | In Progress|  |
+| 5. Media, Power, Presenter & Browser | 3/7 | In Progress|  |
 | 6. Apps & Clipboard | 0/TBD | Not started | - |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |
