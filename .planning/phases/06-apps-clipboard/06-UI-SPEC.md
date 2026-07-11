@@ -1,10 +1,11 @@
 ---
 phase: 6
 slug: apps-clipboard
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-07-11
+reviewed_at: 2026-07-11
 ---
 
 # Phase 6 — UI Design Contract
