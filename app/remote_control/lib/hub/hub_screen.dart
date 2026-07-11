@@ -32,6 +32,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../apps/apps_screen.dart';
 import '../browser/browser_screen.dart';
+import '../clipboard/clipboard_screen.dart';
 import '../media/media_screen.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
@@ -82,12 +83,18 @@ final List<HubTileSpec> kHubTiles = [
     icon: Icons.music_note,
     builder: (_) => const MediaScreen(),
   ),
-  // 06-03: Apps inserted after Media, before Power (06-UI-SPEC placement) —
-  // reading order Trackpad, Media, Apps, Power, Presenter, Browser.
+  // 06-03: Apps inserted after Media, before Power (06-UI-SPEC placement).
   HubTileSpec(
     label: 'Apps',
     icon: Icons.apps,
     builder: (_) => const AppsScreen(),
+  ),
+  // 06-05: Clipboard inserted after Apps, before Power (06-UI-SPEC placement) —
+  // reading order Trackpad, Media, Apps, Clipboard, Power, Presenter, Browser.
+  HubTileSpec(
+    label: 'Clipboard',
+    icon: Icons.content_paste,
+    builder: (_) => const ClipboardScreen(),
   ),
   // 05-06: Power sits between Media and Presenter.
   HubTileSpec(

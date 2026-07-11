@@ -241,13 +241,18 @@ class ClipNotifier extends Notifier<ClipViewState> {
   }
 
   Future<void> _applyFetchReply(String reply) async {
+    // Set the outcome SYNCHRONOUSLY (before the first await) so the screen's
+    // listener — which runs on the same reply `changes` ping, right after this
+    // notifier's handler — sees the fresh event and shows exactly one snackbar.
     if (reply.isEmpty) {
       _lastFetchEvent = ClipFetchEvent(ClipFetchOutcome.empty);
-    } else {
-      await Clipboard.setData(ClipboardData(text: reply));
-      _history = await _store.record(reply);
-      _lastFetchEvent = ClipFetchEvent(ClipFetchOutcome.copied);
+      state = _view();
+      return;
     }
+    _lastFetchEvent = ClipFetchEvent(ClipFetchOutcome.copied);
+    state = _view();
+    await Clipboard.setData(ClipboardData(text: reply));
+    _history = await _store.record(reply);
     state = _view();
   }
 }
