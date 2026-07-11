@@ -92,11 +92,16 @@ pub trait Power: Send + Sync {
 }
 
 /// Window enumeration and app control.
+///
+/// `launch`/`focus`/`close` return `bool` (APPS-01): `false` signals the
+/// action could not be performed (window gone, launch failed) so the router
+/// can surface `err{windowGone|launchFailed}` to the client instead of
+/// silently succeeding. `list` stays a plain read.
 pub trait Apps: Send + Sync {
     fn list(&self) -> Vec<WindowInfo>;
-    fn launch(&self, path: &str);
-    fn focus(&self, id: u64);
-    fn close(&self, id: u64);
+    fn launch(&self, path: &str) -> bool;
+    fn focus(&self, id: u64) -> bool;
+    fn close(&self, id: u64) -> bool;
 }
 
 /// Clipboard text get/set.

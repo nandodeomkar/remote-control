@@ -208,14 +208,20 @@ impl Apps for MockExecutors {
             },
         ]
     }
-    fn launch(&self, path: &str) {
+    /// Records the call and reports success (`true`) so pass-through routing
+    /// tests still see empty replies; the err{windowGone|launchFailed} path
+    /// is exercised by a dedicated failing-apps executor in the router tests.
+    fn launch(&self, path: &str) -> bool {
         self.log.record(Call::AppsLaunch(path.to_string()));
+        true
     }
-    fn focus(&self, id: u64) {
+    fn focus(&self, id: u64) -> bool {
         self.log.record(Call::AppsFocus(id));
+        true
     }
-    fn close(&self, id: u64) {
+    fn close(&self, id: u64) -> bool {
         self.log.record(Call::AppsClose(id));
+        true
     }
 }
 

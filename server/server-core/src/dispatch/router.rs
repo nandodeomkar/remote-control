@@ -195,17 +195,30 @@ pub fn route(
         Msg::AppsList(_) => vec![Msg::AppsList(AppsListPayload {
             windows: Some(exec.apps.list()),
         })],
+        // APPS-01: a failed action returns err{launchFailed|windowGone} so
+        // the client can toast it (SC1). The err `msg` is operator-facing
+        // prose — it NEVER embeds the exe path or the HWND id (T-06-12,
+        // SPEC §12 no-payload-logging / copy contract).
         Msg::AppsLaunch(p) => {
-            exec.apps.launch(&p.path);
-            Vec::new()
+            if exec.apps.launch(&p.path) {
+                Vec::new()
+            } else {
+                vec![err("launchFailed", "could not launch the app".to_string())]
+            }
         }
         Msg::AppsFocus(p) => {
-            exec.apps.focus(p.id);
-            Vec::new()
+            if exec.apps.focus(p.id) {
+                Vec::new()
+            } else {
+                vec![err("windowGone", "that window is no longer available".to_string())]
+            }
         }
         Msg::AppsClose(p) => {
-            exec.apps.close(p.id);
-            Vec::new()
+            if exec.apps.close(p.id) {
+                Vec::new()
+            } else {
+                vec![err("windowGone", "that window is no longer available".to_string())]
+            }
         }
 
         // ── clipboard ──────────────────────────────────────────────────
@@ -374,7 +387,26 @@ mod tests {
         TextPayload,
     };
     use crate::executors::mock::{Call, MockExecutors};
-    use crate::executors::{Button, KeyCode, Modifier};
+    use crate::executors::{Apps, Button, Executors, KeyCode, Modifier, WindowInfo};
+    use std::sync::Arc;
+
+    /// Apps executor whose actions always FAIL (`false`) — drives the
+    /// APPS-01 err{windowGone|launchFailed} path. `list` returns empty.
+    struct FailingApps;
+    impl Apps for FailingApps {
+        fn list(&self) -> Vec<WindowInfo> {
+            Vec::new()
+        }
+        fn launch(&self, _path: &str) -> bool {
+            false
+        }
+        fn focus(&self, _id: u64) -> bool {
+            false
+        }
+        fn close(&self, _id: u64) -> bool {
+            false
+        }
+    }
 
     fn d(msg: Msg) -> Decoded {
         Decoded { seq: None, msg }
@@ -780,9 +812,19 @@ mod tests {
             other => panic!("expected apps.list reply with windows, got: {other:?}"),
         }
 
-        route(d(Msg::AppsLaunch(AppsLaunchPayload { path: "C:\\x.exe".into() })), &mut ctx, &exec, &auth, false);
-        route(d(Msg::AppsFocus(AppsFocusPayload { id: 2 })), &mut ctx, &exec, &auth, false);
-        route(d(Msg::AppsClose(AppsClosePayload { id: 2 })), &mut ctx, &exec, &auth, false);
+        // Success path (MockApps returns true): each action stays silent.
+        assert!(
+            route(d(Msg::AppsLaunch(AppsLaunchPayload { path: "C:\\x.exe".into() })), &mut ctx, &exec, &auth, false).is_empty(),
+            "successful launch must produce no reply"
+        );
+        assert!(
+            route(d(Msg::AppsFocus(AppsFocusPayload { id: 2 })), &mut ctx, &exec, &auth, false).is_empty(),
+            "successful focus must produce no reply"
+        );
+        assert!(
+            route(d(Msg::AppsClose(AppsClosePayload { id: 2 })), &mut ctx, &exec, &auth, false).is_empty(),
+            "successful close must produce no reply"
+        );
         assert_eq!(
             log.calls(),
             vec![
@@ -790,6 +832,42 @@ mod tests {
                 Call::AppsFocus(2),
                 Call::AppsClose(2),
             ]
+        );
+    }
+
+    /// APPS-01 (SC1 toast path): a failing apps executor makes focus/close
+    /// reply err{windowGone} and launch reply err{launchFailed} — exactly one
+    /// err each. The err.msg must never embed the id or the path (T-06-12).
+    #[tokio::test]
+    async fn apps_failed_actions_emit_err_codes() {
+        let (base, _log) = MockExecutors::recording();
+        let exec = Executors { apps: Arc::new(FailingApps), ..base };
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+
+        let focus = route(
+            d(Msg::AppsFocus(AppsFocusPayload { id: 42 })),
+            &mut ctx, &exec, &auth, false,
+        );
+        let p = assert_single_err(&focus, "windowGone");
+        assert!(!p.msg.contains("42"), "err.msg must not embed the HWND id: {}", p.msg);
+
+        let close = route(
+            d(Msg::AppsClose(AppsClosePayload { id: 99 })),
+            &mut ctx, &exec, &auth, false,
+        );
+        let p = assert_single_err(&close, "windowGone");
+        assert!(!p.msg.contains("99"), "err.msg must not embed the HWND id: {}", p.msg);
+
+        let launch = route(
+            d(Msg::AppsLaunch(AppsLaunchPayload { path: "C:\\secret\\app.exe".into() })),
+            &mut ctx, &exec, &auth, false,
+        );
+        let p = assert_single_err(&launch, "launchFailed");
+        assert!(
+            !p.msg.contains("secret") && !p.msg.contains(".exe"),
+            "err.msg must not embed the exe path: {}",
+            p.msg
         );
     }
 

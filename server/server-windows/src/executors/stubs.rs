@@ -16,9 +16,17 @@ impl Apps for StubApps {
     fn list(&self) -> Vec<WindowInfo> {
         vec![]
     }
-    fn launch(&self, _path: &str) {}
-    fn focus(&self, _id: u64) {}
-    fn close(&self, _id: u64) {}
+    // Report success (`true`) so the binary keeps compiling and the router
+    // stays silent; the real WinApps (06-02) returns the true OS outcome.
+    fn launch(&self, _path: &str) -> bool {
+        true
+    }
+    fn focus(&self, _id: u64) -> bool {
+        true
+    }
+    fn close(&self, _id: u64) -> bool {
+        true
+    }
 }
 
 /// No-op `Clipboard` executor. Phase 6 fills this with arboard.
