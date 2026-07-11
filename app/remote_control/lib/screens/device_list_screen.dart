@@ -23,13 +23,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../hub/hub_screen.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus;
 import '../net/handshake.dart';
 import '../net/reconnect_fsm.dart';
 import '../store/device_list_store.dart';
 import '../store/device_store.dart';
-import '../trackpad/trackpad_screen.dart';
 import '../widgets/connection_header.dart';
 import 'connection_copy.dart';
 import 'pairing_dialog.dart';
@@ -79,10 +79,22 @@ class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
   bool _sheetOpen = false;
 
   /// The device key of a USER-INITIATED connect awaiting auth: when it
-  /// reaches authed, the trackpad is pushed (explicit tap = explicit
-  /// navigation). Silent reconnects (D-01 launch kick, beacon/backoff)
-  /// never set this — the user stays on the list per UI-SPEC.
+  /// reaches authed, the hub is pushed (explicit tap = explicit
+  /// navigation, 05-02 D-02). Silent reconnects (D-01 launch kick,
+  /// beacon/backoff) never set this — the user stays on the list per
+  /// UI-SPEC.
   String? _pendingNavKey;
+
+  /// The ONE hub push (05-02 D-02, Pitfall 14): both former TrackpadScreen
+  /// call sites route through this helper so they can never drift. Same
+  /// unawaited push shape as before — only the destination changed.
+  void _openHub(BuildContext context) {
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const HubScreen()),
+      ),
+    );
+  }
 
   // Previous-ping snapshots so the sheet opens on TRANSITIONS only (a
   // dismissed sheet must not reopen on unrelated pings).
@@ -125,17 +137,13 @@ class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
     _prevFsm = fsm;
 
     // Explicit tap = explicit navigation: a user-initiated connect reaching
-    // authed pushes the trackpad ONCE. Silent reconnects never set
+    // authed pushes the hub ONCE. Silent reconnects never set
     // _pendingNavKey, so the D-01 launch kick keeps the user on the list.
     if (service.isAuthed &&
         _pendingNavKey != null &&
         service.target?.key == _pendingNavKey) {
       _pendingNavKey = null;
-      unawaited(
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const TrackpadScreen()),
-        ),
-      );
+      _openHub(context);
       return;
     }
 
@@ -213,15 +221,12 @@ class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
   /// Row tap (D-02): every state funnels into the SAME connect path. Paired
   /// and remembered rows connect silently; an unpaired live row's handshake
   /// reaches needPin and the pairing sheet opens. A tap that reaches authed
-  /// pushes the trackpad; the already-connected row pushes it directly.
+  /// pushes the hub; the already-connected row pushes it directly (the
+  /// trackpad stays one tap away as the hub's primary tile).
   void _onTapEntry(WidgetRef ref, DeviceListEntry entry) {
     if (entry.connected) {
-      // Already connected to this PC: straight to the trackpad.
-      unawaited(
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => const TrackpadScreen()),
-        ),
-      );
+      // Already connected to this PC: straight to the hub.
+      _openHub(context);
       return;
     }
     final service = ref.read(connectionServiceProvider);
