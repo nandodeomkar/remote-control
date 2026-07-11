@@ -18,11 +18,13 @@ use server_core::transport::{ServerDeps, VolumeState};
 use server_core::transport::beacon::{self, BeaconIdentity};
 use tracing_subscriber::EnvFilter;
 
+use apps_thread::AppsCmd;
 use audio_thread::AudioCmd;
+use executors::apps::WinApps;
 use executors::media::WinMedia;
 use executors::mouse_keys::EnigoMouseKeys;
 use executors::power::WinPower;
-use executors::stubs::{StubApps, StubClipboard};
+use executors::stubs::StubClipboard;
 use input_thread::Cmd;
 
 /// Default WebSocket port. The spec leaves the port configurable (settings
@@ -59,16 +61,27 @@ async fn main() -> anyhow::Result<()> {
     let (volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
     std::thread::spawn(move || audio_thread::run_audio_thread(audio_rx, volume_tx));
 
-    // 4. Executor bundle: real enigo mouse + real media/power (05-05);
-    //    Apps/Clipboard stay on stubs (Phase 6). WinMedia holds the
-    //    input-thread sender (media transport keys, MED-01) and the
+    // 3b. Dedicated apps thread (06-02, APPS-01/02/03): owns EnumWindows +
+    //     the shell-icon COM state + the foreground-lock focus dance, and is
+    //     the REAL producer for the 06-01 apps.changed watch seam (replacing
+    //     the interim placeholder). The watch Sender MOVES onto the thread;
+    //     `apps_rx` feeds both WinApps (snapshot reads) and ServerDeps (the
+    //     authed-gated push branch) below.
+    let (apps_cmd_tx, apps_cmd_rx) = std::sync::mpsc::channel::<AppsCmd>();
+    let (apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
+    std::thread::spawn(move || apps_thread::run_apps_thread(apps_cmd_rx, apps_tx));
+
+    // 4. Executor bundle: real enigo mouse + real media/power (05-05) + real
+    //    apps (06-02); Clipboard stays on a stub until 06-04. WinMedia holds
+    //    the input-thread sender (media transport keys, MED-01) and the
     //    audio-thread sender (absolute volume/mute, MED-02); `tx` is cloned
-    //    for the mouse path BEFORE it moves into WinMedia.
+    //    for the mouse path BEFORE it moves into WinMedia. WinApps holds the
+    //    apps-thread command sender + a snapshot receiver clone (list reads).
     let executors = Executors {
         mouse_keys: Arc::new(EnigoMouseKeys::new(tx.clone())),
         media: Arc::new(WinMedia::new(tx, audio_tx)),
         power: Arc::new(WinPower),
-        apps: Arc::new(StubApps),
+        apps: Arc::new(WinApps::new(apps_cmd_tx, apps_rx.clone())),
         clipboard: Arc::new(StubClipboard),
     };
 
@@ -114,12 +127,10 @@ async fn main() -> anyhow::Result<()> {
     //    step 3a; its `volume_rx` is consumed below.)
     let (_pause_tx, pause_rx) = tokio::sync::watch::channel(false);
 
-    // 6a. Placeholder apps watch (APPS-03): the real producer — the Windows
-    //     apps thread that enumerates/pushes the live window list — lands in
-    //     06-02. Until then this default-empty channel keeps the session's
-    //     apps.changed branch wired without ever pushing (the sender is held
-    //     as `_apps_tx` so the receiver's branch is not immediately disabled).
-    let (_apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
+    // 6a. Apps watch (APPS-03): fed by the real apps thread spawned in step
+    //     3b. `apps_rx` (the snapshot receiver) drives the session's authed-
+    //     gated apps.changed push branch; WinApps holds its own clone for
+    //     list reads. Moving it here consumes the receiver into ServerDeps.
     let deps = ServerDeps {
         executors,
         auth,
