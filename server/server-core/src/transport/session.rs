@@ -31,14 +31,14 @@ use crate::auth::AuthManager;
 use crate::auth::pin::PinOutcome;
 use super::VolumeState;
 use crate::codec::json::{
-    AuthFailPayload, AuthOkPayload, ChallengePayload, ErrPayload, Msg, PairOkPayload,
-    VolChangedPayload,
+    AppsChangedPayload, AuthFailPayload, AuthOkPayload, ChallengePayload, ErrPayload, Msg,
+    PairOkPayload, VolChangedPayload,
 };
 use crate::codec::{binary, json};
 use crate::dispatch::AuthState;
 use crate::dispatch::held::HeldInput;
 use crate::dispatch::router::{self, SessionCtx};
-use crate::executors::Executors;
+use crate::executors::{Executors, WindowInfo};
 
 /// The server's protocol version (SPEC §2). Only the MAJOR component is
 /// compared against the client's `hello.protoVersion`. `pub` (re-exported
@@ -86,6 +86,7 @@ pub(super) async fn run_session(
     auth: Arc<Mutex<AuthManager>>,
     mut pause: watch::Receiver<bool>,
     mut volume: watch::Receiver<VolumeState>,
+    mut apps: watch::Receiver<Vec<WindowInfo>>,
 ) {
     let (mut sink, mut stream) = ws.split();
 
@@ -117,6 +118,9 @@ pub(super) async fn run_session(
     // Same discipline for the volume watch (MED-02): producer dropped →
     // disable the branch, never busy-loop.
     let mut volume_alive = true;
+    // Same discipline for the apps watch (APPS-03): producer dropped →
+    // disable the branch, never busy-loop.
+    let mut apps_alive = true;
     // Last time ANY inbound bytes arrived from the peer; drives the
     // liveness deadline branch below.
     let mut last_inbound = Instant::now();
@@ -170,6 +174,26 @@ pub(super) async fn run_session(
                         }
                     }
                     Err(_) => volume_alive = false,
+                }
+            }
+            // APPS-03 live push, authed-gated: identical privacy backstop to
+            // the volume branch (threat T-06-01 / RESEARCH Pitfall 8) — the
+            // window list must never cross to an unauthed socket. watch is
+            // latest-value-only (no backlog flood). Unlike volume there is NO
+            // after-auth snapshot: the client pulls the current list via
+            // `apps.list` on the Apps screen, so this branch is the ONLY apps
+            // push site.
+            changed = apps.changed(), if apps_alive && ctx.auth_state == AuthState::Authed => {
+                match changed {
+                    Ok(()) => {
+                        // Vec<WindowInfo> is not Copy: clone the borrowed
+                        // snapshot. borrow_and_update clears the changed flag.
+                        let windows = apps.borrow_and_update().clone();
+                        if tx.send(apps_changed_frame(windows)).await.is_err() {
+                            break 'read; // write task gone → session over
+                        }
+                    }
+                    Err(_) => apps_alive = false,
                 }
             }
             incoming = stream.next() => {
@@ -415,6 +439,16 @@ fn vol_changed_frame(state: VolumeState) -> Message {
             value: u64::from(state.value),
             muted: state.muted,
         }),
+        None,
+    ))
+}
+
+/// Encode one `apps.changed` push frame (S→C, protoVersion 1.2, APPS-03)
+/// from the core-owned window list. The sole apps-push encoder — no
+/// after-auth snapshot analog (the client pulls via `apps.list`).
+fn apps_changed_frame(windows: Vec<WindowInfo>) -> Message {
+    Message::text(json::encode_msg(
+        &Msg::AppsChanged(AppsChangedPayload { windows }),
         None,
     ))
 }

@@ -25,7 +25,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 use server_core::auth::AuthManager;
 use server_core::auth::challenge::auth_proof;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
-use server_core::executors::{Button, KeyCode};
+use server_core::executors::{Button, KeyCode, WindowInfo};
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
 use server_core::transport::{SERVER_PROTO_VERSION, ServerDeps, VolumeState};
 
@@ -74,11 +74,14 @@ async fn walking_skeleton_pair_auth_input() {
     // Named binding (not `_`): dropping the sender would disable the
     // session's volume branch.
     let (_volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
+    // Same discipline for the apps watch (APPS-03): keep the sender alive.
+    let (_apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
         pause: pause_rx,
         volume: volume_rx,
+        apps: apps_rx,
     };
 
     let (addr, _server) = spawn_test_server(deps).await;
@@ -168,6 +171,9 @@ struct Harness {
     /// Test-owned producer end of the volume watch (MED-02): the vol_ suite
     /// drives `vol.changed` pushes through it.
     volume_tx: tokio::sync::watch::Sender<VolumeState>,
+    /// Test-owned producer end of the apps watch (APPS-03): the apps_ suite
+    /// drives `apps.changed` pushes through it.
+    apps_tx: tokio::sync::watch::Sender<Vec<WindowInfo>>,
     _server: tokio::task::JoinHandle<()>,
 }
 
@@ -176,14 +182,16 @@ async fn start_server() -> Harness {
     let auth = Arc::new(Mutex::new(AuthManager::new()));
     let (pause_tx, pause_rx) = tokio::sync::watch::channel(false);
     let (volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
+    let (apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
         pause: pause_rx,
         volume: volume_rx,
+        apps: apps_rx,
     };
     let (addr, server) = spawn_test_server(deps).await;
-    Harness { addr, log, auth, pause_tx, volume_tx, _server: server }
+    Harness { addr, log, auth, pause_tx, volume_tx, apps_tx, _server: server }
 }
 
 async fn connect(addr: SocketAddr) -> WsClient {
@@ -682,6 +690,30 @@ async fn recv_vol_changed(ws: &mut WsClient) -> (u64, bool) {
     )
 }
 
+/// Receive the next frame, requiring an `apps.changed` push; returns the
+/// `windows` JSON array for field-level assertions.
+async fn recv_apps_changed(ws: &mut WsClient) -> Vec<Value> {
+    let v = recv_json(ws).await;
+    assert_eq!(v["t"], "apps.changed", "expected an apps.changed push, got: {v}");
+    v["p"]["windows"]
+        .as_array()
+        .expect("apps.changed must carry p.windows")
+        .clone()
+}
+
+/// Two-window sample list: one with icon+path (protocol 1.2), one legacy.
+fn sample_windows() -> Vec<WindowInfo> {
+    vec![
+        WindowInfo {
+            id: 7,
+            title: "Firefox".into(),
+            icon: Some("aaaa".into()),
+            path: Some("C:\\ff.exe".into()),
+        },
+        WindowInfo { id: 8, title: "Notepad".into(), icon: None, path: None },
+    ]
+}
+
 /// Assert NO frame of any kind arrives within [`SILENCE_WINDOW`].
 async fn assert_no_frame(ws: &mut WsClient, why: &str) {
     match tokio::time::timeout(SILENCE_WINDOW, ws.next()).await {
@@ -799,4 +831,72 @@ async fn vol_push_on_change_when_authed() {
         .expect("volume watch alive");
     let (value, muted) = recv_vol_changed(&mut ws).await;
     assert_eq!((value, muted), (55, true), "push must carry the new muted flag");
+}
+
+// ──────────────── apps.changed push gating (APPS-03) ───────────────────
+
+/// T-06-01 / threat: a window-list change while the session is still
+/// pre-auth must push NOTHING to the unauthenticated peer. Positive control
+/// on the SAME connection: once paired, the pending pre-auth change is
+/// delivered via the now-enabled apps branch (after the D-03 vol snapshot) —
+/// proving the silence above was the auth gate, not a dead channel.
+#[tokio::test]
+async fn apps_no_push_preauth() {
+    let h = start_server().await;
+    let pin = h.auth.lock().unwrap().begin_pairing();
+
+    let mut ws = connect(h.addr).await;
+    let _nonce = hello_challenge(&mut ws).await; // state: AwaitingAuth
+
+    // Window list changes while unauthed → total silence.
+    h.apps_tx.send(sample_windows()).expect("apps watch alive");
+    assert_no_frame(&mut ws, "apps.changed leaked to an unauthed session").await;
+
+    // Positive control: pair on the SAME connection → pairOk, then the D-03
+    // vol.changed snapshot, then the pending window change fires.
+    send_json(&mut ws, json!({"t": "pin", "seq": 2, "p": {"pin": pin}})).await;
+    let pair_ok = recv_json(&mut ws).await;
+    assert_eq!(
+        pair_ok["t"], "pairOk",
+        "expected pairOk after correct pin, got: {pair_ok}"
+    );
+    let _snapshot = recv_vol_changed(&mut ws).await; // D-03 vol snapshot
+    let windows = recv_apps_changed(&mut ws).await;
+    assert_eq!(
+        windows.len(),
+        2,
+        "post-auth push must carry the windows set while unauthed"
+    );
+    assert_eq!(windows[0]["id"], 7);
+    assert_eq!(windows[0]["icon"], "aaaa", "icon must survive the push");
+    assert_eq!(windows[1]["id"], 8);
+    assert!(
+        windows[1].get("icon").is_none(),
+        "legacy window must omit the icon key"
+    );
+}
+
+/// APPS-03 live push + no-snapshot contract: once authed (with NO prior
+/// window change), the transition emits NO apps snapshot (unlike volume); a
+/// subsequent change produces exactly one apps.changed carrying the current
+/// windows array.
+#[tokio::test]
+async fn apps_changed_after_auth() {
+    let h = start_server().await;
+    let mut ws = authed_client(&h).await; // drains the D-03 vol snapshot
+
+    // No after-auth apps snapshot at the transition: apps never changed, so
+    // nothing is pushed (the client pulls the initial list via apps.list).
+    assert_no_frame(&mut ws, "unexpected apps.changed snapshot at the auth transition").await;
+
+    // A window-list change now produces exactly one apps.changed.
+    h.apps_tx.send(sample_windows()).expect("apps watch alive");
+    let windows = recv_apps_changed(&mut ws).await;
+    assert_eq!(windows.len(), 2, "push must carry the current window list");
+    assert_eq!(windows[0]["id"], 7);
+    assert_eq!(windows[0]["title"], "Firefox");
+    assert_eq!(windows[0]["path"], "C:\\ff.exe");
+
+    // Exactly one: no duplicate push on the same state.
+    assert_no_frame(&mut ws, "duplicate apps.changed after a single change").await;
 }

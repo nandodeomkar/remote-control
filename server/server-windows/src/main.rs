@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 use anyhow::Context;
 use server_core::auth::pin::PIN_TTL_SECS;
 use server_core::auth::AuthManager;
-use server_core::executors::Executors;
+use server_core::executors::{Executors, WindowInfo};
 use server_core::transport::{ServerDeps, VolumeState};
 use server_core::transport::beacon::{self, BeaconIdentity};
 use tracing_subscriber::EnvFilter;
@@ -112,11 +112,19 @@ async fn main() -> anyhow::Result<()> {
     //    (The volume watch is now driven by the real audio thread spawned in
     //    step 3a; its `volume_rx` is consumed below.)
     let (_pause_tx, pause_rx) = tokio::sync::watch::channel(false);
+
+    // 6a. Placeholder apps watch (APPS-03): the real producer — the Windows
+    //     apps thread that enumerates/pushes the live window list — lands in
+    //     06-02. Until then this default-empty channel keeps the session's
+    //     apps.changed branch wired without ever pushing (the sender is held
+    //     as `_apps_tx` so the receiver's branch is not immediately disabled).
+    let (_apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
     let deps = ServerDeps {
         executors,
         auth,
         pause: pause_rx,
         volume: volume_rx,
+        apps: apps_rx,
     };
 
     // 7. Bind the LAN interface (tests bind 127.0.0.1:0; the real binary

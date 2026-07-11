@@ -23,7 +23,7 @@ pub use session::SERVER_PROTO_VERSION;
 use std::sync::{Arc, Mutex};
 
 use crate::auth::AuthManager;
-use crate::executors::Executors;
+use crate::executors::{Executors, WindowInfo};
 
 /// Server-side volume state pushed to authed sessions as `vol.changed`
 /// (MED-02, D-03). Core-owned plain data — ZERO OS deps, so server-core
@@ -52,6 +52,13 @@ pub struct ServerDeps {
     /// Latest server volume state (D-03): authed sessions receive one
     /// `vol.changed` snapshot right after auth and a push on every change.
     pub volume: tokio::sync::watch::Receiver<VolumeState>,
+    /// Latest window list (APPS-03): authed sessions receive an
+    /// `apps.changed` push on every change. Unlike volume there is NO
+    /// after-auth snapshot — the client pulls the current list via
+    /// `apps.list` on the Apps screen. Core-owned plain data (WindowInfo is
+    /// all `String`s), so server-core keeps compiling on CI Linux; the
+    /// Windows apps thread (06-02) is merely a producer on the other end.
+    pub apps: tokio::sync::watch::Receiver<Vec<WindowInfo>>,
 }
 
 /// Run the accept loop on an already-bound listener until the task is
