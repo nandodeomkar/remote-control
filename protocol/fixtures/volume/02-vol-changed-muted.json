@@ -1,0 +1,18 @@
+{
+  "name": "vol-changed-muted",
+  "description": "S→C volume-state push with mute active at value 0 (SPEC §7). Positive round-trip: both required fields present, canonical re-encode is byte-identical.",
+  "wire": {
+    "t": "vol.changed",
+    "p": {
+      "value": 0,
+      "muted": true
+    }
+  },
+  "expect": {
+    "t": "vol.changed",
+    "p": {
+      "value": 0,
+      "muted": true
+    }
+  }
+}

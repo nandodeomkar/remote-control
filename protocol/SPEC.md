@@ -1,6 +1,6 @@
 # Remote Control Wire Protocol — SPEC
 
-**protoVersion:** `"1.0"`
+**protoVersion:** `"1.1"`
 **Status:** Locked contract. Both codecs (Rust `server-core`, Dart `remote_protocol`) are written against this document and proven byte-identical by the golden fixtures in `protocol/fixtures/`. No codec may adjust a fixture to match its own output.
 
 Transport: a single WebSocket connection per session carrying two frame kinds — JSON text frames (everything) and 9-byte binary frames (mouse hot path only). Discovery is UDP broadcast (out of scope for this document; see design spec §4).
@@ -29,10 +29,11 @@ Every JSON text frame is an object of the shape:
 
 ## 2. Versioning (D-06)
 
-- `protoVersion` is a `"major.minor"` string. Current version: `"1.0"`.
+- `protoVersion` is a `"major.minor"` string. Current version: `"1.1"`.
 - `hello` carries `protoVersion`. The server parses only the **major** component.
 - **Major mismatch:** the server replies `err` with `code:"versionMismatch"` and payload fields `serverVersion` and `clientVersion` (both `"major.minor"` strings), then closes the connection.
 - **Minor mismatch:** accepted. Peers simply do not use features the other side does not know; unknown fields and unknown types are handled by the strictness rules (§1, §10).
+- **1.1 addition (D-03):** the S→C `vol.changed {value, muted}` push (§7). This is a minor bump — a `"1.0"` peer that never receives or ignores the type stays fully interoperable, exactly per the minor-mismatch rule above.
 
 ## 3. Handshake FSM
 
@@ -104,6 +105,7 @@ Direction: C→S (client to server), S→C (server to client), C↔S (both).
 | `key` | C→S | `code` (string), `action` (`"tap"`\|`"down"`\|`"up"`) | `mods` (array of `"ctrl"`\|`"alt"`\|`"shift"`\|`"win"`, default `[]`) | Single key with modifiers |
 | `text` | C→S | `bs` (integer ≥ 0), `ins` (string) | — | Diff-ops, §8 |
 | `media` | C→S | `action` (`"playpause"`\|`"next"`\|`"prev"`\|`"volup"`\|`"voldown"`\|`"mute"`\|`"setvol"`) | `value` (integer 0–100; **required iff** `action` is `"setvol"`) | |
+| `vol.changed` | S→C | `value` (integer 0–100), `muted` (bool) | — | Server push (protoVersion 1.1, D-03): after auth and on any server-side volume/mute change |
 | `power` | C→S | `action` (`"lock"`\|`"sleep"`\|`"restart"`\|`"shutdown"`) | — | Requires follow-up `confirm` |
 | `confirm` | C→S | `action` (same enum as `power`) | — | Must match a pending `power` action within **10 seconds**, else server replies `err {code:"noPendingAction"}` |
 | `apps.list` | C→S request / S→C reply | request: — (`p` is `{}`); reply: `windows` (array of `{id: integer, title: string}`) | — | |

@@ -1,0 +1,19 @@
+{
+  "name": "vol-changed",
+  "description": "S→C volume-state push (SPEC §7, protoVersion 1.1 addition). value 0-100, muted bool. The unknown field `future` must be IGNORED on decode (D-05); the canonical re-encode drops it.",
+  "wire": {
+    "t": "vol.changed",
+    "p": {
+      "value": 55,
+      "muted": false,
+      "future": "ignored"
+    }
+  },
+  "expect": {
+    "t": "vol.changed",
+    "p": {
+      "value": 55,
+      "muted": false
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "vol-changed-missing-muted",
+  "description": "Negative fixture (D-05, SPEC §1): vol.changed missing the required p.muted field. Both `value` and `muted` are REQUIRED; a missing required field is a hard decode error in BOTH codecs.",
+  "wire": {
+    "t": "vol.changed",
+    "p": {
+      "value": 55
+    }
+  },
+  "expect": {
+    "error": true
+  }
+}

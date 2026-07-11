@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://remote-control.local/protocol/messages.schema.json",
-  "title": "Remote Control wire protocol — JSON text frames (protoVersion 1.0)",
+  "title": "Remote Control wire protocol — JSON text frames (protoVersion 1.1)",
   "description": "Documentation-grade schema mirroring protocol/SPEC.md §7. Not consumed by code; the golden fixtures in protocol/fixtures/ are the executable contract. Per D-05, decoders IGNORE unknown fields — additionalProperties is deliberately left permissive everywhere.",
   "type": "object",
   "properties": {
@@ -10,6 +10,13 @@
     "p": { "type": "object" }
   },
   "required": ["t"],
+  "allOf": [
+    {
+      "$comment": "protoVersion 1.1 dispatch hook (D-03): the vol.changed push carries a payload with required value+muted. Older types remain doc-grade $defs; retrofitting per-type p dispatch to every family is out of scope.",
+      "if": { "properties": { "t": { "const": "vol.changed" } }, "required": ["t"] },
+      "then": { "properties": { "p": { "$ref": "#/$defs/volChanged" } } }
+    }
+  ],
   "$defs": {
     "hexString64": {
       "type": "string",
@@ -135,6 +142,15 @@
       "required": ["action"],
       "if": { "properties": { "action": { "const": "setvol" } } },
       "then": { "required": ["action", "value"] }
+    },
+    "volChanged": {
+      "description": "vol.changed — S→C push (SPEC §7, protoVersion 1.1 addition, D-03). Sent after auth and on any server-side volume/mute change. BOTH fields required — a missing field is a hard decode error.",
+      "type": "object",
+      "properties": {
+        "value": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "muted": { "type": "boolean" }
+      },
+      "required": ["value", "muted"]
     },
     "power": {
       "description": "C→S. Requires follow-up confirm within 10s (SPEC §7).",
