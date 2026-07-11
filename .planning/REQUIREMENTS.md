@@ -56,8 +56,8 @@
 
 ### Presenter
 
-- [ ] **PRES-01**: User can drive slides — next/prev, start/end show, blank screen
-- [ ] **PRES-02**: User sees elapsed presentation timer
+- [x] **PRES-01**: User can drive slides — next/prev, start/end show, blank screen
+- [x] **PRES-02**: User sees elapsed presentation timer
 
 ### Browser
 
@@ -140,8 +140,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CLIP-02 | Phase 6 | Pending |
 | CLIP-03 | Phase 6 | Pending |
 | CLIP-04 | Phase 6 | Pending |
-| PRES-01 | Phase 5 | Pending |
-| PRES-02 | Phase 5 | Pending |
+| PRES-01 | Phase 5 | Complete |
+| PRES-02 | Phase 5 | Complete |
 | BROW-01 | Phase 5 | Complete |
 | SRV-01 | Phase 7 | Pending |
 | SRV-02 | Phase 7 | Pending |

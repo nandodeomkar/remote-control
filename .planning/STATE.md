@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 05-01-PLAN.md
-last_updated: "2026-07-11T02:10:35.383Z"
-last_activity: 2026-07-11 -- Phase 05 execution started
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-07-11T02:40:00.000Z"
+last_activity: 2026-07-11 -- Completed 05-04 (Presenter slice)
 progress:
   total_phases: 7
   completed_phases: 4
   total_plans: 36
-  completed_plans: 32
+  completed_plans: 35
   percent: 57
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 05 (media-power-presenter-browser) — EXECUTING
-Plan: 2 of 7
-Next: plan Phase 05 (/gsd-plan-phase 5)
+Plan: 4 of 7 complete (05-04 Presenter slice landed)
+Next: continue Phase 05 execution
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
   manual IP, live latency header with no hot-path hitching). See 03-VERIFICATION.md.
@@ -35,7 +35,7 @@ Next: plan Phase 05 (/gsd-plan-phase 5)
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-11 -- Phase 05 execution started
+Last activity: 2026-07-11 -- Completed 05-04 (Presenter slice)
 
 Progress: [██████░░░░] 57% (4 of 7 phases complete)
 
@@ -88,6 +88,7 @@ Progress: [██████░░░░] 57% (4 of 7 phases complete)
 | Phase 05 P01 | 7min | 3 tasks | 14 files |
 | Phase 05 P02 | 8min | 3 tasks | 5 files |
 | Phase 05 P03 | 9min | 2 tasks | 6 files |
+| Phase 05 P04 | 12min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -173,6 +174,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 05-02: Browser grid rows derive from kBrowserActions with a data-driven pairing rule (refresh full-width) — the 7-action list stays the single source of truth vs router.rs
 - [Phase ?]: 05-02: kHubTiles ordered registry IS the hub render order (Trackpad first, full-width primary); later plans insert HubTileSpec entries with zero grid changes
 - [Phase ?]: 05-02: Hub tiles + browser keys fire callbacks on tap-down via the MouseButtonsBar house pattern — widget tests never touch the Navigator or a service fake
+- [Phase 05-04]: PresenterTimer is a pure clock-injected FSM (stopped/running/paused) over nowMillis — elapsed excludes paused gaps (accumulated + live span while running); startShow resets from ANY state; no timers/IO/Flutter in the FSM (D-08, Pitfall 13)
+- [Phase 05-04]: The presenter mm:ss ticker is a widget-local 1s Timer.periodic created LAZILY on first Start show (no rebuild loop before a show) and cancelled in dispose; the timer text tap/long-press stays interactive even when disconnected because the elapsed clock is strictly client-local (D-08)
+- [Phase 05-04]: PresenterScreen gates only the present-sending controls (zones, Start/End/Blank) on auth (muted, never red); Blank is optimistic local state (no wire readback) rendered with the armed-chip outline; WakelockPlus scoped initState->dispose (D-09); Presenter tile inserted between Trackpad and Browser in kHubTiles
 
 ### Pending Todos
 
@@ -204,6 +208,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-11T02:10:35.369Z
-Stopped at: Completed 05-01-PLAN.md
+Last session: 2026-07-11T02:40:00.000Z
+Stopped at: Completed 05-04-PLAN.md
 Resume file: None
