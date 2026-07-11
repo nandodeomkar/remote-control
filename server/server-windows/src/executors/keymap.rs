@@ -128,6 +128,11 @@ pub fn map_key(code: &KeyCode) -> Option<Key> {
         // VkKeyScanW so Ctrl+T / Ctrl+W / Ctrl+Plus chord correctly.
         "BrowserBack" => Key::BrowserBack,
         "BrowserForward" => Key::BrowserForward,
+        // ── Media transport keys (MED-01): VK_MEDIA_* route system-wide via
+        // the OS media stack (SMTC) to whatever session is playing.
+        "MediaPlayPause" => Key::MediaPlayPause,
+        "MediaNextTrack" => Key::MediaNextTrack,
+        "MediaPrevTrack" => Key::MediaPrevTrack,
         "T" => Key::Unicode('t'),
         "W" => Key::Unicode('w'),
         "B" => Key::Unicode('b'),

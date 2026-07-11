@@ -15,6 +15,24 @@ windows = { version = "0.62", features = [
     "Win32_UI_Input_KeyboardAndMouse",
     # GetCursorPos, GetSystemMetrics, SM_*VIRTUALSCREEN — virtual-desktop metrics (D-03)
     "Win32_UI_WindowsAndMessaging",
+    # ── Phase 5 (05-05) media/power executors ──
+    # IMMDeviceEnumerator, MMDeviceEnumerator, eRender/eConsole (audio thread)
+    "Win32_Media_Audio",
+    # IAudioEndpointVolume — absolute set/read master volume (MED-02)
+    "Win32_Media_Audio_Endpoints",
+    # CoInitializeEx, CoCreateInstance — COM on the audio thread
+    "Win32_System_Com",
+    # PROPVARIANT — required by IMMDevice::Activate's signature
+    "Win32_System_Com_StructuredStorage",
+    "Win32_System_Variant",
+    # SetSuspendState — sleep (PWR-02)
+    "Win32_System_Power",
+    # LockWorkStation, ExitWindowsEx, EWX_*, SHTDN_REASON_* (PWR-01/03)
+    "Win32_System_Shutdown",
+    # OpenProcessToken, AdjustTokenPrivileges, LookupPrivilegeValueW, SE_SHUTDOWN_NAME
+    "Win32_Security",
+    # GetCurrentProcess — token acquisition for privilege enablement
+    "Win32_System_Threading",
 ] }
 tokio = { version = "1.52", features = ["rt-multi-thread", "net", "sync", "time", "macros"] }
 tracing = "0.1"
