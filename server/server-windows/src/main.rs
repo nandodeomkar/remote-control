@@ -2,6 +2,7 @@
 //! (RESEARCH Pattern 5): DPI awareness, tracing subscriber, dedicated input
 //! thread, `ServerDeps` assembly, and `server_core::run` on a LAN listener.
 
+mod apps_thread;
 mod audio_thread;
 mod executors;
 mod input_thread;

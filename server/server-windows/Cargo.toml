@@ -31,8 +31,16 @@ windows = { version = "0.62", features = [
     "Win32_System_Shutdown",
     # OpenProcessToken, AdjustTokenPrivileges, LookupPrivilegeValueW, SE_SHUTDOWN_NAME
     "Win32_Security",
-    # GetCurrentProcess — token acquisition for privilege enablement
+    # GetCurrentProcess, GetCurrentThreadId, OpenProcess, QueryFullProcessImageNameW,
+    # PROCESS_QUERY_LIMITED_INFORMATION — token acquisition + apps-thread exe-path resolution (Flag 1)
     "Win32_System_Threading",
+    # ── Phase 6 (06-02) apps thread ──
+    # DwmGetWindowAttribute, DWMWA_CLOAKED — Alt-Tab cloak filter (Flag 2)
+    "Win32_Graphics_Dwm",
+    # GetIconInfo, GetDIBits, DeleteObject, GetDC/ReleaseDC — HICON → RGBA (Flag 2)
+    "Win32_Graphics_Gdi",
+    # ShellExecuteW (launch), SHGetFileInfoW (icon-by-path) (Flag 2 / APPS-02)
+    "Win32_UI_Shell",
 ] }
 tokio = { version = "1.52", features = ["rt-multi-thread", "net", "sync", "time", "macros"] }
 tracing = "0.1"
@@ -44,3 +52,6 @@ winreg = "0.56"
 # WinRT toast for the pairing PIN from the unpackaged exe (D-09/CONN-02);
 # POWERSHELL_APP_ID needs no AUMID registration (proper AUMID: Phase 7 tray).
 tauri-winrt-notification = "0.8"
+# Encode extracted 32x32 window icons to compact PNG for the wire (image-rs org,
+# audited T-06-SC); base64 is hand-rolled (pure fn) to keep the dep set minimal.
+png = "0.18"
