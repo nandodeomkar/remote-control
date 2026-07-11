@@ -36,6 +36,15 @@ void main() {
 
   testWidgets('grid renders every tile label and tap fires its entry',
       (t) async {
+    // The bare grid (no scroll host) must fit its tiles: production HubScreen
+    // wraps it in a SingleChildScrollView, so give the test surface enough
+    // height for the registry as it grows (05-06 added Power → 2 half-tile
+    // rows past the 800x600 default).
+    t.view.physicalSize = const Size(800, 1400);
+    t.view.devicePixelRatio = 1.0;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+
     final opened = <String>[];
     await t.pumpWidget(host(onOpen: (spec) => opened.add(spec.label)));
 
