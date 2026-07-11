@@ -37,9 +37,9 @@
 
 ### Power
 
-- [ ] **PWR-01**: User can lock the PC behind slide-to-confirm
-- [ ] **PWR-02**: User can sleep the PC (SetSuspendState) behind slide-to-confirm
-- [ ] **PWR-03**: User can restart or shut down the PC behind slide-to-confirm plus server-side confirm message
+- [x] **PWR-01**: User can lock the PC behind slide-to-confirm
+- [x] **PWR-02**: User can sleep the PC (SetSuspendState) behind slide-to-confirm
+- [x] **PWR-03**: User can restart or shut down the PC behind slide-to-confirm plus server-side confirm message
 
 ### Apps
 
@@ -130,9 +130,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KEY-04 | Phase 4 | Complete |
 | MED-01 | Phase 5 | Pending |
 | MED-02 | Phase 5 | Complete |
-| PWR-01 | Phase 5 | Pending |
-| PWR-02 | Phase 5 | Pending |
-| PWR-03 | Phase 5 | Pending |
+| PWR-01 | Phase 5 | Complete |
+| PWR-02 | Phase 5 | Complete |
+| PWR-03 | Phase 5 | Complete |
 | APPS-01 | Phase 6 | Pending |
 | APPS-02 | Phase 6 | Pending |
 | APPS-03 | Phase 6 | Pending |

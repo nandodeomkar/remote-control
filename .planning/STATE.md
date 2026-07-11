@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-07-11T02:44:51.000Z"
-last_activity: 2026-07-11 -- Completed 05-05 (real Media/Power executors)
+stopped_at: Completed 05-06-PLAN.md
+last_updated: "2026-07-11T02:57:16.000Z"
+last_activity: 2026-07-11 -- Completed 05-06 (power control slice)
 progress:
   total_phases: 7
   completed_phases: 4
-  total_plans: 36
-  completed_plans: 36
+  total_plans: 37
+  completed_plans: 37
   percent: 57
 ---
 
@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-07-07)
 ## Current Position
 
 Phase: 05 (media-power-presenter-browser) — EXECUTING
-Plan: 5 of 7 complete (05-05 real Windows Media/Power executors landed — whole server side of the phase now real)
-Next: continue Phase 05 execution
+Plan: 6 of 7 complete (05-06 power control slice landed — four actions behind slide-to-confirm + red countdown dialog, driving the live 05-05 WinPower executor; wave 3 done)
+Next: continue Phase 05 execution (05-07 Media slice — the last plan)
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
   manual IP, live latency header with no hot-path hitching). See 03-VERIFICATION.md.
@@ -35,7 +35,7 @@ Next: continue Phase 05 execution
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-11 -- Completed 05-05 (real Media/Power executors)
+Last activity: 2026-07-11 -- Completed 05-06 (power control slice)
 
 Progress: [██████░░░░] 57% (4 of 7 phases complete)
 
@@ -182,6 +182,10 @@ Recent decisions affecting current work:
 - [Phase 05-05]: IMMDevice::Activate is feature-gated on Win32_System_Com_StructuredStorage + Win32_System_Variant (PROPVARIANT param) beyond the 7 RESEARCH-listed windows features — cargo surfaced both (A3)
 - [Phase 05-05]: enable_shutdown_privilege() checks GetLastError() != ERROR_NOT_ALL_ASSIGNED so a silent partial grant is failure (Pitfall 1); every WinPower method thread::spawns (SetSuspendState may block until resume — never a tokio worker, Pitfall 4); sleep=SetSuspendState(false)=SUSPEND not hibernate (SC2); shutdown=EWX_POWEROFF|EWX_FORCEIFHUNG + non-zero planned dwReason (never the unconditional force flag — data loss)
 - [Phase 05-05]: WinMedia holds only two senders (input_tx media taps MED-01, audio_tx volume MED-02) — send-and-forget, no COM on the caller (Pitfall 5); pct_from_scalar rounds+clamps for a lossless 0..=100 round trip (Pitfall 7); StubMedia/StubPower gone, only StubApps/StubClipboard remain for Phase 6
+- [Phase 05-06]: ConfirmTrackFsm is a pure per-track slide-to-confirm FSM (idle→dragging(progress)→completed) — sealed effects (SendPower/SendConfirm/OpenCountdown/SpringBack) carry only the action string, no Flutter/IO/timers/wire types; 0.9 completion threshold, spring-back below (T-05-13)
+- [Phase 05-06]: The single-action-path gate (T-05-12/PWR-03) is structural: SendPower is always effect[0], a single `if (isDestructive)` picks the second effect, so the FSM can never emit SendConfirm for restart/shutdown — unit-proven; PowerMsg is sent from exactly one screen site, ConfirmMsg from exactly two (lock/sleep effect + dialog button)
+- [Phase 05-06]: D-05 lock/sleep completion sends power+confirm same-tick (FIFO held by the reliable queue); D-06 restart/shutdown open the app's ONE modal — a red countdown dialog with a dialog-local 1s ticker seeded from kPowerConfirmWindowSeconds=10 (server CONFIRM_WINDOW mirror); auto-dismiss at 0 / Cancel / barrier send nothing, late confirm's err{noPendingAction} silently ignored, post-confirm disconnect is banner-only (RESEARCH Pattern 5)
+- [Phase 05-06]: Power hub tile (Icons.power_settings_new) inserted between Trackpad and Presenter → order Trackpad, Power, Presenter, Browser; the bare-grid hub test surface was enlarged to 800x1400 for the 4th tile (production HubScreen scrolls the grid)
 
 ### Pending Todos
 
