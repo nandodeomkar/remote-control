@@ -4,6 +4,7 @@
 
 mod apps_thread;
 mod audio_thread;
+mod autostart;
 mod clip_thread;
 mod executors;
 mod input_thread;

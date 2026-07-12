@@ -68,3 +68,9 @@ arboard = "3.6"
 # server-core's token hashing — RustCrypto, already in tree (no new supply-chain
 # surface, T-06-SC).
 sha2 = "0.11"
+# Autostart toggle (SRV-02): writes the HKCU ...\Run key (per-user, no admin).
+# Locked by CLAUDE.md; RESEARCH Package Legitimacy Audit verdict OK/Approved
+# (auto-launch 0.6.0, zzzgydi/tauri-adjacent). Absolute current_exe() app_path;
+# winreg (already in tree) is the documented HKCU fallback if enable() ever
+# returns access-denied (Pitfall 7 / A2).
+auto-launch = "0.6"
