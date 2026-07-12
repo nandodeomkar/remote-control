@@ -247,7 +247,7 @@ Plans:
 - [x] 07-01-PLAN.md — AuthManager persistence + revoke + change-signal (server-core, SRV-03)
 - [x] 07-02-PLAN.md — Protocol 1.3 `input.blocked` codec + golden fixtures (Rust+Dart, SRV-05)
 - [x] 07-03-PLAN.md — OS-integration utilities: autostart + firewall + notify (SRV-02/04)
-- [ ] 07-09-PLAN.md — Theme tokens + haptics gate + keep-awake ref-count modules (UI-02)
+- [x] 07-09-PLAN.md — Theme tokens + haptics gate + keep-awake ref-count modules (UI-02)
 
 **Wave 2**
 
@@ -283,4 +283,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
 | 6. Apps & Clipboard | 7/7 | Complete    | 2026-07-12 |
-| 7. Server Shell, Dashboard & Polish | 3/13 | In Progress|  |
+| 7. Server Shell, Dashboard & Polish | 4/13 | In Progress|  |
