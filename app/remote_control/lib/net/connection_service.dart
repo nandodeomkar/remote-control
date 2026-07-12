@@ -175,6 +175,32 @@ class ClipSnapshot {
   int get hashCode => text.hashCode;
 }
 
+/// The last server-pushed UIPI advisory (SRV-05/D-07 `input.blocked`,
+/// proto 1.3). Value-equal over BOTH [reason] and [at] — unlike the other
+/// snapshots, a repeat transition with the SAME reason must still notify the
+/// banner as a fresh event (e.g. the elevated window stays foreground and a
+/// second injection attempt is dropped again), so equality intentionally
+/// includes the timestamp rather than deduping on [reason] alone.
+class InputBlockedSnapshot {
+  /// Fixed-vocabulary block reason (e.g. `"elevated"`), never a window
+  /// title/exe/PID (T-07-18).
+  final String reason;
+
+  /// When this transition was observed — lets the banner tell a fresh push
+  /// apart from an unrelated `changes` ping.
+  final DateTime at;
+
+  /// Creates a snapshot.
+  const InputBlockedSnapshot({required this.reason, required this.at});
+
+  @override
+  bool operator ==(Object other) =>
+      other is InputBlockedSnapshot && other.reason == reason && other.at == at;
+
+  @override
+  int get hashCode => Object.hash(reason, at);
+}
+
 /// True when [a] is an RFC1918 private IPv4 address or 169.254/16 link-local
 /// (phone-hotspot cases). IPv4 only — everything else is refused.
 ///
@@ -239,6 +265,7 @@ class ConnectionService {
   ClipSnapshot? _clipSnapshot;
   String? _clipFetchReply;
   ErrMsg? _lastError;
+  InputBlockedSnapshot? _inputBlocked;
 
   /// Liveness generation: bumping it invalidates any in-flight tick chain
   /// (the schedule seam has no cancel — stale ticks no-op on a gen mismatch).
@@ -330,6 +357,12 @@ class ConnectionService {
   /// before the first push. The clipboard store reads this off a [changes]
   /// ping. Distinct from [clipFetchReply] — this is the live auto-sync push.
   ClipSnapshot? get clipSnapshot => _clipSnapshot;
+
+  /// The last server-pushed UIPI advisory (SRV-05/D-07 `input.blocked`), or
+  /// null before the first push. Transient — the UipiBanner widget reads this
+  /// off a [changes] ping and auto-dismisses on its own timer; this service
+  /// never clears it on a timeout (that's a UI concern, not connection state).
+  InputBlockedSnapshot? get inputBlockedSnapshot => _inputBlocked;
 
   /// The last `clip.get` reply text (the server answers with a `clip.set`
   /// frame), or null before any Fetch. Kept SEPARATE from [clipSnapshot] so an
@@ -556,6 +589,15 @@ class ConnectionService {
       // clipboard store. S→C only — never routed to the driver, no payload
       // logged (SPEC §12, T-06-09).
       _clipSnapshot = ClipSnapshot(msg.text);
+      _notify();
+      return;
+    }
+    if (msg is InputBlockedMsg) {
+      // SRV-05/D-07 UIPI advisory push: park a transient snapshot and ping
+      // the banner via changes. S→C only — never routed to the driver, no
+      // payload logged (the reason vocabulary carries no window title/exe,
+      // T-07-18).
+      _inputBlocked = InputBlockedSnapshot(reason: msg.reason, at: DateTime.now());
       _notify();
       return;
     }
