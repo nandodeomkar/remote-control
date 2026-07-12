@@ -10,11 +10,50 @@ pub mod pin;
 pub mod token;
 
 use std::net::IpAddr;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use pin::{PinOutcome, PinState};
+use tokio::sync::watch;
+
+/// A single paired device: its stored token hash plus the metadata the
+/// settings paired-device list and config persistence need (D-04). Stores
+/// the SHA-256 hash ONLY — there is deliberately NO raw-token field
+/// (threat T-01-08 / T-01-17).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PairedDevice {
+    /// SHA-256 of the raw token — the ONLY persisted token form, used
+    /// directly as the HMAC verification key.
+    pub hash: [u8; 32],
+    /// The phone's `hello.device` name, recorded at pairing for the
+    /// settings multi-device list (D-04).
+    pub name: String,
+    /// Unix seconds when this device completed pairing (D-04).
+    pub paired_at: u64,
+}
+
+impl PairedDevice {
+    /// Construct a paired-device record from its hash, name, and pairing
+    /// time (unix seconds).
+    pub fn new(hash: [u8; 32], name: String, paired_at: u64) -> Self {
+        Self { hash, name, paired_at }
+    }
+}
+
+/// The result of a successful named pairing: the raw token hex to hand the
+/// phone ONCE (`pairOk`) plus the stored hash so the caller can correlate the
+/// delivery. The raw hex is a return value only — it is never retained by
+/// [`AuthManager`] (threat T-01-08).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PairingResult {
+    /// 64 lowercase hex chars encoding the 32-byte token — for the one-time
+    /// `pairOk` delivery.
+    pub token_hex: String,
+    /// SHA-256 of the raw token bytes — the stored form.
+    pub hash: [u8; 32],
+}
 
 /// Owns pairing state (active PIN + expiry), attempt/lockout tables, the
-/// stored token hashes, and the active challenge nonce.
+/// stored paired-device records, and the active challenge nonce.
 ///
 /// Shared across sessions as `Arc<std::sync::Mutex<AuthManager>>` (see
 /// [`crate::transport::ServerDeps`]).
@@ -23,12 +62,16 @@ pub struct AuthManager {
     /// global failure counter. Lives HERE, not on any session type, so
     /// lockout survives disconnect/reconnect (threat T-01-19).
     pin: PinState,
-    /// Paired-device token hashes — SHA-256 ONLY, never raw tokens
-    /// (threat T-01-17). In-memory for Phase 1; config persistence is
-    /// Phase 7.
-    paired_hashes: Vec<[u8; 32]>,
+    /// Paired-device records — each carries a SHA-256 hash ONLY, never raw
+    /// tokens (threat T-01-17). Seeded from `config.toml` at startup
+    /// (Phase 7 D-01) and mutated by pairing/revoke.
+    paired: Vec<PairedDevice>,
     /// Most recently issued challenge nonce (fresh per `issue_challenge`).
     active_nonce: Option<[u8; 32]>,
+    /// Change-signal: bumped on EVERY paired-set mutation so the composition
+    /// root can subscribe (via [`AuthManager::changes`]) and re-serialize
+    /// `config.toml`. Starts at 0.
+    changes_tx: watch::Sender<u64>,
 }
 
 impl Default for AuthManager {
@@ -40,10 +83,18 @@ impl Default for AuthManager {
 impl AuthManager {
     /// Create a manager with no stored pairing and empty lockout tables.
     pub fn new() -> Self {
+        Self::from_paired(Vec::new())
+    }
+
+    /// Create a manager seeded with previously-paired device records — the
+    /// restore path used at startup after decoding `config.toml` (D-01).
+    /// Lockout tables start empty (lockout is per-run, not persisted).
+    pub fn from_paired(records: Vec<PairedDevice>) -> Self {
         Self {
             pin: PinState::new(),
-            paired_hashes: Vec::new(),
+            paired: records,
             active_nonce: None,
+            changes_tx: watch::Sender::new(0),
         }
     }
 
@@ -62,21 +113,66 @@ impl AuthManager {
     }
 
     /// Complete a successful pairing: issue a fresh 32-byte token, store
-    /// ONLY its SHA-256 hash, and return the raw token hex (64 lowercase)
-    /// for the one-time `pairOk` delivery (SPEC §3a, §12).
+    /// ONLY its SHA-256 hash under a default `"phone"` name, and return the
+    /// raw token hex (64 lowercase) for the one-time `pairOk` delivery
+    /// (SPEC §3a, §12). Signature preserved for callers that do not thread
+    /// the phone's `hello.device` name; see [`Self::complete_pairing_named`].
     pub fn complete_pairing(&mut self) -> String {
-        let issued = token::issue_token();
-        self.paired_hashes.push(issued.hash);
-        // The raw hex leaves this scope immediately — AuthManager keeps no
-        // raw-token field (threat T-01-17).
-        issued.raw_hex
+        self.complete_pairing_named("phone".to_owned()).token_hex
     }
 
-    /// Whether at least one device has completed pairing (a token hash is
+    /// Complete a successful pairing recording the phone's `name` (its
+    /// `hello.device`) and the pairing time. Stores ONLY the SHA-256 hash
+    /// (threat T-01-08), bumps the change-signal (D-01 config re-serialize),
+    /// and returns the raw token hex + hash as a [`PairingResult`] — the raw
+    /// hex is never retained.
+    pub fn complete_pairing_named(&mut self, name: String) -> PairingResult {
+        let issued = token::issue_token();
+        self.paired
+            .push(PairedDevice::new(issued.hash, name, now_unix()));
+        self.bump_changes();
+        // The raw hex leaves in the return value only — AuthManager keeps no
+        // raw-token field (threat T-01-17).
+        PairingResult { token_hex: issued.raw_hex, hash: issued.hash }
+    }
+
+    /// Whether at least one device has completed pairing (a record is
     /// stored). The composition root uses this to stop refreshing the pairing
-    /// PIN once a phone is paired (WR-01).
+    /// PIN once a phone is paired (WR-01) and for smart startup (D-03).
     pub fn is_paired(&self) -> bool {
-        !self.paired_hashes.is_empty()
+        !self.paired.is_empty()
+    }
+
+    /// Remove every paired record matching `hash`, bump the change-signal,
+    /// and report whether anything was removed (D-05). A revoked hash then
+    /// fails all future auth: [`Self::verify_auth_hash`] returns `None`.
+    pub fn revoke(&mut self, hash: &[u8; 32]) -> bool {
+        let before = self.paired.len();
+        self.paired.retain(|d| &d.hash != hash);
+        let removed = self.paired.len() != before;
+        if removed {
+            self.bump_changes();
+        }
+        removed
+    }
+
+    /// The stored token hashes only — for the session revoke-branch
+    /// membership check (07-05).
+    pub fn paired_hashes(&self) -> Vec<[u8; 32]> {
+        self.paired.iter().map(|d| d.hash).collect()
+    }
+
+    /// The full paired-device records — for config serialization (07-07) and
+    /// the settings paired list (07-08).
+    pub fn paired_records(&self) -> &[PairedDevice] {
+        &self.paired
+    }
+
+    /// Subscribe to the paired-set change-signal. The returned [`watch::Receiver`]
+    /// observes an increment on EVERY paired mutation (pairing / revoke); the
+    /// composition root re-serializes `config.toml` on each bump (D-01).
+    pub fn changes(&self) -> watch::Receiver<u64> {
+        self.changes_tx.subscribe()
     }
 
     /// Issue a fresh 32-byte CSPRNG challenge nonce for this connection
@@ -91,10 +187,34 @@ impl AuthManager {
     /// key over `nonce` and compare against `mac_hex` in constant time
     /// (SPEC §4). Returns `false` when no pairing is stored.
     pub fn verify_auth(&self, nonce: &[u8], mac_hex: &str) -> bool {
-        self.paired_hashes
-            .iter()
-            .any(|hash| challenge::verify_mac(hash, nonce, mac_hex))
+        self.verify_auth_hash(nonce, mac_hex).is_some()
     }
+
+    /// Like [`Self::verify_auth`] but returns the FIRST stored hash whose HMAC
+    /// verifies, so a session can record WHICH hash authed it — the revoke
+    /// branch (D-05) checks that hash for continued membership. Returns
+    /// `None` when no stored hash verifies (including the no-pairing case).
+    pub fn verify_auth_hash(&self, nonce: &[u8], mac_hex: &str) -> Option<[u8; 32]> {
+        self.paired
+            .iter()
+            .find(|d| challenge::verify_mac(&d.hash, nonce, mac_hex))
+            .map(|d| d.hash)
+    }
+
+    /// Advance the change-signal by one — called on every paired-set
+    /// mutation. `send_modify` bumps the value even with no live receivers.
+    fn bump_changes(&self) {
+        self.changes_tx.send_modify(|v| *v += 1);
+    }
+}
+
+/// Current unix time in whole seconds, saturating to 0 before the epoch —
+/// never panics (a backwards clock must not crash the auth path).
+fn now_unix() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
