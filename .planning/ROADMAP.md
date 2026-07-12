@@ -252,7 +252,7 @@ Plans:
 **Wave 2**
 
 - [x] 07-04-PLAN.md — Input-thread UIPI detection primitives (SRV-05)
-- [ ] 07-05-PLAN.md — Transport seams: conn_count + revoke branch + input.blocked push + proto 1.3 (SRV-01/03/05)
+- [x] 07-05-PLAN.md — Transport seams: conn_count + revoke branch + input.blocked push + proto 1.3 (SRV-01/03/05)
 - [ ] 07-10-PLAN.md — Palette + haptics + keep-awake migration across screens (UI-02)
 - [ ] 07-11-PLAN.md — UIPI banner client: parking + provider + widget (SRV-05)
 
@@ -283,4 +283,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
 | 6. Apps & Clipboard | 7/7 | Complete    | 2026-07-12 |
-| 7. Server Shell, Dashboard & Polish | 5/13 | In Progress|  |
+| 7. Server Shell, Dashboard & Polish | 6/13 | In Progress|  |
