@@ -16,14 +16,22 @@
 
 use enigo::{Axis, Direction, Enigo, Key, Keyboard, Mouse, Settings};
 use server_core::executors::{Button, KeyCode, Modifier};
-use windows::Win32::Foundation::POINT;
+use windows::core::HRESULT;
+use windows::Win32::Foundation::{CloseHandle, ERROR_ACCESS_DENIED, HANDLE, POINT};
+use windows::Win32::Security::{
+    GetSidSubAuthority, GetSidSubAuthorityCount, GetTokenInformation, TokenIntegrityLevel,
+    TOKEN_MANDATORY_LABEL, TOKEN_QUERY,
+};
+use windows::Win32::System::Threading::{
+    GetCurrentProcess, OpenProcess, OpenProcessToken, PROCESS_QUERY_LIMITED_INFORMATION,
+};
 use windows::Win32::UI::Input::KeyboardAndMouse::{
     INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_MOVE,
     MOUSEEVENTF_VIRTUALDESK, MOUSEINPUT, SendInput,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
-    GetCursorPos, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
-    SM_YVIRTUALSCREEN,
+    GetCursorPos, GetForegroundWindow, GetSystemMetrics, GetWindowThreadProcessId,
+    SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
 };
 
 use crate::executors::keymap::{map_button, map_key, map_mod};
@@ -147,6 +155,124 @@ pub(crate) const SECURITY_MANDATORY_HIGH_RID: u32 = 0x3000;
 /// validated on-device by the 07-06 wiring plan).
 pub(crate) fn is_blocking_il(foreground_rid: u32, our_rid: u32) -> bool {
     foreground_rid > our_rid
+}
+
+/// Extract the RID (the LAST sub-authority) from a token's
+/// `TokenIntegrityLevel` mandatory-label SID. `None` on any failure —
+/// never panics (SHARED-E discipline).
+///
+/// Does NOT take ownership of `token` — the caller closes it.
+fn read_integrity_rid(token: HANDLE) -> Option<u32> {
+    // SAFETY: `GetTokenInformation` is called twice per the standard Win32
+    // two-pass sizing convention (first call sizes the buffer, ignoring its
+    // Result; second call fills a buffer sized to exactly that length). The
+    // mandatory-label struct is read back through a raw pointer cast that is
+    // valid because `buf` was sized and filled by that same second call.
+    unsafe {
+        let mut needed: u32 = 0;
+        let _ = GetTokenInformation(token, TokenIntegrityLevel, None, 0, &mut needed);
+        if needed == 0 {
+            return None;
+        }
+        let mut buf = vec![0u8; needed as usize];
+        GetTokenInformation(
+            token,
+            TokenIntegrityLevel,
+            Some(buf.as_mut_ptr() as *mut _),
+            needed,
+            &mut needed,
+        )
+        .ok()?;
+        let label = &*(buf.as_ptr() as *const TOKEN_MANDATORY_LABEL);
+        let sid = label.Label.Sid;
+        let count = *GetSidSubAuthorityCount(sid);
+        if count == 0 {
+            return None;
+        }
+        Some(*GetSidSubAuthority(sid, u32::from(count - 1)))
+    }
+}
+
+/// Read the FOREGROUND window's process integrity RID (D-07 detection
+/// primitive, RESEARCH Pattern 5): `GetForegroundWindow` →
+/// `GetWindowThreadProcessId` → `OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION)`
+/// → `OpenProcessToken(TOKEN_QUERY)` → [`read_integrity_rid`].
+///
+/// `OpenProcess` returning `ERROR_ACCESS_DENIED` is ITSELF a higher-IL
+/// signal (RESEARCH Pitfall 6 / A4): a foreground window we cannot even
+/// open a handle to is, in practice, elevated relative to us — treated as
+/// [`SECURITY_MANDATORY_HIGH_RID`]. Every other failure returns `None`
+/// (fail-quiet — an uncertain read is not evidence of a block, mirroring
+/// `firewall.rs`'s `Unknown` discipline).
+///
+/// RAII-by-hand: both the process handle and the token handle are closed on
+/// every exit path (`apps_thread::exe_path` discipline, SHARED-E); no
+/// `.unwrap()`/`.expect()` on any HRESULT.
+#[allow(dead_code)] // wired into the input loop + blocked watch by 07-06
+pub(crate) fn foreground_integrity_rid() -> Option<u32> {
+    // SAFETY: `hwnd`/`pid` come straight from the Win32 calls that produce
+    // them; the process handle is closed before this function returns on
+    // every branch, and the token handle likewise.
+    unsafe {
+        let hwnd = GetForegroundWindow();
+        if hwnd.is_invalid() {
+            return None;
+        }
+        let mut pid: u32 = 0;
+        GetWindowThreadProcessId(hwnd, Some(&mut pid));
+        if pid == 0 {
+            return None;
+        }
+
+        let process = match OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+            Ok(handle) => handle,
+            Err(e) if e.code() == HRESULT::from_win32(ERROR_ACCESS_DENIED.0) => {
+                return Some(SECURITY_MANDATORY_HIGH_RID);
+            }
+            Err(_) => return None,
+        };
+
+        let mut token = HANDLE::default();
+        let opened = OpenProcessToken(process, TOKEN_QUERY, &mut token).is_ok();
+        let _ = CloseHandle(process);
+        if !opened {
+            return None;
+        }
+
+        let rid = read_integrity_rid(token);
+        let _ = CloseHandle(token);
+        rid
+    }
+}
+
+/// Our OWN process's integrity RID, read once via the `GetCurrentProcess`
+/// pseudo-handle (no handle to close for the process itself — only the
+/// token handle is real and closed below).
+#[allow(dead_code)] // wired into the input loop + blocked watch by 07-06
+pub(crate) fn our_integrity_rid() -> Option<u32> {
+    // SAFETY: `GetCurrentProcess` returns a pseudo-handle that needs no
+    // `CloseHandle`; the real token handle it opens is closed on every path.
+    unsafe {
+        let mut token = HANDLE::default();
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token).is_err() {
+            return None;
+        }
+        let rid = read_integrity_rid(token);
+        let _ = CloseHandle(token);
+        rid
+    }
+}
+
+/// `true` when the foreground window's integrity level would silently drop
+/// our injected input (D-07 / SRV-05). Any read failure on either side
+/// degrades to [`SECURITY_MANDATORY_MEDIUM_RID`] — an uncertain read must
+/// never manufacture a false "blocked" banner (fail-quiet, mirroring
+/// `firewall.rs`'s `Unknown` discipline).
+#[allow(dead_code)] // wired into the input loop + blocked watch by 07-06
+pub(crate) fn foreground_blocked() -> bool {
+    let foreground = foreground_integrity_rid().unwrap_or(SECURITY_MANDATORY_MEDIUM_RID);
+    let ours = our_integrity_rid().unwrap_or(SECURITY_MANDATORY_MEDIUM_RID);
+    is_blocking_il(foreground, ours)
 }
 
 /// Current cursor position in virtual-desktop coordinates, read FRESH each
