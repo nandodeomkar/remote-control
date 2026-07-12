@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Phase 7 UI-SPEC approved
-last_updated: "2026-07-12T12:05:00.000Z"
-last_activity: 2026-07-12 -- Phase 07 Plan 02 complete (input.blocked proto-1.3 wire contract)
+stopped_at: Completed 07-02-PLAN.md (input.blocked proto-1.3 wire contract)
+last_updated: "2026-07-12T12:01:20.579Z"
+last_activity: 2026-07-12 -- Phase 07 execution started
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 56
-  completed_plans: 45
-  percent: 80
+  completed_plans: 46
+  percent: 82
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 07 (server-shell-dashboard-polish) — EXECUTING
-Plan: 3 of 13
+Plan: 4 of 13
 Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
@@ -102,6 +102,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 06 P05 | ~30min | 3 tasks | 6 files |
 | Phase 07 P01 | 4min | 2 tasks | 1 files |
 | Phase 07 P02 | 15min | 2 tasks | 6 files |
+| Phase 07 P03 | 8min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -219,6 +220,8 @@ Recent decisions affecting current work:
 - [Phase 06]: [Phase 06-05]: HistoryStore.record does move-to-head dedupe (remove existing equal, prepend, cap 5) — the only design satisfying BOTH consecutive dedupe AND reuse-moves-to-head (D-06); clipTextTooLarge caps on UTF-8 BYTES not code units (T-06-16b); Clipboard hub tile after Apps -> Trackpad, Media, Apps, Clipboard, Power, Presenter, Browser
 - [Phase 07-02]: input.blocked (proto 1.3, SRV-05/D-07) added to BOTH codecs as an additive S→C push cloning the vol.changed precedent (InputBlockedPayload{reason} + Msg::InputBlocked / InputBlockedMsg + decodeText arm); reason is a fixed vocabulary ("elevated"), never window title/exe/PII. SERVER_PROTO_VERSION deliberately NOT bumped here (still 1.2) — the version bump + authed-gated session push land in 07-05 which owns session.rs. input.blocked routed to the router S→C-only no-op group (client sending it is ignored silently). A NEW fixture family needs a matching test fn in BOTH hard-coded harnesses (Rust codec_fixtures_input_blocked + Dart input_blocked group) — neither globs dirs; the shared golden fixture proves byte-identical decode.
 - [Phase ?]: [Phase 07-01]: AuthManager grown to Vec<PairedDevice{hash,name,paired_at}> with from_paired/revoke/complete_pairing_named/verify_auth_hash/paired_records + a watch::Sender<u64> change-signal; existing complete_pairing/is_paired/verify_auth signatures preserved (complete_pairing delegates to complete_pairing_named phone, verify_auth to verify_auth_hash().is_some()) so server-windows still builds; hash-only invariant unit-enforced
+- [Phase ?]: [Phase 07-03]: firewall::inbound_allowed keeps read-only INetFwRules enumeration (not just FirewallEnabled+DefaultInboundAction) — Windows default inbound action IS Block on standard profiles so getters-only would false-positive BlockedNoRule everywhere; port-only rule match is the single-host heuristic (A3), Unknown fails quiet (caller must not warn)
+- [Phase ?]: [Phase 07-03]: windows 0.62 — VARIANT cfg-gated on all(Win32_System_Com, Win32_System_Ole), IEnumVARIANT lives in Win32::System::Ole not ::Com; autostart/firewall/notify_firewall_warning are unwired primitives (scoped allow(dead_code)) consumed by 07-06/07-08
 
 ### Pending Todos
 
@@ -252,6 +255,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-12T12:05:00.000Z
+Last session: 2026-07-12T12:00:32.222Z
 Stopped at: Completed 07-02-PLAN.md (input.blocked proto-1.3 wire contract)
 Resume file: None
