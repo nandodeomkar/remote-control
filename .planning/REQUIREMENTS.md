@@ -69,7 +69,7 @@
 - [x] **SRV-02**: Server can auto-start with Windows (toggle)
 - [x] **SRV-03**: User manages device name, port, paired-device revoke, and clipboard sync in a settings window
 - [x] **SRV-04**: Server warns in tray when its port is blocked by firewall (startup self-test)
-- [ ] **SRV-05**: Phone shows a clear status when input is blocked by an elevated window (UIPI) instead of failing silently
+- [x] **SRV-05**: Phone shows a clear status when input is blocked by an elevated window (UIPI) instead of failing silently
 
 ### App UI
 
@@ -147,7 +147,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRV-02 | Phase 7 | Complete |
 | SRV-03 | Phase 7 | Complete |
 | SRV-04 | Phase 7 | Complete |
-| SRV-05 | Phase 7 | Pending |
+| SRV-05 | Phase 7 | Complete |
 | UI-01 | Phase 7 | Pending |
 | UI-02 | Phase 7 | Complete |
 
