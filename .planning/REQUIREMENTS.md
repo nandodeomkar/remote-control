@@ -67,7 +67,7 @@
 
 - [ ] **SRV-01**: Server lives in the tray with status tooltip, pause-input toggle, and quit
 - [ ] **SRV-02**: Server can auto-start with Windows (toggle)
-- [ ] **SRV-03**: User manages device name, port, paired-device revoke, and clipboard sync in a settings window
+- [x] **SRV-03**: User manages device name, port, paired-device revoke, and clipboard sync in a settings window
 - [ ] **SRV-04**: Server warns in tray when its port is blocked by firewall (startup self-test)
 - [ ] **SRV-05**: Phone shows a clear status when input is blocked by an elevated window (UIPI) instead of failing silently
 
@@ -145,7 +145,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | BROW-01 | Phase 5 | Complete |
 | SRV-01 | Phase 7 | Pending |
 | SRV-02 | Phase 7 | Pending |
-| SRV-03 | Phase 7 | Pending |
+| SRV-03 | Phase 7 | Complete |
 | SRV-04 | Phase 7 | Pending |
 | SRV-05 | Phase 7 | Pending |
 | UI-01 | Phase 7 | Pending |

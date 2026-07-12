@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to plan
-stopped_at: Phase 7 context gathered
-last_updated: "2026-07-12T05:20:37.049Z"
-last_activity: 2026-07-12
+status: Ready to execute
+stopped_at: Phase 7 UI-SPEC approved
+last_updated: "2026-07-12T11:42:18.021Z"
+last_activity: 2026-07-12 -- Phase 07 execution started
 progress:
   total_phases: 7
   completed_phases: 6
-  total_plans: 43
-  completed_plans: 43
-  percent: 86
+  total_plans: 56
+  completed_plans: 44
+  percent: 79
 ---
 
 # Project State
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 06 — apps-clipboard
+**Current focus:** Phase 07 — server-shell-dashboard-polish
 
 ## Current Position
 
-Phase: 7
-Plan: Not started
+Phase: 07 (server-shell-dashboard-polish) — EXECUTING
+Plan: 2 of 13
 Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
@@ -36,7 +36,7 @@ Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), 
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-12
+Last activity: 2026-07-12 -- Phase 07 execution started
 
 Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43 plans)
 
@@ -100,6 +100,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 06 P03 | ~30min | 3 tasks | 8 files |
 | Phase 06 P04 | ~30min | 3 tasks | 11 files |
 | Phase 06 P05 | ~30min | 3 tasks | 6 files |
+| Phase 07 P01 | 4min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -215,6 +216,7 @@ Recent decisions affecting current work:
 - [Phase 06-04]: StubClipboard removed + stubs.rs deleted — all five server_core executor traits (MouseKeys/Media/Power/Apps/Clipboard) now have real Windows backends
 - [Phase 06]: [Phase 06-05]: clipFetchReply stays a String? getter but is identity-tracked by ClipNotifier — each clip.set reply decodes to a fresh String, so an unrelated changes ping (identical reference) is never consumed as a Fetch reply; no seq/counter added
 - [Phase 06]: [Phase 06-05]: HistoryStore.record does move-to-head dedupe (remove existing equal, prepend, cap 5) — the only design satisfying BOTH consecutive dedupe AND reuse-moves-to-head (D-06); clipTextTooLarge caps on UTF-8 BYTES not code units (T-06-16b); Clipboard hub tile after Apps -> Trackpad, Media, Apps, Clipboard, Power, Presenter, Browser
+- [Phase ?]: [Phase 07-01]: AuthManager grown to Vec<PairedDevice{hash,name,paired_at}> with from_paired/revoke/complete_pairing_named/verify_auth_hash/paired_records + a watch::Sender<u64> change-signal; existing complete_pairing/is_paired/verify_auth signatures preserved (complete_pairing delegates to complete_pairing_named phone, verify_auth to verify_auth_hash().is_some()) so server-windows still builds; hash-only invariant unit-enforced
 
 ### Pending Todos
 
@@ -248,6 +250,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-12T05:20:37.037Z
-Stopped at: Phase 7 context gathered
-Resume file: .planning/phases/07-server-shell-dashboard-polish/07-CONTEXT.md
+Last session: 2026-07-12T11:42:09.664Z
+Stopped at: Phase 7 UI-SPEC approved
+Resume file: .planning/phases/07-server-shell-dashboard-polish/07-UI-SPEC.md

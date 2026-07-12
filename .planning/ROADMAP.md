@@ -238,8 +238,37 @@ Plans:
   4. A firewall-blocked port produces a tray warning with a fix hint at startup, and input blocked by an elevated window (UIPI) shows a clear status on the phone instead of failing silently
   5. The dashboard home shows the 8 tool tiles with the persistent trackpad quick-bar on every screen, dark minimal theme (#0E0F12, blue accent), haptic feedback toggle, and keep-awake during trackpad/presenter use
 
-**Plans**: TBD
+**Plans**: 13 plans
 **UI hint**: yes
+
+Plans:
+**Wave 1**
+
+- [x] 07-01-PLAN.md — AuthManager persistence + revoke + change-signal (server-core, SRV-03)
+- [ ] 07-02-PLAN.md — Protocol 1.3 `input.blocked` codec + golden fixtures (Rust+Dart, SRV-05)
+- [ ] 07-03-PLAN.md — OS-integration utilities: autostart + firewall + notify (SRV-02/04)
+- [ ] 07-09-PLAN.md — Theme tokens + haptics gate + keep-awake ref-count modules (UI-02)
+
+**Wave 2**
+
+- [ ] 07-04-PLAN.md — Input-thread UIPI detection primitives (SRV-05)
+- [ ] 07-05-PLAN.md — Transport seams: conn_count + revoke branch + input.blocked push + proto 1.3 (SRV-01/03/05)
+- [ ] 07-10-PLAN.md — Palette + haptics + keep-awake migration across screens (UI-02)
+- [ ] 07-11-PLAN.md — UIPI banner client: parking + provider + widget (SRV-05)
+
+**Wave 3**
+
+- [ ] 07-06-PLAN.md — Tray shell bootstrap + firewall self-test + main integration (SRV-01/04/05)
+- [ ] 07-12-PLAN.md — App Settings screen + scroll-direction + paired-PC revoke (UI-02/SRV-03)
+
+**Wave 4**
+
+- [ ] 07-07-PLAN.md — Config persistence + on-demand pairing + smart startup + revoke wiring (SRV-03)
+- [ ] 07-13-PLAN.md — Dashboard rewire: home→HubScreen, uniform 2×4, 8 tiles + quick-bar + Keyboard screen (UI-01)
+
+**Wave 5**
+
+- [ ] 07-08-PLAN.md — egui settings window + tray Settings/Pair-new (SRV-03/02/04)
 
 ## Progress
 
@@ -254,4 +283,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
 | 6. Apps & Clipboard | 7/7 | Complete    | 2026-07-12 |
-| 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |
+| 7. Server Shell, Dashboard & Polish | 1/13 | In Progress|  |
