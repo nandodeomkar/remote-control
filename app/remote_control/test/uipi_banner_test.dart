@@ -94,14 +94,16 @@ void main() {
 
   group('UipiBanner — advisory styling only', () {
     testWidgets('never paints the destructive or accent color', (tester) async {
-      InputBlockedSnapshot? current =
-          InputBlockedSnapshot(reason: 'elevated', at: DateTime.now());
+      InputBlockedSnapshot? current;
       final controller = StreamController<void>.broadcast();
       addTearDown(controller.close);
 
       await tester.pumpWidget(
         _host(UipiBanner(snapshot: () => current, changes: controller.stream)),
       );
+      // A fresh push AFTER mount — a snapshot already parked before mount
+      // is intentionally NOT treated as a new transition (see initState).
+      current = InputBlockedSnapshot(reason: 'elevated', at: DateTime.now());
       controller.add(null);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
@@ -124,8 +126,7 @@ void main() {
     testWidgets('does not intercept touches to the content beneath it', (
       tester,
     ) async {
-      InputBlockedSnapshot? current =
-          InputBlockedSnapshot(reason: 'elevated', at: DateTime.now());
+      InputBlockedSnapshot? current;
       final controller = StreamController<void>.broadcast();
       addTearDown(controller.close);
       var tapped = false;
@@ -147,6 +148,8 @@ void main() {
           ),
         ),
       );
+      // A fresh push AFTER mount, same rule as the styling test above.
+      current = InputBlockedSnapshot(reason: 'elevated', at: DateTime.now());
       controller.add(null);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200));
