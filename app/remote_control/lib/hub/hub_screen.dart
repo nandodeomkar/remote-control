@@ -38,15 +38,9 @@ import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
 import '../power/power_screen.dart';
 import '../presenter/presenter_screen.dart';
+import '../theme/tokens.dart';
 import '../trackpad/trackpad_screen.dart';
 import '../widgets/connection_header.dart';
-
-// UI-SPEC locked palette.
-const Color _bg = Color(0xFF0E0F12);
-const Color _surface = Color(0xFF16181D);
-const Color _hairline = Color(0xFF2A2D34);
-const Color _text = Color(0xFFE6E8EB);
-const Color _muted = Color(0xFF6B7280);
 
 /// One hub tile: label + icon + the tool screen it opens.
 class HubTileSpec {
@@ -185,9 +179,9 @@ class _HubTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: _surface,
+      color: kSurface,
       shape: RoundedRectangleBorder(
-        side: const BorderSide(color: _hairline),
+        side: const BorderSide(color: kHairline),
         borderRadius: BorderRadius.circular(16),
       ),
       child: InkWell(
@@ -197,14 +191,14 @@ class _HubTile extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(spec.icon, size: 32, color: _muted),
+              Icon(spec.icon, size: 32, color: kMuted),
               const SizedBox(height: 4),
               Text(
                 spec.label,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: _text,
+                  color: kText,
                 ),
               ),
             ],
@@ -251,9 +245,9 @@ class _HubScreenState extends ConsumerState<HubScreen> {
     final deviceName = _service.target?.name ?? 'Remote';
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: kBg,
         title: Text(
           deviceName,
           maxLines: 1,
@@ -261,7 +255,7 @@ class _HubScreenState extends ConsumerState<HubScreen> {
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _text,
+            color: kText,
           ),
         ),
         actions: [

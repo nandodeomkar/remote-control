@@ -24,15 +24,13 @@ import 'package:flutter/material.dart';
 import '../hud/latency_probe.dart';
 import '../net/connection_service.dart';
 import '../screens/connection_copy.dart';
+import '../theme/tokens.dart';
 
-// UI-SPEC locked palette (Color table + "Header chip" states table).
-const Color _connectedColor = Color(0xFF4C8DFF);
+// Colors not covered by the D-12 token set (amber "reconnecting" state, the
+// translucent chip fill) stay local — the guard test only forbids the LOCKED
+// palette hex literals, not every color in the app.
 const Color _reconnectingColor = Color(0xFFE8A33D);
-const Color _disconnectedColor = Color(0xFF6B7280);
 const Color _chipFill = Color(0xCC0E0F12);
-const Color _hairline = Color(0xFF2A2D34);
-const Color _surface = Color(0xFF16181D);
-const Color _text = Color(0xFFE6E8EB);
 
 /// Chip color-transition budget (UI-SPEC: 200ms ease, color only).
 const Duration _kChipColorEase = Duration(milliseconds: 200);
@@ -99,11 +97,11 @@ class _ConnectionHeaderChipState extends State<ConnectionHeaderChip> {
   static Color _colorFor(ChipStatus status) {
     switch (status) {
       case ChipStatus.connected:
-        return _connectedColor;
+        return kAccent;
       case ChipStatus.reconnecting:
         return _reconnectingColor;
       case ChipStatus.disconnected:
-        return _disconnectedColor;
+        return kMuted;
     }
   }
 
@@ -131,7 +129,7 @@ class _ConnectionHeaderChipState extends State<ConnectionHeaderChip> {
       decoration: BoxDecoration(
         color: _chipFill,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: _hairline),
+        border: Border.all(color: kHairline),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -161,7 +159,7 @@ class _ConnectionHeaderChipState extends State<ConnectionHeaderChip> {
             Text(
               _fmt(widget.p50()),
               style: const TextStyle(
-                color: _text,
+                color: kText,
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
                 fontFeatures: [FontFeature.tabularFigures()],
@@ -188,10 +186,10 @@ class ReconnectingBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: _surface,
+        color: kSurface,
         border: Border(
-          top: BorderSide(color: _hairline),
-          bottom: BorderSide(color: _hairline),
+          top: BorderSide(color: kHairline),
+          bottom: BorderSide(color: kHairline),
         ),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -203,7 +201,7 @@ class ReconnectingBanner extends StatelessWidget {
             child: Text(
               kReconnectingBannerCopy,
               style: TextStyle(
-                color: _text,
+                color: kText,
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
               ),
@@ -213,7 +211,7 @@ class ReconnectingBanner extends StatelessWidget {
             onPressed: onRetry,
             style: TextButton.styleFrom(
               minimumSize: const Size(48, 48),
-              foregroundColor: _connectedColor,
+              foregroundColor: kAccent,
             ),
             child: const Text(kRetryNowLabel),
           ),

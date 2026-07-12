@@ -30,39 +30,32 @@ import '../net/handshake.dart';
 import '../net/reconnect_fsm.dart';
 import '../store/device_list_store.dart';
 import '../store/device_store.dart';
+import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'connection_copy.dart';
 import 'pairing_dialog.dart';
-
-// Theme tokens (03-UI-SPEC Color table; accent literal reserved — see the
-// library doc).
-const Color _bg = Color(0xFF0E0F12);
-const Color _surface = Color(0xFF16181D);
-const Color _text = Color(0xFFE6E8EB);
-const Color _muted = Color(0xFF6B7280);
-const Color _error = Color(0xFFFF6B6B);
 
 // Typography (exactly the UI-SPEC roles used on this screen).
 const TextStyle _title = TextStyle(
   fontSize: 16,
   fontWeight: FontWeight.w600,
-  color: _text,
+  color: kText,
 );
 const TextStyle _body = TextStyle(
   fontSize: 14,
   fontWeight: FontWeight.w400,
-  color: _muted,
+  color: kMuted,
   height: 1.5,
 );
 const TextStyle _caption = TextStyle(
   fontSize: 12,
   fontWeight: FontWeight.w400,
-  color: _muted,
+  color: kMuted,
 );
 const TextStyle _errorLine = TextStyle(
   fontSize: 14,
   fontWeight: FontWeight.w400,
-  color: _error,
+  color: kError,
 );
 
 /// The device list screen — phase home.
@@ -167,9 +160,9 @@ class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
     final service = ref.read(connectionServiceProvider);
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: kBg,
         title: const Text(kDevicesTitle, style: _title),
         actions: [
           // The CONN-06 chip: status + p50 on its own 500ms poll.
@@ -247,7 +240,7 @@ class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
     unawaited(
       showModalBottomSheet<void>(
         context: context,
-        backgroundColor: _surface,
+        backgroundColor: kSurface,
         isScrollControlled: true,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
@@ -265,7 +258,7 @@ Widget _connectByIpButton(VoidCallback onPressed) {
     onPressed: onPressed,
     style: TextButton.styleFrom(
       minimumSize: const Size(48, 48),
-      foregroundColor: _text,
+      foregroundColor: kText,
     ),
     icon: const Icon(Icons.lan, size: 20),
     label: const Text(kConnectByIpLabel, style: _body),
@@ -282,11 +275,11 @@ class _DeviceRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // Grayed remembered rows: ALL content at muted on the same surface.
-    final contentColor = entry.live ? _text : _muted;
+    final contentColor = entry.live ? kText : kMuted;
     // Accent literal: reserved for the (at most one) connected row's icon.
     final iconColor = entry.connected
-        ? const Color(0xFF4C8DFF)
-        : (entry.live ? _text : _muted);
+        ? kAccent
+        : (entry.live ? kText : kMuted);
 
     final String metaLine;
     if (entry.connected) {
@@ -302,7 +295,7 @@ class _DeviceRow extends StatelessWidget {
     return SizedBox(
       height: 64, // 3xl row height — never shorter than the 48px target
       child: Material(
-        color: _surface,
+        color: kSurface,
         child: InkWell(
           onTap: onTap,
           child: Padding(
@@ -355,7 +348,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.computer, size: 48, color: _muted),
+            const Icon(Icons.computer, size: 48, color: kMuted),
             const SizedBox(height: 32),
             Row(
               mainAxisSize: MainAxisSize.min,
@@ -367,7 +360,7 @@ class _EmptyState extends StatelessWidget {
                   height: 16,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    color: _muted,
+                    color: kMuted,
                   ),
                 ),
               ],
@@ -491,7 +484,7 @@ class _ConnectByIpSheetState extends ConsumerState<_ConnectByIpSheet> {
                   child: TextField(
                     controller: _ipCtrl,
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(color: _text),
+                    style: const TextStyle(color: kText),
                     decoration: const InputDecoration(
                       labelText: kServerIpLabel,
                       hintText: kServerIpHint,
@@ -503,7 +496,7 @@ class _ConnectByIpSheetState extends ConsumerState<_ConnectByIpSheet> {
                   child: TextField(
                     controller: _portCtrl,
                     keyboardType: TextInputType.number,
-                    style: const TextStyle(color: _text),
+                    style: const TextStyle(color: kText),
                     decoration: const InputDecoration(labelText: kPortLabel),
                     onSubmitted: (_) => _busy ? null : _submit(),
                   ),

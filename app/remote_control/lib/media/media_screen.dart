@@ -33,16 +33,9 @@ import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'volume_store.dart';
-
-// UI-SPEC locked palette.
-const Color _bg = Color(0xFF0E0F12);
-const Color _surface = Color(0xFF16181D);
-const Color _hairline = Color(0xFF2A2D34);
-const Color _text = Color(0xFFE6E8EB);
-const Color _accent = Color(0xFF4C8DFF);
-const Color _muted = Color(0xFF6B7280);
 
 /// The media remote: transport row + volume block (MED-01/02).
 class MediaScreen extends ConsumerStatefulWidget {
@@ -89,15 +82,15 @@ class _MediaScreenState extends ConsumerState<MediaScreen> {
     final volumeLive = authed && vol.hasSnapshot;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: kBg,
         title: const Text(
           'Media',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _text,
+            color: kText,
           ),
         ),
         actions: [
@@ -168,12 +161,12 @@ class _MediaScreenState extends ConsumerState<MediaScreen> {
                         Expanded(
                           child: SliderTheme(
                             data: SliderTheme.of(context).copyWith(
-                              activeTrackColor: _accent,
-                              inactiveTrackColor: _hairline,
-                              thumbColor: _accent,
-                              disabledActiveTrackColor: _muted,
-                              disabledInactiveTrackColor: _hairline,
-                              disabledThumbColor: _muted,
+                              activeTrackColor: kAccent,
+                              inactiveTrackColor: kHairline,
+                              thumbColor: kAccent,
+                              disabledActiveTrackColor: kMuted,
+                              disabledInactiveTrackColor: kHairline,
+                              disabledThumbColor: kMuted,
                             ),
                             child: Slider(
                               value: vol.value.clamp(0, 100).toDouble(),
@@ -200,7 +193,7 @@ class _MediaScreenState extends ConsumerState<MediaScreen> {
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
-                              color: _text,
+                              color: kText,
                               fontFeatures: [FontFeature.tabularFigures()],
                             ),
                           ),
@@ -257,16 +250,16 @@ class _TransportButtonState extends State<_TransportButton> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = _pressed ? _accent : _hairline;
+    final borderColor = _pressed ? kAccent : kHairline;
     final iconColor = !widget.enabled
-        ? _muted
+        ? kMuted
         : _pressed
-            ? _accent
-            : _text;
+            ? kAccent
+            : kText;
     return Tooltip(
       message: widget.tooltip,
       child: Material(
-        color: _surface,
+        color: kSurface,
         shape: CircleBorder(side: BorderSide(color: borderColor)),
         child: InkWell(
           customBorder: const CircleBorder(),
@@ -306,19 +299,19 @@ class _MuteButton extends StatelessWidget {
     final BorderSide side;
     final IconData icon;
     if (!enabled) {
-      fill = _surface;
-      iconColor = _muted;
-      side = const BorderSide(color: _hairline);
+      fill = kSurface;
+      iconColor = kMuted;
+      side = const BorderSide(color: kHairline);
       icon = Icons.volume_up;
     } else if (muted) {
-      fill = _accent;
-      iconColor = _bg;
+      fill = kAccent;
+      iconColor = kBg;
       side = BorderSide.none;
       icon = Icons.volume_off;
     } else {
-      fill = _surface;
-      iconColor = _text;
-      side = const BorderSide(color: _hairline);
+      fill = kSurface;
+      iconColor = kText;
+      side = const BorderSide(color: kHairline);
       icon = Icons.volume_up;
     }
     return Tooltip(

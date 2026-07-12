@@ -24,6 +24,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../store/device_store.dart';
+import '../theme/tokens.dart';
 
 /// The canonical client `key.code` vocabulary — a byte-for-byte mirror of
 /// `server/server-windows/src/executors/keymap.rs` `CLIENT_KEY_CODES`.
@@ -207,12 +208,6 @@ List<KeyCapDef> capsForGroup(KeyRowGroup group) => switch (group) {
     };
 
 // ── Widgets ────────────────────────────────────────────────────────────────
-
-const Color _kCapFill = Color(0xFF16181D);
-const Color _kBorderRest = Color(0xFF2A2D34);
-const Color _kAccent = Color(0xFF4C8DFF);
-const Color _kText = Color(0xFFE6E8EB);
-const Color _kMuted = Color(0xFF6B7280);
 
 /// The active group's key caps. See the library doc for the emission model.
 class KeyRows extends StatelessWidget {
@@ -399,12 +394,12 @@ class _KeyCapState extends State<_KeyCap> {
   @override
   Widget build(BuildContext context) {
     final active = widget.enabled && _pressed;
-    final borderColor = active ? _kAccent : _kBorderRest;
+    final borderColor = active ? kAccent : kHairline;
     final faceColor = !widget.enabled
-        ? _kMuted
+        ? kMuted
         : active
-            ? _kAccent
-            : _kText;
+            ? kAccent
+            : kText;
 
     final Widget face = widget.def.icon != null
         ? Icon(widget.def.icon, size: 20, color: faceColor)
@@ -432,7 +427,7 @@ class _KeyCapState extends State<_KeyCap> {
         constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
         padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: _kCapFill,
+          color: kSurface,
           border: Border.all(color: borderColor),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -484,7 +479,7 @@ class KeyRowGroupSwitcher extends StatelessWidget {
                 decoration: BoxDecoration(
                   border: Border(
                     bottom: BorderSide(
-                      color: g == group ? _kAccent : Colors.transparent,
+                      color: g == group ? kAccent : Colors.transparent,
                       width: 2,
                     ),
                   ),
@@ -492,7 +487,7 @@ class KeyRowGroupSwitcher extends StatelessWidget {
                 child: Text(
                   _labels[g]!,
                   style: TextStyle(
-                    color: g == group ? _kAccent : _kMuted,
+                    color: g == group ? kAccent : kMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w400,
                   ),

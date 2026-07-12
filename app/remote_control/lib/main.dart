@@ -21,6 +21,7 @@ import 'net/connection_providers.dart';
 import 'net/reconnect_fsm.dart';
 import 'screens/device_list_screen.dart';
 import 'store/device_list_store.dart';
+import 'theme/tokens.dart';
 
 void main() {
   runApp(const ProviderScope(child: RemoteControlApp()));
@@ -90,14 +91,7 @@ class _RemoteControlAppState extends ConsumerState<RemoteControlApp> {
     return MaterialApp(
       title: 'Remote Control',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0E0F12),
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF4C8DFF),
-          brightness: Brightness.dark,
-        ),
-      ),
+      theme: buildAppTheme(),
       home: const DeviceListScreen(),
     );
   }

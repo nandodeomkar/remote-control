@@ -34,15 +34,8 @@ import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
-
-// UI-SPEC locked palette.
-const Color _bg = Color(0xFF0E0F12);
-const Color _surface = Color(0xFF16181D);
-const Color _hairline = Color(0xFF2A2D34);
-const Color _accent = Color(0xFF4C8DFF);
-const Color _text = Color(0xFFE6E8EB);
-const Color _muted = Color(0xFF6B7280);
 
 /// One browser macro: UI label + icon + the router-vocabulary action string.
 class BrowserActionSpec {
@@ -172,9 +165,9 @@ class _BrowserKeyState extends State<_BrowserKey> {
   @override
   Widget build(BuildContext context) {
     final active = widget.enabled && _pressed;
-    final borderColor = active ? _accent : _hairline;
+    final borderColor = active ? kAccent : kHairline;
     final contentColor =
-        active ? _accent : (widget.enabled ? _text : _muted);
+        active ? kAccent : (widget.enabled ? kText : kMuted);
 
     return GestureDetector(
       onTapDown: widget.enabled ? _onTapDown : null,
@@ -183,7 +176,7 @@ class _BrowserKeyState extends State<_BrowserKey> {
       child: Container(
         constraints: const BoxConstraints(minHeight: 56),
         decoration: BoxDecoration(
-          color: _surface,
+          color: kSurface,
           border: Border.all(color: borderColor),
           borderRadius: BorderRadius.circular(8),
         ),
@@ -243,15 +236,15 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
     final authed = status.chip == ChipStatus.connected;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: kBg,
         title: const Text(
           'Browser',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _text,
+            color: kText,
           ),
         ),
         actions: [

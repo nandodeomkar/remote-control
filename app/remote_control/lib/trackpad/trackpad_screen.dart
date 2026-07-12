@@ -38,6 +38,7 @@ import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
 import '../screens/connection_copy.dart';
 import '../settings/sensitivity.dart';
+import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'gesture_classifier.dart';
 import 'mouse_buttons.dart';
@@ -192,8 +193,8 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
   void _openSensitivitySheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0E0F12),
-      shape: const Border(top: BorderSide(color: Color(0xFF2A2D34))),
+      backgroundColor: kBg,
+      shape: const Border(top: BorderSide(color: kHairline)),
       builder: (context) => SafeArea(
         top: false,
         child: Padding(
@@ -205,7 +206,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
               const Text(
                 'Pointer speed',
                 style: TextStyle(
-                  color: Color(0xFFE6E8EB),
+                  color: kText,
                   fontSize: 14,
                   fontWeight: FontWeight.w400,
                 ),
@@ -215,8 +216,8 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                   value: ref.watch(sensitivityProvider),
                   min: kSensitivityMin,
                   max: kSensitivityMax,
-                  activeColor: const Color(0xFF4C8DFF),
-                  inactiveColor: const Color(0xFF2A2D34),
+                  activeColor: kAccent,
+                  inactiveColor: kHairline,
                   onChanged: ref.read(sensitivityProvider.notifier).set,
                 ),
               ),
@@ -238,7 +239,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
       // D-07: the raised system IME pushes the whole Column up — the
       // trackpad shrinks above the panel but never hides, and stays live.
       resizeToAvoidBottomInset: true,
-      backgroundColor: const Color(0xFF0E0F12),
+      backgroundColor: kBg,
       body: SafeArea(
         child: Column(
           children: [
@@ -255,13 +256,13 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                       onPointerCancel: _onPointerCancel,
                       behavior: HitTestBehavior.opaque,
                       child: Container(
-                        color: const Color(0xFF0E0F12),
+                        color: kBg,
                         alignment: Alignment.center,
                         child: Text(
                           authed
                               ? kTrackpadHintAuthed
                               : kTrackpadHintNotConnected,
-                          style: const TextStyle(color: Color(0xFF6B7280)),
+                          style: const TextStyle(color: kMuted),
                         ),
                       ),
                     ),
@@ -332,9 +333,9 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                           builder: (context, expanded, _) => Tooltip(
                             message: expanded ? 'Hide keys' : 'Show keys',
                             child: Material(
-                              color: const Color(0xFF16181D),
+                              color: kSurface,
                               shape: const CircleBorder(
-                                side: BorderSide(color: Color(0xFF2A2D34)),
+                                side: BorderSide(color: kHairline),
                               ),
                               child: InkWell(
                                 customBorder: const CircleBorder(),
@@ -348,7 +349,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                                         ? Icons.keyboard_hide
                                         : Icons.keyboard,
                                     size: 20,
-                                    color: const Color(0xFFE6E8EB),
+                                    color: kText,
                                   ),
                                 ),
                               ),
@@ -359,9 +360,9 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                         Tooltip(
                           message: 'Pointer speed',
                           child: Material(
-                            color: const Color(0xFF16181D),
+                            color: kSurface,
                             shape: const CircleBorder(
-                              side: BorderSide(color: Color(0xFF2A2D34)),
+                              side: BorderSide(color: kHairline),
                             ),
                             child: InkWell(
                               customBorder: const CircleBorder(),
@@ -372,7 +373,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                                 child: Icon(
                                   Icons.tune,
                                   size: 20,
-                                  color: Color(0xFFE6E8EB),
+                                  color: kText,
                                 ),
                               ),
                             ),
@@ -426,19 +427,19 @@ class _DragLockPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFF16181D),
-        border: Border.all(color: const Color(0xFF4C8DFF)),
+        color: kSurface,
+        border: Border.all(color: kAccent),
         borderRadius: BorderRadius.circular(999),
       ),
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.lock, size: 14, color: Color(0xFF4C8DFF)),
+          Icon(Icons.lock, size: 14, color: kAccent),
           SizedBox(width: 4),
           Text(
             'Drag locked — tap to drop',
             style: TextStyle(
-              color: Color(0xFFE6E8EB),
+              color: kText,
               fontSize: 12,
               fontWeight: FontWeight.w400,
             ),

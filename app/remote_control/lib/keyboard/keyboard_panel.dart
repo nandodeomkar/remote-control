@@ -50,6 +50,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
 
+import '../theme/tokens.dart';
 import 'diff_ops.dart';
 import 'hidden_text_input.dart';
 import 'key_rows.dart';
@@ -284,9 +285,9 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
                   width: double.infinity,
                   decoration: const BoxDecoration(
                     // Continuous with the trackpad above.
-                    color: Color(0xFF0E0F12),
+                    color: kBg,
                     border: Border(
-                      top: BorderSide(color: Color(0xFF2A2D34)),
+                      top: BorderSide(color: kHairline),
                     ),
                   ),
                   padding: const EdgeInsets.all(16),

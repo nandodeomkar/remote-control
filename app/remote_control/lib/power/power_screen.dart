@@ -43,17 +43,9 @@ import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'confirm_track_fsm.dart';
-
-// UI-SPEC locked palette.
-const Color _bg = Color(0xFF0E0F12);
-const Color _surface = Color(0xFF16181D);
-const Color _hairline = Color(0xFF2A2D34);
-const Color _text = Color(0xFFE6E8EB);
-const Color _accent = Color(0xFF4C8DFF);
-const Color _destructive = Color(0xFFFF6B6B);
-const Color _muted = Color(0xFF6B7280);
 
 /// The server-side `power`→`confirm` window (server-core dispatch/router.rs
 /// CONFIRM_WINDOW). The countdown dialog counts down from this many seconds so
@@ -74,7 +66,7 @@ class _PowerAction {
     required this.destructive,
   });
 
-  Color get color => destructive ? _destructive : _accent;
+  Color get color => destructive ? kError : kAccent;
 }
 
 // Reading order: safe pair (Lock, Sleep) then destructive pair (Restart,
@@ -177,15 +169,15 @@ class _PowerScreenState extends ConsumerState<PowerScreen> {
     final authed = status.chip == ChipStatus.connected;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: kBg,
         title: const Text(
           'Power',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _text,
+            color: kText,
           ),
         ),
         actions: [
@@ -328,7 +320,7 @@ class _SlideTrackState extends State<_SlideTrack> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.enabled;
-    final actionColor = enabled ? widget.spec.color : _muted;
+    final actionColor = enabled ? widget.spec.color : kMuted;
     final animDuration =
         _animate ? const Duration(milliseconds: 200) : Duration.zero;
 
@@ -347,8 +339,8 @@ class _SlideTrackState extends State<_SlideTrack> {
           child: Container(
             height: _trackHeight,
             decoration: BoxDecoration(
-              color: _surface,
-              border: Border.all(color: _hairline),
+              color: kSurface,
+              border: Border.all(color: kHairline),
               borderRadius: BorderRadius.circular(16),
             ),
             clipBehavior: Clip.antiAlias,
@@ -371,7 +363,7 @@ class _SlideTrackState extends State<_SlideTrack> {
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w400,
-                          color: _muted,
+                          color: kMuted,
                         ),
                       ),
                     ),
@@ -393,8 +385,8 @@ class _SlideTrackState extends State<_SlideTrack> {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(widget.spec.icon, size: 20, color: _bg),
-                        const Icon(Icons.chevron_right, size: 16, color: _bg),
+                        Icon(widget.spec.icon, size: 20, color: kBg),
+                        const Icon(Icons.chevron_right, size: 16, color: kBg),
                       ],
                     ),
                   ),
@@ -460,18 +452,18 @@ class _CountdownDialogState extends State<_CountdownDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: _surface,
+      backgroundColor: kSurface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: _destructive),
+          const Icon(Icons.warning_amber_rounded, color: kError),
           const SizedBox(width: 8),
           Text(
             '${widget.verb} PC?',
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: _text,
+              color: kText,
             ),
           ),
         ],
@@ -483,7 +475,7 @@ class _CountdownDialogState extends State<_CountdownDialog> {
           const Text(
             'This will close everything open on your PC.',
             style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400,
-                color: _text),
+                color: kText),
           ),
           const SizedBox(height: 8),
           Text(
@@ -491,7 +483,7 @@ class _CountdownDialogState extends State<_CountdownDialog> {
             style: const TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w400,
-              color: _muted,
+              color: kMuted,
               fontFeatures: [FontFeature.tabularFigures()],
             ),
           ),
@@ -500,12 +492,12 @@ class _CountdownDialogState extends State<_CountdownDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(), // Cancel — sends nothing
-          child: const Text('Cancel', style: TextStyle(color: _muted)),
+          child: const Text('Cancel', style: TextStyle(color: kMuted)),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
-            backgroundColor: _destructive,
-            foregroundColor: _bg,
+            backgroundColor: kError,
+            foregroundColor: kBg,
             minimumSize: const Size(0, 48),
           ),
           onPressed: _confirm,

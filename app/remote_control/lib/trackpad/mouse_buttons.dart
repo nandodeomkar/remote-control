@@ -19,11 +19,7 @@ library;
 
 import 'package:flutter/material.dart';
 
-const Color _kBarBg = Color(0xFF0E0F12);
-const Color _kButtonFill = Color(0xFF16181D);
-const Color _kBorderRest = Color(0xFF2A2D34);
-const Color _kAccent = Color(0xFF4C8DFF);
-const Color _kMuted = Color(0xFF6B7280);
+import '../theme/tokens.dart';
 
 /// The docked L/M/R button bar. See the library doc for the contract.
 class MouseButtonsBar extends StatelessWidget {
@@ -44,7 +40,7 @@ class MouseButtonsBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 64,
-      color: _kBarBg,
+      color: kBg,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
         children: [
@@ -121,8 +117,8 @@ class _MouseButtonState extends State<_MouseButton> {
   @override
   Widget build(BuildContext context) {
     final active = widget.enabled && _pressed;
-    final borderColor = active ? _kAccent : _kBorderRest;
-    final labelColor = active ? _kAccent : _kMuted;
+    final borderColor = active ? kAccent : kHairline;
+    final labelColor = active ? kAccent : kMuted;
 
     return Tooltip(
       message: widget.tooltip,
@@ -134,7 +130,7 @@ class _MouseButtonState extends State<_MouseButton> {
           // Fills the padded 64px bar -> 48px tall (the touch-target floor).
           constraints: const BoxConstraints(minHeight: 48),
           decoration: BoxDecoration(
-            color: _kButtonFill,
+            color: kSurface,
             border: Border.all(color: borderColor),
             borderRadius: BorderRadius.circular(8),
           ),

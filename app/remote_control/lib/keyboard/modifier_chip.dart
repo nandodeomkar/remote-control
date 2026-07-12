@@ -10,14 +10,8 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../theme/tokens.dart';
 import 'modifier_fsm.dart';
-
-const Color _kFill = Color(0xFF16181D);
-const Color _kBorderRest = Color(0xFF2A2D34);
-const Color _kAccent = Color(0xFF4C8DFF);
-const Color _kText = Color(0xFFE6E8EB);
-const Color _kMuted = Color(0xFF6B7280);
-const Color _kInk = Color(0xFF0E0F12);
 
 /// A modifier chip. See the library doc for the visual contract.
 class ModifierChip extends StatelessWidget {
@@ -51,19 +45,19 @@ class ModifierChip extends StatelessWidget {
     final locked = enabled && state == ModifierState.locked;
     final armed = enabled && state == ModifierState.armed;
 
-    final Color fill = locked ? _kAccent : _kFill;
+    final Color fill = locked ? kAccent : kSurface;
     final Color border = locked
-        ? _kAccent
+        ? kAccent
         : armed
-            ? _kAccent
-            : _kBorderRest;
+            ? kAccent
+            : kHairline;
     final Color labelColor = !enabled
-        ? _kMuted
+        ? kMuted
         : locked
-            ? _kInk
+            ? kBg
             : armed
-                ? _kAccent
-                : _kText;
+                ? kAccent
+                : kText;
 
     return GestureDetector(
       onTap: enabled ? onTap : null,
@@ -91,7 +85,7 @@ class ModifierChip extends StatelessWidget {
             ),
             if (locked) ...[
               const SizedBox(width: 4), // xs gap after the label
-              const Icon(Icons.lock, size: 16, color: _kInk),
+              const Icon(Icons.lock, size: 16, color: kBg),
             ],
           ],
         ),

@@ -33,16 +33,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'clip_store.dart';
-
-// 06-UI-SPEC locked palette (inherited verbatim from Phases 3/4/5).
-const Color _bg = Color(0xFF0E0F12);
-const Color _surface = Color(0xFF16181D);
-const Color _hairline = Color(0xFF2A2D34);
-const Color _text = Color(0xFFE6E8EB);
-const Color _accent = Color(0xFF4C8DFF);
-const Color _muted = Color(0xFF6B7280);
 
 /// The Clipboard remote: Send/Fetch action row + last-5 history (CLIP-01/02/04).
 class ClipboardScreen extends ConsumerStatefulWidget {
@@ -113,8 +106,8 @@ class _ClipboardScreenState extends ConsumerState<ClipboardScreen> {
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Text(message, style: const TextStyle(color: _text)),
-          backgroundColor: _surface,
+          content: Text(message, style: const TextStyle(color: kText)),
+          backgroundColor: kSurface,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -158,15 +151,15 @@ class _ClipboardScreenState extends ConsumerState<ClipboardScreen> {
     final clip = ref.watch(clipStateProvider);
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: kBg,
         title: const Text(
           'Clipboard',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _text,
+            color: kText,
           ),
         ),
         actions: [
@@ -254,7 +247,7 @@ class _SectionHeader extends StatelessWidget {
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _text,
+            color: kText,
           ),
         ),
       );
@@ -281,17 +274,17 @@ class _AutoSyncRow extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
-                  color: _text,
+                  color: kText,
                 ),
               ),
             ),
             Switch(
               value: value,
               onChanged: onChanged, // never gated — local preference (D-03)
-              activeThumbColor: _accent,
-              activeTrackColor: _accent,
-              inactiveThumbColor: _text,
-              inactiveTrackColor: _hairline,
+              activeThumbColor: kAccent,
+              activeTrackColor: kAccent,
+              inactiveThumbColor: kText,
+              inactiveTrackColor: kHairline,
             ),
           ],
         ),
@@ -308,7 +301,7 @@ class _HonestyNote extends StatelessWidget {
   Widget build(BuildContext context) => const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 16, color: _muted),
+          Icon(Icons.info_outline, size: 16, color: kMuted),
           SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -316,7 +309,7 @@ class _HonestyNote extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
-                color: _muted,
+                color: kMuted,
               ),
             ),
           ),
@@ -360,14 +353,14 @@ class _ActionButtonState extends State<_ActionButton> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = _pressed ? _accent : _hairline;
+    final borderColor = _pressed ? kAccent : kHairline;
     final fg = !widget.enabled
-        ? _muted
+        ? kMuted
         : _pressed
-            ? _accent
-            : _text;
+            ? kAccent
+            : kText;
     return Material(
-      color: _surface,
+      color: kSurface,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: borderColor),
         borderRadius: BorderRadius.circular(16),
@@ -472,14 +465,14 @@ class _HistoryEntryState extends State<_HistoryEntry> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = _pressed ? _accent : _hairline;
+    final borderColor = _pressed ? kAccent : kHairline;
     final textColor = !widget.enabled
-        ? _muted
+        ? kMuted
         : _pressed
-            ? _accent
-            : _text;
+            ? kAccent
+            : kText;
     return Material(
-      color: _surface,
+      color: kSurface,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: borderColor),
         borderRadius: BorderRadius.circular(16),
@@ -529,7 +522,7 @@ class _EmptyState extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: _text,
+                color: kText,
               ),
             ),
             const SizedBox(height: 8),
@@ -539,7 +532,7 @@ class _EmptyState extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
-                color: _muted,
+                color: kMuted,
               ),
             ),
           ],

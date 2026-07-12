@@ -39,16 +39,9 @@ import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'presenter_timer.dart';
-
-// UI-SPEC locked palette.
-const Color _bg = Color(0xFF0E0F12);
-const Color _surface = Color(0xFF16181D);
-const Color _hairline = Color(0xFF2A2D34);
-const Color _text = Color(0xFFE6E8EB);
-const Color _accent = Color(0xFF4C8DFF);
-const Color _muted = Color(0xFF6B7280);
 
 /// The presenter remote (D-07): split tap zones, bottom bar, manual timer.
 class PresenterScreen extends ConsumerStatefulWidget {
@@ -179,11 +172,11 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
   Color _timerColor() {
     switch (_timer.state) {
       case PresenterTimerState.running:
-        return _accent;
+        return kAccent;
       case PresenterTimerState.paused:
-        return _text;
+        return kText;
       case PresenterTimerState.stopped:
-        return _muted;
+        return kMuted;
     }
   }
 
@@ -195,15 +188,15 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
     final authed = status.chip == ChipStatus.connected;
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: kBg,
         title: const Text(
           'Presenter',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _text,
+            color: kText,
           ),
         ),
         actions: [
@@ -239,7 +232,7 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
                   const SizedBox(
                     width: 1,
                     height: double.infinity,
-                    child: ColoredBox(color: _hairline),
+                    child: ColoredBox(color: kHairline),
                   ),
                   Expanded(
                     flex: 2,
@@ -265,8 +258,8 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
     return Container(
       height: 64,
       decoration: const BoxDecoration(
-        color: _bg,
-        border: Border(top: BorderSide(color: _hairline)),
+        color: kBg,
+        border: Border(top: BorderSide(color: kHairline)),
       ),
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
@@ -339,15 +332,15 @@ class _TapZone extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = !enabled
-        ? _muted
+        ? kMuted
         : flashing
-            ? _accent
-            : _muted;
+            ? kAccent
+            : kMuted;
     return GestureDetector(
       onTapDown: enabled ? (_) => onTapDown() : null,
       behavior: HitTestBehavior.opaque,
       child: Container(
-        color: _bg,
+        color: kBg,
         alignment: Alignment.center,
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -385,9 +378,9 @@ class _BarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: _surface,
+      color: kSurface,
       shape: RoundedRectangleBorder(
-        side: const BorderSide(color: _hairline),
+        side: const BorderSide(color: kHairline),
         borderRadius: BorderRadius.circular(8),
       ),
       child: InkWell(
@@ -400,7 +393,7 @@ class _BarButton extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: enabled ? _text : _muted,
+              color: enabled ? kText : kMuted,
             ),
           ),
         ),
@@ -427,17 +420,17 @@ class _BlankToggle extends StatelessWidget {
     final Color borderColor;
     final Color fgColor;
     if (!enabled) {
-      borderColor = _hairline;
-      fgColor = _muted;
+      borderColor = kHairline;
+      fgColor = kMuted;
     } else if (active) {
-      borderColor = _accent;
-      fgColor = _accent;
+      borderColor = kAccent;
+      fgColor = kAccent;
     } else {
-      borderColor = _hairline;
-      fgColor = _text;
+      borderColor = kHairline;
+      fgColor = kText;
     }
     return Material(
-      color: _surface,
+      color: kSurface,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: borderColor),
         borderRadius: BorderRadius.circular(8),

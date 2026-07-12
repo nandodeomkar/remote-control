@@ -30,13 +30,8 @@ import '../net/connection_providers.dart';
 import '../net/handshake.dart';
 import '../net/handshake_fsm.dart';
 import '../net/reconnect_fsm.dart';
+import '../theme/tokens.dart';
 import 'connection_copy.dart';
-
-// Theme tokens (03-UI-SPEC Color table).
-const Color _surface = Color(0xFF16181D);
-const Color _text = Color(0xFFE6E8EB);
-const Color _muted = Color(0xFF6B7280);
-const Color _error = Color(0xFFFF6B6B);
 
 /// The pairing sheet body. Pure widget: state comes in via constructor
 /// parameters, actions go out via callbacks — no Riverpod inside.
@@ -186,7 +181,7 @@ class _PairingSheetState extends State<PairingSheet> {
             style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: _text,
+              color: kText,
             ),
           ),
           const SizedBox(height: 8),
@@ -195,7 +190,7 @@ class _PairingSheetState extends State<PairingSheet> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w400,
-              color: _muted,
+              color: kMuted,
               height: 1.5,
             ),
           ),
@@ -212,7 +207,7 @@ class _PairingSheetState extends State<PairingSheet> {
               fontSize: 28,
               fontWeight: FontWeight.w600,
               letterSpacing: 8,
-              color: _text,
+              color: kText,
               fontFeatures: [FontFeature.tabularFigures()],
             ),
             decoration: const InputDecoration(counterText: ''),
@@ -231,7 +226,7 @@ class _PairingSheetState extends State<PairingSheet> {
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
-                      color: _error,
+                      color: kError,
                       // Countdown seconds must not jitter.
                       fontFeatures: [FontFeature.tabularFigures()],
                     ),
@@ -259,7 +254,7 @@ class _PairingSheetState extends State<PairingSheet> {
 Future<void> showPairingSheet(BuildContext context, DeviceTarget target) {
   return showModalBottomSheet<void>(
     context: context,
-    backgroundColor: _surface,
+    backgroundColor: kSurface,
     isScrollControlled: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),

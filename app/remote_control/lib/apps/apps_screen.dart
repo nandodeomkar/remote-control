@@ -31,16 +31,9 @@ import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'apps_store.dart';
-
-// 06-UI-SPEC locked palette (inherited verbatim from Phases 3/4/5).
-const Color _bg = Color(0xFF0E0F12);
-const Color _surface = Color(0xFF16181D);
-const Color _hairline = Color(0xFF2A2D34);
-const Color _text = Color(0xFFE6E8EB);
-const Color _accent = Color(0xFF4C8DFF);
-const Color _muted = Color(0xFF6B7280);
 
 /// The Apps remote: favorites grid + live open-windows list (APPS-01/02/03).
 class AppsScreen extends ConsumerStatefulWidget {
@@ -98,8 +91,8 @@ class _AppsScreenState extends ConsumerState<AppsScreen> {
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Text(message, style: const TextStyle(color: _text)),
-          backgroundColor: _surface,
+          content: Text(message, style: const TextStyle(color: kText)),
+          backgroundColor: kSurface,
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -125,15 +118,15 @@ class _AppsScreenState extends ConsumerState<AppsScreen> {
     final notifier = ref.read(appsStateProvider.notifier);
 
     return Scaffold(
-      backgroundColor: _bg,
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: _bg,
+        backgroundColor: kBg,
         title: const Text(
           'Apps',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _text,
+            color: kText,
           ),
         ),
         actions: [
@@ -199,7 +192,7 @@ class _SectionHeader extends StatelessWidget {
           style: const TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: _text,
+            color: kText,
           ),
         ),
       );
@@ -226,7 +219,7 @@ class _FavoritesSection extends StatelessWidget {
         alignment: Alignment.centerLeft,
         child: Text(
           'Long-press an open window below to pin it here.',
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: _muted),
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w400, color: kMuted),
         ),
       );
     }
@@ -279,14 +272,14 @@ class _FavoriteTileState extends State<_FavoriteTile> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = _pressed ? _accent : _hairline;
+    final borderColor = _pressed ? kAccent : kHairline;
     final labelColor = !widget.enabled
-        ? _muted
+        ? kMuted
         : _pressed
-            ? _accent
-            : _text;
+            ? kAccent
+            : kText;
     return Material(
-      color: _surface,
+      color: kSurface,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: borderColor),
         borderRadius: BorderRadius.circular(16),
@@ -324,7 +317,7 @@ class _FavoriteTileState extends State<_FavoriteTile> {
               const Positioned(
                 top: 4,
                 right: 4,
-                child: Icon(Icons.push_pin, size: 12, color: _accent),
+                child: Icon(Icons.push_pin, size: 12, color: kAccent),
               ),
             ],
           ),
@@ -412,14 +405,14 @@ class _WindowRowState extends State<_WindowRow> {
 
   @override
   Widget build(BuildContext context) {
-    final borderColor = _pressed ? _accent : _hairline;
+    final borderColor = _pressed ? kAccent : kHairline;
     final titleColor = !widget.enabled
-        ? _muted
+        ? kMuted
         : _pressed
-            ? _accent
-            : _text;
+            ? kAccent
+            : kText;
     return Material(
-      color: _surface,
+      color: kSurface,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: borderColor),
         borderRadius: BorderRadius.circular(16),
@@ -488,10 +481,10 @@ class _CloseButtonState extends State<_CloseButton> {
   @override
   Widget build(BuildContext context) {
     final color = !widget.enabled
-        ? _muted
+        ? kMuted
         : _pressed
-            ? _accent
-            : _muted;
+            ? kAccent
+            : kMuted;
     return Tooltip(
       message: 'Close window',
       child: InkResponse(
@@ -537,7 +530,7 @@ class _AppIcon extends StatelessWidget {
   }
 
   Widget _fallback() =>
-      Icon(Icons.desktop_windows, size: size, color: _muted);
+      Icon(Icons.desktop_windows, size: size, color: kMuted);
 }
 
 /// A centered empty state: 16/600 heading over 14/400 muted body copy.
@@ -557,7 +550,7 @@ class _EmptyState extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                color: _text,
+                color: kText,
               ),
             ),
             const SizedBox(height: 8),
@@ -567,7 +560,7 @@ class _EmptyState extends StatelessWidget {
               style: const TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w400,
-                color: _muted,
+                color: kMuted,
               ),
             ),
           ],

@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 
 import '../net/beacon.dart';
 import '../net/beacon_listener.dart';
+import '../theme/tokens.dart';
 
 void main() {
   runApp(const MaterialApp(
@@ -53,9 +54,9 @@ class _BeaconSmokeScreenState extends State<_BeaconSmokeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0E0F12),
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0E0F12),
+        backgroundColor: kBg,
         foregroundColor: Colors.white70,
         title: Text('Beacon smoke — UDP :$kBeaconPort'),
       ),
@@ -81,7 +82,7 @@ class _BeaconSmokeScreenState extends State<_BeaconSmokeScreen> {
                     ),
                     trailing: Text(
                       'seen x$count',
-                      style: const TextStyle(color: Color(0xFF4C8DFF)),
+                      style: const TextStyle(color: kAccent),
                     ),
                   ),
               ],
