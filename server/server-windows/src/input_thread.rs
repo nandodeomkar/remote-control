@@ -124,6 +124,31 @@ pub fn normalize_virtual(target_x: i32, target_y: i32, m: VirtualMetrics) -> (i3
     (axis(target_x, m.x, m.w), axis(target_y, m.y, m.h))
 }
 
+/// `SECURITY_MANDATORY_MEDIUM_RID` (0x2000): the integrity level our own,
+/// non-elevated process runs at. Mirrors the Win32 constant of the same name
+/// (`windows::Win32::System::SystemServices::SECURITY_MANDATORY_MEDIUM_RID`)
+/// as a plain `u32` so [`is_blocking_il`] stays a pure, OS-free predicate
+/// (D-07 / RESEARCH Pitfall 6).
+pub(crate) const SECURITY_MANDATORY_MEDIUM_RID: u32 = 0x2000;
+
+/// `SECURITY_MANDATORY_HIGH_RID` (0x3000): the integrity level an elevated
+/// ("Run as administrator" / UAC-elevated) foreground process runs at.
+pub(crate) const SECURITY_MANDATORY_HIGH_RID: u32 = 0x3000;
+
+/// D-07 / RESEARCH Pitfall 6: `SendInput` cannot report a UIPI (User
+/// Interface Privilege Isolation) drop — neither its return value nor
+/// `GetLastError` signals it — so detection must be PROACTIVE: compare the
+/// foreground window's process integrity level to ours. A strictly higher
+/// foreground integrity level silently discards our injected input; equal
+/// or lower integrity accepts it normally.
+///
+/// Pure arithmetic — no OS state — so this is unit-tested directly (RESEARCH
+/// A4: the HIGH/MEDIUM threshold is the detection signal; exact tuning is
+/// validated on-device by the 07-06 wiring plan).
+pub(crate) fn is_blocking_il(foreground_rid: u32, our_rid: u32) -> bool {
+    todo!("07-04 GREEN: implement is_blocking_il — see input_thread tests")
+}
+
 /// Current cursor position in virtual-desktop coordinates, read FRESH each
 /// frame (RESEARCH Pitfall 3: never track a floating internal target, or the
 /// cursor fights the physical mouse — the OS carries the position, the
@@ -264,6 +289,37 @@ pub fn run_input_thread(rx: std::sync::mpsc::Receiver<Cmd>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// D-07 / RESEARCH Pitfall 6: a strictly higher-integrity foreground
+    /// window (elevated / UAC) blocks our injected input.
+    #[test]
+    fn is_blocking_il_high_foreground_over_medium_blocks() {
+        assert!(
+            is_blocking_il(SECURITY_MANDATORY_HIGH_RID, SECURITY_MANDATORY_MEDIUM_RID),
+            "a HIGH-integrity foreground over our MEDIUM integrity must block"
+        );
+    }
+
+    /// Equal integrity (the common case: a normal, non-elevated foreground
+    /// window) never blocks.
+    #[test]
+    fn is_blocking_il_equal_integrity_does_not_block() {
+        assert!(
+            !is_blocking_il(SECURITY_MANDATORY_MEDIUM_RID, SECURITY_MANDATORY_MEDIUM_RID),
+            "equal integrity levels must not block"
+        );
+    }
+
+    /// A lower-integrity foreground (e.g. AppContainer/LOW, RID 0x1000) never
+    /// blocks our MEDIUM-integrity input either.
+    #[test]
+    fn is_blocking_il_lower_foreground_does_not_block() {
+        const SECURITY_MANDATORY_LOW_RID: u32 = 0x1000;
+        assert!(
+            !is_blocking_il(SECURITY_MANDATORY_LOW_RID, SECURITY_MANDATORY_MEDIUM_RID),
+            "a LOW-integrity foreground under our MEDIUM integrity must not block"
+        );
+    }
 
     /// Crit 4 (D-04): a stream of sub-integer deltas emits the cumulative
     /// integer sequence with the fractional remainder carried. Over 5 frames
