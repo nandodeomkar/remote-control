@@ -24,6 +24,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
 use server_core::auth::AuthManager;
 use server_core::auth::challenge::auth_proof;
+use server_core::auth::token::hash_token;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
 use server_core::executors::{Button, KeyCode, WindowInfo};
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
@@ -78,6 +79,12 @@ async fn walking_skeleton_pair_auth_input() {
     let (_apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
     // Same discipline for the clip watch (CLIP-03): keep the sender alive.
     let (_clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
+    // 07-05: conn_count/revoke/blocked interim producers — kept alive so
+    // the session's `.changed()` branches don't immediately disable
+    // themselves (same discipline as the named `_volume_tx` etc. above).
+    let (conn_count_tx, _conn_count_rx) = tokio::sync::watch::channel(0usize);
+    let (_revoke_tx, revoke_rx) = tokio::sync::watch::channel(0u64);
+    let (_blocked_tx, blocked_rx) = tokio::sync::watch::channel(0u64);
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
@@ -85,6 +92,9 @@ async fn walking_skeleton_pair_auth_input() {
         volume: volume_rx,
         apps: apps_rx,
         clip: clip_rx,
+        conn_count: Arc::new(conn_count_tx),
+        revoke: revoke_rx,
+        blocked: blocked_rx,
     };
 
     let (addr, _server) = spawn_test_server(deps).await;
@@ -180,6 +190,15 @@ struct Harness {
     /// Test-owned producer end of the clip watch (CLIP-03): the clip_ suite
     /// drives `clip.changed` pushes through it.
     clip_tx: tokio::sync::watch::Sender<ClipState>,
+    /// Shared conn_count sender (SRV-01): the conn_count suite subscribes a
+    /// fresh `Receiver` off it to observe the live device count.
+    conn_count: Arc<tokio::sync::watch::Sender<usize>>,
+    /// Test-owned producer end of the revoke epoch (D-05): the revoke suite
+    /// bumps it after calling `AuthManager::revoke` directly.
+    revoke_tx: tokio::sync::watch::Sender<u64>,
+    /// Test-owned producer end of the blocked epoch (SRV-05): the
+    /// input_blocked suite bumps it to simulate a UIPI transition.
+    blocked_tx: tokio::sync::watch::Sender<u64>,
     _server: tokio::task::JoinHandle<()>,
 }
 
@@ -190,6 +209,9 @@ async fn start_server() -> Harness {
     let (volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
     let (apps_tx, apps_rx) = tokio::sync::watch::channel(Vec::<WindowInfo>::new());
     let (clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
+    let conn_count = Arc::new(tokio::sync::watch::channel(0usize).0);
+    let (revoke_tx, revoke_rx) = tokio::sync::watch::channel(0u64);
+    let (blocked_tx, blocked_rx) = tokio::sync::watch::channel(0u64);
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
@@ -197,9 +219,24 @@ async fn start_server() -> Harness {
         volume: volume_rx,
         apps: apps_rx,
         clip: clip_rx,
+        conn_count: Arc::clone(&conn_count),
+        revoke: revoke_rx,
+        blocked: blocked_rx,
     };
     let (addr, server) = spawn_test_server(deps).await;
-    Harness { addr, log, auth, pause_tx, volume_tx, apps_tx, clip_tx, _server: server }
+    Harness {
+        addr,
+        log,
+        auth,
+        pause_tx,
+        volume_tx,
+        apps_tx,
+        clip_tx,
+        conn_count,
+        revoke_tx,
+        blocked_tx,
+        _server: server,
+    }
 }
 
 async fn connect(addr: SocketAddr) -> WsClient {
@@ -1003,4 +1040,139 @@ async fn clip_no_snapshot_after_auth() {
         .expect("clip watch alive");
     let text = recv_clip_changed(&mut ws).await;
     assert_eq!(text, "fresh-change", "a real post-auth change must still push");
+}
+
+// ──────────────── conn_count (SRV-01) ───────────────────────────────────
+
+/// SRV-01: the tray tooltip source. A session completing auth increments
+/// the shared conn_count watch to 1; tearing the session down (clean close)
+/// returns it to 0. Wrapped in timeouts so a regression fails fast instead
+/// of hanging the suite.
+#[tokio::test]
+async fn conn_count_increments_on_auth_and_decrements_on_teardown() {
+    let h = start_server().await;
+    let mut count_rx = h.conn_count.subscribe();
+    assert_eq!(*count_rx.borrow(), 0, "no session authed yet");
+
+    let mut ws = authed_client(&h).await;
+    tokio::time::timeout(RECV_TIMEOUT, count_rx.wait_for(|n| *n == 1))
+        .await
+        .expect("timed out waiting for conn_count to reach 1")
+        .expect("conn_count sender dropped");
+
+    ws.close(None).await.expect("clean close after auth");
+    drop(ws);
+
+    tokio::time::timeout(RECV_TIMEOUT, count_rx.wait_for(|n| *n == 0))
+        .await
+        .expect("timed out waiting for conn_count to return to 0")
+        .expect("conn_count sender dropped");
+}
+
+// ──────────────── revoke (D-05) ─────────────────────────────────────────
+
+/// D-05 HEADLINE: revoking a hash mid-session drops that LIVE authed
+/// session immediately, and a subsequent reconnect with the same (now
+/// revoked) token fails auth — never a silent retry loop.
+#[tokio::test]
+async fn revoke_drops_live_session_and_blocks_reconnect() {
+    let h = start_server().await;
+    let (mut ws, token) = pair_client(&h).await;
+    let _snapshot = recv_vol_changed(&mut ws).await; // drain D-03 snapshot
+
+    // Prove the session is live BEFORE revoking (no sleep-and-hope).
+    send_json(&mut ws, json!({"t": "click", "seq": 3, "p": {"button": "left"}})).await;
+    assert!(
+        h.log
+            .wait_for(|calls| calls.contains(&Call::Click(Button::Left)), RECV_TIMEOUT)
+            .await,
+        "click never reached the mock before revoke; calls: {:?}",
+        h.log.calls()
+    );
+
+    let raw = hex::decode(&token).expect("token is hex");
+    let hash = hash_token(&raw);
+    let removed = h.auth.lock().unwrap().revoke(&hash);
+    assert!(removed, "revoke must report the hash was present");
+    h.revoke_tx.send_modify(|v| *v += 1);
+
+    // The LIVE session must drop — proving this is NOT just a future
+    // reconnect rejection but an immediate force-disconnect (D-05).
+    let end = tokio::time::timeout(RECV_TIMEOUT, ws.next())
+        .await
+        .expect("timed out waiting for the revoked session to end");
+    match end {
+        None | Some(Ok(Message::Close(_))) | Some(Err(_)) => {}
+        Some(Ok(other)) => panic!("expected the revoked session to end, got: {other:?}"),
+    }
+
+    // A fresh reconnect with the revoked token fails auth (badMac: the hash
+    // no longer exists in the paired set, so no stored hash's HMAC verifies).
+    let mut ws2 = connect(h.addr).await;
+    let nonce_hex = hello_challenge(&mut ws2).await;
+    let nonce_bytes = hex::decode(&nonce_hex).expect("nonce is hex");
+    let mac = auth_proof(&raw, &nonce_bytes);
+    send_json(&mut ws2, json!({"t": "auth", "seq": 2, "p": {"mac": mac}})).await;
+    let auth_fail = recv_json(&mut ws2).await;
+    assert_eq!(
+        auth_fail["t"], "authFail",
+        "a revoked token must fail auth on reconnect, got: {auth_fail}"
+    );
+    let reason = auth_fail["p"]["reason"].as_str().unwrap_or_default();
+    assert!(
+        reason == "badMac" || reason == "noPairing",
+        "expected badMac or noPairing, got: {auth_fail}"
+    );
+}
+
+// ──────────────── input.blocked (SRV-05) ────────────────────────────────
+
+/// Receive the next frame, requiring an `input.blocked` push; returns the
+/// `reason` string.
+async fn recv_input_blocked(ws: &mut WsClient) -> String {
+    let v = recv_json(ws).await;
+    assert_eq!(v["t"], "input.blocked", "expected an input.blocked push, got: {v}");
+    v["p"]["reason"]
+        .as_str()
+        .expect("input.blocked must carry p.reason")
+        .to_string()
+}
+
+/// T-07-14 / RESEARCH SHARED-B: a blocked-epoch advance while the session is
+/// still pre-auth must push NOTHING to the unauthenticated peer. Positive
+/// control on the SAME connection (apps/clip precedent): once paired, the
+/// pending pre-auth advance is delivered via the now-enabled blocked branch,
+/// then a SECOND genuine post-auth transition produces exactly one more
+/// push — proving both the pre-auth silence and the post-auth single-emit.
+#[tokio::test]
+async fn input_blocked_authed_gate_silence_then_single_push() {
+    let h = start_server().await;
+    let pin = h.auth.lock().unwrap().begin_pairing();
+
+    let mut ws = connect(h.addr).await;
+    let _nonce = hello_challenge(&mut ws).await; // state: AwaitingAuth
+
+    // Blocked epoch advances while unauthed → total silence.
+    h.blocked_tx.send_modify(|v| *v += 1);
+    assert_no_frame(&mut ws, "input.blocked leaked to an unauthed session").await;
+
+    // Positive control: pair on the SAME connection → pairOk, then the D-03
+    // vol.changed snapshot, then the pending blocked-epoch change fires
+    // (mirrors apps_no_push_preauth / clip_no_push_preauth exactly).
+    send_json(&mut ws, json!({"t": "pin", "seq": 2, "p": {"pin": pin}})).await;
+    let pair_ok = recv_json(&mut ws).await;
+    assert_eq!(
+        pair_ok["t"], "pairOk",
+        "expected pairOk after correct pin, got: {pair_ok}"
+    );
+    let _snapshot = recv_vol_changed(&mut ws).await; // D-03 vol snapshot
+    let reason = recv_input_blocked(&mut ws).await;
+    assert_eq!(reason, "elevated", "the pending pre-auth advance must carry reason=elevated");
+    assert_no_frame(&mut ws, "duplicate input.blocked after the pending pre-auth change").await;
+
+    // A genuine post-auth transition produces exactly one more push.
+    h.blocked_tx.send_modify(|v| *v += 1);
+    let reason = recv_input_blocked(&mut ws).await;
+    assert_eq!(reason, "elevated");
+    assert_no_frame(&mut ws, "duplicate input.blocked after a single post-auth change").await;
 }
