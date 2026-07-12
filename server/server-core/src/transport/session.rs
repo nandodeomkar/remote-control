@@ -32,7 +32,7 @@ use crate::auth::pin::PinOutcome;
 use super::{ClipState, VolumeState};
 use crate::codec::json::{
     AppsChangedPayload, AuthFailPayload, AuthOkPayload, ChallengePayload, ClipChangedPayload,
-    ErrPayload, Msg, PairOkPayload, VolChangedPayload,
+    ErrPayload, InputBlockedPayload, Msg, PairOkPayload, VolChangedPayload,
 };
 use crate::codec::{binary, json};
 use crate::dispatch::AuthState;
@@ -48,7 +48,10 @@ use crate::executors::{Executors, WindowInfo};
 /// bump: 1.0 clients are still accepted (§2). 1.2 adds the additive
 /// `WindowInfo.icon`/`.path` fields + the `apps.changed` S→C push (APPS-02,
 /// APPS-03) — still a minor bump, so 1.0/1.1 clients remain accepted (§2).
-pub const SERVER_PROTO_VERSION: &str = "1.2";
+/// 1.3 adds the additive `input.blocked` S→C push (SRV-05, D-07) — a
+/// transient UIPI-elevated-foreground-window notice — still a minor bump,
+/// so 1.0/1.1/1.2 clients remain accepted (§2).
+pub const SERVER_PROTO_VERSION: &str = "1.3";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
 /// POST-auth liveness deadline: an Authed session receiving NO inbound
@@ -88,6 +91,9 @@ pub(super) async fn run_session(
     mut volume: watch::Receiver<VolumeState>,
     mut apps: watch::Receiver<Vec<WindowInfo>>,
     mut clip: watch::Receiver<ClipState>,
+    conn_count: Arc<watch::Sender<usize>>,
+    mut revoke: watch::Receiver<u64>,
+    mut blocked: watch::Receiver<u64>,
 ) {
     let (mut sink, mut stream) = ws.split();
 
@@ -125,6 +131,24 @@ pub(super) async fn run_session(
     // Same discipline for the clip watch (CLIP-03): producer dropped →
     // disable the branch, never busy-loop.
     let mut clip_alive = true;
+    // Same discipline for the revoke epoch (D-05): producer dropped →
+    // disable the branch, never busy-loop.
+    let mut revoke_alive = true;
+    // Same discipline for the blocked epoch (SRV-05): producer dropped →
+    // disable the branch, never busy-loop.
+    let mut blocked_alive = true;
+    // The phone's `hello.device` name, captured when Hello is processed so
+    // the pin (pairing) path can record it via `complete_pairing_named`
+    // (D-04/A7). `None` until Hello arrives.
+    let mut hello_device: Option<String> = None;
+    // Which stored hash authed THIS session (set at the pin-Ok / auth-Ok
+    // transition) — the revoke branch (D-05) checks this hash for continued
+    // membership in `AuthManager::paired_hashes()`.
+    let mut authed_hash: Option<[u8; 32]> = None;
+    // Whether this session has already incremented `conn_count` — set at
+    // the Authed transition, guards the CONN-07 cleanup's decrement so a
+    // session that never authed cannot under/over-count (SRV-01).
+    let mut counted = false;
     // Last time ANY inbound bytes arrived from the peer; drives the
     // liveness deadline branch below.
     let mut last_inbound = Instant::now();
@@ -222,6 +246,47 @@ pub(super) async fn run_session(
                     Err(_) => clip_alive = false,
                 }
             }
+            // D-05 revoke: force-disconnect a LIVE authed session whose hash
+            // was just removed from AuthManager.paired. This is a SIBLING
+            // arm (not authed-gated) because a pre-auth session has no
+            // authed_hash yet — the `if let Some(h) = authed_hash` guard
+            // below is what actually filters. A revoked hash lands on the
+            // EXISTING straight-line CONN-07 cleanup: no new teardown code.
+            changed = revoke.changed(), if revoke_alive => {
+                match changed {
+                    Ok(()) => {
+                        let _ = revoke.borrow_and_update();
+                        if let Some(h) = authed_hash {
+                            let still_paired = auth
+                                .lock()
+                                .expect("auth mutex poisoned")
+                                .paired_hashes()
+                                .contains(&h);
+                            if !still_paired {
+                                break 'read;
+                            }
+                        }
+                    }
+                    Err(_) => revoke_alive = false,
+                }
+            }
+            // SRV-05 input.blocked live push, authed-gated: identical
+            // privacy backstop to the volume/apps/clip branches (T-07-14 /
+            // RESEARCH Pitfall 8) — a UIPI-elevated-foreground transition
+            // must never cross to an unauthed socket. Unlike volume there is
+            // NO after-auth snapshot (mirrors apps/clip) — this is a
+            // transition event, not a state prime.
+            changed = blocked.changed(), if blocked_alive && ctx.auth_state == AuthState::Authed => {
+                match changed {
+                    Ok(()) => {
+                        let _ = blocked.borrow_and_update();
+                        if tx.send(input_blocked_frame("elevated")).await.is_err() {
+                            break 'read; // write task gone → session over
+                        }
+                    }
+                    Err(_) => blocked_alive = false,
+                }
+            }
             incoming = stream.next() => {
                 let msg = match incoming {
                     // Clean close: the client finished the WS close
@@ -245,10 +310,11 @@ pub(super) async fn run_session(
                         // below fires exactly at the two Authed transitions
                         // (pairOk and authOk) — never on later frames.
                         let was_authed = ctx.auth_state == AuthState::Authed;
-                        let (replies, close_after) = handle_text(
+                        let (replies, close_after, newly_authed_hash) = handle_text(
                             text.as_str(),
                             &mut ctx,
                             &mut session_nonce,
+                            &mut hello_device,
                             peer_ip,
                             &executors,
                             &auth,
@@ -272,7 +338,15 @@ pub(super) async fn run_session(
                         // (mpsc preserves order). borrow_and_update here AND
                         // in the branch above prevents an immediate
                         // duplicate branch-fire on a pre-auth state change.
+                        // The SAME transition is where conn_count (SRV-01)
+                        // and authed_hash (D-05) are recorded — both are
+                        // exactly-once-per-session facts tied to this guard.
                         if !was_authed && ctx.auth_state == AuthState::Authed {
+                            authed_hash = newly_authed_hash;
+                            if !counted {
+                                conn_count.send_modify(|n| *n += 1);
+                                counted = true;
+                            }
                             let state = *volume.borrow_and_update();
                             if tx.send(vol_changed_frame(state)).await.is_err() {
                                 break 'read;
@@ -312,6 +386,12 @@ pub(super) async fn run_session(
     // and idempotent: if the pause branch already released, this is a no-op.)
     ctx.held.release_all(&*executors.mouse_keys);
 
+    // SRV-01: undo this session's conn_count increment (if any) exactly
+    // once. counted guards the case where the session never reached Authed.
+    if counted {
+        conn_count.send_modify(|n| *n = n.saturating_sub(1));
+    }
+
     // Closing the channel lets the write task drain anything still queued
     // (e.g. the versionMismatch err + close frames), then exit.
     drop(tx);
@@ -321,24 +401,27 @@ pub(super) async fn run_session(
 
 /// Handle one decoded-or-not text frame through the handshake FSM.
 ///
-/// Returns the replies to queue plus whether the session must close after
-/// sending them (true only for the D-06 version reject).
+/// Returns the replies to queue, whether the session must close after
+/// sending them (true only for the D-06 version reject), and — ONLY on a
+/// pin-Ok or auth-Ok transition to Authed — the stored hash that authed this
+/// session (D-05 revoke-branch correlation; `None` otherwise).
 fn handle_text(
     text: &str,
     ctx: &mut SessionCtx,
     session_nonce: &mut Option<[u8; 32]>,
+    hello_device: &mut Option<String>,
     peer_ip: IpAddr,
     executors: &Executors,
     auth: &Mutex<AuthManager>,
     pause: &watch::Receiver<bool>,
-) -> (Vec<Msg>, bool) {
+) -> (Vec<Msg>, bool, Option<[u8; 32]>) {
     let decoded = match json::decode_text(text) {
         Ok(decoded) => decoded,
         Err(e) => {
             // Pre-auth: silent drop (SPEC §6 — no probing oracle for
             // unauthenticated peers, malformed frames included).
             if ctx.auth_state != AuthState::Authed {
-                return (Vec::new(), false);
+                return (Vec::new(), false, None);
             }
             // Post-auth decode error: the SPEC §7 err table defines no
             // decode-failure code ("badMessage" does not exist), so by
@@ -355,6 +438,7 @@ fn handle_text(
                     client_version: None,
                 })],
                 false,
+                None,
             );
         }
     };
@@ -369,6 +453,9 @@ fn handle_text(
                     .next()
                     .and_then(|m| m.parse::<u64>().ok());
                 if major == Some(SERVER_PROTO_MAJOR) {
+                    // Captured for the pin (pairing) path below: the phone's
+                    // display name for the paired-device record (D-04/A7).
+                    *hello_device = Some(p.device.clone());
                     // Minor mismatch is accepted (SPEC §2).
                     let nonce = auth.lock().expect("auth mutex poisoned").issue_challenge();
                     *session_nonce = Some(nonce);
@@ -376,6 +463,7 @@ fn handle_text(
                     (
                         vec![Msg::Challenge(ChallengePayload { nonce: hex::encode(nonce) })],
                         false,
+                        None,
                     )
                 } else {
                     // D-06: major mismatch (or unparseable version) → err
@@ -392,12 +480,13 @@ fn handle_text(
                             client_version: Some(p.proto_version),
                         })],
                         true,
+                        None,
                     )
                 }
             }
             // Everything else pre-hello — including protocol `ping` — is
             // silently dropped (SPEC §6).
-            _ => (Vec::new(), false),
+            _ => (Vec::new(), false, None),
         },
 
         // ── AwaitingAuth: ONLY pin / auth are processed (SPEC §3) ───────
@@ -409,48 +498,63 @@ fn handle_text(
                     .verify_pin(&p.pin, peer_ip);
                 match outcome {
                     PinOutcome::Ok => {
-                        let token =
-                            auth.lock().expect("auth mutex poisoned").complete_pairing();
+                        let name = hello_device.clone().unwrap_or_else(|| "phone".to_owned());
+                        let result = auth
+                            .lock()
+                            .expect("auth mutex poisoned")
+                            .complete_pairing_named(name);
                         ctx.auth_state = AuthState::Authed;
-                        (vec![Msg::PairOk(PairOkPayload { token })], false)
+                        (
+                            vec![Msg::PairOk(PairOkPayload { token: result.token_hex })],
+                            false,
+                            Some(result.hash),
+                        )
                     }
                     PinOutcome::WrongPin { attempts_remaining } => {
-                        (vec![auth_fail("pinInvalid", Some(attempts_remaining), None)], false)
+                        (vec![auth_fail("pinInvalid", Some(attempts_remaining), None)], false, None)
                     }
-                    PinOutcome::Expired => (vec![auth_fail("pinExpired", None, None)], false),
-                    PinOutcome::LockedOut { retry_after_secs } => {
-                        (vec![auth_fail("lockedOut", None, Some(retry_after_secs))], false)
+                    PinOutcome::Expired => (vec![auth_fail("pinExpired", None, None)], false, None),
+                    PinOutcome::LockedOut { retry_after_secs } => (
+                        vec![auth_fail("lockedOut", None, Some(retry_after_secs))],
+                        false,
+                        None,
+                    ),
+                    PinOutcome::NoPairing => {
+                        (vec![auth_fail("noPairing", None, None)], false, None)
                     }
-                    PinOutcome::NoPairing => (vec![auth_fail("noPairing", None, None)], false),
                 }
             }
             Msg::Auth(p) => {
                 // The mac must be bound to THIS connection's nonce; a
                 // session that never got a challenge verifies nothing.
-                let verified = session_nonce.is_some_and(|nonce| {
+                // verify_auth_hash (not the plain bool verify_auth) so the
+                // session can record WHICH stored hash authed it — the
+                // revoke branch (D-05) needs this for its membership check.
+                let verified_hash = session_nonce.and_then(|nonce| {
                     auth.lock()
                         .expect("auth mutex poisoned")
-                        .verify_auth(&nonce, &p.mac)
+                        .verify_auth_hash(&nonce, &p.mac)
                 });
-                if verified {
+                if let Some(hash) = verified_hash {
                     ctx.auth_state = AuthState::Authed;
-                    (vec![Msg::AuthOk(AuthOkPayload {})], false)
+                    (vec![Msg::AuthOk(AuthOkPayload {})], false, Some(hash))
                 } else {
-                    (vec![auth_fail("badMac", None, None)], false)
+                    (vec![auth_fail("badMac", None, None)], false, None)
                 }
             }
             // Everything else pre-auth is silently dropped (SPEC §6).
-            _ => (Vec::new(), false),
+            _ => (Vec::new(), false, None),
         },
 
         // ── Authed: full registry via the dispatch gates ────────────────
         AuthState::Authed => match &decoded.msg {
             // Handshake replays post-auth are ignored: the FSM owns these
             // types and they must never reach route() (its debug_assert).
-            Msg::Hello(_) | Msg::Pin(_) | Msg::Auth(_) => (Vec::new(), false),
+            Msg::Hello(_) | Msg::Pin(_) | Msg::Auth(_) => (Vec::new(), false, None),
             _ => (
                 router::route(decoded, ctx, executors, auth, *pause.borrow()),
                 false,
+                None,
             ),
         },
     }
@@ -486,6 +590,18 @@ fn apps_changed_frame(windows: Vec<WindowInfo>) -> Message {
 fn clip_changed_frame(text: String) -> Message {
     Message::text(json::encode_msg(
         &Msg::ClipChanged(ClipChangedPayload { text }),
+        None,
+    ))
+}
+
+/// Encode one `input.blocked` push frame (S→C, protoVersion 1.3, SRV-05)
+/// carrying a fixed-vocabulary `reason` (e.g. `"elevated"`) — NEVER a window
+/// title/exe path/PII (T-07-05). The sole input.blocked encoder — no
+/// after-auth snapshot analog (mirrors apps/clip: a transition event, not a
+/// state prime).
+fn input_blocked_frame(reason: &str) -> Message {
+    Message::text(json::encode_msg(
+        &Msg::InputBlocked(InputBlockedPayload { reason: reason.to_owned() }),
         None,
     ))
 }

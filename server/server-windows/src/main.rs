@@ -143,6 +143,22 @@ async fn main() -> anyhow::Result<()> {
     //    step 3a; its `volume_rx` is consumed below.)
     let (_pause_tx, pause_rx) = tokio::sync::watch::channel(false);
 
+    // 6b. 07-05 interim producers (06-01 precedent): these three ServerDeps
+    //     seams (SRV-01 tooltip, D-05 revoke, SRV-05 input.blocked) are
+    //     threaded end-to-end in server-core THIS plan, but their real
+    //     producers land later — the tray tooltip reader (07-06), the
+    //     settings-driven revoke sender (07-08), and the input-thread UIPI
+    //     sender (07-04's detection wired to this watch, 07-06). Until then
+    //     these interim channels keep the workspace green: `_conn_count_rx`
+    //     is dropped here (07-06 replaces it with the tray's subscription),
+    //     `_revoke_tx` and `_blocked_tx` never advance (no revoke/block ever
+    //     fires) but must stay alive for the session's `.changed()` branches
+    //     to not immediately disable themselves.
+    let (conn_count_tx, _conn_count_rx) = tokio::sync::watch::channel(0usize);
+    let conn_count = std::sync::Arc::new(conn_count_tx);
+    let (_revoke_tx, revoke_rx) = tokio::sync::watch::channel(0u64);
+    let (_blocked_tx, blocked_rx) = tokio::sync::watch::channel(0u64);
+
     // 6a. Apps watch (APPS-03): fed by the real apps thread spawned in step
     //     3b. `apps_rx` (the snapshot receiver) drives the session's authed-
     //     gated apps.changed push branch; WinApps holds its own clone for
@@ -154,6 +170,9 @@ async fn main() -> anyhow::Result<()> {
         volume: volume_rx,
         apps: apps_rx,
         clip: clip_rx,
+        conn_count: conn_count.clone(),
+        revoke: revoke_rx,
+        blocked: blocked_rx,
     };
 
     // 7. Bind the LAN interface (tests bind 127.0.0.1:0; the real binary

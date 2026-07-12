@@ -84,6 +84,22 @@ pub struct ServerDeps {
     /// sensitive/oversized clips before they reach this watch, so a push is
     /// always a policy-clean text change.
     pub clip: tokio::sync::watch::Receiver<ClipState>,
+    /// Live connected-device count (SRV-01): every session bumps this by one
+    /// on its Authed transition and decrements it in the CONN-07 cleanup.
+    /// `Arc`-shared so every session clones a handle to the SAME sender; the
+    /// tray thread subscribes a `Receiver` off it for the tooltip.
+    pub conn_count: std::sync::Arc<tokio::sync::watch::Sender<usize>>,
+    /// Revocation epoch (D-05): bumped whenever `AuthManager::revoke` removes
+    /// a paired hash. A session whose authed hash is no longer in
+    /// `AuthManager::paired_hashes()` force-disconnects on the next advance —
+    /// landing on the existing CONN-07 cleanup, no new teardown code.
+    pub revoke: tokio::sync::watch::Receiver<u64>,
+    /// Input-blocked epoch (SRV-05): bumped by the input thread's proactive
+    /// UIPI detection on every foreground-blocked transition. Authed sessions
+    /// push an `input.blocked` frame on each advance. Unlike volume there is
+    /// NO after-auth snapshot (mirrors apps/clip) — this is a transition
+    /// event, not a state prime.
+    pub blocked: tokio::sync::watch::Receiver<u64>,
 }
 
 /// Run the accept loop on an already-bound listener until the task is
