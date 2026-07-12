@@ -223,7 +223,8 @@ mod tests {
     //! pair -> proof -> verify round trip using ONLY the stored hash.
 
     use super::challenge::auth_proof;
-    use super::AuthManager;
+    use super::token::hash_token;
+    use super::{AuthManager, PairedDevice};
 
     #[test]
     fn issue_challenge_yields_fresh_nonces() {
@@ -269,5 +270,113 @@ mod tests {
         let nonce = auth.issue_challenge();
         let mac = auth_proof(b"any raw token", &nonce);
         assert!(!auth.verify_auth(&nonce, &mac), "empty hash table must verify nothing");
+    }
+
+    #[test]
+    fn from_paired_seeds_the_paired_set() {
+        // D-01 restore path: a manager seeded from prior records is paired and
+        // enumerates exactly those records.
+        let records = vec![
+            PairedDevice::new([1u8; 32], "Pixel".to_owned(), 1_700_000_000),
+            PairedDevice::new([2u8; 32], "Galaxy".to_owned(), 1_700_000_100),
+        ];
+        let auth = AuthManager::from_paired(records.clone());
+        assert!(auth.is_paired(), "seeded manager reports paired");
+        assert_eq!(
+            auth.paired_records().len(),
+            records.len(),
+            "paired_records must enumerate every seeded device"
+        );
+        assert_eq!(auth.paired_records(), records.as_slice());
+    }
+
+    #[test]
+    fn complete_pairing_named_records_name_time_and_token() {
+        let mut auth = AuthManager::new();
+        let result = auth.complete_pairing_named("Pixel".to_owned());
+
+        // The PairingResult carries a valid one-time token hex + its hash.
+        assert_eq!(result.token_hex.len(), 64, "token_hex is 64 lowercase hex chars");
+        let raw = hex::decode(&result.token_hex).expect("token_hex decodes");
+        assert_eq!(result.hash, hash_token(&raw), "PairingResult.hash == sha256(token bytes)");
+
+        // The stored record carries the phone's name and a real pairing time.
+        let stored = auth.paired_records();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(stored[0].name, "Pixel", "name recorded from hello.device");
+        assert_ne!(stored[0].paired_at, 0, "paired_at is a real unix timestamp");
+        assert_eq!(stored[0].hash, result.hash, "stored hash matches the result hash");
+    }
+
+    #[test]
+    fn verify_auth_hash_returns_the_matching_hash_or_none() {
+        let mut auth = AuthManager::new();
+        let result = auth.complete_pairing_named("Pixel".to_owned());
+        let nonce = auth.issue_challenge();
+        let mac = auth_proof(&hex::decode(&result.token_hex).unwrap(), &nonce);
+
+        // D-05: a valid proof returns WHICH hash authed the session.
+        assert_eq!(
+            auth.verify_auth_hash(&nonce, &mac),
+            Some(result.hash),
+            "a valid proof returns the matching stored hash"
+        );
+        // A wrong mac returns None.
+        let bogus = "0".repeat(64);
+        assert_eq!(auth.verify_auth_hash(&nonce, &bogus), None, "wrong mac verifies nothing");
+    }
+
+    #[test]
+    fn revoke_removes_only_the_targeted_hash_and_reports_presence() {
+        let mut auth = AuthManager::new();
+        let result = auth.complete_pairing_named("Pixel".to_owned());
+        let nonce = auth.issue_challenge();
+        let mac = auth_proof(&hex::decode(&result.token_hex).unwrap(), &nonce);
+        assert!(auth.verify_auth(&nonce, &mac), "authed before revoke");
+
+        // Revoking a known hash reports true and drops it — future auth fails.
+        assert!(auth.revoke(&result.hash), "revoke reports the hash was present");
+        assert!(!auth.is_paired(), "the only device is gone");
+        assert!(!auth.verify_auth(&nonce, &mac), "a revoked hash must fail future auth (D-05)");
+
+        // Revoking an unknown hash reports false.
+        assert!(!auth.revoke(&[9u8; 32]), "revoking an absent hash reports false");
+    }
+
+    #[test]
+    fn changes_signal_advances_on_pairing_and_revoke() {
+        let mut auth = AuthManager::new();
+
+        // Subscribe BEFORE any mutation; the seed value is 0.
+        let mut rx = auth.changes();
+        assert_eq!(*rx.borrow_and_update(), 0);
+
+        // A pairing bumps the signal.
+        let result = auth.complete_pairing_named("Pixel".to_owned());
+        assert!(rx.has_changed().unwrap(), "pairing advances the change-signal");
+        let after_pair = *rx.borrow_and_update();
+        assert!(after_pair > 0, "version increments after pairing");
+
+        // A revoke bumps it again.
+        assert!(auth.revoke(&result.hash));
+        assert!(rx.has_changed().unwrap(), "revoke advances the change-signal");
+        assert!(*rx.borrow_and_update() > after_pair, "version increments again after revoke");
+    }
+
+    #[test]
+    fn paired_record_carries_only_hash_name_time_no_raw_token() {
+        // Hash-only invariant (T-01-08): a paired device round-trips through
+        // paired_records() carrying its hash/name/paired_at and nothing that
+        // could reconstruct the raw token.
+        let mut auth = AuthManager::new();
+        let result = auth.complete_pairing_named("Pixel".to_owned());
+        let record = &auth.paired_records()[0];
+        assert_eq!(record.hash, result.hash);
+        assert_eq!(record.name, "Pixel");
+        assert_ne!(record.paired_at, 0);
+        // The stored hash is NOT the raw token: hashing it again differs.
+        let raw = hex::decode(&result.token_hex).unwrap();
+        assert_eq!(record.hash, hash_token(&raw));
+        assert_ne!(record.hash.to_vec(), raw, "the stored form is the hash, never the raw token");
     }
 }
