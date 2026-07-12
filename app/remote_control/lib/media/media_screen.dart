@@ -26,13 +26,13 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'volume_store.dart';
@@ -240,7 +240,7 @@ class _TransportButtonState extends State<_TransportButton> {
   // Press-down (Phase-4 rule): send + haptic + accent flash immediately.
   void _fire() {
     widget.onPress();
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     setState(() => _pressed = true);
     Future.delayed(const Duration(milliseconds: 100), () {
       if (!mounted) return;

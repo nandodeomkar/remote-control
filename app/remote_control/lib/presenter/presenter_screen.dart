@@ -31,16 +31,16 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
+import '../widgets/keep_awake.dart';
 import 'presenter_timer.dart';
 
 /// The presenter remote (D-07): split tap zones, bottom bar, manual timer.
@@ -77,15 +77,17 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
     _timer = PresenterTimer(
       nowMillis: () => DateTime.now().millisecondsSinceEpoch,
     );
-    // D-09: keep the phone awake while presenting.
-    WakelockPlus.enable();
+    // D-09/D-14: keep the phone awake while presenting, ref-counted so a
+    // Trackpad quick-bar excursion never drops it out from under this screen.
+    keepAwake.acquire();
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
-    // D-09: release the wakelock — it must never leak past this screen.
-    WakelockPlus.disable();
+    // D-09/D-14: release this screen's hold — the shared ref-count only
+    // disables the wakelock once every holder has released.
+    keepAwake.release();
     super.dispose();
   }
 
@@ -107,7 +109,7 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
   // flash of the tapped chevron.
   void _onZone(PresentMsg msg, bool isPrev) {
     _service.sendReliable(msg);
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     setState(() {
       if (isPrev) {
         _prevFlash = true;
@@ -130,7 +132,7 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
   // "Start show": present {start} AND start the local timer (D-08).
   void _onStartShow() {
     _service.sendReliable(const PresentMsg(action: 'start'));
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     _timer.startShow();
     _ensureTicker();
     setState(() {});
@@ -140,13 +142,13 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
   // (D-08).
   void _onEndShow() {
     _service.sendReliable(const PresentMsg(action: 'end'));
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
   }
 
   // "Blank" toggle: present {blank} + optimistic local flip (no readback).
   void _onBlank() {
     _service.sendReliable(const PresentMsg(action: 'blank'));
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     setState(() => _blanked = !_blanked);
   }
 
@@ -158,7 +160,7 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
 
   void _onTimerReset() {
     _timer.reset();
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     setState(() {});
   }
 

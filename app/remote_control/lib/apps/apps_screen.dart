@@ -24,13 +24,13 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'apps_store.dart';
@@ -263,7 +263,7 @@ class _FavoriteTileState extends State<_FavoriteTile> {
 
   void _fire() {
     widget.onLaunch();
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     setState(() => _pressed = true);
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) setState(() => _pressed = false);
@@ -396,7 +396,7 @@ class _WindowRowState extends State<_WindowRow> {
 
   void _fire() {
     widget.onFocus();
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     setState(() => _pressed = true);
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) setState(() => _pressed = false);
@@ -471,7 +471,7 @@ class _CloseButtonState extends State<_CloseButton> {
 
   void _fire() {
     widget.onClose();
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     setState(() => _pressed = true);
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) setState(() => _pressed = false);

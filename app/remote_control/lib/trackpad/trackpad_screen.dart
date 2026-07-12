@@ -26,9 +26,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
 
@@ -37,9 +35,11 @@ import '../keyboard/keyboard_panel.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
 import '../screens/connection_copy.dart';
+import '../settings/haptics.dart';
 import '../settings/sensitivity.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
+import '../widgets/keep_awake.dart';
 import 'gesture_classifier.dart';
 import 'mouse_buttons.dart';
 import 'trackpad_driver.dart';
@@ -110,7 +110,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
       onSendMove: _service.sendMove,
       onSendScroll: _service.sendScroll,
       onSendReliable: _service.sendReliable,
-      onHaptic: HapticFeedback.lightImpact,
+      onHaptic: hapticTick,
       onDragLockChanged: (locked) => _dragLockPill.value = locked,
       // The timer fires back INTO the classifier; its verdict (drag start or
       // stale no-op) round-trips through the driver like any other intent.
@@ -142,8 +142,10 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
       _lastChip = chip;
     });
 
-    // Keep the screen awake so it never dims mid-drag.
-    WakelockPlus.enable();
+    // Keep the screen awake so it never dims mid-drag (D-14: ref-counted so
+    // a Presenter->quick-bar->Trackpad excursion never drops the other's
+    // hold — Pitfall 8).
+    keepAwake.acquire();
   }
 
   @override
@@ -153,7 +155,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
     _dragLockPill.dispose();
     _panelExpanded.dispose();
     _imeFocusNode.dispose();
-    WakelockPlus.disable();
+    keepAwake.release();
     super.dispose();
   }
 
@@ -183,7 +185,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
   // L/M/R bar press: reliable click + the same haptic tick as tap-clicks.
   void _onMouseButton(String button) {
     _service.sendReliable(ClickMsg(button: button));
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
   }
 
   // The D-05 sensitivity sheet: a modal route (OUTSIDE the Listener subtree,

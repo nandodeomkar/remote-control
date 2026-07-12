@@ -24,16 +24,14 @@
 /// (full-width), Zoom out/Zoom in.
 library;
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 
@@ -226,7 +224,7 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
   /// not release; SendPolicy owns the auth gating downstream).
   void _onAction(String action) {
     _service.sendReliable(BrowserMsg(action: action));
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
   }
 
   @override

@@ -33,6 +33,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'clip_store.dart';
@@ -344,7 +345,7 @@ class _ActionButtonState extends State<_ActionButton> {
   // Press-down (Phase-4 rule): fire + haptic + accent flash immediately.
   void _fire() {
     widget.onPress();
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     setState(() => _pressed = true);
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) setState(() => _pressed = false);
@@ -456,7 +457,7 @@ class _HistoryEntryState extends State<_HistoryEntry> {
 
   void _fire() {
     widget.onReuse();
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     setState(() => _pressed = true);
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) setState(() => _pressed = false);

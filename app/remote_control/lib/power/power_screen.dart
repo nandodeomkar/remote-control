@@ -36,13 +36,13 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
+import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'confirm_track_fsm.dart';
@@ -155,7 +155,7 @@ class _PowerScreenState extends ConsumerState<PowerScreen> {
           onConfirm: () {
             // The second of exactly two ConfirmMsg send sites (D-06).
             _service.sendReliable(ConfirmMsg(action: action));
-            unawaited(HapticFeedback.mediumImpact());
+            hapticTickMedium();
           },
         ),
       ),
@@ -291,7 +291,7 @@ class _SlideTrackState extends State<_SlideTrack> {
     final effects = _fsm.dragEnd();
     if (_fsm.state == ConfirmTrackState.completed) {
       // Full-fill flash + haptic tick on completion (press-style feedback).
-      unawaited(HapticFeedback.mediumImpact());
+      hapticTickMedium();
       setState(() {
         _animate = false;
         _display = 1.0;

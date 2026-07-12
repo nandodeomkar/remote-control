@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'net/connection_providers.dart';
 import 'net/reconnect_fsm.dart';
 import 'screens/device_list_screen.dart';
+import 'settings/haptics.dart';
 import 'store/device_list_store.dart';
 import 'theme/tokens.dart';
 
@@ -42,6 +43,11 @@ class _RemoteControlAppState extends ConsumerState<RemoteControlApp> {
   @override
   void initState() {
     super.initState();
+    // D-13: install the haptics hot-path cache ONCE at app start, before any
+    // tap can fire — mirrors the trackpad sensitivity-cache seam
+    // (listenManual, fireImmediately) so hapticTick()/hapticTickMedium() are
+    // gated correctly from the very first frame.
+    bindHapticsCache(ref);
     // D-06: app returns to the foreground -> instant retry (backoff reset).
     _lifecycle = AppLifecycleListener(
       onResume: () => ref.read(connectionServiceProvider).onAppResumed(),

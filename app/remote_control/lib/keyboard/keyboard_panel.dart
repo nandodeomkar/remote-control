@@ -45,11 +45,11 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
 
+import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import 'diff_ops.dart';
 import 'hidden_text_input.dart';
@@ -182,13 +182,13 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
   }
 
   void _onChipTap(Mod mod) {
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     _sendEffects(_fsm.tap(mod));
     setState(() {});
   }
 
   void _onChipLongPress(Mod mod) {
-    unawaited(HapticFeedback.lightImpact());
+    hapticTick();
     _sendEffects(_fsm.longPress(mod));
     setState(() {});
   }
@@ -255,7 +255,7 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
           onKeyUp: _onKeyUp,
           onKeyTapWithMods: _onKeyTapWithMods,
           hasArmedMods: () => _fsm.modsForTap().isNotEmpty,
-          onPressHaptic: HapticFeedback.lightImpact,
+          onPressHaptic: hapticTick,
         ),
       ],
     );
