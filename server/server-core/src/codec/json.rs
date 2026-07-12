@@ -206,6 +206,17 @@ pub struct ClipChangedPayload {
     pub text: String,
 }
 
+/// `input.blocked` payload (S→C push, protoVersion 1.3, D-07/SRV-05): the
+/// foreground window is higher-integrity (elevated) so injected input is
+/// being silently dropped by UIPI. `reason` is a fixed vocabulary string
+/// (currently `"elevated"`) — never a window title/exe path/PII (T-07-05).
+/// Additive: 1.0–1.2 clients ignore this message. The version bump lives in
+/// session.rs (07-05), not here.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct InputBlockedPayload {
+    pub reason: String,
+}
+
 /// `browser` payload (C→S): key-macro actions (SPEC §7).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BrowserPayload {
@@ -279,6 +290,7 @@ pub enum Msg {
     ClipSet(ClipSetPayload),
     ClipGet(ClipGetPayload),
     ClipChanged(ClipChangedPayload),
+    InputBlocked(InputBlockedPayload),
     Browser(BrowserPayload),
     Present(PresentPayload),
     Ping(PingPayload),
@@ -329,6 +341,7 @@ pub fn decode_text(s: &str) -> Result<Decoded, CodecError> {
         "clip.set" => Msg::ClipSet(payload(p)?),
         "clip.get" => Msg::ClipGet(payload(p)?),
         "clip.changed" => Msg::ClipChanged(payload(p)?),
+        "input.blocked" => Msg::InputBlocked(payload(p)?),
         "browser" => Msg::Browser(payload(p)?),
         "present" => Msg::Present(payload(p)?),
         "ping" => Msg::Ping(payload(p)?),
@@ -395,6 +408,7 @@ pub fn encode_msg(msg: &Msg, seq: Option<u64>) -> String {
         Msg::ClipSet(pl) => ("clip.set", val(pl)),
         Msg::ClipGet(pl) => ("clip.get", val(pl)),
         Msg::ClipChanged(pl) => ("clip.changed", val(pl)),
+        Msg::InputBlocked(pl) => ("input.blocked", val(pl)),
         Msg::Browser(pl) => ("browser", val(pl)),
         Msg::Present(pl) => ("present", val(pl)),
         Msg::Ping(pl) => ("ping", val(pl)),
@@ -559,6 +573,15 @@ mod tests {
         round_trip(Msg::ClipSet(ClipSetPayload { text: "copied 📋".into() }), Some(11));
         round_trip(Msg::ClipGet(ClipGetPayload {}), Some(12));
         round_trip(Msg::ClipChanged(ClipChangedPayload { text: "pushed".into() }), None);
+    }
+
+    #[test]
+    fn round_trip_input_blocked() {
+        // proto 1.3 (SRV-05/D-07): additive S→C push, encode/decode symmetric.
+        round_trip(
+            Msg::InputBlocked(InputBlockedPayload { reason: "elevated".into() }),
+            None,
+        );
     }
 
     #[test]

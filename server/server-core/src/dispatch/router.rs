@@ -267,6 +267,7 @@ pub fn route(
         | Msg::AppsChanged(_)
         | Msg::ClipChanged(_)
         | Msg::VolChanged(_)
+        | Msg::InputBlocked(_)
         | Msg::Pong(_)
         | Msg::Err(_) => Vec::new(),
     }
