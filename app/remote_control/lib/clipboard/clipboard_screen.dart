@@ -6,8 +6,10 @@
 ///   - Action row: two equal key-cap buttons — "Send to PC" (`arrow_upward`)
 ///     and "Fetch from PC" (`arrow_downward`), sm gap, ≥48px, pressed
 ///     accent-flash + haptic.
-///   - lg gap — a placeholder gap where the 06-06 auto-sync row + persistent
-///     honesty note will land (DELIBERATELY not added this plan).
+///   - Auto-sync row (CLIP-03, 06-06): "Auto-sync clipboard" label + a Material
+///     Switch (accent on / inactive off, DEFAULT OFF, ALWAYS enabled — a local
+///     preference exempt from connection gating, D-03), with the persistent
+///     honesty note directly beneath (never hidden, D-08).
 ///   - History section: header "Recent", up to 5 entries most-recent-first,
 ///     tap → reuse (re-push to the PC, D-06) + snackbar. Empty → an empty state.
 ///
@@ -16,6 +18,11 @@
 /// phone clipboard (`Clipboard.setData`). All wire-bound controls are gated on
 /// connection (muted, never red — inherited rule); the fetch outcome surfaces as
 /// a transient snackbar off the notifier's identity-tracked fetch event.
+///
+/// Auto-sync (06-06): when ON, a `clip.changed` push applies to the phone
+/// clipboard live (client-gated, RESEARCH A4) and phone→PC syncs on app resume
+/// (Android 10+ background-read limit, D-08) — an [AppLifecycleListener] drives
+/// the resume hook. Echo suppression lives in the store (D-05).
 library;
 
 import 'dart:async';
@@ -51,6 +58,11 @@ class _ClipboardScreenState extends ConsumerState<ClipboardScreen> {
   late final ConnectionService _service;
   StreamSubscription<void>? _sub;
 
+  /// The D-08 resume hook: on `AppLifecycleState.resumed` the notifier reads the
+  /// phone clipboard and (when auto-sync is on) syncs it to the PC. Disposed
+  /// with the screen.
+  AppLifecycleListener? _lifecycle;
+
   /// The last fetch event already surfaced (identity-tracked — the value-equal
   /// view does not rebuild on an empty-PC Fetch, so the screen watches the raw
   /// `changes` stream to catch each fresh outcome exactly once).
@@ -65,12 +77,19 @@ class _ClipboardScreenState extends ConsumerState<ClipboardScreen> {
     // see the fresh lastFetchEvent on the same ping.
     ref.read(clipStateProvider.notifier);
     _sub = _service.changes.listen((_) => _maybeShowFetch());
+    // phone→PC on foreground only (Android 10+ blocks background reads, D-08).
+    _lifecycle = AppLifecycleListener(
+      onResume: () =>
+          unawaited(ref.read(clipStateProvider.notifier).syncOnResume()),
+    );
   }
 
   @override
   void dispose() {
     _sub?.cancel();
     _sub = null;
+    _lifecycle?.dispose();
+    _lifecycle = null;
     super.dispose();
   }
 
@@ -193,8 +212,16 @@ class _ClipboardScreenState extends ConsumerState<ClipboardScreen> {
                         ),
                       ],
                     ),
-                    // lg gap — the 06-06 auto-sync row + persistent honesty note
-                    // land here (DELIBERATELY not added this plan).
+                    // lg gap → auto-sync row (CLIP-03), then the persistent
+                    // honesty note directly beneath (D-03/D-08).
+                    const SizedBox(height: 24),
+                    _AutoSyncRow(
+                      value: clip.autoSyncOn,
+                      onChanged: (v) =>
+                          ref.read(clipStateProvider.notifier).setAutoSync(v),
+                    ),
+                    const SizedBox(height: 8),
+                    const _HonestyNote(),
                     const SizedBox(height: 24),
                     const _SectionHeader('Recent'),
                     const SizedBox(height: 8),
@@ -230,6 +257,70 @@ class _SectionHeader extends StatelessWidget {
             color: _text,
           ),
         ),
+      );
+}
+
+/// The auto-sync toggle row (CLIP-03 / D-03): "Auto-sync clipboard" label +
+/// a Material [Switch] (accent `#4C8DFF` on / inactive `#2A2D34` off). Default
+/// OFF, ≥48px. ALWAYS enabled — it is a local persisted preference, exempt from
+/// the connection gating that mutes the wire-bound controls.
+class _AutoSyncRow extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  const _AutoSyncRow({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Row(
+          children: [
+            const Expanded(
+              child: Text(
+                'Auto-sync clipboard',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: _text,
+                ),
+              ),
+            ),
+            Switch(
+              value: value,
+              onChanged: onChanged, // never gated — local preference (D-03)
+              activeThumbColor: _accent,
+              activeTrackColor: _accent,
+              inactiveThumbColor: _text,
+              inactiveTrackColor: _hairline,
+            ),
+          ],
+        ),
+      );
+}
+
+/// The persistent Android-honesty note (D-08) — ALWAYS visible regardless of
+/// the toggle: leading `Icons.info_outline` + 12/400 `#6B7280` copy explaining
+/// the platform limit (phone→PC only on foreground, PC→phone live).
+class _HonestyNote extends StatelessWidget {
+  const _HonestyNote();
+
+  @override
+  Widget build(BuildContext context) => const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.info_outline, size: 16, color: _muted),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Phone → PC syncs when you open this app. PC → phone syncs live.',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+                color: _muted,
+              ),
+            ),
+          ),
+        ],
       );
 }
 
