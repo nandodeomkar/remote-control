@@ -117,5 +117,140 @@ void main() {
       const b = ClipViewState(history: ['x'], connected: false);
       expect(a, isNot(b));
     });
+
+    test('a differing autoSyncOn flag makes them unequal', () {
+      const a =
+          ClipViewState(history: ['x'], connected: true, autoSyncOn: true);
+      const b =
+          ClipViewState(history: ['x'], connected: true, autoSyncOn: false);
+      expect(a, isNot(b));
+    });
+  });
+
+  group('AutoSyncStore — default off + persist/reload (D-03)', () {
+    test('load returns false when the key is absent (default OFF)', () async {
+      final store = AutoSyncStore(prefs: prefs);
+      expect(await store.load(), isFalse);
+    });
+
+    test('set(true) persists and reloads true across instances', () async {
+      await AutoSyncStore(prefs: prefs).set(true);
+      expect(await AutoSyncStore(prefs: prefs).load(), isTrue);
+    });
+
+    test('set(false) persists and reloads false', () async {
+      await AutoSyncStore(prefs: prefs).set(true);
+      await AutoSyncStore(prefs: prefs).set(false);
+      expect(await AutoSyncStore(prefs: prefs).load(), isFalse);
+    });
+  });
+
+  group('ClipSyncPolicy — PC→phone apply gate + echo suppression (A4/D-05)', () {
+    late List<String> written; // Clipboard.setData targets
+    late List<String> recorded; // history records
+    late List<String> sent; // clip.set sends
+    late ClipSyncPolicy policy;
+
+    ClipSyncPolicy build() => ClipSyncPolicy(
+          writeClipboard: (t) async => written.add(t),
+          record: (t) async => recorded.add(t),
+          send: sent.add,
+        );
+
+    setUp(() {
+      written = <String>[];
+      recorded = <String>[];
+      sent = <String>[];
+      policy = build();
+    });
+
+    test('applyPush with auto-sync ON writes + records + tracks lastSynced',
+        () async {
+      final applied = await policy.applyPush('hello', autoSyncOn: true);
+      expect(applied, isTrue);
+      expect(written, ['hello']);
+      expect(recorded, ['hello']);
+      expect(policy.lastSynced, 'hello');
+    });
+
+    test('applyPush with auto-sync OFF is ignored (no write, no record)',
+        () async {
+      final applied = await policy.applyPush('hello', autoSyncOn: false);
+      expect(applied, isFalse);
+      expect(written, isEmpty);
+      expect(recorded, isEmpty);
+      expect(policy.lastSynced, isNull);
+    });
+
+    test('applyPush of a null snapshot is ignored', () async {
+      final applied = await policy.applyPush(null, autoSyncOn: true);
+      expect(applied, isFalse);
+      expect(written, isEmpty);
+    });
+
+    test('echo suppression: a push equal to lastSynced is ignored (no loop)',
+        () async {
+      await policy.applyPush('hello', autoSyncOn: true); // lastSynced = hello
+      written.clear();
+      recorded.clear();
+      final applied = await policy.applyPush('hello', autoSyncOn: true);
+      expect(applied, isFalse, reason: 'value just applied — echo, not re-applied');
+      expect(written, isEmpty);
+      expect(recorded, isEmpty);
+    });
+
+    test('noteSynced suppresses a later server echo of a value we just sent',
+        () async {
+      policy.noteSynced('mine'); // the value this device just Sent to the PC
+      final applied = await policy.applyPush('mine', autoSyncOn: true);
+      expect(applied, isFalse, reason: 'server bounced back our own value');
+      expect(written, isEmpty);
+    });
+  });
+
+  group('ClipSyncPolicy — phone→PC syncOnResume (D-08)', () {
+    late List<String> recorded;
+    late List<String> sent;
+    late ClipSyncPolicy policy;
+
+    ClipSyncPolicy build() => ClipSyncPolicy(
+          writeClipboard: (t) async {},
+          record: (t) async => recorded.add(t),
+          send: sent.add,
+        );
+
+    setUp(() {
+      recorded = <String>[];
+      sent = <String>[];
+      policy = build();
+    });
+
+    test('syncOnResume ON with a genuine new phone clip sends + records',
+        () async {
+      final did = await policy.syncOnResume('fresh', autoSyncOn: true);
+      expect(did, isTrue);
+      expect(sent, ['fresh']);
+      expect(recorded, ['fresh']);
+      expect(policy.lastSynced, 'fresh');
+    });
+
+    test('syncOnResume OFF sends nothing', () async {
+      final did = await policy.syncOnResume('fresh', autoSyncOn: false);
+      expect(did, isFalse);
+      expect(sent, isEmpty);
+    });
+
+    test('syncOnResume echo-skips a value equal to lastSynced', () async {
+      await policy.applyPush('x', autoSyncOn: true); // lastSynced = x
+      final did = await policy.syncOnResume('x', autoSyncOn: true);
+      expect(did, isFalse, reason: 'phone still holds what the PC just pushed');
+      expect(sent, isEmpty);
+    });
+
+    test('syncOnResume with empty/null phone text sends nothing', () async {
+      expect(await policy.syncOnResume('', autoSyncOn: true), isFalse);
+      expect(await policy.syncOnResume(null, autoSyncOn: true), isFalse);
+      expect(sent, isEmpty);
+    });
   });
 }
