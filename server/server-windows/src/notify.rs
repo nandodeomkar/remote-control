@@ -31,3 +31,30 @@ pub fn notify_pin(pin: &str) {
         tracing::warn!("toast notification failed; PIN available on console");
     }
 }
+
+/// Show a loud firewall-block warning toast (D-06 / SRV-04): the phone can't
+/// reach the server, and the one-line `hint` tells the owner how to fix it
+/// (e.g. "Allow Remote Control through Windows Firewall (TCP port 17777)").
+///
+/// D-06 is deliberately noisy — a firewall block silently strands the daily
+/// driver, so it earns a toast on top of the tray warning state. The
+/// composition root (07-06) fires this from the startup firewall self-test
+/// ([`crate::firewall::inbound_allowed`] == `BlockedNoRule`).
+///
+/// SECURITY (threat T-07-08): the `hint` is operator-facing fix guidance only
+/// — it carries NO token, PIN, or device name. On toast failure we log a
+/// generic `warn!` with no interpolated text (same no-secret discipline as
+/// [`notify_pin`]).
+// Consumed by the composition root's startup self-test in 07-06; unwired here.
+#[allow(dead_code)]
+pub fn notify_firewall_warning(hint: &str) {
+    let result = Toast::new(Toast::POWERSHELL_APP_ID)
+        .title("Remote Control can't be reached")
+        .text1(hint)
+        .duration(Duration::Long)
+        .show();
+    if result.is_err() {
+        // Generic on purpose: never echo the hint into a tracing sink.
+        tracing::warn!("firewall warning toast failed");
+    }
+}
