@@ -146,7 +146,7 @@ pub(crate) const SECURITY_MANDATORY_HIGH_RID: u32 = 0x3000;
 /// A4: the HIGH/MEDIUM threshold is the detection signal; exact tuning is
 /// validated on-device by the 07-06 wiring plan).
 pub(crate) fn is_blocking_il(foreground_rid: u32, our_rid: u32) -> bool {
-    todo!("07-04 GREEN: implement is_blocking_il — see input_thread tests")
+    foreground_rid > our_rid
 }
 
 /// Current cursor position in virtual-desktop coordinates, read FRESH each
