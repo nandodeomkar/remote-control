@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 07-05-PLAN.md (conn_count/revoke/input.blocked transport seams, proto 1.3)
-last_updated: "2026-07-12T12:41:14.594Z"
+stopped_at: Completed 07-10-PLAN.md (palette/haptics/keep-awake screen migration onto 07-09 primitives, UI-02)
+last_updated: "2026-07-12T13:00:34.231Z"
 last_activity: 2026-07-12 -- Phase 07 execution started
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 56
-  completed_plans: 49
+  completed_plans: 50
   percent: 86
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 07 (server-shell-dashboard-polish) — EXECUTING
-Plan: 7 of 13
+Plan: 8 of 13
 Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
@@ -106,6 +106,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 07 P09 | 12min | 3 tasks | 5 files |
 | Phase 07 P04 | 5min | 2 tasks | 1 files |
 | Phase 07 P05 | 12min | 3 tasks | 6 files |
+| Phase 07 P10 | ~30min | 2 tasks | 18 files |
 
 ## Accumulated Context
 
@@ -230,6 +231,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 07-04]: RID constants defined as plain crate-local u32 consts (not windows::Win32::System::SystemServices) so is_blocking_il stays a zero-OS-dependency pure predicate; values (0x2000/0x3000) match the real Win32 constants
 - [Phase ?]: [Phase 07-04]: foreground_blocked() degrades BOTH the foreground and our own RID reads to SECURITY_MANDATORY_MEDIUM_RID on failure (fail-quiet), never manufacturing a spurious block from an uncertain read
 - [Phase ?]: 07-05: revoke select! arm is a sibling (not authed-gated) — the if let Some(h) = authed_hash guard inside filters; input.blocked mirrors apps/clip (no after-auth snapshot); handle_text grew a third return element (newly-authed hash) captured at the existing D-03 was_authed transition guard
+- [Phase 07-10]: grep-guard test (test/theme_tokens_guard_test.dart) scans the WHOLE lib/ tree, not just the plan's named 12 screens, per the plan's own acceptance criteria (`grep -rn "0xFF16181D" lib` must return ONLY tokens.dart); migrated 5 additional palette offenders under Rule 2 (key_rows.dart, modifier_chip.dart, pairing_dialog.dart, mouse_buttons.dart, dev/beacon_smoke_main.dart)
+- [Phase 07-10]: connection_header.dart keeps two local Color consts (_reconnectingColor #E8A33D amber, _chipFill translucent #CC0E0F12) uninverted — neither is one of the seven D-12 locked tokens, so the guard test intentionally does not forbid them
+- [Phase 07-10]: bindHapticsCache(ref) installed once in main.dart's RemoteControlApp.initState (before the D-01 launch kick and D-06 resume listener) so the haptics hot-path cache is primed before the very first tap; all ~19 HapticFeedback call sites now route through hapticTick()/hapticTickMedium(); Trackpad and Presenter route keep-awake through the shared keepAwake ref-counted singleton instead of raw WakelockPlus calls
 
 ### Pending Todos
 
@@ -263,6 +267,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-12T12:41:14.577Z
-Stopped at: Completed 07-05-PLAN.md (conn_count/revoke/input.blocked transport seams, proto 1.3)
+Last session: 2026-07-12T13:00:34.231Z
+Stopped at: Completed 07-10-PLAN.md (palette/haptics/keep-awake screen migration onto 07-09 primitives, UI-02)
 Resume file: None
