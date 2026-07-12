@@ -18,7 +18,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 3: Discovery, Pairing & Connection** - Phone finds the PC automatically, pairs once via PIN, then reconnects silently and recovers from WiFi drops and IP changes (completed 2026-07-09 — on-device E2E PASS on Xiaomi + Windows 11: all five success criteria)
 - [x] **Phase 4: Trackpad & Keyboard** - The product-defining screens: full trackpad feel checklist and IME-correct typing with special-key rows, sticky modifiers, and autorepeat (completed 2026-07-10 — verification passed; on-device UAT incl. WiFi-kill liveness + slow-PIN pairing re-checks)
 - [x] **Phase 5: Media, Power, Presenter & Browser** - The everyday control-center extras: media/absolute volume, double-confirmed power actions, slide driving with timer, browser macros (completed 2026-07-11)
-- [ ] **Phase 6: Apps & Clipboard** - Window/app management with live server push, and bidirectional clipboard with history and loop-safe auto-sync
+- [x] **Phase 6: Apps & Clipboard** - Window/app management with live server push, and bidirectional clipboard with history and loop-safe auto-sync (completed 2026-07-12)
 - [ ] **Phase 7: Server Shell, Dashboard & Polish** - Tray shell with settings/autostart/revoke, firewall and UIPI status surfacing, dashboard identity and final app polish
 
 ## Phase Details
@@ -222,7 +222,7 @@ Plans:
 
 **Wave 5** *(after all)*
 
-- [ ] 06-07-PLAN.md — On-device UAT gate (SC1–SC5 + wire-size guard)
+- [x] 06-07-PLAN.md — On-device UAT gate (SC1–SC5 + wire-size guard)
 
 ### Phase 7: Server Shell, Dashboard & Polish
 
@@ -253,5 +253,5 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 3. Discovery, Pairing & Connection | 7/7 | Complete — on-device E2E PASS | 2026-07-09 |
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
-| 6. Apps & Clipboard | 6/7 | In Progress|  |
+| 6. Apps & Clipboard | 7/7 | Complete   | 2026-07-12 |
 | 7. Server Shell, Dashboard & Polish | 0/TBD | Not started | - |
