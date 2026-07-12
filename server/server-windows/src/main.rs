@@ -7,6 +7,7 @@ mod audio_thread;
 mod autostart;
 mod clip_thread;
 mod executors;
+mod firewall;
 mod input_thread;
 mod notify;
 

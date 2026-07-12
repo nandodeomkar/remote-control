@@ -47,6 +47,14 @@ windows = { version = "0.62", features = [
     # RegisterClipboardFormatW, IsClipboardFormatAvailable — sensitive-clip
     # exclusion-format presence check (Flag 3 / CLIP-03)
     "Win32_System_DataExchange",
+    # ── Phase 7 (07-03) firewall self-test ──
+    # INetFwPolicy2, NetFwPolicy2, INetFwRules/INetFwRule, NET_FW_* — READ-ONLY
+    # inbound-allowed query on the active profile (SRV-04, ASVS V4; never
+    # Add/Set/Remove). Win32_System_Com (CoCreateInstance) already present.
+    "Win32_NetworkManagement_WindowsFirewall",
+    # IEnumVARIANT (rule enumeration) + VARIANT (gated on Com+Ole) — walk the
+    # firewall Rules collection read-only.
+    "Win32_System_Ole",
 ] }
 tokio = { version = "1.52", features = ["rt-multi-thread", "net", "sync", "time", "macros"] }
 tracing = "0.1"
