@@ -635,6 +635,29 @@ final class ClipChangedMsg extends RemoteMessage {
   Map<String, Object?> toPayload() => {'text': text};
 }
 
+/// `input.blocked` (S→C push, protoVersion 1.3, SRV-05/D-07): the foreground
+/// window is higher-integrity (elevated) so injected input is being silently
+/// dropped by UIPI. `reason` is a fixed vocabulary string (currently
+/// `"elevated"`) — never a window title/exe path/PII. Additive: older servers
+/// never send it, and unknown payload fields are ignored on decode (D-05).
+final class InputBlockedMsg extends RemoteMessage {
+  /// Fixed-vocabulary block reason (e.g. `"elevated"`).
+  final String reason;
+
+  /// Creates an input.blocked message.
+  const InputBlockedMsg({required this.reason});
+
+  /// Decodes the `input.blocked` payload.
+  factory InputBlockedMsg.fromPayload(Map<String, dynamic> p) =>
+      InputBlockedMsg(reason: _req<String>(p, 'reason'));
+
+  @override
+  String get t => 'input.blocked';
+
+  @override
+  Map<String, Object?> toPayload() => {'reason': reason};
+}
+
 /// `browser` (C→S): key-macro actions.
 final class BrowserMsg extends RemoteMessage {
   /// Browser action string.
@@ -826,6 +849,7 @@ final class UnknownMsg extends RemoteMessage {
     'clip.set' => ClipSetMsg.fromPayload(p),
     'clip.get' => ClipGetMsg.fromPayload(p),
     'clip.changed' => ClipChangedMsg.fromPayload(p),
+    'input.blocked' => InputBlockedMsg.fromPayload(p),
     'browser' => BrowserMsg.fromPayload(p),
     'present' => PresentMsg.fromPayload(p),
     'ping' => PingMsg.fromPayload(p),

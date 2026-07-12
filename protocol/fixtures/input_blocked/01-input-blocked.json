@@ -1,0 +1,17 @@
+{
+  "name": "input-blocked",
+  "description": "S→C input-blocked push (SPEC §7, protoVersion 1.3 addition, SRV-05/D-07). reason is a fixed-vocabulary string (\"elevated\"). The unknown field `future` must be IGNORED on decode (D-05); the canonical re-encode drops it.",
+  "wire": {
+    "t": "input.blocked",
+    "p": {
+      "reason": "elevated",
+      "future": "ignored"
+    }
+  },
+  "expect": {
+    "t": "input.blocked",
+    "p": {
+      "reason": "elevated"
+    }
+  }
+}

@@ -166,6 +166,14 @@ fn codec_fixtures_window_info() {
 }
 
 #[test]
+fn codec_fixtures_input_blocked() {
+    // protocol 1.3 (07-02, SRV-05/D-07): the additive S→C input.blocked push
+    // round-trips reason=="elevated" and drops the unknown `future` field on
+    // re-encode (D-05) — the same shared fixture the Dart harness exercises.
+    run_json_family("input_blocked");
+}
+
+#[test]
 fn auth_proof_fixture() {
     let path = Path::new(FIXTURES_ROOT).join("handshake/05-auth-proof.json");
     let fixture = load(&path);

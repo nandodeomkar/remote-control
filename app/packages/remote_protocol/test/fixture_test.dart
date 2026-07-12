@@ -182,4 +182,12 @@ void main() {
   group('window_info fixtures', () {
     runJsonFamily('window_info');
   });
+
+  // protocol 1.3 (07-02, SRV-05/D-07): additive S→C input.blocked push.
+  // 01-input-blocked decodes reason=="elevated" and drops the unknown
+  // `future` field on re-encode (D-05), proving the shared golden fixture
+  // decodes identically in the Rust and Dart codecs.
+  group('input_blocked fixtures', () {
+    runJsonFamily('input_blocked');
+  });
 }
