@@ -10,6 +10,7 @@ mod executors;
 mod firewall;
 mod input_thread;
 mod notify;
+mod shell;
 
 use std::sync::{Arc, Mutex};
 

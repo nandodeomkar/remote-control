@@ -1,0 +1,8 @@
+[toolchain]
+# Phase 7 (07-06) pins the workspace toolchain to a version new enough for the
+# tray/settings shell's egui 0.35 stack (egui/ecolor/emath/epaint all require
+# rustc >= 1.92; the previously-active 1.89 toolchain failed the build with a
+# hard version-gate error). 1.97.0 was the current `stable` release at the
+# time this was pinned (2026-07-13) — bump this file, not a local override,
+# if a future dependency needs newer still.
+channel = "1.97.0"

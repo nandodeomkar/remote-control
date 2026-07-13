@@ -82,3 +82,17 @@ sha2 = "0.11"
 # winreg (already in tree) is the documented HKCU fallback if enable() ever
 # returns access-denied (Pitfall 7 / A2).
 auto-launch = "0.6"
+# ── Phase 7 (07-06) tray/settings shell ──
+# Tray icon + muda menu (Pause/Quit; Settings/Pair-new land in 07-08).
+# tauri-apps, RESEARCH Package Legitimacy Audit verdict OK/Approved (locked).
+tray-icon = "0.24"
+# Event loop the tray + (07-08) settings window run on, off-main via
+# with_any_thread(true). PINNED to 0.30 — 0.31 is a beta that breaks eframe/
+# egui 0.35 compat (RESEARCH "Deprecated"/Package Legitimacy Audit).
+winit = "0.30"
+# egui-on-winit (NOT the eframe wrapper — RESEARCH Pitfall 4: eframe owns its
+# own loop and cannot share the tray's). Settings window lands in 07-08; the
+# deps land now so that plan adds zero Cargo churn.
+egui = "0.35"
+egui-winit = "0.35"
+egui_glow = "0.35"
