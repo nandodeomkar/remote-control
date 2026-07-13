@@ -259,7 +259,7 @@ Plans:
 **Wave 3**
 
 - [x] 07-06-PLAN.md — Tray shell bootstrap + firewall self-test + main integration (SRV-01/04/05)
-- [ ] 07-12-PLAN.md — App Settings screen + scroll-direction + paired-PC revoke (UI-02/SRV-03)
+- [x] 07-12-PLAN.md — App Settings screen + scroll-direction + paired-PC revoke (UI-02/SRV-03)
 
 **Wave 4**
 
@@ -283,4 +283,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
 | 6. Apps & Clipboard | 7/7 | Complete    | 2026-07-12 |
-| 7. Server Shell, Dashboard & Polish | 9/13 | In Progress|  |
+| 7. Server Shell, Dashboard & Polish | 10/13 | In Progress|  |

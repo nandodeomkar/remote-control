@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 07-11-PLAN.md (UIPI transient banner client surface, SRV-05/D-07)
-last_updated: "2026-07-13T02:41:52.401Z"
+status: Phase complete — ready for verification
+stopped_at: Completed 07-12-PLAN.md (App Settings screen + scroll-direction pref, D-11/SRV-03)
+last_updated: "2026-07-13T03:07:47.989Z"
 last_activity: 2026-07-12 -- Phase 07 execution started
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 56
-  completed_plans: 52
+  completed_plans: 53
   percent: 86
 ---
 
@@ -109,6 +109,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 07 P10 | ~30min | 2 tasks | 18 files |
 | Phase 07 P11 | ~20min | 2 tasks | 3 files |
 | Phase 07 P06 | ~50min | 3 tasks | 6 files |
+| Phase 07 P12 | 25min | 2 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -241,6 +242,8 @@ Recent decisions affecting current work:
 - [Phase 07-06]: tray-icon 0.24 confirmed (vendored source read) to auto-handle TaskbarCreated re-registration internally -- no manual rebuild() needed — verified against platform_impl/windows/mod.rs's tray_proc S_U_TASKBAR_RESTART handler rather than trusting the RESEARCH [ASSUMED] tag
 - [Phase 07-06]: rustc toolchain pinned to 1.97.0 via server/rust-toolchain.toml — egui/ecolor/emath/epaint 0.35 require rustc >= 1.92; the prior default 1.89 toolchain hard-failed the build (Rule 3 blocking fix)
 - [Phase 07-06]: UIPI foreground probe (maybe_check_uipi) adds a 250ms time throttle on top of the plan's transition debounce — foreground_blocked() walks two OpenProcess/OpenProcessToken chains, too costly to run unthrottled on every Move event without risking the locked <30ms cursor-latency budget (PAD-05)
+- [Phase 07-12]: trackpad_screen.dart wiring for scroll_direction added under Rule 2 (not in plan file list) so the D-11 pref has real effect, not just an isolated driver seam
+- [Phase 07-12]: TrackpadDriver scrollReversed seam is optional (defaults Natural) so every pre-existing driver test call site compiles unchanged; scroll_direction.dart's hot-path cache lives module-level (haptics-style), not screen-local
 
 ### Pending Todos
 
@@ -274,6 +277,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-13T02:40:46.695Z
-Stopped at: Completed 07-11-PLAN.md (UIPI transient banner client surface, SRV-05/D-07)
+Last session: 2026-07-13T03:07:47.972Z
+Stopped at: Completed 07-12-PLAN.md (App Settings screen + scroll-direction pref, D-11/SRV-03)
 Resume file: None
