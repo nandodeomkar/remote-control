@@ -36,6 +36,7 @@ import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
 import '../screens/connection_copy.dart';
 import '../settings/haptics.dart';
+import '../settings/scroll_direction.dart';
 import '../settings/sensitivity.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
@@ -103,6 +104,12 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
       fireImmediately: true,
     );
 
+    // D-11 scroll-direction cache: same listenManual seam, but the cache
+    // lives in scroll_direction.dart itself (mirrors bindHapticsCache) so
+    // the driver's scrollReversed getter reads scrollReversedCached
+    // directly below — no local double needed here.
+    bindScrollDirectionCache(ref);
+
     _classifier = GestureClassifier(
       nowMillis: () => DateTime.now().millisecondsSinceEpoch,
     );
@@ -116,6 +123,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
       // stale no-op) round-trips through the driver like any other intent.
       onLongPressElapsed: () => _driver.handle(_classifier.onLongPressFire()),
       sensitivity: () => _sensitivity,
+      scrollReversed: () => scrollReversedCached,
       onReset: _classifier.reset,
     );
 

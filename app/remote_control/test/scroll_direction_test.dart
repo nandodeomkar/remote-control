@@ -39,7 +39,7 @@ void main() {
       bool Function()? scrollReversed,
     }) =>
         TrackpadDriver(
-          onSendMove: (_, __) {},
+          onSendMove: (_, _) {},
           onSendScroll: onSendScroll,
           onSendReliable: (_) {},
           onHaptic: () {},
@@ -113,7 +113,7 @@ void main() {
       // Fake schedule (Harness idiom from trackpad_driver_test.dart) so the
       // pending tick fires synchronously instead of via a real Timer.
       final driver = TrackpadDriver(
-        onSendMove: (_, __) {},
+        onSendMove: (_, _) {},
         onSendScroll: (dx, dy) => scrolls.add((dx, dy)),
         onSendReliable: (_) {},
         onHaptic: () {},
