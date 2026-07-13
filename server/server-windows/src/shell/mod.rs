@@ -6,10 +6,6 @@
 //! (RESEARCH Pattern 1 / SHARED-D — the same dedicated-OS-thread idiom as
 //! the input/audio/apps/clip threads in `main.rs`).
 
-// Wired into main.rs by Task 2 of this same plan (07-06). Scoped-allow so
-// Task 1 lands a warning-clean build in isolation (07-03/07-04 precedent).
-#![allow(dead_code)]
-
 pub mod tray;
 
 use std::sync::{Arc, Mutex};
@@ -32,6 +28,13 @@ use tray::{Tray, TrayState};
 /// `Send + Sync` `EventLoopProxy`) plus the one tokio→shell push (`Tooltip`)
 /// the composition root drives off the `conn_count` watch.
 pub enum UserEvent {
+    /// Click/hover/enter/leave on the tray icon itself. Carried through for
+    /// 07-08 (e.g. a left-click could one day open the settings window);
+    /// today's `ShellApp::user_event` intentionally discards the payload —
+    /// muda/tray-icon already draws the OS-native context menu without our
+    /// help (hence `#[allow(dead_code)]`: this is an interface-first field,
+    /// not a bug).
+    #[allow(dead_code)]
     Tray(TrayIconEvent),
     Menu(MenuEvent),
     /// Live connected-device COUNT — never names (T-07-20).
@@ -55,14 +58,18 @@ pub struct ShellCtx {
     pub pause_tx: watch::Sender<bool>,
     /// Shared pairing state — unused by this plan's bootstrap; 07-08's
     /// on-demand "Pair new device" / paired-list revoke reads/drives it.
+    #[allow(dead_code)]
     pub auth: Arc<Mutex<AuthManager>>,
     /// D-05 revocation epoch sender — unused by this plan's bootstrap;
     /// 07-08's settings-window revoke button drives it.
+    #[allow(dead_code)]
     pub revoke_tx: watch::Sender<u64>,
     /// Placeholder until 07-07's `config.rs` lands a real config handle.
+    #[allow(dead_code)]
     pub config: (),
     /// Placeholder until 07-08's settings window needs a real autostart
     /// handle.
+    #[allow(dead_code)]
     pub autostart: (),
     /// The startup firewall/bind self-test verdict (SRV-04 / D-06), set by
     /// `main.rs` BEFORE spawning this thread so the tray can render the
@@ -72,7 +79,8 @@ pub struct ShellCtx {
     /// firewall-hint banner: `true` whenever `firewall_status` is anything
     /// other than `Allowed` (a `BlockedNoRule` warning OR an inconclusive
     /// `Unknown` read both merit the hint — only a confirmed `Allowed`
-    /// suppresses it).
+    /// suppresses it). Unread until 07-08's settings window exists.
+    #[allow(dead_code)]
     pub notify_firewall: bool,
 }
 

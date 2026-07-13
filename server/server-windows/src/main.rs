@@ -30,7 +30,9 @@ use executors::clipboard::WinClipboard;
 use executors::media::WinMedia;
 use executors::mouse_keys::EnigoMouseKeys;
 use executors::power::WinPower;
+use firewall::{BindProblem, FirewallStatus};
 use input_thread::Cmd;
+use shell::ShellCtx;
 
 /// Default WebSocket port. The spec leaves the port configurable (settings
 /// window, Phase 7); until then this default is override-able via `RC_PORT`.
@@ -54,8 +56,14 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     // 3. Dedicated input thread: the only place the !Sync Enigo lives.
+    //    `blocked_tx` is the SRV-05 UIPI epoch (07-04's foreground_blocked()
+    //    proactive detection, debounced on the input thread itself) —
+    //    created here, alongside the thread that owns it, rather than at
+    //    step 6b with the other transport-seam channels (06-01 precedent:
+    //    a channel's Sender lives with its real producer).
     let (tx, rx) = std::sync::mpsc::channel::<Cmd>();
-    std::thread::spawn(move || input_thread::run_input_thread(rx));
+    let (blocked_tx, blocked_rx) = tokio::sync::watch::channel(0u64);
+    std::thread::spawn(move || input_thread::run_input_thread(rx, blocked_tx));
 
     // 3a. Dedicated COM audio thread (05-05, MED-02): owns all WASAPI/COM
     //     objects and is the REAL producer for the 05-03 volume watch seam.
@@ -139,26 +147,26 @@ async fn main() -> anyhow::Result<()> {
         }
     });
 
-    // 6. Server-side pause flag (SPEC §11) — no pause UI in the spike.
-    //    (The volume watch is now driven by the real audio thread spawned in
-    //    step 3a; its `volume_rx` is consumed below.)
-    let (_pause_tx, pause_rx) = tokio::sync::watch::channel(false);
+    // 6. Server-side pause flag (SPEC §11): the tray's Pause menu item
+    //    (07-06) is now the real driver — `pause_tx` moves into `ShellCtx`
+    //    below, alongside `auth`/`revoke_tx` (a clone taken BEFORE `auth`
+    //    moves into `deps`, mirroring the `auth_for_repin` clone above).
+    let (pause_tx, pause_rx) = tokio::sync::watch::channel(false);
 
-    // 6b. 07-05 interim producers (06-01 precedent): these three ServerDeps
-    //     seams (SRV-01 tooltip, D-05 revoke, SRV-05 input.blocked) are
-    //     threaded end-to-end in server-core THIS plan, but their real
-    //     producers land later — the tray tooltip reader (07-06), the
-    //     settings-driven revoke sender (07-08), and the input-thread UIPI
-    //     sender (07-04's detection wired to this watch, 07-06). Until then
-    //     these interim channels keep the workspace green: `_conn_count_rx`
-    //     is dropped here (07-06 replaces it with the tray's subscription),
-    //     `_revoke_tx` and `_blocked_tx` never advance (no revoke/block ever
-    //     fires) but must stay alive for the session's `.changed()` branches
-    //     to not immediately disable themselves.
+    // 6b. conn_count (SRV-01 tooltip) + revoke (D-05, real sender lands in
+    //     07-08's settings window) — the real conn_count SENDER already
+    //     lives here (sessions bump/decrement it); `revoke_tx` stays a
+    //     not-yet-driven real sender (07-08 wires its "Revoke" button) but
+    //     is no longer an interim placeholder — it is handed to the shell
+    //     thread's ShellCtx below so 07-08 has somewhere to reach it.
     let (conn_count_tx, _conn_count_rx) = tokio::sync::watch::channel(0usize);
     let conn_count = std::sync::Arc::new(conn_count_tx);
-    let (_revoke_tx, revoke_rx) = tokio::sync::watch::channel(0u64);
-    let (_blocked_tx, blocked_rx) = tokio::sync::watch::channel(0u64);
+    let (revoke_tx, revoke_rx) = tokio::sync::watch::channel(0u64);
+
+    // Clone BEFORE `auth` moves into `deps` (mirrors `auth_for_repin` above)
+    // — the shell thread's ShellCtx needs its own handle for 07-08's
+    // on-demand pairing/revoke UI.
+    let auth_for_shell = std::sync::Arc::clone(&auth);
 
     // 6a. Apps watch (APPS-03): fed by the real apps thread spawned in step
     //     3b. `apps_rx` (the snapshot receiver) drives the session's authed-
@@ -184,10 +192,49 @@ async fn main() -> anyhow::Result<()> {
             .with_context(|| format!("RC_PORT must be a valid port number, got {v:?}"))?,
         Err(_) => DEFAULT_PORT,
     };
-    let listener = tokio::net::TcpListener::bind(("0.0.0.0", port))
-        .await
-        .with_context(|| format!("bind 0.0.0.0:{port}"))?;
+    // 7 (SRV-04 / D-06): AddrInUse must NOT `?`-propagate straight into a
+    // crash — classify it via `firewall::classify_bind_error` and surface a
+    // LOUD, distinct warning (toast) instead (RESEARCH Pitfall 5). Without a
+    // bound listener there is nothing left to run, so this still exits, but
+    // the owner has already been told why via the toast — never a silent or
+    // unexplained failure.
+    let listener = match tokio::net::TcpListener::bind(("0.0.0.0", port)).await {
+        Ok(l) => l,
+        Err(e) => {
+            return match firewall::classify_bind_error(&e) {
+                Some(BindProblem::PortInUse) => {
+                    tracing::warn!(port, "bind failed: port already in use (SRV-04)");
+                    notify::notify_firewall_warning(&format!(
+                        "Another app is using port {port}. Change the port in Settings or close the other app."
+                    ));
+                    Err(anyhow::anyhow!(
+                        "port {port} already in use; see the tray warning toast"
+                    ))
+                }
+                None => Err(e).with_context(|| format!("bind 0.0.0.0:{port}")),
+            };
+        }
+    };
     tracing::info!(port, "server-windows listening");
+
+    // 7b (SRV-04 / D-06): the startup firewall self-test. Bind succeeding
+    // says nothing about whether the FIREWALL lets a phone's inbound
+    // connection through (Pitfall 5 — bind is local, the firewall filters
+    // *inbound from other hosts*), so query `INetFwPolicy2` separately.
+    // READ-ONLY (T-07-07/ASVS V4, enforced in firewall.rs) — never creates or
+    // modifies a rule. `Unknown` is fail-quiet (firewall.rs's documented
+    // contract): only a confirmed `BlockedNoRule` fires the loud warning.
+    let firewall_status = firewall::inbound_allowed(port);
+    if firewall_status == FirewallStatus::BlockedNoRule {
+        tracing::warn!(port, "firewall inbound check: no allow rule found (SRV-04)");
+        notify::notify_firewall_warning(&format!(
+            "Allow Remote Control through Windows Firewall (TCP {port}) so your phone can connect."
+        ));
+    }
+    // 07-08's settings window shows a persistent hint whenever the verdict
+    // is anything other than a confirmed Allowed (BlockedNoRule OR an
+    // inconclusive Unknown read both merit keeping the hint visible).
+    let notify_firewall = firewall_status != FirewallStatus::Allowed;
 
     // 7a. Discovery beacon (CONN-01): identity is Windows-specific (winreg
     //     MachineGuid + COMPUTERNAME) and injected HERE so server-core
@@ -214,6 +261,42 @@ async fn main() -> anyhow::Result<()> {
         },
         beacon_port,
     ));
+
+    // 7c (SRV-01). Spawn the tray shell thread: it reads `firewall_status`
+    // at `StartCause::Init` to render the warning icon from the very first
+    // frame, drives `pause_tx` (the tray's Pause menu item), and holds
+    // `auth_for_shell`/`revoke_tx` for 07-08's on-demand settings window.
+    // `config`/`autostart` are placeholder `()` handles until 07-07/07-08
+    // land real ones (ShellCtx doc comment). MUST run before
+    // `server_core::run` blocks this task forever (RESEARCH Pattern 1).
+    let shell_proxy = shell::spawn_shell_thread(ShellCtx {
+        conn_count: conn_count.subscribe(),
+        pause_tx,
+        auth: auth_for_shell,
+        revoke_tx,
+        config: (),
+        autostart: (),
+        firewall_status,
+        notify_firewall,
+    });
+
+    // Forward every conn_count change to the shell thread's tooltip via the
+    // EventLoopProxy (RESEARCH Pattern 1 — Send+Sync proxy, the tokio→shell
+    // bridge). `borrow_and_update` primes the tray with the CURRENT value
+    // first (defensive against a change landing between spawn and here);
+    // the loop then blocks on `changed()` — zero busy-polling. A closed
+    // channel (`changed()` errs) means `conn_count`'s sole Arc-held Sender
+    // was dropped, which only happens at process teardown.
+    let mut conn_count_for_tray = conn_count.subscribe();
+    tokio::spawn(async move {
+        loop {
+            let count = *conn_count_for_tray.borrow_and_update();
+            let _ = shell_proxy.send_event(shell::UserEvent::Tooltip(count));
+            if conn_count_for_tray.changed().await.is_err() {
+                break;
+            }
+        }
+    });
 
     // 8. The whole loop lives in server-core (Phase 1, unchanged).
     server_core::run(listener, deps).await;

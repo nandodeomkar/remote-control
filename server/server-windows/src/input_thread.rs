@@ -208,7 +208,6 @@ fn read_integrity_rid(token: HANDLE) -> Option<u32> {
 /// RAII-by-hand: both the process handle and the token handle are closed on
 /// every exit path (`apps_thread::exe_path` discipline, SHARED-E); no
 /// `.unwrap()`/`.expect()` on any HRESULT.
-#[allow(dead_code)] // wired into the input loop + blocked watch by 07-06
 pub(crate) fn foreground_integrity_rid() -> Option<u32> {
     // SAFETY: `hwnd`/`pid` come straight from the Win32 calls that produce
     // them; the process handle is closed before this function returns on
@@ -248,7 +247,6 @@ pub(crate) fn foreground_integrity_rid() -> Option<u32> {
 /// Our OWN process's integrity RID, read once via the `GetCurrentProcess`
 /// pseudo-handle (no handle to close for the process itself — only the
 /// token handle is real and closed below).
-#[allow(dead_code)] // wired into the input loop + blocked watch by 07-06
 pub(crate) fn our_integrity_rid() -> Option<u32> {
     // SAFETY: `GetCurrentProcess` returns a pseudo-handle that needs no
     // `CloseHandle`; the real token handle it opens is closed on every path.
@@ -268,7 +266,6 @@ pub(crate) fn our_integrity_rid() -> Option<u32> {
 /// degrades to [`SECURITY_MANDATORY_MEDIUM_RID`] — an uncertain read must
 /// never manufacture a false "blocked" banner (fail-quiet, mirroring
 /// `firewall.rs`'s `Unknown` discipline).
-#[allow(dead_code)] // wired into the input loop + blocked watch by 07-06
 pub(crate) fn foreground_blocked() -> bool {
     let foreground = foreground_integrity_rid().unwrap_or(SECURITY_MANDATORY_MEDIUM_RID);
     let ours = our_integrity_rid().unwrap_or(SECURITY_MANDATORY_MEDIUM_RID);
@@ -324,19 +321,65 @@ fn inject_absolute(target_x: i32, target_y: i32) {
     }
 }
 
+/// Minimum spacing between UIPI foreground-integrity probes (SRV-05).
+/// [`foreground_blocked`] walks two `OpenProcess`/`OpenProcessToken` chains —
+/// too costly to run on every `Move` event at 60-120Hz without risking the
+/// <30ms cursor-latency budget (PAD-05, locked). 250ms keeps the elevated-
+/// window banner responsive (on-device threshold tuning is RESEARCH A4, not
+/// below human perception) while keeping the hot mouse-move path free of a
+/// Win32 syscall chain on every single frame (Rule 2 addition — the plan's
+/// literal "in the Move/Click arms" wording did not itself specify a
+/// throttle, but an unthrottled per-frame probe is a correctness-adjacent
+/// performance regression on the hottest path in the whole server).
+const UIPI_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_millis(250);
+
+/// Debounced UIPI check: only probes [`foreground_blocked`] at most once per
+/// [`UIPI_CHECK_INTERVAL`], and only advances `blocked_tx`'s epoch on a
+/// false→true transition (D-07 / RESEARCH Pattern 5 — a transition event,
+/// never a per-frame push). The false→true→false round trip resets
+/// `was_blocked` on the true→false edge with no further send: the client
+/// banner auto-dismisses client-side (07-11), the server has nothing more to
+/// say once input is flowing again.
+fn maybe_check_uipi(
+    last_check: &mut std::time::Instant,
+    was_blocked: &mut bool,
+    blocked_tx: &tokio::sync::watch::Sender<u64>,
+) {
+    let now = std::time::Instant::now();
+    if now.duration_since(*last_check) < UIPI_CHECK_INTERVAL {
+        return;
+    }
+    *last_check = now;
+    let blocked = foreground_blocked();
+    if blocked != *was_blocked {
+        *was_blocked = blocked;
+        if blocked {
+            blocked_tx.send_modify(|e| *e = e.wrapping_add(1));
+        }
+    }
+}
+
 /// Run the input-injection loop until every `Sender<Cmd>` is dropped.
 ///
 /// MUST be called on a dedicated `std::thread` — `Enigo` is `!Sync` and this
 /// is the only place it lives. DPI awareness is declared once in `main`
 /// BEFORE this thread starts (RESEARCH Pattern 3), so the integer deltas
 /// injected here map to physical pixels on scaled displays.
-pub fn run_input_thread(rx: std::sync::mpsc::Receiver<Cmd>) {
+///
+/// `blocked_tx` is the SRV-05 UIPI epoch: [`maybe_check_uipi`] fires on the
+/// `Move`/`Click` arms (RESEARCH Pattern 5), debounced both by time
+/// ([`UIPI_CHECK_INTERVAL`]) and by transition (only a false→true edge
+/// advances the epoch).
+pub fn run_input_thread(rx: std::sync::mpsc::Receiver<Cmd>, blocked_tx: tokio::sync::watch::Sender<u64>) {
     let mut enigo = Enigo::new(&Settings::default()).expect("enigo init on input thread");
     let mut move_acc = SubPixelAccumulator::new();
     let mut scroll_acc = SubPixelAccumulator::new();
+    let mut uipi_last_check = std::time::Instant::now() - UIPI_CHECK_INTERVAL;
+    let mut uipi_was_blocked = false;
     while let Ok(cmd) = rx.recv() {
         match cmd {
             Cmd::Move(dx, dy) => {
+                maybe_check_uipi(&mut uipi_last_check, &mut uipi_was_blocked, &blocked_tx);
                 // D-02: the accumulator is unchanged — it yields the integer
                 // delta to consume and carries the fraction across frames.
                 let (ix, iy) = move_acc.step(dx, dy);
@@ -365,6 +408,7 @@ pub fn run_input_thread(rx: std::sync::mpsc::Receiver<Cmd>) {
             // Every arm below follows the non-fatal-drop rule (T-04-01):
             // injection failures and unknown key codes drop, never panic.
             Cmd::Click(b) => {
+                maybe_check_uipi(&mut uipi_last_check, &mut uipi_was_blocked, &blocked_tx);
                 let _ = enigo.button(map_button(b), Direction::Click);
             }
             Cmd::ButtonDown(b) => {

@@ -15,11 +15,6 @@
 //! locked Flutter palette (accent blue / muted gray / error red) for visual
 //! consistency with the phone app.
 
-// Consumed by shell/mod.rs's ShellApp, wired into main.rs by Task 2 of this
-// same plan (07-06). Scoped-allow so Task 1 lands a warning-clean build in
-// isolation (07-03/07-04 precedent).
-#![allow(dead_code)]
-
 use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
