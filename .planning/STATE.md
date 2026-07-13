@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
 stopped_at: Completed 07-11-PLAN.md (UIPI transient banner client surface, SRV-05/D-07)
-last_updated: "2026-07-12T19:53:27.615Z"
+last_updated: "2026-07-13T02:41:52.401Z"
 last_activity: 2026-07-12 -- Phase 07 execution started
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 56
-  completed_plans: 51
+  completed_plans: 52
   percent: 86
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 07 (server-shell-dashboard-polish) — EXECUTING
-Plan: 12 of 13
+Plan: 13 of 13
 Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
@@ -108,6 +108,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 07 P05 | 12min | 3 tasks | 6 files |
 | Phase 07 P10 | ~30min | 2 tasks | 18 files |
 | Phase 07 P11 | ~20min | 2 tasks | 3 files |
+| Phase 07 P06 | ~50min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -237,6 +238,9 @@ Recent decisions affecting current work:
 - [Phase 07-10]: bindHapticsCache(ref) installed once in main.dart's RemoteControlApp.initState (before the D-01 launch kick and D-06 resume listener) so the haptics hot-path cache is primed before the very first tap; all ~19 HapticFeedback call sites now route through hapticTick()/hapticTickMedium(); Trackpad and Presenter route keep-awake through the shared keepAwake ref-counted singleton instead of raw WakelockPlus calls
 - [Phase 07-11]: InputBlockedSnapshot equality includes the timestamp (not just reason) so a repeated elevated-window block still notifies the banner as a fresh event
 - [Phase 07-11]: UipiBanner mount-time seed guard: a snapshot already parked before mount is not shown, only a strictly newer transition opens the banner
+- [Phase 07-06]: tray-icon 0.24 confirmed (vendored source read) to auto-handle TaskbarCreated re-registration internally -- no manual rebuild() needed — verified against platform_impl/windows/mod.rs's tray_proc S_U_TASKBAR_RESTART handler rather than trusting the RESEARCH [ASSUMED] tag
+- [Phase 07-06]: rustc toolchain pinned to 1.97.0 via server/rust-toolchain.toml — egui/ecolor/emath/epaint 0.35 require rustc >= 1.92; the prior default 1.89 toolchain hard-failed the build (Rule 3 blocking fix)
+- [Phase 07-06]: UIPI foreground probe (maybe_check_uipi) adds a 250ms time throttle on top of the plan's transition debounce — foreground_blocked() walks two OpenProcess/OpenProcessToken chains, too costly to run unthrottled on every Move event without risking the locked <30ms cursor-latency budget (PAD-05)
 
 ### Pending Todos
 
@@ -270,6 +274,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-12T19:53:27.601Z
+Last session: 2026-07-13T02:40:46.695Z
 Stopped at: Completed 07-11-PLAN.md (UIPI transient banner client surface, SRV-05/D-07)
 Resume file: None
