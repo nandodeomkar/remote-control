@@ -1,7 +1,13 @@
-/// The phase home (D-02): live GUID-merged device list fed by the beacon
-/// listener, grayed remembered-offline rows at their last-known address,
-/// empty state with live-scan hint, and the Connect-by-IP secondary
-/// affordance (D-03, CONN-05).
+/// The add/switch-PC screen (07-12/07-13, D-08): live GUID-merged device
+/// list fed by the beacon listener, grayed remembered-offline rows at their
+/// last-known address, empty state with live-scan hint, and the
+/// Connect-by-IP secondary affordance (D-03, CONN-05).
+///
+/// Was the phase home through Phase 6 (D-02); Phase 7 moves the app's home
+/// role to `HubScreen` (07-13) and repurposes this screen as the
+/// add/switch-PC surface reached from the App Settings screen's "Paired
+/// PCs" group (07-12). No behavior change from the move — every row/sheet
+/// contract below is unchanged; only the entry point differs.
 ///
 /// Visual contract: 03-UI-SPEC.md, locked. 64px rows, 4-size/2-weight
 /// typography, accent `#4C8DFF` reserved — in this file it appears ONLY on
