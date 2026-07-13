@@ -12,7 +12,11 @@
 /// Dart), `onDragLockChanged` (the pill's ValueNotifier), `onLongPressElapsed`
 /// (the screen feeds `classifier.onLongPressFire()` back into [handle]), the
 /// `sensitivity` getter (D-05 — the screen caches the provider value; never a
-/// provider lookup per event), and the `schedule` timer seam (ConnectionService
+/// provider lookup per event), the `scrollReversed` getter (D-11 — same
+/// cached-hot-path contract: `true` flips the y-scroll sign gate on top of
+/// the fixed `kScrollDirection` convention, `false`/omitted leaves it
+/// unchanged — `trackpad_screen.dart` wires `scroll_direction.dart`'s
+/// `scrollReversedCached`), and the `schedule` timer seam (ConnectionService
 /// `_schedule` idiom) so every branch unit-tests deterministically.
 ///
 /// The schedule seam has NO cancel handle, so both the momentum loop and the
@@ -46,6 +50,12 @@ class TrackpadDriver {
   final void Function(bool locked) _onDragLockChanged;
   final void Function() _onLongPressElapsed;
   final double Function() _sensitivity;
+
+  /// D-11 scroll-direction sign gate: `true` (Reversed) flips the y-scroll
+  /// sign on top of `kScrollDirection`; `false` (Natural, the default when
+  /// no seam is injected) leaves it unchanged. Re-read per intent — never
+  /// cached inside the driver — mirroring the [_sensitivity] contract.
+  final bool Function() _scrollReversed;
   final void Function(Duration, void Function()) _schedule;
   final void Function()? _onReset;
 
@@ -75,6 +85,7 @@ class TrackpadDriver {
     required void Function(bool locked) onDragLockChanged,
     required void Function() onLongPressElapsed,
     required double Function() sensitivity,
+    bool Function()? scrollReversed,
     void Function(Duration, void Function())? schedule,
     void Function()? onReset,
   })  : _onSendMove = onSendMove,
@@ -84,12 +95,17 @@ class TrackpadDriver {
         _onDragLockChanged = onDragLockChanged,
         _onLongPressElapsed = onLongPressElapsed,
         _sensitivity = sensitivity,
+        _scrollReversed = scrollReversed ?? _naturalScroll,
         _schedule = schedule ?? _timerSchedule,
         _onReset = onReset;
 
   static void _timerSchedule(Duration delay, void Function() fn) {
     Timer(delay, fn);
   }
+
+  /// Default when no `scrollReversed` seam is injected: Natural (unchanged
+  /// `kScrollDirection` sign) — preserves every pre-D-11 caller's behavior.
+  static bool _naturalScroll() => false;
 
   /// Whether drag-lock is currently engaged (the pill's source of truth).
   bool get dragLocked => _dragLocked;
@@ -111,7 +127,7 @@ class TrackpadDriver {
         case ScrollIntent(:final dx, :final dy):
           _onSendScroll(
             dx * kScrollUnitPerPx,
-            dy * kScrollUnitPerPx * kScrollDirection,
+            dy * kScrollUnitPerPx * kScrollDirection * _directionSign(),
           );
         case FlingIntent(:final vx, :final vy):
           _startMomentum(vx, vy);
@@ -173,13 +189,18 @@ class TrackpadDriver {
       if (math.sqrt(_vx * _vx + _vy * _vy) < kMomentumStopVelocity) return;
       _onSendScroll(
         _vx * kMomentumTickMs * kScrollUnitPerPx,
-        _vy * kMomentumTickMs * kScrollUnitPerPx * kScrollDirection,
+        _vy * kMomentumTickMs * kScrollUnitPerPx * kScrollDirection *
+            _directionSign(),
       );
       _schedule(const Duration(milliseconds: kMomentumTickMs), tick);
     }
 
     _schedule(const Duration(milliseconds: kMomentumTickMs), tick);
   }
+
+  /// D-11 sign gate read fresh at each emission (fling ticks included) — the
+  /// magnitude/decay math above is untouched, only this multiplier is new.
+  double _directionSign() => _scrollReversed() ? -1.0 : 1.0;
 
   /// One-shot long-press timer: fires [_onLongPressElapsed] unless disarmed
   /// (or re-armed, or disposed) before the delay elapses.
