@@ -40,3 +40,12 @@ and keep/reopen a PIN window on demand (e.g. a tray "Pair a new device" action t
 calls `begin_pairing()` again) rather than tying the PIN lifecycle to a single
 process run. Track against the Phase-7 server-shell work; revisit the refresh-loop
 `break`-on-`is_paired` condition then.
+
+## Closed — 07-07 (2026-07-14)
+
+Closed by plan 07-07 (commit 354fa13): paired token hashes now persist in
+`%APPDATA%/RemoteControl/config.toml` and reload via `AuthManager::from_paired`
+at startup (D-01); smart startup opens a PIN window only when zero devices are
+paired (D-03); `begin_on_demand_pairing()` reopens a fresh 60s window any time
+— the tray/settings "Pair new device" action (07-08) drives it (D-02). The
+WR-01 refresh loop is now bounded to the zero-paired startup window only.
