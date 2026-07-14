@@ -1,12 +1,13 @@
-/// App shell (03-07): device list as home (D-02), the D-01 silent launch
-/// kick, and the D-06 resume trigger.
+/// App shell: the dashboard ([HubScreen]) as home (D-08, 07-13), the D-01
+/// silent launch kick, and the D-06 resume trigger.
 ///
 /// Launch (D-01): after the first frame, read the last-connected device
 /// pointer and — if a remembered device exists — fire a silent, non-blocking
 /// [ConnectionService.connectTo]. NO navigation on success (the chip flips
-/// Connected; the user stays on the device list, which is home). No
-/// remembered device, or any storage failure, degrades to the plain device
-/// list (T-03-26: the launch path never crashes on credential reads).
+/// Connected; the user stays on the dashboard, which is home). No remembered
+/// device, or any storage failure, degrades to the offline dashboard
+/// (T-03-26: the launch path never crashes on credential reads); the former
+/// device list is the add/switch-PC screen reached via Settings.
 ///
 /// Resume (D-06): an [AppLifecycleListener] forwards onResume to
 /// [ConnectionService.onAppResumed] — instant retry, no waiting out backoff.
@@ -17,9 +18,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'hub/hub_screen.dart';
 import 'net/connection_providers.dart';
 import 'net/reconnect_fsm.dart';
-import 'screens/device_list_screen.dart';
 import 'settings/haptics.dart';
 import 'store/device_list_store.dart';
 import 'theme/tokens.dart';
@@ -28,7 +29,7 @@ void main() {
   runApp(const ProviderScope(child: RemoteControlApp()));
 }
 
-/// The app shell: dark-minimal theme, device-list home, launch/resume wiring.
+/// The app shell: dark-minimal theme, dashboard home, launch/resume wiring.
 class RemoteControlApp extends ConsumerStatefulWidget {
   /// Creates the app shell.
   const RemoteControlApp({super.key});
@@ -52,8 +53,8 @@ class _RemoteControlAppState extends ConsumerState<RemoteControlApp> {
     _lifecycle = AppLifecycleListener(
       onResume: () => ref.read(connectionServiceProvider).onAppResumed(),
     );
-    // D-01: the silent launch kick runs after the first frame so the device
-    // list is on screen immediately — no splash spinner takeover.
+    // D-01: the silent launch kick runs after the first frame so the
+    // dashboard is on screen immediately — no splash spinner takeover.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_launchKick());
     });
@@ -67,13 +68,13 @@ class _RemoteControlAppState extends ConsumerState<RemoteControlApp> {
   }
 
   /// Silent auto-reconnect to the last-connected PC (D-01). Non-blocking,
-  /// no navigation on success; every failure path lands back on the device
-  /// list, which is already home.
+  /// no navigation on success; every failure path lands back on the
+  /// dashboard, which is already home.
   Future<void> _launchKick() async {
     try {
       final store = ref.read(deviceStoreProvider);
       final lastKey = await store.lastDeviceKey();
-      if (lastKey == null) return; // nothing remembered — the list is home
+      if (lastKey == null) return; // nothing remembered — the hub is home
       final devices = await store.loadDevices();
       final meta = devices[lastKey];
       if (meta == null) return; // dangling pointer — degrade silently
@@ -88,7 +89,8 @@ class _RemoteControlAppState extends ConsumerState<RemoteControlApp> {
           );
     } catch (_) {
       // T-03-26: storage failures at launch degrade to unpaired/no-target —
-      // the device list renders and pairing takes over. Never crash here.
+      // the dashboard renders offline and pairing (via Settings ->
+      // add/switch PC) takes over. Never crash here.
     }
   }
 
@@ -98,7 +100,7 @@ class _RemoteControlAppState extends ConsumerState<RemoteControlApp> {
       title: 'Remote Control',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: const DeviceListScreen(),
+      home: const HubScreen(),
     );
   }
 }

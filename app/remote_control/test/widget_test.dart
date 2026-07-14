@@ -1,4 +1,4 @@
-// App-shell smoke test (03-07): home is the device list (D-02), and the
+// App-shell smoke test: home is the dashboard (D-08, 07-13), and the
 // remote_protocol path dependency resolves and imports.
 //
 // Storage/beacon seams are overridden with inert fakes so the shell pumps
@@ -10,11 +10,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_protocol/remote_protocol.dart';
 
+import 'package:remote_control/hub/hub_screen.dart';
 import 'package:remote_control/main.dart';
 import 'package:remote_control/net/connection_providers.dart';
 import 'package:remote_control/net/connection_service.dart';
-import 'package:remote_control/screens/connection_copy.dart';
-import 'package:remote_control/screens/device_list_screen.dart';
 import 'package:remote_control/store/device_list_store.dart';
 import 'package:remote_control/store/device_store.dart';
 
@@ -50,7 +49,7 @@ class _StubDeviceList extends DeviceListNotifier {
 }
 
 void main() {
-  testWidgets('app shell homes on the device list', (tester) async {
+  testWidgets('app shell homes on the dashboard', (tester) async {
     final store = DeviceStore(secure: _FakeSecureKv(), prefs: _FakePrefsKv());
     await tester.pumpWidget(
       ProviderScope(
@@ -66,12 +65,10 @@ void main() {
     );
     await tester.pump();
 
-    // Home is the device list (D-02) with the Devices title rendered.
-    expect(find.byType(DeviceListScreen), findsOneWidget);
-    expect(find.text(kDevicesTitle), findsOneWidget);
-
-    // The trackpad spike shell is gone from launch.
-    expect(find.text('Connect'), findsNothing);
+    // Home is the dashboard (D-08) with the fallback "Remote" title —
+    // no remembered device means no connected target name.
+    expect(find.byType(HubScreen), findsOneWidget);
+    expect(find.text('Remote'), findsOneWidget);
   });
 
   test('remote_protocol imports via path dependency', () {
