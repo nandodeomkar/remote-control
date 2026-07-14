@@ -85,43 +85,84 @@ fn de_port<'de, D>(d: D) -> Result<Option<u16>, D::Error>
 where
     D: Deserializer<'de>,
 {
-    let _ = d;
-    todo!("07-07 Task 1 GREEN: lenient port deserializer")
+    // Deserialize into a dynamic toml::Value first so a wrong-typed field
+    // (string, bool, float…) is OUR lenient branch, not a hard serde error
+    // that would fail the whole document and drop the paired list (T-07-27).
+    let value = toml::Value::deserialize(d)?;
+    Ok(match value {
+        toml::Value::Integer(n) if (1..=i64::from(u16::MAX)).contains(&n) => Some(n as u16),
+        _ => {
+            tracing::warn!("config.toml port is not a valid TCP port; ignoring it");
+            None
+        }
+    })
 }
 
 /// `%APPDATA%/RemoteControl/config.toml` via `dirs::config_dir()` (RESEARCH
 /// A5: Roaming, the spec's `%APPDATA%`). A missing known folder degrades to
 /// a relative path — never a panic.
 pub fn config_path() -> PathBuf {
-    todo!("07-07 Task 1 GREEN: config_path")
+    // unwrap_or_default: a None known folder (never seen on real Windows)
+    // degrades to a relative "RemoteControl/config.toml" — mirror of
+    // main.rs's machine_guid degrade-never-panic fallback.
+    dirs::config_dir()
+        .unwrap_or_default()
+        .join("RemoteControl")
+        .join("config.toml")
 }
 
 /// Read + parse the config file. Missing file (the normal first run) or any
 /// read/parse error yields [`Config::default`] — never a panic (T-07-27).
 pub fn load() -> Config {
-    todo!("07-07 Task 1 GREEN: load")
+    match std::fs::read_to_string(config_path()) {
+        Ok(text) => parse(&text),
+        // Missing file IS the normal first run — no warn for NotFound.
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Config::default(),
+        Err(e) => {
+            tracing::warn!(error = %e, "config.toml read failed; using defaults");
+            Config::default()
+        }
+    }
 }
 
 /// Pure parse seam for [`load`] (unit-testable without disk): a corrupt or
 /// partial document yields [`Config::default`] with a warn.
 pub fn parse(text: &str) -> Config {
-    let _ = text;
-    todo!("07-07 Task 1 GREEN: parse")
+    toml::from_str(text).unwrap_or_else(|e| {
+        // The error carries a position/description only — never file content
+        // (a corrupt config could hold anything; keep it out of the logs).
+        tracing::warn!(error = %e, "config.toml parse failed; using defaults");
+        Config::default()
+    })
 }
 
 /// Pure serialize seam for [`save`] (unit-testable without disk).
 /// Serialization failure warns and yields an empty string ([`save`] skips
 /// the write rather than truncating a good file).
 pub fn to_toml(cfg: &Config) -> String {
-    let _ = cfg;
-    todo!("07-07 Task 1 GREEN: to_toml")
+    toml::to_string(cfg).unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "config serialize failed");
+        String::new()
+    })
 }
 
 /// Serialize + write the config file, creating the parent directory. Every
 /// failure is log-and-continue — persistence must never crash the server.
 pub fn save(cfg: &Config) {
-    let _ = cfg;
-    todo!("07-07 Task 1 GREEN: save")
+    let text = to_toml(cfg);
+    if text.is_empty() {
+        // A default Config never serializes empty, so empty == serialization
+        // failure: skip the write rather than truncating a good file.
+        tracing::warn!("config serialize produced nothing; skipping save");
+        return;
+    }
+    let path = config_path();
+    if let Some(parent) = path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    if let Err(e) = std::fs::write(&path, text) {
+        tracing::warn!(error = %e, "config.toml write failed");
+    }
 }
 
 /// Decode the `[[paired]]` records into [`PairedDevice`]s for
@@ -129,8 +170,23 @@ pub fn save(cfg: &Config) {
 /// hex OR wrong length) SKIPS that entry with a warn — the remaining valid
 /// devices still load (T-07-27).
 pub fn to_paired_devices(cfg: &Config) -> Vec<PairedDevice> {
-    let _ = cfg;
-    todo!("07-07 Task 1 GREEN: to_paired_devices")
+    cfg.paired
+        .iter()
+        .filter_map(|p| {
+            let decoded = hex::decode(&p.hash)
+                .ok()
+                .and_then(|bytes| <[u8; 32]>::try_from(bytes).ok());
+            match decoded {
+                Some(hash) => Some(PairedDevice::new(hash, p.name.clone(), p.paired_at)),
+                None => {
+                    // Bad hex OR wrong length: SKIP with a warn carrying the
+                    // device NAME only — never hash material (T-07-27).
+                    tracing::warn!(name = %p.name, "skipping paired entry with a malformed hash");
+                    None
+                }
+            }
+        })
+        .collect()
 }
 
 /// Build a [`Config`] from the live auth records + current settings — the
@@ -144,16 +200,35 @@ pub fn from_auth(
     autostart: bool,
     clipboard_sync: bool,
 ) -> Config {
-    let _ = (records, device_name, port, autostart, clipboard_sync);
-    todo!("07-07 Task 1 GREEN: from_auth")
+    Config {
+        device_name,
+        port,
+        autostart,
+        clipboard_sync,
+        paired: records
+            .iter()
+            .map(|d| PairedDeviceCfg {
+                name: d.name.clone(),
+                hash: hex::encode(d.hash),
+                paired_at: d.paired_at,
+            })
+            .collect(),
+    }
 }
 
 /// Resolved WebSocket port: `RC_PORT` env > `Config::port` > [`DEFAULT_PORT`]
 /// (SPEC precedence). An unparseable/zero env value warns and falls through
 /// — never a panic (T-07-27).
 pub fn resolve_port(env_port: Option<&str>, cfg: &Config) -> u16 {
-    let _ = (env_port, cfg);
-    todo!("07-07 Task 1 GREEN: resolve_port")
+    if let Some(raw) = env_port {
+        match raw.parse::<u16>() {
+            Ok(p) if p != 0 => return p,
+            _ => tracing::warn!(
+                "RC_PORT is not a valid TCP port; falling back to config/default"
+            ),
+        }
+    }
+    cfg.port.unwrap_or(DEFAULT_PORT)
 }
 
 #[cfg(test)]
