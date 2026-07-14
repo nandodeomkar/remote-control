@@ -58,6 +58,19 @@ windows = { version = "0.62", features = [
 ] }
 tokio = { version = "1.52", features = ["rt-multi-thread", "net", "sync", "time", "macros"] }
 tracing = "0.1"
+# ── Phase 7 (07-07) persistent config ──
+# config.toml serde structs (Config + [[paired]] PairedDeviceCfg) — derive
+# lives here now that server-windows owns its own serde types (SRV-03/D-01).
+serde = { version = "1", features = ["derive"] }
+# TOML codec for %APPDATA%/RemoteControl/config.toml. Locked by CLAUDE.md;
+# RESEARCH Package Legitimacy Audit verdict OK/Approved (toml-rs org).
+toml = "1.1"
+# Known-folder resolution: dirs::config_dir() == %APPDATA%\Roaming (RESEARCH
+# A5). Locked by CLAUDE.md; audit verdict OK/Approved (dirs-dev org).
+dirs = "6.0"
+# Paired-hash hex codec (64 lowercase hex chars ⇄ [u8;32]) — same crate/major
+# server-core already uses for the token hex (no new supply-chain surface).
+hex = "0.4"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 anyhow = "1"
 # Machine GUID read (HKLM\SOFTWARE\Microsoft\Cryptography) for the beacon
