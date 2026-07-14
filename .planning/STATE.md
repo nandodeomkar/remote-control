@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase complete — ready for verification
-stopped_at: Completed 07-12-PLAN.md (App Settings screen + scroll-direction pref, D-11/SRV-03)
-last_updated: "2026-07-13T03:07:47.989Z"
-last_activity: 2026-07-12 -- Phase 07 execution started
+status: Ready to execute
+stopped_at: Completed 07-07-PLAN.md (config persistence + smart startup + on-demand pairing, SRV-03)
+last_updated: "2026-07-14T14:42:48.288Z"
+last_activity: 2026-07-14 -- Phase 07 execution started
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 56
-  completed_plans: 53
+  completed_plans: 54
   percent: 86
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 07 (server-shell-dashboard-polish) — EXECUTING
-Plan: 13 of 13
+Plan: 2 of 13
 Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
@@ -36,7 +36,7 @@ Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), 
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-12 -- Phase 07 execution started
+Last activity: 2026-07-14 -- Phase 07 execution started
 
 Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43 plans)
 
@@ -110,6 +110,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 07 P11 | ~20min | 2 tasks | 3 files |
 | Phase 07 P06 | ~50min | 3 tasks | 6 files |
 | Phase 07 P12 | 25min | 2 tasks | 8 files |
+| Phase 07 P07 | ~15min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -244,6 +245,9 @@ Recent decisions affecting current work:
 - [Phase 07-06]: UIPI foreground probe (maybe_check_uipi) adds a 250ms time throttle on top of the plan's transition debounce — foreground_blocked() walks two OpenProcess/OpenProcessToken chains, too costly to run unthrottled on every Move event without risking the locked <30ms cursor-latency budget (PAD-05)
 - [Phase 07-12]: trackpad_screen.dart wiring for scroll_direction added under Rule 2 (not in plan file list) so the D-11 pref has real effect, not just an isolated driver seam
 - [Phase 07-12]: TrackpadDriver scrollReversed seam is optional (defaults Natural) so every pre-existing driver test call site compiles unchanged; scroll_direction.dart's hot-path cache lives module-level (haptics-style), not screen-local
+- [Phase 07-07]: Config::default() keeps clipboard_sync ON (manual Default impl): a derived false default would silently regress Phase-6 always-on clipboard sync on fresh installs; port field uses a lenient toml::Value codec so a hand-edited garbage port drops field-local instead of failing the whole document and wiping the paired list
+- [Phase 07-07]: RC_PORT env override is never baked into config.toml (save subscription re-serializes cfg.port, the loaded value); invalid RC_PORT now warns + falls through via config::resolve_port instead of aborting startup (T-07-27 fail-safe)
+- [Phase 07-07]: clip-sync gate is an Arc<AtomicBool> checked on the clip thread's poll tick only — clip.set (explicit phone action) keeps working with sync off; beacon guid fallback stays COMPUTERNAME-based while display name follows cfg.device_name (rename must not change discovery identity)
 
 ### Pending Todos
 
@@ -277,6 +281,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-13T03:07:47.972Z
-Stopped at: Completed 07-12-PLAN.md (App Settings screen + scroll-direction pref, D-11/SRV-03)
+Last session: 2026-07-14T14:42:48.274Z
+Stopped at: Completed 07-07-PLAN.md (config persistence + smart startup + on-demand pairing, SRV-03)
 Resume file: None
