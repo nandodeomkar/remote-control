@@ -22,7 +22,9 @@
 //! EVERY arboard/HRESULT failure skips the tick and is dropped with `let _ =`
 //! / `?`-to-`None` — never a panic (the send-and-forget rule).
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
+use std::sync::Arc;
 use std::time::Duration;
 
 use server_core::transport::ClipState;
@@ -128,7 +130,12 @@ fn push_if_changed(
 /// Run the clipboard command + poll loop until every `Sender<ClipCmd>` is
 /// dropped. MUST be called on a dedicated `std::thread` (arboard single-thread
 /// affinity, Pitfall 6). NO `CoInitializeEx` — arboard needs no COM apartment.
-pub fn run_clip_thread(rx: Receiver<ClipCmd>, tx: Sender<ClipState>) {
+///
+/// `sync_enabled` is the config/settings clipboard-sync toggle (07-07,
+/// RESEARCH Open Q5): when `false` the poll tick still drains commands (a
+/// phone-initiated `clip.set` remains an explicit user action and keeps
+/// working) but the PC clipboard is never mirrored OUT as a `clip.changed`.
+pub fn run_clip_thread(rx: Receiver<ClipCmd>, tx: Sender<ClipState>, sync_enabled: Arc<AtomicBool>) {
     // Register the sensitive-content exclusion format once (RESEARCH Flag 3).
     // A 0 id (registration failure) simply makes the sensitive check always
     // report false — fail-open, the documented residual risk (A3).
@@ -159,15 +166,17 @@ pub fn run_clip_thread(rx: Receiver<ClipCmd>, tx: Sender<ClipState>) {
                 }
             }
             // Poll tick: read the clipboard, gate it, push iff it changed
-            // externally.
+            // externally — and iff the clipboard-sync toggle is ON (07-07).
             Err(RecvTimeoutError::Timeout) => {
-                push_if_changed(
-                    clipboard.as_mut(),
-                    exclude_id,
-                    &tx,
-                    &last_set,
-                    &mut last_pushed,
-                );
+                if sync_enabled.load(Ordering::Relaxed) {
+                    push_if_changed(
+                        clipboard.as_mut(),
+                        exclude_id,
+                        &tx,
+                        &last_set,
+                        &mut last_pushed,
+                    );
+                }
             }
             // Every producer dropped — the server is shutting down.
             Err(RecvTimeoutError::Disconnected) => break,

@@ -45,10 +45,12 @@ pub enum UserEvent {
 /// are defined now (interface-first, RESEARCH SHARED-D): this plan's
 /// bootstrap only reads/drives `conn_count`/`pause_tx`/quit/`firewall_status`
 /// /`notify_firewall`; `auth`/`revoke_tx` are unused until 07-08's on-demand
-/// settings window (Pair-new / paired-list revoke) consumes them.
-/// `config`/`autostart` are placeholder `()` handles — 07-07 has not landed
-/// `config.rs` yet, and `crate::autostart::{enable,disable,is_enabled}` are
-/// today free functions needing no state; 07-08 will retype both fields to
+/// settings window (Pair-new / paired-list revoke) consumes them via
+/// `crate::begin_on_demand_pairing` / `crate::revoke_device` (07-07).
+/// `config`/`autostart` are placeholder `()` handles — `config.rs` exists
+/// (07-07) but the shell needs no handle until its settings window edits
+/// settings, and `crate::autostart::{enable,disable,is_enabled}` are today
+/// free functions needing no state; 07-08 will retype both fields to
 /// whatever real handle its settings window needs.
 pub struct ShellCtx {
     /// Live connected-device count (SRV-01 tooltip source).

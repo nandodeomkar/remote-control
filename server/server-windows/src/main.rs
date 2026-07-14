@@ -35,10 +35,6 @@ use firewall::{BindProblem, FirewallStatus};
 use input_thread::Cmd;
 use shell::ShellCtx;
 
-/// Default WebSocket port. The spec leaves the port configurable (settings
-/// window, Phase 7); until then this default is override-able via `RC_PORT`.
-const DEFAULT_PORT: u16 = 17777;
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     // 1. DPI awareness FIRST, before any Enigo op (RESEARCH Pattern 3 /
@@ -55,6 +51,15 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .init();
+
+    // 2b. Persistent config (SRV-03 / D-01): load %APPDATA%/RemoteControl/
+    //     config.toml FIRST — it seeds the auth store (step 5), the resolved
+    //     device name/port (steps 7/7a), and the clipboard-sync gate (step
+    //     3c). The load is fail-safe end to end (corrupt file ⇒ defaults,
+    //     bad hash entries skipped — config.rs, T-07-27); a first run with
+    //     no file simply yields defaults.
+    let cfg = config::load();
+    let resolved_device_name = cfg.device_name.clone().unwrap_or_else(device_name);
 
     // 3. Dedicated input thread: the only place the !Sync Enigo lives.
     //    `blocked_tx` is the SRV-05 UIPI epoch (07-04's foreground_blocked()
@@ -91,9 +96,15 @@ async fn main() -> anyhow::Result<()> {
     //     placeholder). The watch Sender MOVES onto the thread; `clip_rx` feeds
     //     both WinClipboard (snapshot reads) and ServerDeps (the authed-gated
     //     push branch) below. NO CoInitializeEx — arboard needs no COM.
+    //     `clip_sync_enabled` is the config's clipboard_sync toggle (07-07,
+    //     RESEARCH Open Q5): OFF stops the PC→phone mirror push while a
+    //     phone-initiated clip.set keeps working. The Arc is shared with the
+    //     thread; 07-08's settings window flips it live.
     let (clip_cmd_tx, clip_cmd_rx) = std::sync::mpsc::channel::<ClipCmd>();
     let (clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
-    std::thread::spawn(move || clip_thread::run_clip_thread(clip_cmd_rx, clip_tx));
+    //     (07-08 clones this Arc into its settings window before the move.)
+    let clip_sync_enabled = Arc::new(std::sync::atomic::AtomicBool::new(cfg.clipboard_sync));
+    std::thread::spawn(move || clip_thread::run_clip_thread(clip_cmd_rx, clip_tx, clip_sync_enabled));
 
     // 4. Executor bundle: real enigo mouse + real media/power (05-05) + real
     //    apps (06-02) + real clipboard (06-04) — every trait now has a Windows
@@ -111,40 +122,80 @@ async fn main() -> anyhow::Result<()> {
         clipboard: Arc::new(WinClipboard::new(clip_cmd_tx, clip_rx.clone())),
     };
 
-    // 5. Auth: real Phase 1 pairing (D-01/D-02) — show the PIN via a
-    //    Windows toast with the console print as guaranteed fallback
-    //    (D-09; the tray-proper display comes in Phase 7). The PIN goes to
-    //    stdout + toast as the pairing UX, NOT through the tracing
-    //    subscriber.
-    let auth = Arc::new(Mutex::new(AuthManager::new()));
-    let pin = auth
-        .lock()
-        .expect("auth mutex poisoned at startup")
-        .begin_pairing();
-    notify::notify_pin(&pin);
+    // 5. Auth (SRV-03 / D-01): seed the store from config.toml's paired
+    //    records — pairings now survive restarts. Malformed entries were
+    //    already skipped fail-safe by `to_paired_devices` (T-07-27).
+    let auth = Arc::new(Mutex::new(AuthManager::from_paired(config::to_paired_devices(&cfg))));
 
-    // 5a. Re-pair loop (WR-01): the initial PIN expires after PIN_TTL_SECS.
-    //     Without this, pairing is permanently impossible ~60s after launch
-    //     with no indication. Refresh the window (re-notify a fresh PIN)
-    //     each TTL while still unpaired; stop once a phone pairs. Both the
-    //     initial and refreshed PIN route through the same notify path
-    //     (toast + console). Clone the Arc BEFORE `auth` is moved into
-    //     ServerDeps below.
-    let auth_for_repin = Arc::clone(&auth);
+    // 5a. SMART STARTUP (D-03): ≥1 paired device ⇒ start silent (no PIN
+    //     toast — the phone reconnects with its stored token); zero paired ⇒
+    //     open a pairing window and show the PIN (D-09: toast + console,
+    //     never through tracing). The decision is the pure `smart_startup_pin`
+    //     below (unit-tested).
+    let startup_pin = smart_startup_pin(
+        &mut auth.lock().expect("auth mutex poisoned at startup"),
+    );
+    if let Some(pin) = startup_pin {
+        notify::notify_pin(&pin);
+
+        // Bounded re-pin refresh (WR-01): the startup PIN expires after
+        // PIN_TTL_SECS; refresh (re-notify a fresh PIN) each TTL ONLY while
+        // no device has paired for this open startup window — the loop ends
+        // the moment a phone pairs. It is spawned ONLY on the zero-paired
+        // branch, so it is no longer the permanent process-lifetime loop
+        // (D-02/D-03 rework; on-demand re-pairing is `begin_on_demand_pairing`
+        // driven from the tray/settings shell, 07-08). Clone the Arc BEFORE
+        // `auth` is moved into ServerDeps below.
+        let auth_for_repin = Arc::clone(&auth);
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(PIN_TTL_SECS)).await;
+                let refreshed = {
+                    let mut guard = auth_for_repin
+                        .lock()
+                        .expect("auth mutex poisoned during re-pair refresh");
+                    if guard.is_paired() {
+                        break; // a device paired — stop refreshing
+                    }
+                    guard.begin_pairing()
+                    // guard dropped here, before the notify below
+                };
+                notify::notify_pin(&refreshed);
+            }
+        });
+    }
+
+    // 5b. Config re-serialization (D-01/D-05): subscribe to the auth store's
+    //     change-signal and rewrite config.toml on EVERY paired-set mutation
+    //     — a completed pairing AND a revoke both persist immediately. The
+    //     settings values re-serialized alongside are the ones loaded at
+    //     startup (cfg.port, NOT the RC_PORT env override — env must never
+    //     get baked into the file; 07-08's settings window rewrites them
+    //     when the owner edits settings). Subscribe BEFORE `auth` moves
+    //     into ServerDeps.
+    let mut auth_changes = auth
+        .lock()
+        .expect("auth mutex poisoned at config subscription")
+        .changes();
+    let auth_for_save = Arc::clone(&auth);
+    let saved_device_name = cfg.device_name.clone();
+    let (saved_port, saved_autostart, saved_clip) = (cfg.port, cfg.autostart, cfg.clipboard_sync);
     tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(PIN_TTL_SECS)).await;
-            let refreshed = {
-                let mut guard = auth_for_repin
+        while auth_changes.changed().await.is_ok() {
+            let snapshot = {
+                let guard = auth_for_save
                     .lock()
-                    .expect("auth mutex poisoned during re-pair refresh");
-                if guard.is_paired() {
-                    break; // a device paired — stop refreshing
-                }
-                guard.begin_pairing()
-                // guard dropped here, before the notify below
+                    .expect("auth mutex poisoned during config save");
+                config::from_auth(
+                    guard.paired_records(),
+                    saved_device_name.clone(),
+                    saved_port,
+                    saved_autostart,
+                    saved_clip,
+                )
+                // guard dropped here, before the file write below
             };
-            notify::notify_pin(&refreshed);
+            config::save(&snapshot);
         }
     });
 
@@ -187,12 +238,10 @@ async fn main() -> anyhow::Result<()> {
 
     // 7. Bind the LAN interface (tests bind 127.0.0.1:0; the real binary
     //    binds 0.0.0.0 — LAN-only by network design, never internet-exposed).
-    let port: u16 = match std::env::var("RC_PORT") {
-        Ok(v) => v
-            .parse()
-            .with_context(|| format!("RC_PORT must be a valid port number, got {v:?}"))?,
-        Err(_) => DEFAULT_PORT,
-    };
+    //    Precedence (07-07): RC_PORT env > config.port > DEFAULT_PORT; an
+    //    invalid RC_PORT now warns and falls through instead of aborting
+    //    (fail-safe, T-07-27 — config.rs owns the resolution).
+    let port: u16 = config::resolve_port(std::env::var("RC_PORT").ok().as_deref(), &cfg);
     // 7 (SRV-04 / D-06): AddrInUse must NOT `?`-propagate straight into a
     // crash — classify it via `firewall::classify_bind_error` and surface a
     // LOUD, distinct warning (toast) instead (RESEARCH Pitfall 5). Without a
@@ -256,7 +305,10 @@ async fn main() -> anyhow::Result<()> {
     };
     tokio::spawn(beacon::run_beacon(
         BeaconIdentity {
-            name: device_name(),
+            // Config's device_name (07-07) overrides COMPUTERNAME when set;
+            // the guid fallback above deliberately stays COMPUTERNAME-based
+            // so the beacon IDENTITY survives a display-name change.
+            name: resolved_device_name,
             guid,
             ws_port: port,
         },
@@ -266,9 +318,12 @@ async fn main() -> anyhow::Result<()> {
     // 7c (SRV-01). Spawn the tray shell thread: it reads `firewall_status`
     // at `StartCause::Init` to render the warning icon from the very first
     // frame, drives `pause_tx` (the tray's Pause menu item), and holds
-    // `auth_for_shell`/`revoke_tx` for 07-08's on-demand settings window.
-    // `config`/`autostart` are placeholder `()` handles until 07-07/07-08
-    // land real ones (ShellCtx doc comment). MUST run before
+    // `auth_for_shell`/`revoke_tx` for 07-08's on-demand settings window —
+    // its Pair-new action calls `crate::begin_on_demand_pairing(&ctx.auth)`
+    // and its revoke button `crate::revoke_device(&ctx.auth, &ctx.revoke_tx,
+    // hash)` (both defined below; the step-5b subscription persists either
+    // mutation). `config`/`autostart` stay placeholder `()` handles until
+    // 07-08 retypes them for its settings window. MUST run before
     // `server_core::run` blocks this task forever (RESEARCH Pattern 1).
     let shell_proxy = shell::spawn_shell_thread(ShellCtx {
         conn_count: conn_count.subscribe(),
@@ -316,7 +371,138 @@ fn machine_guid() -> Option<String> {
 }
 
 /// Human-readable device name for the beacon: `COMPUTERNAME` with a literal
-/// fallback (assumption A5 — the env var is standard on Windows).
+/// fallback (assumption A5 — the env var is standard on Windows). Since
+/// 07-07 this is the FALLBACK only — `config.device_name` overrides it when
+/// set (see step 2b).
 fn device_name() -> String {
     std::env::var("COMPUTERNAME").unwrap_or_else(|_| "Windows PC".to_string())
+}
+
+/// Pure D-03 smart-startup decision: `Some(pin)` when a pairing window was
+/// opened (zero paired devices), `None` when startup is silent (≥1 paired —
+/// the phone reconnects with its stored token, no PIN toast). The caller
+/// notifies ONLY on `Some`, so "paired ⇒ no begin_pairing/notify" is proven
+/// by this function alone.
+fn smart_startup_pin(auth: &mut AuthManager) -> Option<String> {
+    if auth.is_paired() {
+        None
+    } else {
+        Some(auth.begin_pairing())
+    }
+}
+
+/// On-demand pairing trigger (D-02): opens a fresh 60s PIN window ANY time —
+/// including when devices are already paired (multi-device, SRV-03) — and
+/// shows the PIN via the standard notify path (toast + console, never
+/// tracing). The tray/settings shell's "Pair new device" action (07-08)
+/// calls this through the `auth` Arc its `ShellCtx` already holds.
+// Unwired until 07-08's shell menu item lands (same scoped-allow precedent
+// as autostart.rs / notify_firewall_warning in 07-03).
+#[allow(dead_code)]
+pub fn begin_on_demand_pairing(auth: &Arc<Mutex<AuthManager>>) -> String {
+    let pin = auth
+        .lock()
+        .expect("auth mutex poisoned during on-demand pairing")
+        .begin_pairing();
+    notify::notify_pin(&pin);
+    pin
+}
+
+/// Settings revoke path (D-05): drop `hash` from the auth store and, iff it
+/// was present, advance the revocation epoch so the live session's revoke
+/// `select!` branch (07-05) force-disconnects it. The auth store's own
+/// change-signal bump (inside `revoke`) independently triggers the step-5b
+/// config save — persistence and disconnect ride separate seams on purpose.
+/// Returns whether anything was removed. 07-08's settings window drives this
+/// via the `auth`/`revoke_tx` handles its `ShellCtx` already holds.
+// Unwired until 07-08's settings window lands (scoped-allow precedent above).
+#[allow(dead_code)]
+pub fn revoke_device(
+    auth: &Arc<Mutex<AuthManager>>,
+    revoke_tx: &tokio::sync::watch::Sender<u64>,
+    hash: &[u8; 32],
+) -> bool {
+    let removed = auth
+        .lock()
+        .expect("auth mutex poisoned during revoke")
+        .revoke(hash);
+    if removed {
+        revoke_tx.send_modify(|epoch| *epoch += 1);
+    }
+    removed
+}
+
+#[cfg(test)]
+mod tests {
+    //! Smart-startup (D-03) + revoke-wiring (D-05) unit tests — the
+    //! `cargo test -p server-windows startup` validation surface.
+
+    use std::sync::{Arc, Mutex};
+
+    use server_core::auth::{AuthManager, PairedDevice};
+
+    use super::{revoke_device, smart_startup_pin};
+
+    /// D-03: ≥1 paired device ⇒ silent startup — NO pairing window opens, so
+    /// no PIN can reach notify (the caller notifies only on `Some`).
+    #[test]
+    fn startup_paired_is_silent() {
+        let mut auth = AuthManager::from_paired(vec![PairedDevice::new(
+            [7u8; 32],
+            "Pixel".to_owned(),
+            1_700_000_000,
+        )]);
+        assert_eq!(
+            smart_startup_pin(&mut auth),
+            None,
+            "a paired store must start silent — no begin_pairing, no notify"
+        );
+    }
+
+    /// D-03: zero paired devices ⇒ a pairing window opens and the PIN goes
+    /// to notify (a real 6-digit PIN comes back).
+    #[test]
+    fn startup_unpaired_opens_a_pin_window() {
+        let mut auth = AuthManager::new();
+        let pin = smart_startup_pin(&mut auth).expect("zero paired opens a pairing window");
+        assert_eq!(pin.len(), 6, "6-digit zero-padded PIN");
+        assert!(pin.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    /// D-05 wiring: revoking a present hash advances the revocation epoch
+    /// (live-session drop) AND the auth change-signal (config re-save); an
+    /// absent hash advances neither.
+    #[test]
+    fn startup_revoke_bumps_epoch_and_change_signal() {
+        let mut mgr = AuthManager::new();
+        let paired = mgr.complete_pairing_named("Pixel".to_owned());
+        let auth = Arc::new(Mutex::new(mgr));
+
+        let (revoke_tx, mut revoke_rx) = tokio::sync::watch::channel(0u64);
+        let mut changes = auth.lock().unwrap().changes();
+        let _ = changes.borrow_and_update(); // clear the pairing bump
+
+        assert!(
+            revoke_device(&auth, &revoke_tx, &paired.hash),
+            "revoking a present hash reports removal"
+        );
+        assert!(
+            revoke_rx.has_changed().unwrap(),
+            "revoke advances the D-05 revocation epoch (session drop)"
+        );
+        assert!(
+            changes.has_changed().unwrap(),
+            "revoke bumps the change-signal (config re-save)"
+        );
+
+        let _ = revoke_rx.borrow_and_update();
+        assert!(
+            !revoke_device(&auth, &revoke_tx, &[9u8; 32]),
+            "an absent hash removes nothing"
+        );
+        assert!(
+            !revoke_rx.has_changed().unwrap(),
+            "an absent hash must never advance the revocation epoch"
+        );
+    }
 }
