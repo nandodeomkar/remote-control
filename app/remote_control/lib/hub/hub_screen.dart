@@ -48,6 +48,7 @@ import '../settings/settings_screen.dart';
 import '../theme/tokens.dart';
 import '../trackpad/trackpad_screen.dart';
 import '../widgets/connection_header.dart';
+import '../widgets/quick_bar_scaffold.dart';
 
 /// One hub tile: label + icon + the tool screen it opens.
 class HubTileSpec {
@@ -60,11 +61,18 @@ class HubTileSpec {
   /// Builds the destination screen for the MaterialPageRoute push.
   final WidgetBuilder builder;
 
+  /// Whether the pushed destination shows the persistent Trackpad quick-bar
+  /// (D-10). False ONLY for the Trackpad tile — no redundant shortcut to the
+  /// screen you are on; the [QuickBarScaffold] wrapper (and its UIPI banner)
+  /// still applies.
+  final bool showQuickBar;
+
   /// Creates a tile spec.
   const HubTileSpec({
     required this.label,
     required this.icon,
     required this.builder,
+    this.showQuickBar = true,
   });
 }
 
@@ -75,6 +83,8 @@ final List<HubTileSpec> kHubTiles = [
     label: 'Trackpad',
     icon: Icons.touch_app,
     builder: (_) => const TrackpadScreen(),
+    // D-10: never a quick-bar shortcut to the screen you are on.
+    showQuickBar: false,
   ),
   // 07-13: Keyboard promoted to a first-class screen at position 2 (D-09).
   HubTileSpec(
@@ -253,11 +263,19 @@ class _HubScreenState extends ConsumerState<HubScreen> {
     _service = ref.read(connectionServiceProvider);
   }
 
-  /// Tile tap → plain MaterialPageRoute push (house rule, D-01).
+  /// Tile tap → plain MaterialPageRoute push (house rule, D-01), wrapped in
+  /// [QuickBarScaffold] CENTRALLY so every tool screen gets the persistent
+  /// Trackpad quick-bar + UIPI banner (D-10) — the Trackpad tile alone
+  /// passes `showQuickBar: false` (no shortcut to the screen you are on).
   void _open(HubTileSpec spec) {
     unawaited(
       Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: spec.builder),
+        MaterialPageRoute<void>(
+          builder: (context) => QuickBarScaffold(
+            showQuickBar: spec.showQuickBar,
+            body: spec.builder(context),
+          ),
+        ),
       ),
     );
   }
