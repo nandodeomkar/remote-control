@@ -264,7 +264,7 @@ Plans:
 **Wave 4**
 
 - [x] 07-07-PLAN.md — Config persistence + on-demand pairing + smart startup + revoke wiring (SRV-03)
-- [ ] 07-13-PLAN.md — Dashboard rewire: home→HubScreen, uniform 2×4, 8 tiles + quick-bar + Keyboard screen (UI-01)
+- [x] 07-13-PLAN.md — Dashboard rewire: home→HubScreen, uniform 2×4, 8 tiles + quick-bar + Keyboard screen (UI-01)
 
 **Wave 5**
 
@@ -283,4 +283,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
 | 6. Apps & Clipboard | 7/7 | Complete    | 2026-07-12 |
-| 7. Server Shell, Dashboard & Polish | 11/13 | In Progress|  |
+| 7. Server Shell, Dashboard & Polish | 12/13 | In Progress|  |

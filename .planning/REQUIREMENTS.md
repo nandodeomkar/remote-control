@@ -73,7 +73,7 @@
 
 ### App UI
 
-- [ ] **UI-01**: Dashboard home with tool tiles plus persistent trackpad quick-bar on every screen
+- [x] **UI-01**: Dashboard home with tool tiles plus persistent trackpad quick-bar on every screen
 - [x] **UI-02**: Dark minimal theme (#0E0F12, blue accent), haptic feedback toggle, keep-awake during trackpad/presenter
 
 ## v2 Requirements
@@ -148,7 +148,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SRV-03 | Phase 7 | Complete |
 | SRV-04 | Phase 7 | Complete |
 | SRV-05 | Phase 7 | Complete |
-| UI-01 | Phase 7 | Pending |
+| UI-01 | Phase 7 | Complete |
 | UI-02 | Phase 7 | Complete |
 
 **Coverage:**
