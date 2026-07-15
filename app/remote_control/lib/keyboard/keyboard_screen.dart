@@ -9,10 +9,10 @@
 /// and the panel's own changes subscription drives its D-12 disconnect reset.
 ///
 /// Chrome (07-UI-SPEC §4): app bar `kBg`, title "Keyboard" (16/600 `kText`),
-/// body = the panel docked at the bottom of a `kBg` canvas. The quick-bar is
-/// NOT self-hosted — `HubScreen._open` wraps every tile destination in
-/// `QuickBarScaffold` centrally (07-13 Task 2), so this screen gets the
-/// persistent Trackpad shortcut without knowing about it.
+/// body = the panel docked at the bottom of a `kBg` canvas. The floating
+/// trackpad bubble is NOT self-hosted — `HubScreen._open` wraps every tile
+/// destination in `BubbleScaffold` centrally (08-06), so this screen gets
+/// the persistent Trackpad shortcut without knowing about it.
 library;
 
 import 'package:flutter/material.dart';

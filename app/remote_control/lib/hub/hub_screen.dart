@@ -5,7 +5,7 @@
 /// the exact D-09 reading order: Trackpad, Keyboard, Media, Apps, Clipboard,
 /// Power, Presenter, Browser. The grid is a UNIFORM 2×4 (07-UI-SPEC §1,
 /// Pitfall 9): the legacy full-width Trackpad primary row is gone — the
-/// persistent quick-bar (`QuickBarScaffold`, 07-13 Task 2) now carries
+/// floating trackpad bubble (`BubbleScaffold`, 08-06) now carries
 /// Trackpad primacy on every tool screen.
 ///
 /// [HubTileGrid] is widget-only (the MouseButtonsBar callback pattern):
@@ -47,8 +47,8 @@ import '../presenter/presenter_screen.dart';
 import '../settings/settings_screen.dart';
 import '../theme/tokens.dart';
 import '../trackpad/trackpad_screen.dart';
+import '../widgets/bubble_scaffold.dart';
 import '../widgets/connection_header.dart';
-import '../widgets/quick_bar_scaffold.dart';
 
 /// One hub tile: label + icon + the tool screen it opens.
 class HubTileSpec {
@@ -61,18 +61,18 @@ class HubTileSpec {
   /// Builds the destination screen for the MaterialPageRoute push.
   final WidgetBuilder builder;
 
-  /// Whether the pushed destination shows the persistent Trackpad quick-bar
-  /// (D-10). False ONLY for the Trackpad tile — no redundant shortcut to the
-  /// screen you are on; the [QuickBarScaffold] wrapper (and its UIPI banner)
+  /// Whether the pushed destination shows the floating trackpad bubble
+  /// (D8-05). False ONLY for the Trackpad tile — no redundant shortcut to the
+  /// screen you are on; the [BubbleScaffold] wrapper (and its UIPI banner)
   /// still applies.
-  final bool showQuickBar;
+  final bool showBubble;
 
   /// Creates a tile spec.
   const HubTileSpec({
     required this.label,
     required this.icon,
     required this.builder,
-    this.showQuickBar = true,
+    this.showBubble = true,
   });
 }
 
@@ -83,8 +83,8 @@ final List<HubTileSpec> kHubTiles = [
     label: 'Trackpad',
     icon: Icons.touch_app,
     builder: (_) => const TrackpadScreen(),
-    // D-10: never a quick-bar shortcut to the screen you are on.
-    showQuickBar: false,
+    // D8-05: never a bubble shortcut to the screen you are on.
+    showBubble: false,
   ),
   // 07-13: Keyboard promoted to a first-class screen at position 2 (D-09).
   HubTileSpec(
@@ -264,15 +264,15 @@ class _HubScreenState extends ConsumerState<HubScreen> {
   }
 
   /// Tile tap → plain MaterialPageRoute push (house rule, D-01), wrapped in
-  /// [QuickBarScaffold] CENTRALLY so every tool screen gets the persistent
-  /// Trackpad quick-bar + UIPI banner (D-10) — the Trackpad tile alone
-  /// passes `showQuickBar: false` (no shortcut to the screen you are on).
+  /// [BubbleScaffold] CENTRALLY so every tool screen gets the floating
+  /// trackpad bubble + UIPI banner (D8-05) — the Trackpad tile alone
+  /// passes `showBubble: false` (no shortcut to the screen you are on).
   void _open(HubTileSpec spec) {
     unawaited(
       Navigator.of(context).push(
         MaterialPageRoute<void>(
-          builder: (context) => QuickBarScaffold(
-            showQuickBar: spec.showQuickBar,
+          builder: (context) => BubbleScaffold(
+            showBubble: spec.showBubble,
             body: spec.builder(context),
           ),
         ),
