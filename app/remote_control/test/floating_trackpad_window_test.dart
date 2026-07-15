@@ -26,12 +26,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_protocol/remote_protocol.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import 'package:remote_control/net/connection_providers.dart';
 import 'package:remote_control/net/connection_service.dart';
+import 'package:remote_control/settings/window_position.dart';
 import 'package:remote_control/store/device_store.dart';
 import 'package:remote_control/trackpad/floating_trackpad_window.dart';
 import 'package:remote_control/trackpad/trackpad_core.dart';
