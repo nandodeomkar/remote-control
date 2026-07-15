@@ -514,7 +514,18 @@ class ConnectionService {
 
     // Token read happens at dial time only; it flows straight into the
     // HandshakeDriver ctor and is never held on a service field (T-03-20).
-    final token = await _store.tokenFor(target.key);
+    // WR-03: keystore reads are slow and CAN THROW after an OS update
+    // (CLAUDE.md). An uncaught throw here escapes the `unawaited(_applyStep())`
+    // callers (retryNow / onAppResumed / beacon sightings) as a zone error and
+    // strands the FSM in `connecting` with no `transportFailed` — the reconnect
+    // loop stalls permanently. Degrade a lost token to null: the PIN path is
+    // the correct fallback.
+    String? token;
+    try {
+      token = await _store.tokenFor(target.key);
+    } catch (_) {
+      token = null;
+    }
 
     final WebSocketChannel channel;
     try {
@@ -656,7 +667,12 @@ class ConnectionService {
       final token = driver.token;
       final target = _fsm.target;
       if (token != null && target != null) {
-        unawaited(_persistNewPairing(target, token));
+        // WR-03: _persistNewPairing does keystore WRITES (saveToken) that can
+        // throw after an OS update (CLAUDE.md). Swallow the failure so it never
+        // becomes an uncaught async error; the only cost is that this pairing
+        // isn't remembered and the user can re-pair. (Surfacing a "couldn't
+        // remember this PC" hint to the UI is left for a follow-up.)
+        unawaited(_persistNewPairing(target, token).catchError((Object _) {}));
       }
     }
     _policy.authed = true;
