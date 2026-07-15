@@ -298,13 +298,13 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
   4. Bubble `(edge, yFraction)` and window `(x, y)` positions persist independently across app restarts (default bubble: right edge, 70% down)
   5. Collapsing the window or leaving the screen while drag-locked flushes `DragMsg(end)` on a live authed socket (CR-01), keepAwake is acquired on expand / released on collapse without dropping Presenter's hold, and no stuck mouse button remains behind a collapsed bubble
 
-**Plans:** 1/6 plans executed
+**Plans:** 2/6 plans executed
 
 Plans:
 **Wave 1**
 
 - [x] 08-01-PLAN.md — Dual position persistence: bubble `(edge, yFraction)` + window `(x, y)` stores/notifiers (D8-02/03, SC4)
-- [ ] 08-02-PLAN.md — `TrackpadCore` extraction (safety net + core + thin `TrackpadScreen`) — behavior-neutral hot-path engine (D8-04/07, SC2/SC5)
+- [x] 08-02-PLAN.md — `TrackpadCore` extraction (safety net + core + thin `TrackpadScreen`) — behavior-neutral hot-path engine (D8-04/07, SC2/SC5)
 
 **Wave 2** *(after Wave 1)*
 
