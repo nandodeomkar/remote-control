@@ -1,29 +1,25 @@
-/// The trackpad surface — a pure [ConnectionService] consumer (03-07, D-08),
-/// grown in 04-04 into the full PAD-01..04 gesture surface.
+/// The trackpad screen — since 08-02 a THIN composition of [TrackpadCore]
+/// (the D8-04 hot-path engine) + its retained chrome.
 ///
-/// The raw pointer routes now feed the [GestureClassifier] (pure FSM) whose
-/// intents the [TrackpadDriver] executes: accelGain-scaled moves w/ the D-05
-/// sensitivity, tap/two-finger-tap clicks, momentum scroll with instant
-/// touch-stop, and long-press drag with drag-lock. Chrome added this plan:
-/// the [MouseButtonsBar] docked beneath the surface (PAD-02), the drag-lock
-/// pill (top-center, PAD-04), and the tune affordance (bottom-right) that
-/// opens the D-05 sensitivity sheet. 04-05 adds the expandable
-/// [KeyboardPanel] (D-07) docked below the bar with its toggle in the
-/// bottom-right cluster — hidden-IME typing rides the reliable path via
-/// [ImeDiffProducer] (KEY-01, D-08).
+/// The hot path (raw pointer routes → [GestureClassifier] → [TrackpadDriver] →
+/// service, the D-05 sensitivity / D-11 scroll caches, the disconnect-hygiene
+/// subscription, the D-14 keep-awake hold, and the CR-01 dispose flush) now
+/// lives entirely in [TrackpadCore] so the floating window (08-04) mounts the
+/// SAME engine. This screen mounts the core as its full-bleed gesture surface
+/// and layers the chrome OVER it: the [MouseButtonsBar] docked beneath (PAD-02),
+/// the drag-lock pill (top-center, PAD-04) reading the core's drag-lock
+/// listenable, the tune affordance (bottom-right) that opens the D-05
+/// sensitivity sheet, and the expandable [KeyboardPanel] (D-07) with its toggle
+/// — hidden-IME typing rides the reliable path via [ImeDiffProducer]
+/// (KEY-01, D-08).
 ///
-/// HOT-PATH INVARIANT (Phase 2/3, preserved): the pointer routes are
-/// `classifier -> driver -> service` calls with ZERO setState — the per-event
-/// intent list is the only allocation. The pill rides its own
-/// [ValueNotifier] + [ValueListenableBuilder] (LOCALIZED rebuild — the
-/// Listener subtree and header chip never rebuild); the header chip keeps its
-/// 500ms poll; the banner/bar chrome watches the transition-only status
-/// provider. The screen holds ONE `changes` subscription solely for
-/// disconnect hygiene (driver.reset — no stale drag pill / momentum survives
-/// a drop; the server half is CONN-07 release_all).
+/// The extraction is behavior-neutral (D8-04): the primitive gesture tests pass
+/// unmodified and the composition smoke test renders the same chrome after the
+/// slim. The pill rides a [ValueNotifier] the core drives (LOCALIZED rebuild —
+/// the core's Listener subtree and the header chip never rebuild off it); the
+/// header chip keeps its 500ms poll; the banner/bar chrome watches the
+/// transition-only status provider.
 library;
-
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -34,16 +30,12 @@ import '../keyboard/diff_ops.dart';
 import '../keyboard/keyboard_panel.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
-import '../screens/connection_copy.dart';
 import '../settings/haptics.dart';
-import '../settings/scroll_direction.dart';
 import '../settings/sensitivity.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
-import '../widgets/keep_awake.dart';
-import 'gesture_classifier.dart';
 import 'mouse_buttons.dart';
-import 'trackpad_driver.dart';
+import 'trackpad_core.dart';
 import 'tuning.dart';
 
 /// The trackpad screen: hot-path surface + gesture chrome + header chip.
@@ -56,22 +48,19 @@ class TrackpadScreen extends ConsumerStatefulWidget {
 }
 
 class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
-  /// Cached once — the provider is an app-lifetime singleton, and the hot
-  /// path must not pay a provider lookup per pointer event.
+  /// Cached once for the chrome (mouse-button clicks, IME diffs, keyboard
+  /// panel, header chip, banner retry). The hot path's own service read lives
+  /// inside [TrackpadCore] — never a provider lookup per pointer event.
   late final ConnectionService _service;
 
-  /// Pure gesture FSM (04-03) — constructed once, system clock seam.
-  late final GestureClassifier _classifier;
-
-  /// Intent executor (04-04 Task 1) — real seams wired below.
-  late final TrackpadDriver _driver;
-
-  /// Drives ONLY the drag-lock pill (ValueListenableBuilder — localized
-  /// rebuild; the Listener subtree and header chip never rebuild off this).
-  final ValueNotifier<bool> _dragLockPill = ValueNotifier<bool>(false);
+  /// The shared drag-lock state: [TrackpadCore] drives it via
+  /// `onDragLockChanged`, and the top-center pill reads it (localized rebuild;
+  /// the core's Listener subtree and the header chip never rebuild off this).
+  /// This screen owns and disposes it.
+  final ValueNotifier<bool> _dragLock = ValueNotifier<bool>(false);
 
   /// Drives ONLY the keyboard panel slot + the toggle icon (D-07). Same
-  /// localized-rebuild discipline: the Listener subtree is never a child of
+  /// localized-rebuild discipline: the core's surface is never a child of
   /// this notifier's builders (Pitfall 6 — panel animation off the hot path).
   final ValueNotifier<bool> _panelExpanded = ValueNotifier<bool>(false);
 
@@ -81,120 +70,22 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
   /// KEY-01 committed-text diff producer (emit -> reliable path).
   late final ImeDiffProducer _imeProducer;
 
-  /// Disconnect-hygiene subscription (transition detection, not UI).
-  StreamSubscription<void>? _changesSub;
-  ChipStatus _lastChip = ChipStatus.disconnected;
-
-  /// Cached D-05 sensitivity — the driver's getter reads THIS double; the
-  /// [sensitivityProvider] listener below updates it on change (never a
-  /// provider lookup per pointer event — hot-path invariant).
-  double _sensitivity = kSensitivityDefault;
-
   @override
   void initState() {
     super.initState();
     _service = ref.read(connectionServiceProvider);
 
-    // D-05 sensitivity cache: listenManual (no widget rebuild) seeds the
-    // double immediately and follows every slider change; the subscription
-    // closes with the element. The hot path only ever reads _sensitivity.
-    ref.listenManual<double>(
-      sensitivityProvider,
-      (_, next) => _sensitivity = next,
-      fireImmediately: true,
-    );
-
-    // D-11 scroll-direction cache: same listenManual seam, but the cache
-    // lives in scroll_direction.dart itself (mirrors bindHapticsCache) so
-    // the driver's scrollReversed getter reads scrollReversedCached
-    // directly below — no local double needed here.
-    bindScrollDirectionCache(ref);
-
-    _classifier = GestureClassifier(
-      nowMillis: () => DateTime.now().millisecondsSinceEpoch,
-    );
-    _driver = TrackpadDriver(
-      onSendMove: _service.sendMove,
-      onSendScroll: _service.sendScroll,
-      onSendReliable: _service.sendReliable,
-      onHaptic: hapticTick,
-      onDragLockChanged: (locked) => _dragLockPill.value = locked,
-      // The timer fires back INTO the classifier; its verdict (drag start or
-      // stale no-op) round-trips through the driver like any other intent.
-      onLongPressElapsed: () => _driver.handle(_classifier.onLongPressFire()),
-      sensitivity: () => _sensitivity,
-      scrollReversed: () => scrollReversedCached,
-      onReset: _classifier.reset,
-    );
-
     // KEY-01: hidden-IME diffs ride the reliable path (queued pre-auth,
     // flushed on auth — SendPolicy owns the gating).
     _imeProducer = ImeDiffProducer(emit: _service.sendReliable);
-
-    // Disconnect hygiene: on the transition INTO disconnected, clear the
-    // client gesture state (drag pill, momentum, pending long-press) here.
-    // The server's held buttons are released by CONN-07 release_all. IME
-    // disconnect hygiene now lives in KeyboardPanel + HiddenTextInput: the
-    // panel's reset signal reseeds the diff producer AND its controller
-    // atomically (CR-01) — resetting the producer alone from this listener
-    // desynced it from the hidden field's text and replayed pre-disconnect
-    // typing into the next session. The panel may stay open; its keys
-    // render gated in 04-06.
-    _lastChip = _service.chipStatus;
-    _changesSub = _service.changes.listen((_) {
-      final chip = _service.chipStatus;
-      if (chip == ChipStatus.disconnected &&
-          _lastChip != ChipStatus.disconnected) {
-        _driver.reset();
-      }
-      _lastChip = chip;
-    });
-
-    // Keep the screen awake so it never dims mid-drag (D-14: ref-counted so
-    // a Presenter->quick-bar->Trackpad excursion never drops the other's
-    // hold — Pitfall 8).
-    keepAwake.acquire();
   }
 
   @override
   void dispose() {
-    _changesSub?.cancel();
-    // CR-01: if drag-lock is engaged and the session is still live (the screen
-    // was popped mid-drag), the PC's left button stays held — _driver.dispose()
-    // deliberately sends nothing. Flush the owed drag end here first, on a live
-    // socket only (a dropped session was freed by CONN-07 release_all).
-    if (_driver.dragLocked && _service.isAuthed) {
-      _service.sendReliable(const DragMsg(action: 'end', button: 'left'));
-    }
-    _driver.dispose();
-    _dragLockPill.dispose();
+    _dragLock.dispose();
     _panelExpanded.dispose();
     _imeFocusNode.dispose();
-    keepAwake.release();
     super.dispose();
-  }
-
-  // Hot path: classifier -> driver -> service, NO setState, and the
-  // per-event intent list is the only allocation. The service owns gating
-  // (volatile drop unless authed) and the probe cadence.
-  void _onPointerDown(PointerDownEvent e) {
-    _driver.handle(
-      _classifier.onPointerDown(e.pointer, e.position.dx, e.position.dy),
-    );
-  }
-
-  void _onPointerMove(PointerMoveEvent e) {
-    _driver.handle(
-      _classifier.onPointerMove(e.pointer, e.position.dx, e.position.dy),
-    );
-  }
-
-  void _onPointerUp(PointerUpEvent e) {
-    _driver.handle(_classifier.onPointerUp(e.pointer));
-  }
-
-  void _onPointerCancel(PointerCancelEvent e) {
-    _driver.handle(_classifier.onPointerCancel(e.pointer));
   }
 
   // L/M/R bar press: reliable click + the same haptic tick as tap-clicks.
@@ -263,25 +154,16 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
             Expanded(
               child: Stack(
                 children: [
-                  // The full-bleed trackpad surface: Listener is a raw pointer
-                  // route with zero gesture arena / rebuild on the hot path.
+                  // The full-bleed trackpad surface + hot-path engine
+                  // (D8-04): the SAME TrackpadCore the floating window mounts,
+                  // so cursor behavior is identical by construction. It owns
+                  // the pointer route, caches, keep-awake, and the CR-01
+                  // dispose flush; this screen just supplies the authed hint
+                  // and the shared drag-lock handle.
                   Positioned.fill(
-                    child: Listener(
-                      onPointerDown: _onPointerDown,
-                      onPointerMove: _onPointerMove,
-                      onPointerUp: _onPointerUp,
-                      onPointerCancel: _onPointerCancel,
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        color: kBg,
-                        alignment: Alignment.center,
-                        child: Text(
-                          authed
-                              ? kTrackpadHintAuthed
-                              : kTrackpadHintNotConnected,
-                          style: const TextStyle(color: kMuted),
-                        ),
-                      ),
+                    child: TrackpadCore(
+                      authed: authed,
+                      dragLock: _dragLock,
                     ),
                   ),
 
@@ -322,7 +204,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                     right: 0,
                     child: Center(
                       child: ValueListenableBuilder<bool>(
-                        valueListenable: _dragLockPill,
+                        valueListenable: _dragLock,
                         builder: (context, locked, _) => IgnorePointer(
                           child: AnimatedOpacity(
                             opacity: locked ? 1.0 : 0.0,
