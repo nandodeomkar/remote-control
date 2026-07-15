@@ -74,4 +74,31 @@ void main() {
     expect(disables, 1);
     expect(keep.activeCount, 1);
   });
+
+  // 08-02 — a window excursion (Presenter holds keep-awake, the floating
+  // trackpad window/screen opens over it and closes) must NOT drop the
+  // still-live Presenter hold. TrackpadCore owns exactly one acquire/release,
+  // so the co-held Presenter hold survives the 1->2->1 excursion and the
+  // platform flag stays on until Presenter itself releases.
+  test('window excursion keeps a co-held Presenter hold alive', () {
+    var enables = 0;
+    var disables = 0;
+    final keep = KeepAwake(
+      enable: () async => enables++,
+      disable: () async => disables++,
+    );
+
+    keep.acquire(); // Presenter opens: 0 -> 1, enable
+    expect(enables, 1);
+
+    keep.acquire(); // window/trackpad core mounts over it: 1 -> 2
+    keep.release(); // window collapses (core disposes): 2 -> 1
+    expect(keep.activeCount, 1,
+        reason: 'Presenter still holds keep-awake after the excursion');
+    expect(disables, 0, reason: 'the flag must NOT drop while Presenter holds');
+
+    keep.release(); // Presenter closes: 1 -> 0
+    expect(keep.activeCount, 0);
+    expect(disables, 1, reason: 'the final release drops the flag exactly once');
+  });
 }
