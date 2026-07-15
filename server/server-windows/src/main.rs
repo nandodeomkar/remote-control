@@ -61,6 +61,13 @@ async fn main() -> anyhow::Result<()> {
     let cfg = config::load();
     let resolved_device_name = cfg.device_name.clone().unwrap_or_else(device_name);
 
+    // 2c. The LIVE editable settings (07-08): seeded from the startup config
+    //     (never the RC_PORT env override — env must never get baked into
+    //     the file). The settings window mutates it; the step-5b save task
+    //     reads it on every re-serialize — so a pairing/revoke save can't
+    //     clobber a settings edit with stale startup values, and vice versa.
+    let settings = Arc::new(Mutex::new(config::SharedSettings::from_config(&cfg)));
+
     // 3. Dedicated input thread: the only place the !Sync Enigo lives.
     //    `blocked_tx` is the SRV-05 UIPI epoch (07-04's foreground_blocked()
     //    proactive detection, debounced on the input thread itself) —
@@ -102,8 +109,11 @@ async fn main() -> anyhow::Result<()> {
     //     thread; 07-08's settings window flips it live.
     let (clip_cmd_tx, clip_cmd_rx) = std::sync::mpsc::channel::<ClipCmd>();
     let (clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
-    //     (07-08 clones this Arc into its settings window before the move.)
+    //     The shell's settings window holds its own clone (07-08): its
+    //     clipboard-sync checkbox flips the gate LIVE — clone BEFORE the
+    //     Arc moves onto the clip thread.
     let clip_sync_enabled = Arc::new(std::sync::atomic::AtomicBool::new(cfg.clipboard_sync));
+    let clip_sync_for_shell = Arc::clone(&clip_sync_enabled);
     std::thread::spawn(move || clip_thread::run_clip_thread(clip_cmd_rx, clip_tx, clip_sync_enabled));
 
     // 4. Executor bundle: real enigo mouse + real media/power (05-05) + real
@@ -168,30 +178,35 @@ async fn main() -> anyhow::Result<()> {
     // 5b. Config re-serialization (D-01/D-05): subscribe to the auth store's
     //     change-signal and rewrite config.toml on EVERY paired-set mutation
     //     — a completed pairing AND a revoke both persist immediately. The
-    //     settings values re-serialized alongside are the ones loaded at
-    //     startup (cfg.port, NOT the RC_PORT env override — env must never
-    //     get baked into the file; 07-08's settings window rewrites them
-    //     when the owner edits settings). Subscribe BEFORE `auth` moves
+    //     settings values re-serialized alongside come from the LIVE shared
+    //     handle (step 2c) — the CURRENT edits, never the RC_PORT env
+    //     override and never a stale startup snapshot (07-08's settings
+    //     window mutates the same handle). Subscribe BEFORE `auth` moves
     //     into ServerDeps.
     let mut auth_changes = auth
         .lock()
         .expect("auth mutex poisoned at config subscription")
         .changes();
     let auth_for_save = Arc::clone(&auth);
-    let saved_device_name = cfg.device_name.clone();
-    let (saved_port, saved_autostart, saved_clip) = (cfg.port, cfg.autostart, cfg.clipboard_sync);
+    let settings_for_save = Arc::clone(&settings);
     tokio::spawn(async move {
         while auth_changes.changed().await.is_ok() {
             let snapshot = {
+                // Take the two locks SEQUENTIALLY (settings first, dropped
+                // before auth) — never nested, no ordering to deadlock on.
+                let s = settings_for_save
+                    .lock()
+                    .expect("settings mutex poisoned during config save")
+                    .clone();
                 let guard = auth_for_save
                     .lock()
                     .expect("auth mutex poisoned during config save");
                 config::from_auth(
                     guard.paired_records(),
-                    saved_device_name.clone(),
-                    saved_port,
-                    saved_autostart,
-                    saved_clip,
+                    s.device_name,
+                    s.port,
+                    s.autostart,
+                    s.clipboard_sync,
                 )
                 // guard dropped here, before the file write below
             };
@@ -205,12 +220,10 @@ async fn main() -> anyhow::Result<()> {
     //    moves into `deps`, mirroring the `auth_for_repin` clone above).
     let (pause_tx, pause_rx) = tokio::sync::watch::channel(false);
 
-    // 6b. conn_count (SRV-01 tooltip) + revoke (D-05, real sender lands in
-    //     07-08's settings window) — the real conn_count SENDER already
-    //     lives here (sessions bump/decrement it); `revoke_tx` stays a
-    //     not-yet-driven real sender (07-08 wires its "Revoke" button) but
-    //     is no longer an interim placeholder — it is handed to the shell
-    //     thread's ShellCtx below so 07-08 has somewhere to reach it.
+    // 6b. conn_count (SRV-01 tooltip) + revoke (D-05) — the real conn_count
+    //     SENDER lives here (sessions bump/decrement it); `revoke_tx` is
+    //     driven by the settings window's Revoke button (07-08, via
+    //     `revoke_device`) through the shell thread's ShellCtx below.
     let (conn_count_tx, _conn_count_rx) = tokio::sync::watch::channel(0usize);
     let conn_count = std::sync::Arc::new(conn_count_tx);
     let (revoke_tx, revoke_rx) = tokio::sync::watch::channel(0u64);
@@ -315,23 +328,26 @@ async fn main() -> anyhow::Result<()> {
         beacon_port,
     ));
 
-    // 7c (SRV-01). Spawn the tray shell thread: it reads `firewall_status`
-    // at `StartCause::Init` to render the warning icon from the very first
-    // frame, drives `pause_tx` (the tray's Pause menu item), and holds
-    // `auth_for_shell`/`revoke_tx` for 07-08's on-demand settings window —
-    // its Pair-new action calls `crate::begin_on_demand_pairing(&ctx.auth)`
-    // and its revoke button `crate::revoke_device(&ctx.auth, &ctx.revoke_tx,
-    // hash)` (both defined below; the step-5b subscription persists either
-    // mutation). `config`/`autostart` stay placeholder `()` handles until
-    // 07-08 retypes them for its settings window. MUST run before
-    // `server_core::run` blocks this task forever (RESEARCH Pattern 1).
+    // 7c (SRV-01/SRV-03). Spawn the tray + settings shell thread: it reads
+    // `firewall_status` at `StartCause::Init` to render the warning icon
+    // from the very first frame, drives `pause_tx` (the tray's Pause menu
+    // item), and holds `auth_for_shell`/`revoke_tx` for the on-demand
+    // settings window (07-08) — its Pair-new action calls
+    // `crate::begin_on_demand_pairing(&ctx.auth)` and its revoke button
+    // `crate::revoke_device(&ctx.auth, &ctx.revoke_tx, hash)` (both defined
+    // below; the step-5b subscription persists either mutation). `config` is
+    // the step-2c live settings handle; `clip_sync` the clip thread's live
+    // gate; `resolved_port` display-only (the port field hint + firewall fix
+    // text). MUST run before `server_core::run` blocks this task forever
+    // (RESEARCH Pattern 1).
     let shell_proxy = shell::spawn_shell_thread(ShellCtx {
         conn_count: conn_count.subscribe(),
         pause_tx,
         auth: auth_for_shell,
         revoke_tx,
-        config: (),
-        autostart: (),
+        config: Arc::clone(&settings),
+        clip_sync: clip_sync_for_shell,
+        resolved_port: port,
         firewall_status,
         notify_firewall,
     });

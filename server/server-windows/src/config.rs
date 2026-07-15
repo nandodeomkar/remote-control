@@ -216,6 +216,39 @@ pub fn from_auth(
     }
 }
 
+/// The live, shared copy of the EDITABLE settings (07-08): everything in
+/// [`Config`] except the paired records (those live in the auth store). The
+/// settings window mutates it behind `Arc<Mutex<..>>`; the composition
+/// root's auth-change save task reads it on every re-serialize — so a
+/// pairing/revoke save can never clobber a settings edit with the stale
+/// startup values, and a settings save can never drop a fresh pairing.
+///
+/// Seeded from the STARTUP [`Config`] (never the `RC_PORT` env override —
+/// env must never get baked into the file).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SharedSettings {
+    /// Overrides the `COMPUTERNAME`-derived beacon/device name when set.
+    pub device_name: Option<String>,
+    /// Configured WebSocket port (restart-required — RESEARCH Open Q3).
+    pub port: Option<u16>,
+    /// Launch-at-login toggle (SRV-02) — mirrors the HKCU Run entry.
+    pub autostart: bool,
+    /// Gates the clip thread's PC→phone auto-sync push (RESEARCH Open Q5).
+    pub clipboard_sync: bool,
+}
+
+impl SharedSettings {
+    /// Seed from the config loaded at startup (step 2b of `main`).
+    pub fn from_config(cfg: &Config) -> Self {
+        Self {
+            device_name: cfg.device_name.clone(),
+            port: cfg.port,
+            autostart: cfg.autostart,
+            clipboard_sync: cfg.clipboard_sync,
+        }
+    }
+}
+
 /// Resolved WebSocket port: `RC_PORT` env > `Config::port` > [`DEFAULT_PORT`]
 /// (SPEC precedence). An unparseable/zero env value warns and falls through
 /// — never a panic (T-07-27).
