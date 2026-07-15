@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: Milestone complete
 stopped_at: Completed 07-08-PLAN.md (settings window — last plan of phase 07)
-last_updated: "2026-07-15T07:50:29.194Z"
-last_activity: 2026-07-15
+last_updated: "2026-07-15T13:34:08.734Z"
+last_activity: 2026-07-15 -- Phase 08 planning complete
 progress:
   total_phases: 7
   completed_phases: 7
@@ -36,7 +36,7 @@ Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), 
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-15
+Last activity: 2026-07-15 -- Phase 08 planning complete
 
 Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43 plans)
 
