@@ -197,8 +197,19 @@ pub(super) async fn run_session(
                         // branch and the after-auth snapshot below never
                         // double-fire on the same state.
                         let state = *volume.borrow_and_update();
-                        if tx.send(vol_changed_frame(state)).await.is_err() {
-                            break 'read; // write task gone → session over
+                        // WR-08: try_send, NEVER a blocking await inside a
+                        // select! arm. A blocked send stalls the whole session
+                        // task — the liveness deadline branch included — so an
+                        // alive-but-not-reading client (frozen app, full TCP
+                        // window) could hold input past the CONN-07 10s
+                        // contract. A full queue safely drops this push: watch
+                        // is latest-value-only, so the next change re-delivers
+                        // current state. Receiver gone → write task exited →
+                        // session over.
+                        match tx.try_send(vol_changed_frame(state)) {
+                            Ok(()) => {}
+                            Err(mpsc::error::TrySendError::Full(_)) => {}
+                            Err(mpsc::error::TrySendError::Closed(_)) => break 'read,
                         }
                     }
                     Err(_) => volume_alive = false,
@@ -217,8 +228,12 @@ pub(super) async fn run_session(
                         // Vec<WindowInfo> is not Copy: clone the borrowed
                         // snapshot. borrow_and_update clears the changed flag.
                         let windows = apps.borrow_and_update().clone();
-                        if tx.send(apps_changed_frame(windows)).await.is_err() {
-                            break 'read; // write task gone → session over
+                        // WR-08: non-blocking try_send (see the vol branch) —
+                        // drop on a full queue, the latest-value re-delivers.
+                        match tx.try_send(apps_changed_frame(windows)) {
+                            Ok(()) => {}
+                            Err(mpsc::error::TrySendError::Full(_)) => {}
+                            Err(mpsc::error::TrySendError::Closed(_)) => break 'read,
                         }
                     }
                     Err(_) => apps_alive = false,
@@ -239,8 +254,12 @@ pub(super) async fn run_session(
                         // ClipState owns a String (not Copy): clone the
                         // borrowed snapshot. borrow_and_update clears the flag.
                         let text = clip.borrow_and_update().text.clone();
-                        if tx.send(clip_changed_frame(text)).await.is_err() {
-                            break 'read; // write task gone → session over
+                        // WR-08: non-blocking try_send (see the vol branch) —
+                        // drop on a full queue, the latest-value re-delivers.
+                        match tx.try_send(clip_changed_frame(text)) {
+                            Ok(()) => {}
+                            Err(mpsc::error::TrySendError::Full(_)) => {}
+                            Err(mpsc::error::TrySendError::Closed(_)) => break 'read,
                         }
                     }
                     Err(_) => clip_alive = false,
@@ -280,8 +299,13 @@ pub(super) async fn run_session(
                 match changed {
                     Ok(()) => {
                         let _ = blocked.borrow_and_update();
-                        if tx.send(input_blocked_frame("elevated")).await.is_err() {
-                            break 'read; // write task gone → session over
+                        // WR-08: non-blocking try_send (see the vol branch) —
+                        // a dropped elevated notice re-fires on the next epoch
+                        // advance; blocking here would stall the liveness arm.
+                        match tx.try_send(input_blocked_frame("elevated")) {
+                            Ok(()) => {}
+                            Err(mpsc::error::TrySendError::Full(_)) => {}
+                            Err(mpsc::error::TrySendError::Closed(_)) => break 'read,
                         }
                     }
                     Err(_) => blocked_alive = false,
@@ -322,15 +346,20 @@ pub(super) async fn run_session(
                         );
                         for reply in replies {
                             let frame = Message::text(json::encode_msg(&reply, None));
-                            if tx.send(frame).await.is_err() {
-                                break 'read; // write task gone → session over
+                            // WR-08: non-blocking send. A reply cannot be
+                            // dropped without corrupting protocol state, so a
+                            // full queue (client stopped reading) is treated as
+                            // a dead session — fall through to the CONN-07
+                            // cleanup, keeping the liveness guarantee reachable.
+                            if tx.try_send(frame).is_err() {
+                                break 'read; // queue full (not reading) or gone
                             }
                         }
                         if close_after {
                             // versionMismatch (D-06): err queued above is
                             // written first (mpsc preserves order), then the
                             // close frame, then the session ends.
-                            let _ = tx.send(Message::Close(None)).await;
+                            let _ = tx.try_send(Message::Close(None));
                             break 'read;
                         }
                         // D-03 "right after auth": exactly one vol.changed
@@ -348,7 +377,9 @@ pub(super) async fn run_session(
                                 counted = true;
                             }
                             let state = *volume.borrow_and_update();
-                            if tx.send(vol_changed_frame(state)).await.is_err() {
+                            // WR-08: non-blocking; a full queue here means the
+                            // client isn't reading — treat as a dead session.
+                            if tx.try_send(vol_changed_frame(state)).is_err() {
                                 break 'read;
                             }
                         }
