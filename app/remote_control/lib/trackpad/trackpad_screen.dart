@@ -159,6 +159,13 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
   @override
   void dispose() {
     _changesSub?.cancel();
+    // CR-01: if drag-lock is engaged and the session is still live (the screen
+    // was popped mid-drag), the PC's left button stays held — _driver.dispose()
+    // deliberately sends nothing. Flush the owed drag end here first, on a live
+    // socket only (a dropped session was freed by CONN-07 release_all).
+    if (_driver.dragLocked && _service.isAuthed) {
+      _service.sendReliable(const DragMsg(action: 'end', button: 'left'));
+    }
     _driver.dispose();
     _dragLockPill.dispose();
     _panelExpanded.dispose();

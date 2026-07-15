@@ -164,6 +164,21 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel> {
   @override
   void dispose() {
     _changesSub?.cancel();
+    // CR-01: the session may still be authed (the screen was popped, or the
+    // hosting trackpad screen disposed, mid-hold). Flush every owed release
+    // before going away — otherwise the server holds the input indefinitely
+    // (Windows autorepeats a held key; a locked modifier stays physically
+    // held). On a LIVE socket only: a disconnected session already had its
+    // held input freed by CONN-07 release_all, and sending into a NEW session
+    // would be wrong (mirrors the D-12 zero-effect path). _onKeyUp's remove()
+    // guard keeps this idempotent with each cap's own dispose-time release.
+    if (!widget.isDisconnected()) {
+      for (final code in _heldCodes.toList()) {
+        widget.send(KeyMsg(code: code, action: 'up'));
+      }
+      _sendEffects(_fsm.releaseAll()); // ups for any locked-modifier holds
+    }
+    _heldCodes.clear();
     _imeResetTick.dispose();
     super.dispose();
   }

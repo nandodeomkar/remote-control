@@ -159,6 +159,24 @@ class ModifierFsm {
     return const [];
   }
 
+  /// CR-01: the driver is going away while the session is STILL live (the
+  /// keyboard panel disposed mid-hold — a screen pop with a modifier locked).
+  /// Unlike [disconnected] (dead socket, zero effects), the owed ups MUST
+  /// reach the server here, else a locked modifier stays physically held on
+  /// the PC. Every LOCKED modifier emits its [SendModifierUp]; ARMED/rest are
+  /// client-local (no effect). All state resets to rest.
+  List<ModifierEffect> releaseAll() {
+    final effects = <ModifierEffect>[];
+    for (final mod in Mod.values) {
+      if (_states[mod] == ModifierState.locked) {
+        effects.add(SendModifierUp(kModifierHoldCodes[mod]!));
+      }
+      _states[mod] = ModifierState.rest;
+    }
+    _armedOrder.clear();
+    return effects;
+  }
+
   /// The current state of [mod] (the chips poll this after each event).
   ModifierState stateOf(Mod mod) => _states[mod]!;
 

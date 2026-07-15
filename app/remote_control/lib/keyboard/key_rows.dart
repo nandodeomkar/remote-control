@@ -392,6 +392,19 @@ class _KeyCapState extends State<_KeyCap> {
   }
 
   @override
+  void dispose() {
+    // CR-01: a cap disposed mid-hold — a screen pop with a key held, or a
+    // Nav/Fn/Num group switch that rebuilds KeyRows with different caps while
+    // a key is down — must still release its held key, else the server key
+    // stays down and Windows autorepeats it forever. A deferred press owes a
+    // combo (fired only on a real release), not an up, so it releases nothing.
+    // The panel's _onKeyUp remove() guard makes this idempotent with the
+    // panel-level flush and the D-12 disconnect wipe.
+    if (_live && !_deferred) widget.onKeyUp(widget.def.code);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final active = widget.enabled && _pressed;
     final borderColor = active ? kAccent : kHairline;
