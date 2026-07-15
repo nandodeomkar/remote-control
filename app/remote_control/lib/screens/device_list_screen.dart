@@ -489,7 +489,13 @@ class _ConnectByIpSheetState extends ConsumerState<_ConnectByIpSheet> {
                   flex: 3,
                   child: TextField(
                     controller: _ipCtrl,
-                    keyboardType: TextInputType.number,
+                    // WR-07: plain `number` requests Android's digits-only
+                    // class, and several OEM keyboards (e.g. MIUI default)
+                    // render no '.' key — making "192.168.1.50" untypable and
+                    // the D-03 IP fallback dead on the very devices it rescues.
+                    // decimal:true guarantees the period key.
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
                     style: const TextStyle(color: kText),
                     decoration: const InputDecoration(
                       labelText: kServerIpLabel,
