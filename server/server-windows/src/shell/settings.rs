@@ -86,16 +86,29 @@ impl SettingsWindow {
             .with_stencil_size(0)
             .with_transparency(false);
 
-        let (window, gl_config) = glutin_winit::DisplayBuilder::new()
-            .with_preference(glutin_winit::ApiPreference::FallbackEgl)
-            .with_window_attributes(Some(attrs.clone()))
-            .build(event_loop, template, |mut configs| {
-                // A Windows desktop always exposes at least one GL config;
-                // an empty iterator here means the GPU stack is broken
-                // beyond anything we could recover from.
-                configs.next().expect("no OpenGL config available")
-            })
-            .map_err(|e| anyhow::anyhow!("GL display/config creation failed: {e}"))?;
+        // WR-05: the config-picker closure MUST return a `Config`, so an empty
+        // iterator (a broken/remote GPU stack — RDP, stale drivers, VMs — is
+        // exactly where "no GL config" happens) can only be signalled by
+        // panicking. That panic would unwind through `event_loop.run_app` on
+        // the shell thread and take the tray, Pause, and Quit down with it —
+        // the precise failure this module's own doc contract forbids. Contain
+        // it: catch the unwind and convert it to an `anyhow::Error` so
+        // `open_settings` (shell/mod.rs) logs and continues with the tray alive.
+        let build_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            glutin_winit::DisplayBuilder::new()
+                .with_preference(glutin_winit::ApiPreference::FallbackEgl)
+                .with_window_attributes(Some(attrs.clone()))
+                .build(event_loop, template, |mut configs| {
+                    configs.next().expect("no OpenGL config available")
+                })
+        }));
+        let (window, gl_config) = match build_result {
+            Ok(Ok(pair)) => pair,
+            Ok(Err(e)) => {
+                return Err(anyhow::anyhow!("GL display/config creation failed: {e}"));
+            }
+            Err(_) => return Err(anyhow::anyhow!("no OpenGL config available")),
+        };
 
         // DisplayBuilder MAY create the window while probing configs; if it
         // didn't, finalize it against the chosen config now.
