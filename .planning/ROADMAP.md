@@ -19,7 +19,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 4: Trackpad & Keyboard** - The product-defining screens: full trackpad feel checklist and IME-correct typing with special-key rows, sticky modifiers, and autorepeat (completed 2026-07-10 — verification passed; on-device UAT incl. WiFi-kill liveness + slow-PIN pairing re-checks)
 - [x] **Phase 5: Media, Power, Presenter & Browser** - The everyday control-center extras: media/absolute volume, double-confirmed power actions, slide driving with timer, browser macros (completed 2026-07-11)
 - [x] **Phase 6: Apps & Clipboard** - Window/app management with live server push, and bidirectional clipboard with history and loop-safe auto-sync (completed 2026-07-12)
-- [ ] **Phase 7: Server Shell, Dashboard & Polish** - Tray shell with settings/autostart/revoke, firewall and UIPI status surfacing, dashboard identity and final app polish
+- [x] **Phase 7: Server Shell, Dashboard & Polish** - Tray shell with settings/autostart/revoke, firewall and UIPI status surfacing, dashboard identity and final app polish (completed 2026-07-15)
 
 ## Phase Details
 
@@ -268,7 +268,7 @@ Plans:
 
 **Wave 5**
 
-- [ ] 07-08-PLAN.md — egui settings window + tray Settings/Pair-new (SRV-03/02/04)
+- [x] 07-08-PLAN.md — egui settings window + tray Settings/Pair-new (SRV-03/02/04)
 
 ## Progress
 
@@ -283,4 +283,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 4. Trackpad & Keyboard | 10/10 | Complete   | 2026-07-10 |
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
 | 6. Apps & Clipboard | 7/7 | Complete    | 2026-07-12 |
-| 7. Server Shell, Dashboard & Polish | 12/13 | In Progress|  |
+| 7. Server Shell, Dashboard & Polish | 13/13 | Complete   | 2026-07-15 |
