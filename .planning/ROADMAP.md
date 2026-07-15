@@ -298,7 +298,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
   4. Bubble `(edge, yFraction)` and window `(x, y)` positions persist independently across app restarts (default bubble: right edge, 70% down)
   5. Collapsing the window or leaving the screen while drag-locked flushes `DragMsg(end)` on a live authed socket (CR-01), keepAwake is acquired on expand / released on collapse without dropping Presenter's hold, and no stuck mouse button remains behind a collapsed bubble
 
-**Plans:** 3/6 plans executed
+**Plans:** 4/6 plans executed
 
 Plans:
 **Wave 1**
@@ -309,7 +309,7 @@ Plans:
 **Wave 2** *(after Wave 1)*
 
 - [x] 08-03-PLAN.md — `TrackpadBubble`: draggable minimized bubble + nearest-edge snap + muted gate (D8-02, SC3) [after 08-01]
-- [ ] 08-04-PLAN.md — `FloatingTrackpadWindow`: header-drag card mounting `TrackpadCore` + `MouseButtonsBar` + A2 layout guard (D8-03/04, SC2/SC3) [after 08-01/08-02]
+- [x] 08-04-PLAN.md — `FloatingTrackpadWindow`: header-drag card mounting `TrackpadCore` + `MouseButtonsBar` + A2 layout guard (D8-03/04, SC2/SC3) [after 08-01/08-02]
 
 **Wave 3** *(after Wave 2)*
 

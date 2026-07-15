@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 08-03-PLAN.md (TrackpadBubble draggable minimized bubble)
-last_updated: "2026-07-15T14:23:38.083Z"
+stopped_at: Completed 08-04-PLAN.md (FloatingTrackpadWindow expanded card)
+last_updated: "2026-07-15T14:35:31.638Z"
 last_activity: 2026-07-15 -- Phase 08 execution started
 progress:
   total_phases: 8
   completed_phases: 7
   total_plans: 62
-  completed_plans: 59
+  completed_plans: 60
   percent: 88
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 08 (floating-trackpad-bubble-replace-quick-bar-with-draggable-bu) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
@@ -117,6 +117,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 08 P01 | 9min | 2 tasks | 4 files |
 | Phase 08 P02 | 22min | 3 tasks | 5 files |
 | Phase 08 P03 | ~12min | 2 tasks | 2 files |
+| Phase 08 P04 | ~10min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -265,6 +266,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 08-02]: TrackpadCore extracted as the shared zero-setState hot-path engine; the full screen and the 08-04 window mount the SAME core so cursor parity holds by construction
 - [Phase ?]: [Phase 08-02]: drag-lock surfaced via a parent-owned ValueNotifier injected into TrackpadCore and re-exposed as ValueListenable<bool> dragLocked (D8-04 injected-notifier discretion); TrackpadScreen keeps its _service read for chrome only
 - [Phase 08]: 08-03: TrackpadBubble is a full-bleed Stack with the 56dp circle in a Positioned child; drag/tap gestures target the circle (not the widget center) and commit yFraction from the release top-left dy (matching the store clamp), snapping to the nearest edge via a 200ms easeOut controller that commits on completion
+- [Phase 08]: 08-04: FloatingTrackpadWindow is a self-positioning single Positioned card — header-only drag (⠿ handle GestureDetector, a disjoint SIBLING of the TrackpadCore Listener) clamps offset to [0, screen−card] and commits clamped [0,1] fractions to windowPositionProvider; surface touches stay pure mouse input (Pitfall 2, T-08-06/SC3)
+- [Phase 08]: 08-04: the window owns its drag-lock ValueNotifier (fed to TrackpadCore, read by the inline header pill) unless a test injects one; keepAwake is a forwarded-only seam since TrackpadCore is the sole hold owner (Pitfall 4); first-open anchors from initialTopLeft (bubble spot) else screen-center
 
 ### Pending Todos
 
@@ -298,6 +301,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-15T14:23:30.334Z
-Stopped at: Completed 08-03-PLAN.md (TrackpadBubble draggable minimized bubble)
+Last session: 2026-07-15T14:35:31.619Z
+Stopped at: Completed 08-04-PLAN.md (FloatingTrackpadWindow expanded card)
 Resume file: None
