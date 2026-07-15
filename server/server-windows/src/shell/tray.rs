@@ -1,5 +1,5 @@
-//! Tray icon (SRV-01): `TrayIcon` + a `muda` menu (Pause, Quit — Settings /
-//! Pair-new are added in 07-08) plus three RGBA icon states.
+//! Tray icon (SRV-01/SRV-03): `TrayIcon` + a `muda` menu (Settings, Pair new
+//! device, Pause, Quit) plus three RGBA icon states.
 //!
 //! **TaskbarCreated re-registration (RESEARCH Pitfall 1 / A1 — CONFIRMED):**
 //! `tray-icon` 0.24 handles `TaskbarCreated` internally — its Win32
@@ -35,10 +35,12 @@ pub enum TrayState {
 /// scales it for the notification-area DPI).
 const TRAY_ICON_SIZE: u32 = 32;
 
-/// The tray icon + its two-item menu. Built once on `StartCause::Init`
+/// The tray icon + its menu. Built once on `StartCause::Init`
 /// (RESEARCH Pitfall 3 — never at thread-spawn time).
 pub struct Tray {
     icon: TrayIcon,
+    settings_id: MenuId,
+    pair_id: MenuId,
     pause_id: MenuId,
     quit_id: MenuId,
 }
@@ -48,12 +50,23 @@ impl Tray {
     /// loop (RESEARCH Pitfall 2/3) — in practice, from
     /// `ApplicationHandler::new_events` on `StartCause::Init`.
     pub fn new() -> tray_icon::Result<Self> {
+        // Settings opens the on-demand egui window (07-08); Pair-new opens a
+        // fresh 60s PIN window WITHOUT opening settings — D-02 requires the
+        // action in BOTH places.
+        let settings_item = MenuItem::new("Settings…", true, None);
+        let pair_item = MenuItem::new("Pair new device", true, None);
         let pause_item = MenuItem::new("Pause input", true, None);
         let quit_item = MenuItem::new("Quit", true, None);
+        let settings_id = settings_item.id().clone();
+        let pair_id = pair_item.id().clone();
         let pause_id = pause_item.id().clone();
         let quit_id = quit_item.id().clone();
 
         let menu = Menu::new();
+        menu.append(&settings_item).map_err(menu_err)?;
+        menu.append(&pair_item).map_err(menu_err)?;
+        menu.append(&PredefinedMenuItem::separator())
+            .map_err(menu_err)?;
         menu.append(&pause_item).map_err(menu_err)?;
         menu.append(&PredefinedMenuItem::separator())
             .map_err(menu_err)?;
@@ -67,6 +80,8 @@ impl Tray {
 
         Ok(Self {
             icon,
+            settings_id,
+            pair_id,
             pause_id,
             quit_id,
         })
@@ -85,6 +100,18 @@ impl Tray {
     /// [`Tray::set_tooltip`].
     pub fn set_state(&self, state: TrayState) {
         let _ = self.icon.set_icon(Some(icon_for(state)));
+    }
+
+    /// The Settings menu item's id — opens the on-demand egui settings
+    /// window (routed through `UserEvent::OpenSettings`).
+    pub fn settings_id(&self) -> &MenuId {
+        &self.settings_id
+    }
+
+    /// The Pair-new menu item's id — on-demand pairing straight from the
+    /// tray, no settings window needed (D-02).
+    pub fn pair_id(&self) -> &MenuId {
+        &self.pair_id
     }
 
     /// The Pause menu item's id, compared against incoming `MenuEvent`s.

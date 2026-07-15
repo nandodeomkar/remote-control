@@ -47,9 +47,6 @@ pub enum UserEvent {
     /// Open (or focus) the on-demand egui settings window (SRV-03). Sent by
     /// the tray's Settings menu item; any future caller (e.g. a tray
     /// left-click) can push the same event through the proxy.
-    // Constructed by the 07-08 Task-2 tray menu item; the handler below is
-    // already live (scoped-allow removed when the sender lands).
-    #[allow(dead_code)]
     OpenSettings,
     /// egui requested a repaint in `delay` (its request-repaint callback —
     /// zero = now, non-zero = cursor-blink/animation schedule). Riding the
@@ -77,8 +74,6 @@ pub struct ShellCtx {
     /// D-05 revocation epoch sender — the settings Revoke button advances it
     /// (via `crate::revoke_device`) so the 07-05 session branch drops the
     /// revoked phone's live connection.
-    // Driven by the 07-08 Task-2 paired-device list; scoped-allow until then.
-    #[allow(dead_code)]
     pub revoke_tx: watch::Sender<u64>,
     /// The shared editable settings (device name/port/autostart/clip-sync).
     /// The settings window mutates it; the composition root's auth-change
@@ -100,8 +95,6 @@ pub struct ShellCtx {
     /// banner: `true` whenever `firewall_status` is anything other than
     /// `Allowed` (a `BlockedNoRule` warning OR an inconclusive `Unknown`
     /// read both merit the hint — only a confirmed `Allowed` suppresses it).
-    // Read by the 07-08 Task-2 firewall hint; scoped-allow until it lands.
-    #[allow(dead_code)]
     pub notify_firewall: bool,
 }
 
@@ -261,7 +254,16 @@ impl ApplicationHandler<UserEvent> for ShellApp {
             }
             UserEvent::Menu(menu_event) => {
                 let Some(tray) = &self.tray else { return };
-                if *menu_event.id() == *tray.pause_id() {
+                if *menu_event.id() == *tray.settings_id() {
+                    // Route through OpenSettings (not a direct call) so the
+                    // tray item and any future opener share one entry point.
+                    let _ = self.proxy.send_event(UserEvent::OpenSettings);
+                } else if *menu_event.id() == *tray.pair_id() {
+                    // D-02: on-demand pairing straight from the tray —
+                    // AuthManager::begin_pairing + notify_pin via the
+                    // ShellCtx auth Arc, no settings window needed.
+                    crate::begin_on_demand_pairing(&self.ctx.auth);
+                } else if *menu_event.id() == *tray.pause_id() {
                     self.paused = !self.paused;
                     // Send-and-forget: a closed receiver means the process
                     // is already tearing down, not an error to recover from.

@@ -41,11 +41,13 @@ use winit::raw_window_handle::HasWindowHandle as _;
 use winit::window::{Window, WindowId};
 
 use super::{ShellCtx, UserEvent};
+use crate::firewall::FirewallStatus;
 use crate::{autostart, config};
 
 /// D-12 locked palette (same tokens as the tray icons / Flutter app).
 const ACCENT_BLUE: egui::Color32 = egui::Color32::from_rgb(0x4C, 0x8D, 0xFF);
 const ERROR_RED: egui::Color32 = egui::Color32::from_rgb(0xFF, 0x6B, 0x6B);
+const MUTED_GRAY: egui::Color32 = egui::Color32::from_rgb(0x6B, 0x72, 0x80);
 /// Window clear color — the app's #0E0F12 dark background.
 const BG_CLEAR: (f32, f32, f32) = (0.055, 0.059, 0.071);
 
@@ -284,9 +286,45 @@ impl UiState {
                         ui.heading("Settings");
                         ui.add_space(10.0);
 
+                        self.render_firewall_hint(ctx, ui);
                         self.render_general(ctx, ui);
+                        self.render_paired_devices(ctx, ui);
                     });
             });
+    }
+
+    /// SRV-04 / D-06: the PERSISTENT firewall hint — rendered every frame
+    /// the window is open, whenever the startup self-test could not confirm
+    /// inbound is allowed. Read-only status; the text carries no secret
+    /// (T-07-34).
+    fn render_firewall_hint(&mut self, ctx: &ShellCtx, ui: &mut egui::Ui) {
+        if !ctx.notify_firewall {
+            return;
+        }
+        let port = ctx.resolved_port;
+        match ctx.firewall_status {
+            FirewallStatus::BlockedNoRule => {
+                ui.colored_label(
+                    ERROR_RED,
+                    format!(
+                        "Windows Firewall is blocking inbound TCP {port} — your phone \
+                         can't connect. Fix: Windows Security → Firewall & network \
+                         protection → Allow an app through firewall → add Remote Control."
+                    ),
+                );
+            }
+            _ => {
+                ui.colored_label(
+                    MUTED_GRAY,
+                    format!(
+                        "Couldn't confirm Windows Firewall allows inbound TCP {port}. \
+                         If your phone can't connect, allow Remote Control through the \
+                         firewall."
+                    ),
+                );
+            }
+        }
+        ui.add_space(10.0);
     }
 
     /// Device name / port / clipboard-sync / autostart (SRV-03 + SRV-02).
@@ -372,6 +410,58 @@ impl UiState {
         }
     }
 
+    /// D-04/D-05/D-02: the paired-device list with per-row Revoke + the
+    /// on-demand "Pair new device" action. Names render ONLY here — the
+    /// local operator's screen; the tray tooltip stays count-only (T-07-33).
+    fn render_paired_devices(&mut self, ctx: &ShellCtx, ui: &mut egui::Ui) {
+        ui.add_space(12.0);
+        ui.separator();
+        ui.add_space(6.0);
+        ui.heading("Paired devices");
+        ui.add_space(6.0);
+
+        // Clone the records so the auth lock is NOT held while rendering —
+        // revoke_device below re-takes it.
+        let records = ctx
+            .auth
+            .lock()
+            .expect("auth mutex poisoned rendering the paired list")
+            .paired_records()
+            .to_vec();
+
+        if records.is_empty() {
+            ui.weak("No phones paired yet.");
+        }
+        for device in &records {
+            ui.horizontal(|ui| {
+                ui.label(&device.name);
+                ui.weak(paired_ago(device.paired_at));
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Revoke").clicked() {
+                        // D-05 (T-07-31): crate::revoke_device =
+                        // AuthManager::revoke via the ShellCtx auth Arc
+                        // (drops the stored hash + bumps auth.changes() →
+                        // the 07-07 config re-save) AND revoke_tx.send_modify
+                        // (advances the revocation epoch → the 07-05 select!
+                        // branch force-disconnects the live session; the
+                        // phone re-pairs with kRevokedExplanation).
+                        crate::revoke_device(&ctx.auth, &ctx.revoke_tx, &device.hash);
+                    }
+                });
+            });
+        }
+
+        ui.add_space(8.0);
+        if ui.button("Pair new device").clicked() {
+            // D-02 on demand: crate::begin_on_demand_pairing =
+            // AuthManager::begin_pairing via the ShellCtx auth Arc (a fresh
+            // 60s PIN window — works with devices already paired, D-04
+            // multi-phone) + notify::notify_pin (toast + console, never
+            // tracing).
+            crate::begin_on_demand_pairing(&ctx.auth);
+        }
+    }
+
     /// Commit the device-name buffer to the shared settings + config file
     /// (empty/whitespace = clear the override, back to `COMPUTERNAME`).
     fn commit_device_name(&mut self, ctx: &ShellCtx) {
@@ -424,6 +514,19 @@ fn parse_port(text: &str) -> Option<u16> {
     text.parse::<u16>().ok().filter(|p| *p != 0)
 }
 
+/// Human "paired N days ago" for the device list (D-04).
+fn paired_ago(paired_at: u64) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    match now.saturating_sub(paired_at) / 86_400 {
+        0 => "paired today".to_owned(),
+        1 => "paired yesterday".to_owned(),
+        n => format!("paired {n} days ago"),
+    }
+}
+
 /// Serialize the CURRENT shared settings + live auth records to config.toml
 /// — the settings window's write path through the 07-07 config module. The
 /// paired records come from the auth store (single source of truth), so a
@@ -446,7 +549,7 @@ fn persist(ctx: &ShellCtx) {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_port;
+    use super::{paired_ago, parse_port};
 
     /// The settings-side port validation: numeric, in-range, never 0.
     #[test]
@@ -459,5 +562,19 @@ mod tests {
         assert_eq!(parse_port("-1"), None);
         assert_eq!(parse_port("abc"), None);
         assert_eq!(parse_port(""), None);
+    }
+
+    /// Human paired-at formatting for the device list.
+    #[test]
+    fn settings_paired_ago_is_humane() {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        assert_eq!(paired_ago(now), "paired today");
+        assert_eq!(paired_ago(now - 90_000), "paired yesterday");
+        assert_eq!(paired_ago(now - 86_400 * 12), "paired 12 days ago");
+        // A future timestamp (clock skew) saturates to "today", never panics.
+        assert_eq!(paired_ago(now + 86_400), "paired today");
     }
 }

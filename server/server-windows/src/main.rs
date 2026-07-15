@@ -410,11 +410,8 @@ fn smart_startup_pin(auth: &mut AuthManager) -> Option<String> {
 /// On-demand pairing trigger (D-02): opens a fresh 60s PIN window ANY time —
 /// including when devices are already paired (multi-device, SRV-03) — and
 /// shows the PIN via the standard notify path (toast + console, never
-/// tracing). The tray/settings shell's "Pair new device" action (07-08)
-/// calls this through the `auth` Arc its `ShellCtx` already holds.
-// Unwired until 07-08's shell menu item lands (same scoped-allow precedent
-// as autostart.rs / notify_firewall_warning in 07-03).
-#[allow(dead_code)]
+/// tracing). The tray's "Pair new device" item and the settings window's
+/// button (07-08) both call this through the `auth` Arc `ShellCtx` holds.
 pub fn begin_on_demand_pairing(auth: &Arc<Mutex<AuthManager>>) -> String {
     let pin = auth
         .lock()
@@ -429,10 +426,9 @@ pub fn begin_on_demand_pairing(auth: &Arc<Mutex<AuthManager>>) -> String {
 /// `select!` branch (07-05) force-disconnects it. The auth store's own
 /// change-signal bump (inside `revoke`) independently triggers the step-5b
 /// config save — persistence and disconnect ride separate seams on purpose.
-/// Returns whether anything was removed. 07-08's settings window drives this
-/// via the `auth`/`revoke_tx` handles its `ShellCtx` already holds.
-// Unwired until 07-08's settings window lands (scoped-allow precedent above).
-#[allow(dead_code)]
+/// Returns whether anything was removed. The settings window's per-row
+/// Revoke button (07-08) drives this via the `auth`/`revoke_tx` handles its
+/// `ShellCtx` holds.
 pub fn revoke_device(
     auth: &Arc<Mutex<AuthManager>>,
     revoke_tx: &tokio::sync::watch::Sender<u64>,
