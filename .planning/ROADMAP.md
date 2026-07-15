@@ -298,7 +298,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
   4. Bubble `(edge, yFraction)` and window `(x, y)` positions persist independently across app restarts (default bubble: right edge, 70% down)
   5. Collapsing the window or leaving the screen while drag-locked flushes `DragMsg(end)` on a live authed socket (CR-01), keepAwake is acquired on expand / released on collapse without dropping Presenter's hold, and no stuck mouse button remains behind a collapsed bubble
 
-**Plans:** 4/6 plans executed
+**Plans:** 5/6 plans executed
 
 Plans:
 **Wave 1**
@@ -313,7 +313,7 @@ Plans:
 
 **Wave 3** *(after Wave 2)*
 
-- [ ] 08-05-PLAN.md — `BubbleScaffold`: Stack overlay (body + verbatim UIPI banner + expand-gated bubble/window) + `PopScope` collapse-first (D8-01/05/07/08, SC1) [after 08-03/08-04]
+- [x] 08-05-PLAN.md — `BubbleScaffold`: Stack overlay (body + verbatim UIPI banner + expand-gated bubble/window) + `PopScope` collapse-first (D8-01/05/07/08, SC1) [after 08-03/08-04]
 
 **Wave 4** *(after Wave 3)*
 
