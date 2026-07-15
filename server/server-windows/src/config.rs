@@ -160,8 +160,24 @@ pub fn save(cfg: &Config) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if let Err(e) = std::fs::write(&path, text) {
-        tracing::warn!(error = %e, "config.toml write failed");
+    // WR-04: write to a sibling temp file then atomically rename it over the
+    // target. `std::fs::write` truncates-then-writes in place, so any
+    // interruption mid-write (power loss, crash, a Quit that kills an in-flight
+    // save) can leave a truncated/partial config. The load path is fail-safe —
+    // a corrupt file parses to `Config::default()` (zero paired devices) — so a
+    // single torn write would SILENTLY revoke every phone. Writing to a temp
+    // and renaming means a crash can only ever damage the temp file, and
+    // rename replaces the destination atomically on the same volume (Windows
+    // MoveFileEx REPLACE_EXISTING): any reader or racing writer sees either the
+    // whole old file or the whole new one, never a truncated mix.
+    let tmp = path.with_extension("toml.tmp");
+    if let Err(e) = std::fs::write(&tmp, &text) {
+        tracing::warn!(error = %e, "config.toml temp write failed; skipping save");
+        return;
+    }
+    if let Err(e) = std::fs::rename(&tmp, &path) {
+        tracing::warn!(error = %e, "config.toml atomic rename failed");
+        let _ = std::fs::remove_file(&tmp); // don't leave a stale temp behind
     }
 }
 
