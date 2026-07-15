@@ -77,7 +77,7 @@ void main() {
       var tapped = false;
       await sizedPump(t, _host(onTap: () => tapped = true, authed: true));
 
-      await t.tap(_circle);
+      await t.tap(find.byIcon(Icons.touch_app));
       await t.pump();
 
       expect(tapped, isTrue);
@@ -88,7 +88,7 @@ void main() {
       var tapped = false;
       await sizedPump(t, _host(onTap: () => tapped = true, authed: false));
 
-      await t.tap(_circle);
+      await t.tap(find.byIcon(Icons.touch_app));
       await t.pump();
 
       expect(tapped, isTrue);
@@ -123,7 +123,7 @@ void main() {
 
       // Drag from the bubble's rest center (right edge) to a left-half release
       // center at (60, 588) → top-left (32, 560) → yFraction 560/800 = 0.70.
-      final start = t.getCenter(_circle);
+      final start = t.getCenter(find.byIcon(Icons.touch_app));
       final g = await t.startGesture(start);
       await g.moveBy(const Offset(0, 20)); // cross touch-slop
       await g.moveTo(const Offset(60, 588));
@@ -143,7 +143,7 @@ void main() {
 
       // Release center at (340, 668) → top-left (312, 640) → yFraction 0.80,
       // center x 340 > 200 → right edge.
-      final start = t.getCenter(_circle);
+      final start = t.getCenter(find.byIcon(Icons.touch_app));
       final g = await t.startGesture(start);
       await g.moveBy(const Offset(0, 20)); // cross touch-slop
       await g.moveTo(const Offset(340, 668));
