@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Milestone complete
+status: Ready to execute
 stopped_at: Completed 07-08-PLAN.md (settings window — last plan of phase 07)
-last_updated: "2026-07-15T13:34:08.734Z"
-last_activity: 2026-07-15 -- Phase 08 planning complete
+last_updated: "2026-07-15T13:51:54.551Z"
+last_activity: 2026-07-15 -- Phase 08 execution started
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 7
-  total_plans: 56
-  completed_plans: 56
-  percent: 100
+  total_plans: 62
+  completed_plans: 57
+  percent: 88
 ---
 
 # Project State
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 07 — server-shell-dashboard-polish
+**Current focus:** Phase 08 — floating-trackpad-bubble-replace-quick-bar-with-draggable-bu
 
 ## Current Position
 
-Phase: 07
-Plan: Not started
+Phase: 08 (floating-trackpad-bubble-replace-quick-bar-with-draggable-bu) — EXECUTING
+Plan: 2 of 6
 Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
@@ -36,7 +36,7 @@ Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), 
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-15 -- Phase 08 planning complete
+Last activity: 2026-07-15 -- Phase 08 execution started
 
 Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43 plans)
 
@@ -114,6 +114,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 07 P07 | ~15min | 2 tasks | 6 files |
 | Phase 07 P13 | ~20min | 2 tasks | 8 files |
 | Phase 07 P08 | ~55min | 2 tasks | 7 files |
+| Phase 08 P01 | 9min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -258,6 +259,7 @@ Recent decisions affecting current work:
 - [Phase 07]: 07-08: egui-on-winit via EguiGlow + glutin 0.32/glutin-winit 0.5 — eframe cannot share the tray loop (Pitfall 4)
 - [Phase 07]: 07-08: SharedSettings live handle — settings edits and pairing/revoke config saves share one source of truth (no clobbering)
 - [Phase 07]: 07-08: device-name change also restart-to-apply (beacon identity binds once at startup, same as port — Open Q3)
+- [Phase ?]: [Phase 08-01]: bubble/window positions each serialize as a single JSON string, degrade corrupt/unknown reads to their default (bubble right/70%, window unset sentinel), and clamp fractions to [0,1] on read+write (T-08-01 off-screen guard); window uses a bool isSet sentinel via .at/.unset const ctors, independent of the bubble key (SC4)
 
 ### Pending Todos
 
@@ -291,6 +293,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-15T02:18:56.889Z
+Last session: 2026-07-15T13:51:22.065Z
 Stopped at: Completed 07-08-PLAN.md (settings window — last plan of phase 07)
 Resume file: None
