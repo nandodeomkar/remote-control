@@ -371,7 +371,20 @@ fn maybe_check_uipi(
 /// ([`UIPI_CHECK_INTERVAL`]) and by transition (only a false→true edge
 /// advances the epoch).
 pub fn run_input_thread(rx: std::sync::mpsc::Receiver<Cmd>, blocked_tx: tokio::sync::watch::Sender<u64>) {
-    let mut enigo = Enigo::new(&Settings::default()).expect("enigo init on input thread");
+    // WR-06: this runs on a spawned std::thread, so an `expect` panic here does
+    // NOT crash the process and is never observed by `main` — the tray shows
+    // Normal, the phone pairs and shows Connected, yet every Cmd lands in a
+    // dead channel and nothing moves. Degrade instead of panicking (matching
+    // the clip/firewall/autostart threads): log, drain the channel so senders
+    // never block on a full queue, and return with input injection disabled.
+    let mut enigo = match Enigo::new(&Settings::default()) {
+        Ok(e) => e,
+        Err(e) => {
+            tracing::error!(error = %e, "enigo init failed; input injection disabled");
+            while rx.recv().is_ok() {}
+            return;
+        }
+    };
     let mut move_acc = SubPixelAccumulator::new();
     let mut scroll_acc = SubPixelAccumulator::new();
     let mut uipi_last_check = std::time::Instant::now() - UIPI_CHECK_INTERVAL;
