@@ -287,11 +287,33 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 
 ### Phase 8: Floating trackpad bubble — replace quick-bar with draggable bubble + floating trackpad window (spec: docs/superpowers/specs/2026-07-15-trackpad-bubble-design.md)
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal**: On every tool screen (Keyboard, Media, Apps, Clipboard, Power, Presenter, Browser) the persistent 56px trackpad quick-bar is replaced by a draggable bubble that expands into a floating, draggable trackpad window — so the user mouses the laptop cursor without leaving the tool screen. The trackpad hot-path is extracted into a reusable `TrackpadCore` shared by the full Trackpad screen and the new window with byte-for-byte behavior parity; bubble and window positions persist across restarts; the quick-bar is deleted outright.
+**Requirements**: TBD (extends shipped PAD-01..05)
 **Depends on:** Phase 7
-**Plans:** 0 plans
+**Success Criteria** (what must be TRUE):
+
+  1. The `QuickBarScaffold`/`_TrackpadQuickBar` (56px reserved slot) is gone; every tool screen is wrapped by `BubbleScaffold` and gains the full height back, while the hub and the full Trackpad screen show no bubble
+  2. Tapping the bubble expands a floating trackpad window (gesture surface + L/R buttons + open-full shortcut) whose cursor input is behavior-identical to the full Trackpad screen (same `TrackpadCore`, zero-setState hot path); existing trackpad primitive tests still pass
+  3. The bubble is draggable and snaps to the nearest left/right edge; the window is draggable by its header only (surface touches stay pure mouse input) and is always clamped fully on-screen
+  4. Bubble `(edge, yFraction)` and window `(x, y)` positions persist independently across app restarts (default bubble: right edge, 70% down)
+  5. Collapsing the window or leaving the screen while drag-locked flushes `DragMsg(end)` on a live authed socket (CR-01), keepAwake is acquired on expand / released on collapse without dropping Presenter's hold, and no stuck mouse button remains behind a collapsed bubble
+**Plans:** 6 plans (4 waves)
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 8 to break down)
+- [ ] 08-01-PLAN.md — Dual position persistence: bubble `(edge, yFraction)` + window `(x, y)` stores/notifiers (D8-02/03, SC4)
+- [ ] 08-02-PLAN.md — `TrackpadCore` extraction (safety net + core + thin `TrackpadScreen`) — behavior-neutral hot-path engine (D8-04/07, SC2/SC5)
+
+**Wave 2** *(after Wave 1)*
+
+- [ ] 08-03-PLAN.md — `TrackpadBubble`: draggable minimized bubble + nearest-edge snap + muted gate (D8-02, SC3) [after 08-01]
+- [ ] 08-04-PLAN.md — `FloatingTrackpadWindow`: header-drag card mounting `TrackpadCore` + `MouseButtonsBar` + A2 layout guard (D8-03/04, SC2/SC3) [after 08-01/08-02]
+
+**Wave 3** *(after Wave 2)*
+
+- [ ] 08-05-PLAN.md — `BubbleScaffold`: Stack overlay (body + verbatim UIPI banner + expand-gated bubble/window) + `PopScope` collapse-first (D8-01/05/07/08, SC1) [after 08-03/08-04]
+
+**Wave 4** *(after Wave 3)*
+
+- [ ] 08-06-PLAN.md — Central migration to `BubbleScaffold` + quick-bar deleted outright + on-device UAT gate (D8-05/06, SC1/SC5) [after 08-05]
