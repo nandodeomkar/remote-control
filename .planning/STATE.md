@@ -117,6 +117,10 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 8 added: Floating trackpad bubble — replace quick-bar with draggable bubble + floating trackpad window (spec: docs/superpowers/specs/2026-07-15-trackpad-bubble-design.md)
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.

@@ -284,3 +284,14 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
 | 6. Apps & Clipboard | 7/7 | Complete    | 2026-07-12 |
 | 7. Server Shell, Dashboard & Polish | 13/13 | Complete    | 2026-07-15 |
+
+### Phase 8: Floating trackpad bubble — replace quick-bar with draggable bubble + floating trackpad window (spec: docs/superpowers/specs/2026-07-15-trackpad-bubble-design.md)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 7
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 8 to break down)
