@@ -277,6 +277,14 @@ class ConnectionService {
   /// of backoff cannot let a stale timer fire a premature redial (WR-01).
   int _backoffGen = 0;
 
+  /// Dial generation: distinguishes dial EPISODES, not merely FSM state
+  /// (WR-02). Bumped at the top of every [_dial]; a dial whose `_connect`
+  /// await resolves AFTER a newer dial started sees a mismatch and bails
+  /// (closing its own socket) instead of installing a channel + HandshakeDriver
+  /// bound to a superseded target. The bare `_fsm.state == connecting` check
+  /// cannot catch this — two overlapping dials are both in `connecting`.
+  int _dialGen = 0;
+
   final StreamController<void> _changes = StreamController<void>.broadcast();
 
   /// Creates the service.
@@ -486,6 +494,7 @@ class ConnectionService {
   }
 
   Future<void> _dial(DeviceTarget target) async {
+    final gen = ++_dialGen; // WR-02: this dial episode; supersedes older dials
     _backoffGen++; // a dial supersedes any pending backoff timer (WR-01)
     _teardownChannel(); // a fresh dial never rides an old socket (idempotent)
 
@@ -517,8 +526,11 @@ class ConnectionService {
       return;
     }
 
-    if (_fsm.state != ReconnectState.connecting) {
-      // The world moved on during the await (e.g. disconnect) — stale dial.
+    if (gen != _dialGen || _fsm.state != ReconnectState.connecting) {
+      // A newer dial episode started (WR-02), or the world moved on during the
+      // await (e.g. disconnect) — stale dial: close our socket and bail rather
+      // than install a channel/driver bound to a superseded target or leak the
+      // subscription by overwriting _channel/_sub.
       unawaited(channel.sink.close());
       return;
     }
