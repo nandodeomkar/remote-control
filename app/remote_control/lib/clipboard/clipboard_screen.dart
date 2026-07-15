@@ -70,6 +70,11 @@ class _ClipboardScreenState extends ConsumerState<ClipboardScreen> {
     // Fetch-reply ping it consumes the reply before our listener runs and we
     // see the fresh lastFetchEvent on the same ping.
     ref.read(clipStateProvider.notifier);
+    // WR-01: seed the "already seen" marker from whatever fetch event is
+    // parked at mount time WITHOUT surfacing it — the first post-mount
+    // `changes` ping must not re-toast a fetch outcome ("Copied to phone.")
+    // from a previous visit minutes ago. Mirrors the UipiBanner pattern.
+    _shownFetch = ref.read(clipStateProvider.notifier).lastFetchEvent;
     _sub = _service.changes.listen((_) => _maybeShowFetch());
     // phone→PC on foreground only (Android 10+ blocks background reads, D-08).
     _lifecycle = AppLifecycleListener(

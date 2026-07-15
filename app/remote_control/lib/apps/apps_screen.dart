@@ -58,6 +58,11 @@ class _AppsScreenState extends ConsumerState<AppsScreen> {
   void initState() {
     super.initState();
     _service = ref.read(connectionServiceProvider);
+    // WR-01: seed the "already seen" marker from whatever err is parked at
+    // mount time WITHOUT surfacing it — the first post-mount `changes` ping
+    // (primeList's apps.list reply lands within moments) must not re-toast a
+    // stale error left from a previous visit. Mirrors the UipiBanner pattern.
+    _shownError = _service.lastError;
     // Surface server err frames as toasts off the raw changes stream (the
     // AppsViewState is value-equal and would not rebuild on an err park).
     _sub = _service.changes.listen((_) => _maybeShowError());
