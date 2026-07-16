@@ -215,6 +215,67 @@ List<KeyCapDef> capsForGroup(KeyRowGroup group) => switch (group) {
       KeyRowGroup.num => kNumCaps,
     };
 
+// ── Pad cap definitions (10-03 — the full-screen keyboard's four pads) ─────
+//
+// The pads are a SEPARATE surface from the D-07 trackpad-docked panel's row
+// groups above: these tables + [capsForPad] + [KeyboardPad] serve the
+// full-screen swipeable keyboard (10-04/10-05). The group tables/switcher/
+// store above stay owned by the docked panel and are untouched.
+
+/// The Type pad's slim extras row (UI-SPEC §Pad layouts — Type pad):
+/// `Esc | Tab | ← | ↑ | ↓ | → | Del`, docked under the IME canvas.
+///
+/// Reuses the [kNavClusterCaps] / [kNavArrowCaps] codes and faces — the
+/// arrows carry their icon + tooltip.
+const List<KeyCapDef> kTypeExtrasCaps = [
+  KeyCapDef('Esc', label: 'Esc'),
+  KeyCapDef('Tab', label: 'Tab'),
+  KeyCapDef('Left', icon: Symbols.arrow_back_rounded, tooltip: 'Left'),
+  KeyCapDef('Up', icon: Symbols.arrow_upward_rounded, tooltip: 'Up'),
+  KeyCapDef('Down', icon: Symbols.arrow_downward_rounded, tooltip: 'Down'),
+  KeyCapDef('Right', icon: Symbols.arrow_forward_rounded, tooltip: 'Right'),
+  KeyCapDef('Del', label: 'Del'),
+];
+
+/// The Arrows pad's top row (UI-SPEC §Pad layouts — Arrows pad):
+/// `Home | End | PgUp | PgDn`, above the large inverted-T ([kNavArrowCaps]).
+const List<KeyCapDef> kArrowsTopCaps = [
+  KeyCapDef('Home', label: 'Home'),
+  KeyCapDef('End', label: 'End'),
+  KeyCapDef('PgUp', label: 'PgUp'),
+  KeyCapDef('PgDn', label: 'PgDn'),
+];
+
+/// The Fn pad's full-width Esc cap (UI-SPEC §Pad layouts — Fn pad,
+/// user-locked: Esc on this pad too), rendered above the F1–F12 grid.
+const KeyCapDef kFnEscCap = KeyCapDef('Esc', label: 'Esc');
+
+/// The full-screen keyboard's swipeable pads (UI-SPEC §Pad layouts), in
+/// PageView order. [type] is the default (see [kKeyboardPadPrefsKey]).
+enum KeyboardPad {
+  /// System IME + the slim extras row ([kTypeExtrasCaps]).
+  type,
+
+  /// [kArrowsTopCaps] over the large inverted-T ([kNavArrowCaps]).
+  arrows,
+
+  /// The calculator-layout numpad ([kNumCaps]).
+  numpad,
+
+  /// [kFnEscCap] over the F1–F12 grid ([kFnCaps]).
+  fn,
+}
+
+/// Every cap definition a [pad] renders — the widget-test coverage seam
+/// (iterate THIS, not the screen): every returned code MUST be in
+/// [kClientKeyCodes], else the key is dead server-side (T-04-02).
+List<KeyCapDef> capsForPad(KeyboardPad pad) => switch (pad) {
+      KeyboardPad.type => kTypeExtrasCaps,
+      KeyboardPad.arrows => [...kArrowsTopCaps, ...kNavArrowCaps],
+      KeyboardPad.numpad => kNumCaps,
+      KeyboardPad.fn => [kFnEscCap, ...kFnCaps],
+    };
+
 // ── Widgets ────────────────────────────────────────────────────────────────
 
 /// The active group's key caps. See the library doc for the emission model.
@@ -255,7 +316,7 @@ class KeyRows extends StatelessWidget {
     this.onPressHaptic,
   });
 
-  Widget _cap(KeyCapDef def, {double? width}) => _KeyCap(
+  Widget _cap(KeyCapDef def, {double? width}) => KeyCap(
         def: def,
         enabled: enabled,
         width: width,
@@ -330,17 +391,41 @@ class KeyRows extends StatelessWidget {
 
 /// One key cap: press-down branch capture + pressed accent state
 /// (UI-SPEC key-cap state table).
-class _KeyCap extends StatefulWidget {
+///
+/// PUBLIC and SHARED (10-03): the D-07 docked panel's [KeyRows] and the
+/// full-screen keyboard's pads (10-04/10-05) mount the SAME widget, so the
+/// emission model documented at the library top — D-11 hold, D-10 deferred
+/// combo, IN-04 always-wired releases, CR-01 dispose release — is shared by
+/// reference and can never drift between the two surfaces. Reuse it; do not
+/// clone its press logic.
+class KeyCap extends StatefulWidget {
+  /// The cap this widget renders and emits for.
   final KeyCapDef def;
+
+  /// False renders the muted, non-interactive (press-entry gated) state.
   final bool enabled;
+
+  /// Fixed width (null sizes to the content + the 48px minWidth floor).
   final double? width;
+
+  /// Press-down with no armed mods: `key {action: down}` (KEY-04 hold).
   final void Function(String code) onKeyDown;
+
+  /// Release of a non-deferred press: `key {action: up}`.
   final void Function(String code) onKeyUp;
+
+  /// Release of a DEFERRED press: `key {action: tap, mods: [...]}` (D-10).
   final void Function(String code) onKeyTapWithMods;
+
+  /// Polled at press-down to pick the down/up vs tap+mods branch.
   final bool Function() hasArmedMods;
+
+  /// Fired on every press-down (the haptic tick — UI-SPEC: on key-down).
   final VoidCallback? onPressHaptic;
 
-  const _KeyCap({
+  /// Creates a key cap.
+  const KeyCap({
+    super.key,
     required this.def,
     required this.enabled,
     required this.onKeyDown,
@@ -352,10 +437,12 @@ class _KeyCap extends StatefulWidget {
   });
 
   @override
-  State<_KeyCap> createState() => _KeyCapState();
+  State<KeyCap> createState() => KeyCapState();
 }
 
-class _KeyCapState extends State<_KeyCap> {
+/// The [KeyCap] state — public with its widget; the press bodies below are
+/// the sacred emission model (see the library doc).
+class KeyCapState extends State<KeyCap> {
   bool _pressed = false;
 
   /// The branch captured at press-down: true = armed mods were pending, so
