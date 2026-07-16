@@ -52,7 +52,7 @@ Next: 09-08 on-device visual UAT gate re-run — MUST `flutter build apk --relea
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-16 -- Completed quick task 260716-oi2: Browser tab list + switching via Chrome extension (human E2E checklist outstanding — see SUMMARY)
+Last activity: 2026-07-16 -- Completed quick task 260716-sme: Tab-group visibility in the browser tab list (protocol 1.5; human E2E extension reload + group walkthrough outstanding — see SUMMARY)
 
 Progress: [██████████] 100% (8 of 8 phases complete; 62 of 62 plans)
 
@@ -331,6 +331,7 @@ Recent decisions affecting current work:
 | 260716-n9e | README rework: user-facing install guide | 2026-07-16 | 840ed84 | [260716-n9e-readme-rework-user-facing-install-sectio](./quick/260716-n9e-readme-rework-user-facing-install-sectio/) |
 | 260716-ns1 | App branding: pointer logo, exe icon, Android launcher icons | 2026-07-16 | 1279415 | [260716-ns1-app-branding-pointer-logo-exe-icon-embed](./quick/260716-ns1-app-branding-pointer-logo-exe-icon-embed/) |
 | 260716-oi2 | Browser tab list + switching via Chrome extension (Tab Bridge, protocol 1.4) | 2026-07-16 | 44629e4 | [260716-oi2-browser-tab-list-and-switching-via-chrom](./quick/260716-oi2-browser-tab-list-and-switching-via-chrom/) |
+| 260716-sme | Tab-group visibility — view-only group headers in the phone tab list (protocol 1.5) | 2026-07-16 | a08d992 | [260716-sme-add-tab-group-visibility-to-browser-tabs](./quick/260716-sme-add-tab-group-visibility-to-browser-tabs/) |
 
 ## Deferred Items
 
