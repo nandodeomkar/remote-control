@@ -49,6 +49,25 @@ void main() {
     }
   });
 
+  test('new shortcut vocabulary codes are mirrored from keymap.rs (10-01)', () {
+    // The 18 codes 10-01 added to keymap.rs CLIENT_KEY_CODES: letters for
+    // Ctrl/Win chords, the main-row zero, PrintScreen, and the promoted
+    // browser/present macro codes. The registry-driven catalog gate lands in
+    // 10-02 once kShortcutCatalog exists; this is the byte-for-byte lockstep.
+    const newCodes = [
+      'A', 'C', 'D', 'E', 'F', 'I', 'R', 'S', 'V', 'X', 'Y', 'Z',
+      '0', 'PrintScreen', 'T', 'W', 'Plus', 'Minus',
+    ];
+    for (final code in newCodes) {
+      expect(
+        kClientKeyCodes,
+        contains(code),
+        reason: 'shortcut code $code must mirror keymap.rs CLIENT_KEY_CODES '
+            'byte-for-byte or the server drops it silently',
+      );
+    }
+  });
+
   group('key-cap emission model', () {
     late List<String> events;
     late bool armed;

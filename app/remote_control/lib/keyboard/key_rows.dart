@@ -47,6 +47,13 @@ const List<String> kClientKeyCodes = [
   'Num9', 'NumEnter', 'NumDot',
   // Modifier hold codes (D-10 locked-modifier physical hold path)
   'ControlLeft', 'AltLeft', 'ShiftLeft', 'WinLeft',
+  // Shortcut vocabulary (letters, main-row zero, PrintScreen, promoted
+  // browser macros) — 10-01, byte-for-byte with keymap.rs CLIENT_KEY_CODES.
+  // Consumed by the 10-02 Shortcuts catalog; letters chord via Ctrl/Win,
+  // '0' is the main-row zero (distinct from Num0), T/W/Plus/Minus were
+  // promoted out of the server's ROUTER_MACRO_CODES.
+  'A', 'C', 'D', 'E', 'F', 'I', 'R', 'S', 'V', 'X', 'Y', 'Z',
+  '0', 'PrintScreen', 'T', 'W', 'Plus', 'Minus',
 ];
 
 /// The visible special-key row group (D-09 — toggleable, default Nav).
