@@ -284,6 +284,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 5. Media, Power, Presenter & Browser | 7/7 | Complete    | 2026-07-11 |
 | 6. Apps & Clipboard | 7/7 | Complete    | 2026-07-12 |
 | 7. Server Shell, Dashboard & Polish | 13/13 | Complete    | 2026-07-15 |
+| 8. Floating Trackpad Bubble | 6/6 | Complete — on-device UAT PASS | 2026-07-16 |
 
 ### Phase 8: Floating trackpad bubble — replace quick-bar with draggable bubble + floating trackpad window (spec: docs/superpowers/specs/2026-07-15-trackpad-bubble-design.md)
 
@@ -298,7 +299,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
   4. Bubble `(edge, yFraction)` and window `(x, y)` positions persist independently across app restarts (default bubble: right edge, 70% down)
   5. Collapsing the window or leaving the screen while drag-locked flushes `DragMsg(end)` on a live authed socket (CR-01), keepAwake is acquired on expand / released on collapse without dropping Presenter's hold, and no stuck mouse button remains behind a collapsed bubble
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans executed — **Phase complete 2026-07-16** (on-device UAT gate PASSED: all six human-checks incl. latency parity, dual position persistence, CR-01 drag flush, Presenter keepAwake)
 
 Plans:
 **Wave 1**
@@ -317,4 +318,4 @@ Plans:
 
 **Wave 4** *(after Wave 3)*
 
-- [ ] 08-06-PLAN.md — Central migration to `BubbleScaffold` + quick-bar deleted outright + on-device UAT gate (D8-05/06, SC1/SC5) [after 08-05]
+- [x] 08-06-PLAN.md — Central migration to `BubbleScaffold` + quick-bar deleted outright + on-device UAT gate (D8-05/06, SC1/SC5) [after 08-05] (completed 2026-07-16)

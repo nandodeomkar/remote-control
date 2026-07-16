@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 08-05-PLAN.md (BubbleScaffold)
-last_updated: "2026-07-15T15:28:07.999Z"
-last_activity: 2026-07-15 -- Phase 08 execution started
+status: Phase 08 complete — all phases done
+stopped_at: Completed 08-06-PLAN.md (central migration + quick-bar deletion + on-device UAT gate PASS)
+last_updated: "2026-07-16T08:45:00.000Z"
+last_activity: 2026-07-16 -- Phase 08 closed (UAT passed on-device)
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 62
-  completed_plans: 61
-  percent: 88
+  completed_plans: 62
+  percent: 100
 ---
 
 # Project State
@@ -21,13 +21,19 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 08 — floating-trackpad-bubble-replace-quick-bar-with-draggable-bu
+**Current focus:** All phases complete — dogfood/refine hold (no new milestone yet)
 
 ## Current Position
 
-Phase: 08 (floating-trackpad-bubble-replace-quick-bar-with-draggable-bu) — EXECUTING
-Plan: 6 of 6
-Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), then 06-06 (auto-sync + client echo suppression + Android 10+ resume-sync) and 06-07 (on-device UAT gate). The Clipboard server (06-04: clip thread + WinClipboard + clip.changed seam) is now code-complete alongside the Apps track (06-01/02/03); on-device UAT is 06-07.
+Phase: 08 (floating-trackpad-bubble-replace-quick-bar-with-draggable-bu) — COMPLETE 2026-07-16
+Plan: 6 of 6 complete
+Next: nothing queued. All 8 phases done (62/62 plans). Phase 08 closed with the
+  on-device UAT gate PASS (Xiaomi 25080RABDI, fresh release APK): all six
+  human-checks — latency parity vs full Trackpad screen, dual position
+  persistence across restart, Power-screen slide-to-confirm unobstructed,
+  WiFi-drop muted state + drag reset + UIPI banner, CR-01 drag flush on
+  collapse/leave, Presenter keepAwake hold. Quick-bar deleted outright
+  (283 lines); grep gate 0 refs, analyzer clean, full suite 399 green.
   Phase 05 CLOSED 2026-07-11: 7/7 plans, verification 5/5 code layer, UAT 6/6 on-device (media, absolute volume+PC follow, lock/sleep-suspend, restart/shutdown two-gesture, PowerPoint presenter, browser macros incl. fixed zoom-in), security threats_open 0 (19/19). Google Slides web-start = documented known limitation (out of SC4 scope).
   Phase 03 E2E on Xiaomi 25080RABDI + Windows 11: all five success criteria passed
   (discovery ≤4s, PIN pairing + error copy, silent reconnect, WiFi-drop recovery,
@@ -38,7 +44,7 @@ Next: 06-05-PLAN.md (Clipboard client: send/fetch + last-5 history + hub tile), 
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
 Last activity: 2026-07-15 -- Phase 08 execution started
 
-Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43 plans)
+Progress: [██████████] 100% (8 of 8 phases complete; 62 of 62 plans)
 
 ## Performance Metrics
 
@@ -119,6 +125,7 @@ Progress: [███████░░░] 74% (5 of 7 phases complete; 41 of 43
 | Phase 08 P03 | ~12min | 2 tasks | 2 files |
 | Phase 08 P04 | ~10min | 2 tasks | 2 files |
 | Phase 08 P05 | 12min | 2 tasks | 2 files |
+| Phase 08 P06 | ~15min + UAT | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -271,6 +278,8 @@ Recent decisions affecting current work:
 - [Phase 08]: 08-04: the window owns its drag-lock ValueNotifier (fed to TrackpadCore, read by the inline header pill) unless a test injects one; keepAwake is a forwarded-only seam since TrackpadCore is the sole hold owner (Pitfall 4); first-open anchors from initialTopLeft (bubble spot) else screen-center
 - [Phase ?]: [Phase 08]: 08-05: PopScope wraps a ValueListenableBuilder<bool> (not the reverse) so canPop stays reactive to _expanded while the Material/Stack subtree is passed as the builder's cached child, preserving the body-never-rebuilds-off-expand invariant
 - [Phase ?]: [Phase 08]: 08-05: FloatingTrackpadWindow is rendered UNWRAPPED (no ScaleTransition/Opacity) in the expanded branch since it returns a bare Positioned that must be a direct Stack child (Transform/Opacity break the Positioned<->Stack ParentData contract when interposed) -- the 200ms AnimationController instead drives only the bubble's FadeTransition
+- [Phase 08]: 08-06: central wrapper migration — renaming HubTileSpec.showQuickBar->showBubble and swapping the _open wrap in hub_screen.dart alone migrated all 7 tool screens (D8-05); quick-bar deleted outright with no restore toggle (D8-06)
+- [Phase 08]: 08-06: `flutter install` reuses the last-built APK without rebuilding — on-device UAT of any migration REQUIRES an explicit `flutter build apk --release` first (burned: stale 07-15 APK installed with a fresh install timestamp, phone showed the old quick-bar)
 
 ### Pending Todos
 
@@ -304,6 +313,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-15T15:28:07.979Z
-Stopped at: Completed 08-05-PLAN.md (BubbleScaffold)
+Last session: 2026-07-16T08:45:00.000Z
+Stopped at: Completed 08-06-PLAN.md — Phase 08 CLOSED (on-device UAT PASS)
 Resume file: None
