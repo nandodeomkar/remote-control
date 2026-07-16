@@ -155,6 +155,37 @@ class AppsSnapshot {
   int get hashCode => Object.hashAll(windows);
 }
 
+/// The last server-pushed browser tab state (BROW-01 `tabs.changed` /
+/// `tabs.list` reply, proto 1.4). Value-equal over element equality so the
+/// tabs Notifier suppresses no-op rebuilds on identical pushes (mirrors
+/// [AppsSnapshot] discipline — hand-rolled element-wise ==, 06-03
+/// no-package:collection rule).
+class TabsSnapshot {
+  /// Whether the Tab Bridge extension is connected on the PC —
+  /// `false` renders the install hint.
+  final bool connected;
+
+  /// The tab list in extension order (no client sort).
+  final List<TabInfo> tabs;
+
+  /// Creates a snapshot.
+  const TabsSnapshot({required this.connected, required this.tabs});
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! TabsSnapshot) return false;
+    if (other.connected != connected) return false;
+    if (other.tabs.length != tabs.length) return false;
+    for (var i = 0; i < tabs.length; i++) {
+      if (other.tabs[i] != tabs[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(connected, Object.hashAll(tabs));
+}
+
 /// The last server-pushed clipboard state (D-03 `clip.changed`). Value-equal so
 /// the clipboard Notifier suppresses no-op rebuilds on identical pushes
 /// (mirrors [VolumeSnapshot] discipline). Distinct from the fetch reply below:
@@ -262,6 +293,7 @@ class ConnectionService {
   Object? _lastDialError;
   VolumeSnapshot? _volumeSnapshot;
   AppsSnapshot? _appsSnapshot;
+  TabsSnapshot? _tabsSnapshot;
   ClipSnapshot? _clipSnapshot;
   String? _clipFetchReply;
   ErrMsg? _lastError;
@@ -360,6 +392,11 @@ class ConnectionService {
   /// reply), or null before the first push. The apps store reads this off a
   /// [changes] ping.
   AppsSnapshot? get appsSnapshot => _appsSnapshot;
+
+  /// The last server-pushed browser tab state (BROW-01 `tabs.changed` /
+  /// `tabs.list` reply), or null before the first push. The tabs store reads
+  /// this off a [changes] ping.
+  TabsSnapshot? get tabsSnapshot => _tabsSnapshot;
 
   /// The last server-pushed clipboard state (D-03 `clip.changed`), or null
   /// before the first push. The clipboard store reads this off a [changes]
@@ -604,6 +641,25 @@ class ConnectionService {
       // apps.list reply (the screen-open prime): park the same snapshot. A
       // request has no `windows`; a reply always does — default to empty.
       _appsSnapshot = AppsSnapshot(msg.windows ?? const []);
+      _notify();
+      return;
+    }
+    if (msg is TabsChangedMsg) {
+      // BROW-01 live tab push: park the value-equal snapshot and ping the
+      // tabs store. S→C only — never routed to the driver, and NO payload
+      // logging anywhere (SPEC §12 — tab titles are browsing data).
+      _tabsSnapshot = TabsSnapshot(connected: msg.connected, tabs: msg.tabs);
+      _notify();
+      return;
+    }
+    if (msg is TabsListMsg) {
+      // tabs.list reply (the Browser-screen-open prime): park the same
+      // snapshot. A request has neither field; a reply always carries both —
+      // default to the never-connected hint shape. No payload logging.
+      _tabsSnapshot = TabsSnapshot(
+        connected: msg.connected ?? false,
+        tabs: msg.tabs ?? const [],
+      );
       _notify();
       return;
     }
