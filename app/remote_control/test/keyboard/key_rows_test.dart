@@ -17,6 +17,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:remote_control/keyboard/key_rows.dart';
 import 'package:remote_control/store/device_store.dart';
+import 'package:remote_control/theme/tokens.dart';
 
 /// In-memory [PrefsKv] (device_store test house pattern) — the persistence
 /// seam for the row-group store.
@@ -191,6 +192,62 @@ void main() {
 
       expect(selected, KeyRowGroup.fn);
       expect(prefs.map[kKeyRowGroupPrefsKey], 'fn');
+    });
+
+    testWidgets(
+        'switcher renders Nav/Fn/Num; selected label is accent, unselected '
+        'muted (UI-SPEC active-tab contract)', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: KeyRowGroupSwitcher(
+            group: KeyRowGroup.fn,
+            onChanged: (_) {},
+          ),
+        ),
+      ));
+
+      // All three tab labels are present.
+      for (final label in ['Nav', 'Fn', 'Num']) {
+        expect(find.text(label), findsOneWidget);
+      }
+
+      Color labelColor(String label) =>
+          tester.widget<Text>(find.text(label)).style!.color!;
+
+      // Selected group (Fn) is accent; the other two are muted.
+      expect(labelColor('Fn'), kAccent);
+      expect(labelColor('Nav'), kMuted);
+      expect(labelColor('Num'), kMuted);
+
+      // The selected tab carries a 2px accent bottom border (underline);
+      // unselected tabs' bottom border is transparent.
+      BorderSide bottomOf(String label) {
+        final container = tester.widget<Container>(
+          find
+              .ancestor(
+                of: find.text(label),
+                matching: find.byType(Container),
+              )
+              .first,
+        );
+        return (container.decoration! as BoxDecoration).border!.bottom;
+      }
+
+      expect(bottomOf('Fn').color, kAccent);
+      expect(bottomOf('Fn').width, 2);
+      expect(bottomOf('Nav').color, Colors.transparent);
+
+      // Tab labels are 12/w400 per the plan's switcher contract.
+      final fnStyle = tester.widget<Text>(find.text('Fn')).style!;
+      expect(fnStyle.fontSize, 12);
+      expect(fnStyle.fontWeight, FontWeight.w400);
+
+      // Each segment meets the 48px touch-target floor.
+      final navSize = tester.getSize(find.ancestor(
+        of: find.text('Nav'),
+        matching: find.byType(InkWell),
+      ));
+      expect(navSize.height, greaterThanOrEqualTo(48));
     });
 
     test('store defaults to nav when unset or corrupt', () async {

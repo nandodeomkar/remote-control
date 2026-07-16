@@ -27,6 +27,17 @@ import 'keyboard_panel.dart';
 /// App-bar title (house rule: no inline literals).
 const String kKeyboardTitle = 'Keyboard';
 
+/// The centered hint copy above the panel (Copywriting Contract, verbatim
+/// from the prototype line 130). House rule: no inline copy literals.
+const String kKeyboardHint =
+    'The system keyboard handles typing. These are the extra keys.';
+
+/// Hint text color (Prototype line 130, `#4a505c`). A local non-token const
+/// mirroring `connection_header`/`dot_grid`'s pattern — it is NOT one of the
+/// seven D-12 locked tokens, so it must not live in `tokens.dart` and does not
+/// trip the palette guard.
+const Color _kKeyboardHintColor = Color(0xFF4A505C);
+
 /// The Keyboard tool screen: the [KeyboardPanel] always-expanded on a `kBg`
 /// canvas. See the library doc for the contract.
 class KeyboardScreen extends ConsumerStatefulWidget {
@@ -85,9 +96,26 @@ class _KeyboardScreenState extends ConsumerState<KeyboardScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // The kBg canvas above the docked panel (the panel keeps its
-            // trackpad-era bottom-docked shape; the empty area breathes).
-            const Expanded(child: SizedBox.expand()),
+            // The kBg canvas above the docked panel carries the centered
+            // hint copy (Copywriting Contract) — the panel keeps its
+            // trackpad-era bottom-docked shape.
+            const Expanded(
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    kKeyboardHint,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: _kKeyboardHintColor,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w400,
+                      height: 1.7,
+                    ),
+                  ),
+                ),
+              ),
+            ),
             KeyboardPanel(
               // Always open on this screen: chrome visible, IME raised on
               // entry (the panel requests focus post-frame itself).
