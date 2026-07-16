@@ -13,13 +13,66 @@
 
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:remote_protocol/remote_protocol.dart';
 
 import 'package:remote_control/keyboard/key_rows.dart' show kClientKeyCodes;
+import 'package:remote_control/net/connection_providers.dart';
+import 'package:remote_control/net/connection_service.dart';
 import 'package:remote_control/shortcuts/shortcuts_screen.dart';
+import 'package:remote_control/store/device_store.dart';
 
 /// The wire modifier vocabulary (modifier_fsm _kWireMods).
 const Set<String> _kWireMods = {'ctrl', 'alt', 'shift', 'win'};
+
+class _FakeSecureKv implements SecureKv {
+  final Map<String, String> backing = {};
+  @override
+  Future<String?> read(String key) async => backing[key];
+  @override
+  Future<void> write(String key, String value) async => backing[key] = value;
+  @override
+  Future<void> delete(String key) async => backing.remove(key);
+}
+
+class _FakePrefsKv implements PrefsKv {
+  final Map<String, String> backing = {};
+  @override
+  Future<String?> getString(String key) async => backing[key];
+  @override
+  Future<void> setString(String key, String value) async {
+    backing[key] = value;
+  }
+}
+
+/// A recording service reporting a fixed chip status — the media-screen seam.
+class _FakeService extends ConnectionService {
+  _FakeService({required this.connected})
+      : super(
+          store: DeviceStore(secure: _FakeSecureKv(), prefs: _FakePrefsKv()),
+        );
+
+  final bool connected;
+  final List<RemoteMessage> reliable = [];
+
+  @override
+  bool get isAuthed => connected;
+
+  @override
+  ChipStatus get chipStatus =>
+      connected ? ChipStatus.connected : ChipStatus.disconnected;
+
+  @override
+  void sendReliable(RemoteMessage msg) => reliable.add(msg);
+}
+
+Widget _host(ConnectionService service) => ProviderScope(
+      overrides: [
+        connectionServiceProvider.overrideWith((ref) => service),
+      ],
+      child: const MaterialApp(home: ShortcutsScreen()),
+    );
 
 void main() {
   group('kShortcutCatalog integrity', () {
@@ -191,6 +244,104 @@ void main() {
 
       final icon = t.widget<Icon>(find.byType(Icon));
       expect(icon.size, 24);
+    });
+  });
+
+  group('ShortcutsScreen render + wiring', () {
+    testWidgets('renders all 4 section headers and 25 buttons', (t) async {
+      t.view.physicalSize = const Size(1000, 4000);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+
+      await t.pumpWidget(_host(_FakeService(connected: true)));
+
+      for (final header in const [
+        'Windows & Desktop',
+        'Screenshot',
+        'Browser & App',
+        'Editing',
+      ]) {
+        expect(find.text(header), findsOneWidget, reason: 'missing "$header"');
+      }
+
+      expect(find.byType(ShortcutButton), findsNWidgets(25));
+
+      await t.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('connected: tapping "Show desktop" sends one Win+D KeyMsg',
+        (t) async {
+      t.view.physicalSize = const Size(1000, 4000);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+
+      final svc = _FakeService(connected: true);
+      await t.pumpWidget(_host(svc));
+
+      await t.tap(find.text('Show desktop'));
+      await t.pump();
+
+      expect(svc.reliable, hasLength(1));
+      final msg = svc.reliable.single as KeyMsg;
+      expect(msg.code, 'D');
+      expect(msg.action, 'tap');
+      expect(msg.mods, ['win']);
+
+      // Let the 100ms accent-flash timer settle before teardown.
+      await t.pump(const Duration(milliseconds: 120));
+      await t.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('connected: tapping "Copy" sends Ctrl+C', (t) async {
+      t.view.physicalSize = const Size(1000, 4000);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+
+      final svc = _FakeService(connected: true);
+      await t.pumpWidget(_host(svc));
+
+      // "Copy" sits at the bottom (Editing section) — scroll it into view.
+      await t.scrollUntilVisible(find.text('Copy'), 300);
+      await t.tap(find.text('Copy'));
+      await t.pump();
+
+      expect(svc.reliable, hasLength(1));
+      final msg = svc.reliable.single as KeyMsg;
+      expect(msg.code, 'C');
+      expect(msg.action, 'tap');
+      expect(msg.mods, ['ctrl']);
+
+      // Let the 100ms accent-flash timer settle before teardown.
+      await t.pump(const Duration(milliseconds: 120));
+      await t.pumpWidget(const SizedBox());
+    });
+
+    testWidgets('disconnected: pressing a button sends nothing (gated muted)',
+        (t) async {
+      t.view.physicalSize = const Size(1000, 4000);
+      t.view.devicePixelRatio = 1.0;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+
+      final svc = _FakeService(connected: false);
+      await t.pumpWidget(_host(svc));
+
+      // Same 25 buttons render (layout unchanged) — but inert.
+      expect(find.byType(ShortcutButton), findsNWidgets(25));
+
+      await t.tap(find.text('Show desktop'));
+      await t.pump();
+
+      expect(svc.reliable, isEmpty, reason: 'unauthed buttons are inert');
+
+      // Gated content renders kMuted, not red.
+      final effect = t.widget<Text>(find.text('Show desktop'));
+      expect(effect.style?.color, const Color(0xFF6B7280));
+
+      await t.pumpWidget(const SizedBox());
     });
   });
 }
