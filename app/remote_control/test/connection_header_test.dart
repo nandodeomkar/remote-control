@@ -173,9 +173,53 @@ void main() {
       final retry = find.widgetWithText(TextButton, kRetryNowLabel);
       expect(retry, findsOneWidget);
 
+      // The 'Retry now' target meets the ≥48px minimum (UI-SPEC touch floor).
+      final button = tester.widget<TextButton>(retry);
+      final minSize = button.style?.minimumSize?.resolve(<WidgetState>{});
+      expect(minSize, const Size(48, 48));
+
       await tester.tap(retry);
       await tester.pump();
       expect(retries, 1);
+    });
+
+    testWidgets('connected chip shows the "· … ms" latency segment, '
+        'non-connected chips omit it', (tester) async {
+      // Connected: the '· {n} ms' segment renders.
+      await tester.pumpWidget(
+        _host(
+          ConnectionHeaderChip(
+            status: () => ChipStatus.connected,
+            p50: () => 7,
+          ),
+        ),
+      );
+      expect(find.textContaining('· '), findsOneWidget);
+      expect(find.textContaining('ms'), findsOneWidget);
+
+      // Reconnecting: the latency segment is gone entirely.
+      await tester.pumpWidget(
+        _host(
+          ConnectionHeaderChip(
+            status: () => ChipStatus.reconnecting,
+            p50: () => 7,
+          ),
+        ),
+      );
+      expect(find.textContaining('· '), findsNothing);
+      expect(find.textContaining('ms'), findsNothing);
+
+      // Disconnected: likewise absent.
+      await tester.pumpWidget(
+        _host(
+          ConnectionHeaderChip(
+            status: () => ChipStatus.disconnected,
+            p50: () => 7,
+          ),
+        ),
+      );
+      expect(find.textContaining('· '), findsNothing);
+      expect(find.textContaining('ms'), findsNothing);
     });
   });
 }
