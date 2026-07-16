@@ -16,6 +16,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_protocol/remote_protocol.dart';
@@ -160,7 +161,7 @@ void main() {
     }
     // Nav is the D-09 default group.
     expect(find.text('Esc'), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_forward), findsOneWidget);
+    expect(find.byIcon(Symbols.arrow_forward_rounded), findsOneWidget);
   });
 
   testWidgets(
@@ -175,7 +176,7 @@ void main() {
     expect(sentKeys(), hasLength(1));
     expect(sentKeys().single.code, 'WinLeft');
     expect(sentKeys().single.action, 'down');
-    expect(find.byIcon(Icons.lock), findsOneWidget);
+    expect(find.byIcon(Symbols.lock_rounded), findsOneWidget);
 
     await tester.tap(find.text('Win'));
     await tester.pumpAndSettle();
@@ -183,7 +184,7 @@ void main() {
     expect(sentKeys(), hasLength(2));
     expect(sentKeys().last.code, 'WinLeft');
     expect(sentKeys().last.action, 'up');
-    expect(find.byIcon(Icons.lock), findsNothing);
+    expect(find.byIcon(Symbols.lock_rounded), findsNothing);
   });
 
   testWidgets(
@@ -243,7 +244,7 @@ void main() {
 
     await tester.longPress(find.text('Win'));
     await tester.pumpAndSettle();
-    expect(find.byIcon(Icons.lock), findsOneWidget);
+    expect(find.byIcon(Symbols.lock_rounded), findsOneWidget);
     final sendsBeforeDrop = sent.length;
 
     // The service drops: chip status flips to disconnected + a changes ping.
@@ -253,7 +254,7 @@ void main() {
 
     // Visual reset... but NO KeyMsg up — the socket is gone and CONN-07
     // release_all already freed the real key server-side.
-    expect(find.byIcon(Icons.lock), findsNothing);
+    expect(find.byIcon(Symbols.lock_rounded), findsNothing);
     expect(sent.length, sendsBeforeDrop);
   });
 
@@ -410,6 +411,6 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(sent, isEmpty);
-    expect(find.byIcon(Icons.lock), findsNothing);
+    expect(find.byIcon(Symbols.lock_rounded), findsNothing);
   });
 }

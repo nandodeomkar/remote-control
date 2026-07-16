@@ -23,6 +23,7 @@
 // bubble/window position providers TrackpadBubble/FloatingTrackpadWindow read.
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -138,14 +139,14 @@ void main() {
     expect(find.byType(TrackpadBubble), findsOneWidget);
     expect(find.byType(FloatingTrackpadWindow), findsNothing);
 
-    await t.tap(find.byIcon(Icons.touch_app));
+    await t.tap(find.byIcon(Symbols.touch_app_rounded));
     await t.pumpAndSettle();
 
     expect(find.byType(TrackpadBubble), findsNothing,
         reason: 'the bubble and window are never both visible (D8-01)');
     expect(find.byType(FloatingTrackpadWindow), findsOneWidget);
 
-    await t.tap(find.byIcon(Icons.close));
+    await t.tap(find.byIcon(Symbols.close_rounded));
     await t.pumpAndSettle();
 
     expect(find.byType(FloatingTrackpadWindow), findsNothing);
@@ -172,7 +173,7 @@ void main() {
       ),
     );
 
-    await t.tap(find.byIcon(Icons.touch_app));
+    await t.tap(find.byIcon(Symbols.touch_app_rounded));
     await t.pumpAndSettle();
     expect(find.byType(FloatingTrackpadWindow), findsOneWidget);
 
@@ -212,7 +213,7 @@ void main() {
     );
     await t.pumpAndSettle();
 
-    await t.tap(find.byIcon(Icons.touch_app));
+    await t.tap(find.byIcon(Symbols.touch_app_rounded));
     await t.pumpAndSettle();
     expect(find.byType(FloatingTrackpadWindow), findsOneWidget);
 

@@ -23,6 +23,7 @@
 // spy so the test never touches the wakelock platform channel.
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_protocol/remote_protocol.dart';
@@ -139,7 +140,7 @@ void main() {
       );
 
       final before = _cardPositioned(t);
-      await t.drag(find.byIcon(Icons.drag_indicator), const Offset(30, 40));
+      await t.drag(find.byIcon(Symbols.drag_indicator_rounded), const Offset(30, 40));
       await t.pump();
       final after = _cardPositioned(t);
 
@@ -166,7 +167,7 @@ void main() {
       );
 
       // Drag the header handle far beyond the bottom-right corner.
-      await t.drag(find.byIcon(Icons.drag_indicator), const Offset(4000, 4000));
+      await t.drag(find.byIcon(Symbols.drag_indicator_rounded), const Offset(4000, 4000));
       await t.pump();
 
       final container = ProviderScope.containerOf(
@@ -233,12 +234,12 @@ void main() {
         ),
       );
 
-      await t.tap(find.byIcon(Icons.open_in_full));
+      await t.tap(find.byIcon(Symbols.open_in_full_rounded));
       await t.pump();
       expect(expanded, 1);
       expect(collapsed, 0);
 
-      await t.tap(find.byIcon(Icons.close));
+      await t.tap(find.byIcon(Symbols.close_rounded));
       await t.pump();
       expect(collapsed, 1);
       expect(expanded, 1);

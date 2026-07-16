@@ -15,6 +15,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:remote_control/net/connection_service.dart';
@@ -110,7 +111,7 @@ void main() {
 
       expect(find.text(kUipiBannerCopy), findsOneWidget);
 
-      final icon = tester.widget<Icon>(find.byIcon(Icons.info_outline));
+      final icon = tester.widget<Icon>(find.byIcon(Symbols.info_rounded));
       expect(icon.color, isNot(kError));
       expect(icon.color, isNot(kAccent));
       expect(icon.color, kMuted);

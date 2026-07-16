@@ -13,6 +13,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:remote_control/keyboard/key_rows.dart';
@@ -75,7 +76,7 @@ void main() {
         );
 
     Finder rightArrowCap() => find.ancestor(
-          of: find.byIcon(Icons.arrow_forward),
+          of: find.byIcon(Symbols.arrow_forward_rounded),
           matching: find.byType(GestureDetector),
         );
 

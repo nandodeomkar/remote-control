@@ -12,6 +12,7 @@
 // the controls render in their gated pre-snapshot state and the readout is "--".
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_protocol/remote_protocol.dart';
@@ -77,9 +78,9 @@ void main() {
   testWidgets('renders the three transport icons', (t) async {
     await t.pumpWidget(_host(_FakeService()));
 
-    expect(find.byIcon(Icons.skip_previous), findsOneWidget);
-    expect(find.byIcon(Icons.play_arrow), findsOneWidget);
-    expect(find.byIcon(Icons.skip_next), findsOneWidget);
+    expect(find.byIcon(Symbols.skip_previous_rounded), findsOneWidget);
+    expect(find.byIcon(Symbols.play_arrow_rounded), findsOneWidget);
+    expect(find.byIcon(Symbols.skip_next_rounded), findsOneWidget);
 
     // Unmount so the header chip's periodic ticker is cancelled (no pending
     // timer at teardown).
@@ -97,9 +98,9 @@ void main() {
       return t.getSize(box);
     }
 
-    expect(sizeOf(Icons.play_arrow), const Size(64, 64));
-    expect(sizeOf(Icons.skip_previous), const Size(48, 48));
-    expect(sizeOf(Icons.skip_next), const Size(48, 48));
+    expect(sizeOf(Symbols.play_arrow_rounded), const Size(64, 64));
+    expect(sizeOf(Symbols.skip_previous_rounded), const Size(48, 48));
+    expect(sizeOf(Symbols.skip_next_rounded), const Size(48, 48));
 
     await t.pumpWidget(const SizedBox());
   });

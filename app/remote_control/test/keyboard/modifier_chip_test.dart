@@ -10,6 +10,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:remote_control/keyboard/modifier_chip.dart';
@@ -54,7 +55,7 @@ void main() {
     expect(deco.color, kSurface);
     expect(deco.border!.top.color, kHairline);
     expect(labelColorOf(tester), kText);
-    expect(find.byIcon(Icons.lock), findsNothing);
+    expect(find.byIcon(Symbols.lock_rounded), findsNothing);
   });
 
   testWidgets('armed → kSurface fill, kAccent border + label, no glyph',
@@ -66,7 +67,7 @@ void main() {
     expect(deco.color, kSurface);
     expect(deco.border!.top.color, kAccent);
     expect(labelColorOf(tester), kAccent);
-    expect(find.byIcon(Icons.lock), findsNothing);
+    expect(find.byIcon(Symbols.lock_rounded), findsNothing);
   });
 
   testWidgets('locked → kAccent fill + border, kBg label, trailing lock glyph',
@@ -80,7 +81,7 @@ void main() {
     expect(labelColorOf(tester), kBg);
 
     // The lock glyph renders in kBg (contrast on the accent fill), size 16.
-    final lock = find.byIcon(Icons.lock);
+    final lock = find.byIcon(Symbols.lock_rounded);
     expect(lock, findsOneWidget);
     final icon = tester.widget<Icon>(lock);
     expect(icon.color, kBg);
@@ -99,7 +100,7 @@ void main() {
     expect(deco.color, kSurface, reason: 'disabled never fills accent');
     expect(deco.border!.top.color, kHairline);
     expect(labelColorOf(tester), kMuted);
-    expect(find.byIcon(Icons.lock), findsNothing);
+    expect(find.byIcon(Symbols.lock_rounded), findsNothing);
   });
 
   testWidgets('chip meets 48×48 floor, radius 8, and animates 200ms ease',

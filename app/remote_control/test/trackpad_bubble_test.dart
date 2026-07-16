@@ -8,7 +8,7 @@
 //   1. tap fires the injected onTap callback (haptic tick is a HapticFeedback
 //      platform call — we assert the callback flag, not the platform channel);
 //   2. muted gate — !authed renders kSurface fill + a muted (kMuted) icon and
-//      is STILL tappable; authed renders kAccent fill + Icons.touch_app kText;
+//      is STILL tappable; authed renders kAccent fill + Symbols.touch_app_rounded kText;
 //   3. drag-snap — a release on the LEFT half commits Edge.left, on the RIGHT
 //      half Edge.right, and the committed yFraction equals the release Y over
 //      the surface height, clamped to [0,1] — observed on bubblePositionProvider
@@ -20,6 +20,7 @@
 // commit is observable without real prefs. RED until Task 2 creates the widget.
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -77,7 +78,7 @@ void main() {
       var tapped = false;
       await sizedPump(t, _host(onTap: () => tapped = true, authed: true));
 
-      await t.tap(find.byIcon(Icons.touch_app));
+      await t.tap(find.byIcon(Symbols.touch_app_rounded));
       await t.pump();
 
       expect(tapped, isTrue);
@@ -88,7 +89,7 @@ void main() {
       var tapped = false;
       await sizedPump(t, _host(onTap: () => tapped = true, authed: false));
 
-      await t.tap(find.byIcon(Icons.touch_app));
+      await t.tap(find.byIcon(Symbols.touch_app_rounded));
       await t.pump();
 
       expect(tapped, isTrue);
@@ -96,12 +97,12 @@ void main() {
   });
 
   group('muted gate', () {
-    testWidgets('authed renders kAccent fill + Icons.touch_app', (t) async {
+    testWidgets('authed renders kAccent fill + Symbols.touch_app_rounded', (t) async {
       await sizedPump(t, _host(onTap: () {}, authed: true));
 
-      expect(find.byIcon(Icons.touch_app), findsOneWidget);
+      expect(find.byIcon(Symbols.touch_app_rounded), findsOneWidget);
       expect(_bubbleDecoration(t).color, kAccent);
-      final icon = t.widget<Icon>(find.byIcon(Icons.touch_app));
+      final icon = t.widget<Icon>(find.byIcon(Symbols.touch_app_rounded));
       expect(icon.color, kText);
     });
 
@@ -109,9 +110,9 @@ void main() {
         (t) async {
       await sizedPump(t, _host(onTap: () {}, authed: false));
 
-      expect(find.byIcon(Icons.touch_app), findsOneWidget);
+      expect(find.byIcon(Symbols.touch_app_rounded), findsOneWidget);
       expect(_bubbleDecoration(t).color, kSurface);
-      final icon = t.widget<Icon>(find.byIcon(Icons.touch_app));
+      final icon = t.widget<Icon>(find.byIcon(Symbols.touch_app_rounded));
       expect(icon.color, kMuted);
     });
   });
@@ -123,7 +124,7 @@ void main() {
 
       // Drag from the bubble's rest center (right edge) to a left-half release
       // center at (60, 588) → top-left (32, 560) → yFraction 560/800 = 0.70.
-      final start = t.getCenter(find.byIcon(Icons.touch_app));
+      final start = t.getCenter(find.byIcon(Symbols.touch_app_rounded));
       final g = await t.startGesture(start);
       await g.moveBy(const Offset(0, 20)); // cross touch-slop
       await g.moveTo(const Offset(60, 588));
@@ -143,7 +144,7 @@ void main() {
 
       // Release center at (340, 668) → top-left (312, 640) → yFraction 0.80,
       // center x 340 > 200 → right edge.
-      final start = t.getCenter(find.byIcon(Icons.touch_app));
+      final start = t.getCenter(find.byIcon(Symbols.touch_app_rounded));
       final g = await t.startGesture(start);
       await g.moveBy(const Offset(0, 20)); // cross touch-slop
       await g.moveTo(const Offset(340, 668));

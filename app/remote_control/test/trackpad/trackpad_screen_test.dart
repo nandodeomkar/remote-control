@@ -18,6 +18,7 @@
 // ignore_for_file: depend_on_referenced_packages
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -96,8 +97,8 @@ void main() {
     expect(find.text('R'), findsOneWidget);
 
     // The bottom-right cluster: tune affordance (D-05) + keyboard toggle (D-07).
-    expect(find.byIcon(Icons.tune), findsOneWidget);
-    expect(find.byIcon(Icons.keyboard), findsOneWidget);
+    expect(find.byIcon(Symbols.tune_rounded), findsOneWidget);
+    expect(find.byIcon(Symbols.keyboard_rounded), findsOneWidget);
 
     // Dispose the tree so the header chip's throttle timer is cancelled and
     // the keep-awake hold is released before the harness tears down.

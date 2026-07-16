@@ -12,6 +12,7 @@
 // header chip polls on a periodic timer, so settle would never converge.
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
@@ -123,8 +124,8 @@ void main() {
     await t.pumpWidget(_host(store));
     await t.pump();
 
-    expect(find.byIcon(Icons.settings), findsOneWidget);
-    await t.tap(find.byIcon(Icons.settings));
+    expect(find.byIcon(Symbols.settings_rounded), findsOneWidget);
+    await t.tap(find.byIcon(Symbols.settings_rounded));
     // Push transition (no pumpAndSettle — the header chip polls forever).
     await t.pump();
     await t.pump(const Duration(milliseconds: 400));

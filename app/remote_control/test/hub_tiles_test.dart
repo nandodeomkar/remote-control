@@ -6,6 +6,7 @@
 // navigation stays out of the widget test.
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_control/hub/hub_screen.dart';
 
@@ -43,7 +44,7 @@ void main() {
           'Apps, Clipboard, Power, Presenter, Browser',
     );
     expect(kHubTiles[1].label, 'Keyboard');
-    expect(kHubTiles[1].icon, Icons.keyboard);
+    expect(kHubTiles[1].icon, Symbols.keyboard_rounded);
   });
 
   testWidgets('grid renders all 8 tiles uniformly in 2×4 reading order',
