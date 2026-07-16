@@ -342,3 +342,14 @@ Plans:
 **Wave 2** *(after all of Wave 1)*
 
 - [x] 09-08-PLAN.md — On-device visual UAT gate: fresh release APK + per-screen walkthrough against the delta table
+
+### Phase 10: Keyboard rethink and Shortcuts tile — full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn) with persistent modifier chips, plus a new Shortcuts hub tile of one-tap Windows shortcut buttons over the existing key tap+mods path (keymap vocabulary extension both sides)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 9
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 10 to break down)

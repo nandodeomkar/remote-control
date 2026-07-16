@@ -149,6 +149,7 @@ Progress: [██████████] 100% (8 of 8 phases complete; 62 of 6
 ### Roadmap Evolution
 
 - Phase 8 added: Floating trackpad bubble — replace quick-bar with draggable bubble + floating trackpad window (spec: docs/superpowers/specs/2026-07-15-trackpad-bubble-design.md)
+- Phase 10 added: Keyboard rethink + Shortcuts tile — full-screen swipeable keyboard pads (Type w/ system IME + slim extras row, Arrows, Numpad, Fn) with persistent modifier chips + bottom tabs replacing the bottom-docked panel/switcher; new Shortcuts hub tile of one-tap Windows shortcut buttons (show desktop, snip/screenshots, task manager, explorer, settings, snap, refresh, tabs, find, zoom, edit ops) via existing key tap+mods path; keymap.rs CLIENT_KEY_CODES + Dart mirror extended (letters, PrintScreen, etc). Excluded by user: Alt+Tab (Apps remote exists), Win+L lock, Ctrl+Alt+Del (uninjectable)
 - Phase 9 added: UI refinement to design prototype — visual pass across all screens to match the Claude Design handoff (spec: docs/superpowers/specs/2026-07-16-ui-refinement-prototype/Prototype.dc.html). User-decided: dot-grid trackpad texture only — NO fake cursor dot, NO tap ripple. Palette untouched (7 D-12 tokens already byte-identical to prototype).
 
 ### Decisions
