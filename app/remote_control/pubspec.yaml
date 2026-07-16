@@ -52,6 +52,9 @@ dependencies:
   # byte-identical to the Rust decoder. NEVER re-implement a codec app-side.
   remote_protocol:
     path: ../packages/remote_protocol
+  # QR pairing scanner — the maintained package (the old qr_code_scanner is
+  # deprecated); user-locked (260716-kba), verified publisher steenbakker.dev.
+  mobile_scanner: ^7.2.1
 
 dev_dependencies:
   flutter_test:
