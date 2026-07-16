@@ -285,7 +285,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 6. Apps & Clipboard | 7/7 | Complete    | 2026-07-12 |
 | 7. Server Shell, Dashboard & Polish | 13/13 | Complete    | 2026-07-15 |
 | 8. Floating Trackpad Bubble | 6/6 | Complete — on-device UAT PASS | 2026-07-16 |
-| 9. UI Refinement to Design Prototype | 3/8 | In Progress|  |
+| 9. UI Refinement to Design Prototype | 4/8 | In Progress|  |
 
 ### Phase 8: Floating trackpad bubble — replace quick-bar with draggable bubble + floating trackpad window (spec: docs/superpowers/specs/2026-07-15-trackpad-bubble-design.md)
 
@@ -326,7 +326,7 @@ Plans:
 **Goal:** Every shipped screen is brought up to the approved 09-UI-SPEC prototype values — the headline being the decorative dot-grid trackpad texture on BOTH the full Trackpad surface (24px tiles) and the floating window (22px tiles) — while the seven locked palette tokens stay byte-identical (no fake cursor dot, no tap ripple). Every other screen is a confirm-or-close-small-delta pass, closing the two real gaps found during planning (the missing Keyboard hint copy and the #4a505c trackpad-hint / 56px floating-window-bar values), all verified end-to-end by an on-device visual UAT.
 **Requirements**: none (visual refinement — maps no REQ-IDs)
 **Depends on:** Phase 8
-**Plans:** 3/8 plans executed
+**Plans:** 4/8 plans executed
 
 Plans:
 **Wave 1** *(all parallel — zero file overlap)*
@@ -334,7 +334,7 @@ Plans:
 - [x] 09-01-PLAN.md — Dot-grid trackpad texture (24px full / 22px window) + #4a505c hint + 56px window mouse bar + no fake cursor/ripple (headline change)
 - [x] 09-02-PLAN.md — Status chip + reconnecting banner + Hub confirm (values pinned by test)
 - [x] 09-03-PLAN.md — Keyboard confirm + add missing hint copy + 3-state modifier-chip test
-- [ ] 09-04-PLAN.md — Media + Browser confirm (new media widget test, strengthened browser test)
+- [x] 09-04-PLAN.md — Media + Browser confirm (new media widget test, strengthened browser test)
 - [ ] 09-05-PLAN.md — Apps + Clipboard confirm (geometry/copy parity)
 - [ ] 09-06-PLAN.md — Power + Presenter confirm (track/dialog + split-zone/timer parity)
 - [ ] 09-07-PLAN.md — Settings confirm (grouped cards, revoke copy, static "Blue" chip)
