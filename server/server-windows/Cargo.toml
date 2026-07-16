@@ -119,3 +119,10 @@ glutin-winit = "0.5"
 # payload rendered as egui rects. Pure-Rust, no default image feature (we paint
 # the module matrix ourselves).
 qrcode = { version = "0.14", default-features = false }
+
+[build-dependencies]
+# Embeds assets/icon/icon.ico + VERSIONINFO into the exe (build.rs, quick
+# 260716-ns1). Maintained fork of winres (BenjaminRi/winresource); verified
+# on crates.io at execution time (0.1.31, repo matches, not yanked).
+# Build-time only — zero runtime surface.
+winresource = "0.1"
