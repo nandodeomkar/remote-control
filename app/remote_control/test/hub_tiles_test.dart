@@ -21,11 +21,14 @@ const List<String> kExpectedOrder = [
   'Browser',
 ];
 
-Widget _host({required void Function(HubTileSpec spec) onOpen}) {
+Widget _host({
+  required void Function(HubTileSpec spec) onOpen,
+  bool enabled = true,
+}) {
   return MaterialApp(
     home: Scaffold(
       body: SingleChildScrollView(
-        child: HubTileGrid(tiles: kHubTiles, onOpen: onOpen),
+        child: HubTileGrid(tiles: kHubTiles, onOpen: onOpen, enabled: enabled),
       ),
     ),
   );
@@ -60,6 +63,11 @@ void main() {
     // full-width special case (Pitfall 9: the SizedBox(height: 96) primary
     // row is gone).
     expect(find.byType(AspectRatio), findsNWidgets(8));
+
+    // Every cell holds the UI-SPEC ~1.4:1 aspect ratio (§1 tile spec).
+    for (final ar in t.widgetList<AspectRatio>(find.byType(AspectRatio))) {
+      expect(ar.aspectRatio, 1.4, reason: 'tile cell must be 1.4:1 (UI-SPEC)');
+    }
 
     Finder cellOf(String label) => find.ancestor(
           of: find.text(label),
@@ -108,5 +116,23 @@ void main() {
     await t.pump();
 
     expect(opened, ['Keyboard', 'Browser']);
+  });
+
+  testWidgets('disabled grid renders every tile non-tappable (onTap null)',
+      (t) async {
+    t.view.physicalSize = const Size(800, 1400);
+    t.view.devicePixelRatio = 1.0;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+
+    await t.pumpWidget(_host(onOpen: (_) {}, enabled: false));
+
+    // D-08 offline: same 8 tiles, but each InkWell has a null onTap — visible
+    // and layout-stable, yet non-tappable (no ripple, no navigation).
+    final inkWells = t.widgetList<InkWell>(find.byType(InkWell)).toList();
+    expect(inkWells, hasLength(8));
+    for (final ink in inkWells) {
+      expect(ink.onTap, isNull, reason: 'offline tiles must be non-tappable');
+    }
   });
 }
