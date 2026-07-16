@@ -50,9 +50,9 @@ import '../screens/connection_copy.dart';
 import '../settings/haptics.dart';
 import '../settings/scroll_direction.dart';
 import '../settings/sensitivity.dart';
-import '../theme/tokens.dart';
 import '../trackpad/tuning.dart';
 import '../widgets/keep_awake.dart';
+import 'dot_grid.dart';
 import 'gesture_classifier.dart';
 import 'trackpad_driver.dart';
 
@@ -74,6 +74,11 @@ class TrackpadCore extends ConsumerStatefulWidget {
   /// [keepAwake] singleton; tests inject a spy to assert the ref-count.
   final KeepAwake? keepAwake;
 
+  /// Dot-grid tile size for the decorative [DotGridPainter] background. The
+  /// full Trackpad screen keeps the default [kTrackpadDotTileFull] (24px); the
+  /// floating window passes [kTrackpadDotTileWindow] (22px).
+  final double dotTile;
+
   /// Test seam: inject a classifier to drive the FSM deterministically.
   /// Production callers pass none → the real construction is used.
   @visibleForTesting
@@ -91,6 +96,7 @@ class TrackpadCore extends ConsumerStatefulWidget {
     required this.authed,
     required this.dragLock,
     this.keepAwake,
+    this.dotTile = kTrackpadDotTileFull,
     this.classifier,
     this.driver,
   });
@@ -236,13 +242,26 @@ class TrackpadCoreState extends ConsumerState<TrackpadCore> {
       onPointerUp: _onPointerUp,
       onPointerCancel: _onPointerCancel,
       behavior: HitTestBehavior.opaque,
-      child: Container(
-        color: kBg,
-        alignment: Alignment.center,
-        child: Text(
-          widget.authed ? kTrackpadHintAuthed : kTrackpadHintNotConnected,
-          style: const TextStyle(color: kMuted),
-        ),
+      // The dot-grid texture (09-01) is a decorative CustomPaint UNDER this
+      // Listener: it has no child and no hitTest, so every pointer event still
+      // reaches the Listener above (the drag/tap route is untouched). The hint
+      // Text is layered above in an IgnorePointer so it never swallows a touch
+      // either. No fake cursor dot / tap ripple (locked exclusion).
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CustomPaint(painter: DotGridPainter(tile: widget.dotTile)),
+          IgnorePointer(
+            child: Center(
+              child: Text(
+                widget.authed
+                    ? kTrackpadHintAuthed
+                    : kTrackpadHintNotConnected,
+                style: const TextStyle(color: kTrackpadHintColor),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

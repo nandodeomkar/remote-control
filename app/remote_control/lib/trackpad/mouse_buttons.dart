@@ -29,17 +29,28 @@ class MouseButtonsBar extends StatelessWidget {
   /// False renders the gated all-muted, non-interactive state.
   final bool enabled;
 
+  /// Bar height in logical px. The full-trackpad screen keeps the default 64px
+  /// (Prototype line 118); the floating window passes 56px (line 412). The
+  /// per-button touch floor is derived from this minus the 16px vertical
+  /// padding (64→48, 56→40).
+  final double height;
+
   /// Creates the bar.
   const MouseButtonsBar({
     super.key,
     required this.onPress,
     required this.enabled,
+    this.height = 64,
   });
 
   @override
   Widget build(BuildContext context) {
+    // The per-button touch floor tracks the bar height minus the 16px vertical
+    // padding (64→48 unchanged; 56→40 for the window bar) so a shorter bar has
+    // no RenderFlex overflow.
+    final buttonMinHeight = height - 16;
     return Container(
-      height: 64,
+      height: height,
       color: kBg,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Row(
@@ -51,6 +62,7 @@ class MouseButtonsBar extends StatelessWidget {
               tooltip: 'Left click',
               button: 'left',
               enabled: enabled,
+              minHeight: buttonMinHeight,
               onPress: onPress,
             ),
           ),
@@ -61,6 +73,7 @@ class MouseButtonsBar extends StatelessWidget {
               tooltip: 'Middle click',
               button: 'middle',
               enabled: enabled,
+              minHeight: buttonMinHeight,
               onPress: onPress,
             ),
           ),
@@ -72,6 +85,7 @@ class MouseButtonsBar extends StatelessWidget {
               tooltip: 'Right click',
               button: 'right',
               enabled: enabled,
+              minHeight: buttonMinHeight,
               onPress: onPress,
             ),
           ),
@@ -87,6 +101,7 @@ class _MouseButton extends StatefulWidget {
   final String tooltip;
   final String button;
   final bool enabled;
+  final double minHeight;
   final void Function(String button) onPress;
 
   const _MouseButton({
@@ -94,6 +109,7 @@ class _MouseButton extends StatefulWidget {
     required this.tooltip,
     required this.button,
     required this.enabled,
+    required this.minHeight,
     required this.onPress,
   });
 
@@ -127,8 +143,9 @@ class _MouseButtonState extends State<_MouseButton> {
         onTapUp: widget.enabled ? (_) => _release() : null,
         onTapCancel: widget.enabled ? _release : null,
         child: Container(
-          // Fills the padded 64px bar -> 48px tall (the touch-target floor).
-          constraints: const BoxConstraints(minHeight: 48),
+          // Fills the padded bar -> [minHeight] tall (64px bar → 48px floor;
+          // 56px window bar → 40px, no overflow).
+          constraints: BoxConstraints(minHeight: widget.minHeight),
           decoration: BoxDecoration(
             color: kSurface,
             border: Border.all(color: borderColor),

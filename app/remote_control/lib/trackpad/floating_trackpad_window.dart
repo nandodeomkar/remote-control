@@ -40,6 +40,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../settings/window_position.dart';
 import '../theme/tokens.dart';
 import '../widgets/keep_awake.dart';
+import 'dot_grid.dart';
 import 'mouse_buttons.dart';
 import 'trackpad_core.dart';
 
@@ -218,12 +219,16 @@ class _FloatingTrackpadWindowState
                 authed: widget.authed,
                 dragLock: _dragLock,
                 keepAwake: widget.keepAwake,
+                // 22px window-surface dot grid (Prototype line 405).
+                dotTile: kTrackpadDotTileWindow,
               ),
             ),
             // L/M/R buttons (PAD-02), muted when not authed ("muted, not red").
+            // 56px window bar (Prototype line 412) vs the 64px full-screen bar.
             MouseButtonsBar(
               onPress: widget.onMouseButton,
               enabled: widget.authed,
+              height: 56,
             ),
           ],
         ),
