@@ -1,0 +1,27 @@
+{
+  "name": "tabs-group-missing-color",
+  "description": "NEGATIVE (D-05, protocol 1.5): a GroupEl missing the required `color` field must be a hard decode error in both codecs — GroupEl's four fields (id, title, color, collapsed) are all required; missing required fields are never silently coerced.",
+  "wire": {
+    "t": "tabs.changed",
+    "p": {
+      "connected": true,
+      "groups": [
+        {
+          "id": 1,
+          "title": "Work",
+          "collapsed": false
+        }
+      ],
+      "tabs": [
+        {
+          "id": 7,
+          "title": "GitHub",
+          "active": true
+        }
+      ]
+    }
+  },
+  "expect": {
+    "error": true
+  }
+}

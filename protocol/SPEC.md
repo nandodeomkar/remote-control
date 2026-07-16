@@ -1,6 +1,6 @@
 # Remote Control Wire Protocol — SPEC
 
-**protoVersion:** `"1.4"`
+**protoVersion:** `"1.5"`
 **Status:** Locked contract. Both codecs (Rust `server-core`, Dart `remote_protocol`) are written against this document and proven byte-identical by the golden fixtures in `protocol/fixtures/`. No codec may adjust a fixture to match its own output.
 
 Transport: a single WebSocket connection per session carrying two frame kinds — JSON text frames (everything) and 9-byte binary frames (mouse hot path only). Discovery is UDP broadcast (out of scope for this document; see design spec §4).
@@ -29,7 +29,7 @@ Every JSON text frame is an object of the shape:
 
 ## 2. Versioning (D-06)
 
-- `protoVersion` is a `"major.minor"` string. Current version: `"1.4"`.
+- `protoVersion` is a `"major.minor"` string. Current version: `"1.5"`.
 - `hello` carries `protoVersion`. The server parses only the **major** component.
 - **Major mismatch:** the server replies `err` with `code:"versionMismatch"` and payload fields `serverVersion` and `clientVersion` (both `"major.minor"` strings), then closes the connection.
 - **Minor mismatch:** accepted. Peers simply do not use features the other side does not know; unknown fields and unknown types are handled by the strictness rules (§1, §10).
@@ -37,6 +37,7 @@ Every JSON text frame is an object of the shape:
 - **1.2 addition (APPS-02/APPS-03, D-07):** optional `icon` (base64 PNG, 32×32) and `path` (resolved exe path) fields on the `apps.list`/`apps.changed` window elements, plus the `apps.changed` S→C push. Minor bump — legacy elements without the fields stay valid.
 - **1.3 addition (SRV-05, D-07):** the S→C `input.blocked {reason}` push — a transient UIPI-elevated-foreground-window notice. Minor bump.
 - **1.4 addition (BROW-01):** the `tabs.*` family (`tabs.list`, `tabs.changed`, `tabs.activate`, `tabs.close`, §7) — live browser tab list fed by the localhost extension leg (§15). Minor bump — 1.0–1.3 clients stay accepted.
+- **1.5 addition (BROW-01):** tab-group visibility — the GroupEl element, optional `groups` on the `tabs.list` reply / `tabs.changed` / `tabs.state` payloads, and the optional TabEl `groupId`. View-only (no group commands). Minor bump — 1.0–1.4 clients stay accepted.
 
 ## 3. Handshake FSM
 
@@ -117,8 +118,8 @@ Direction: C→S (client to server), S→C (server to client), C↔S (both).
 | `apps.focus` | C→S | `id` (integer) | — | |
 | `apps.close` | C→S | `id` (integer) | — | |
 | `apps.changed` | S→C | `windows` (array of `{id: integer, title: string, icon?: string, path?: string}`) | — | Server push; same element shape (and skip-when-absent convention) as the `apps.list` reply |
-| `tabs.list` | C→S request / S→C reply | request: — (`p` is `{}`); reply: `connected` (bool), `tabs` (array of TabEl) | — | Pull on Browser-screen open (protoVersion 1.4). With the extension never connected the reply is `{connected:false, tabs:[]}` |
-| `tabs.changed` | S→C | `connected` (bool), `tabs` (array of TabEl) | — | Server push (protoVersion 1.4): on any tab change AND on extension connect/disconnect |
+| `tabs.list` | C→S request / S→C reply | request: — (`p` is `{}`); reply: `connected` (bool), `tabs` (array of TabEl) | reply: `groups` (array of GroupEl, protoVersion 1.5 — absent from 1.4 servers) | Pull on Browser-screen open (protoVersion 1.4). With the extension never connected the reply is `{connected:false, tabs:[]}` |
+| `tabs.changed` | S→C | `connected` (bool), `tabs` (array of TabEl) | `groups` (array of GroupEl, protoVersion 1.5 — absent from 1.4 servers) | Server push (protoVersion 1.4): on any tab change AND on extension connect/disconnect |
 | `tabs.activate` | C→S | `id` (integer) | — | Switch the PC browser to that tab (window focused too). Fire-and-forget — no err reply; stale ids self-heal via the next `tabs.changed`. Executor-bound (§11) |
 | `tabs.close` | C→S | `id` (integer) | — | Close that tab. Fire-and-forget — same semantics as `tabs.activate`. Executor-bound (§11) |
 | `clip.set` | C↔S | `text` (string) | — | Both directions |
@@ -130,7 +131,9 @@ Direction: C→S (client to server), S→C (server to client), C↔S (both).
 | `pong` | S→C | `ts` (integer, echoed from `ping`) | — | |
 | `err` | S→C | `code` (string), `msg` (string) | code-specific fields | Human-readable `msg`; see codes below |
 
-**TabEl element (protoVersion 1.4):** `{id: integer, title: string, active: bool, icon?: string}` — `icon` is a base64 PNG WITHOUT a `data:` prefix (the exact WindowInfo icon convention: skipped entirely when absent, never emitted as null). Exactly one element carries `active:true`. **No `url` field ever crosses the phone-facing wire** — titles are enough (privacy).
+**TabEl element (protoVersion 1.4):** `{id: integer, title: string, active: bool, icon?: string, groupId?: integer}` — `icon` is a base64 PNG WITHOUT a `data:` prefix (the exact WindowInfo icon convention: skipped entirely when absent, never emitted as null). `groupId` (protoVersion 1.5) references a GroupEl `id`; absent = ungrouped — skipped entirely when absent, never emitted as null (and never emitted as `-1`). Exactly one element carries `active:true`. **No `url` field ever crosses the phone-facing wire** — titles are enough (privacy).
+
+**GroupEl element (protoVersion 1.5):** `{id: integer, title: string, color: string, collapsed: bool}` — ALL four fields are required within an element (a missing field is a hard decode error, exactly like TabEl's `id`/`title`/`active`). `color` is Chrome's named group color passed through verbatim — vocabulary `grey|blue|red|yellow|green|pink|purple|cyan|orange`; the value is NOT validated on the wire (unknown names render as a neutral fallback client-side, the enum-string leniency rule). `title` may be empty (Chrome allows unnamed groups) and is capped at 32 chars extension-side. `collapsed` is display metadata only — no wire message toggles it (view-only: there are no group create/collapse/move commands).
 
 **`err` codes:**
 
@@ -220,12 +223,12 @@ Message table (extension ↔ server):
 | Type | Direction | `p` | Notes |
 |------|-----------|-----|-------|
 | `ext.hello` | ext→srv | `extVersion` (string) | First frame after connect |
-| `tabs.state` | ext→srv | `tabs` (array of TabEl, §7) | ALWAYS a full snapshot, never a diff |
+| `tabs.state` | ext→srv | `tabs` (array of TabEl, §7); `groups` (array of GroupEl, §7 — optional, protoVersion 1.5) | ALWAYS a full snapshot, never a diff |
 | `ext.ping` | ext→srv | `{}` | 20 s keepalive (holds the MV3 service worker alive) |
 | `ext.pong` | srv→ext | `{}` | Keepalive reply |
 | `tabs.activate` | srv→ext | `id` (integer) | Same payload as the phone-facing message |
 | `tabs.close` | srv→ext | `id` (integer) | Same payload as the phone-facing message |
 
-**Limits:** the 64 KB `max_message_size`/`max_frame_size` caps (§13) apply per-listener — an oversize frame kills the extension session. Extension-side caps enforced BEFORE send: max **50 tabs**, max **4096 base64 chars** per icon (icon dropped above), and if the serialized `tabs.state` frame exceeds **56 KB** icons are stripped from the end of the list until it fits. The server additionally truncates at 50 tabs as a belt.
+**Limits:** the 64 KB `max_message_size`/`max_frame_size` caps (§13) apply per-listener — an oversize frame kills the extension session. Extension-side caps enforced BEFORE send: max **50 tabs**, max **4096 base64 chars** per icon (icon dropped above), max **16 groups** with group titles capped at **32 chars** (protoVersion 1.5), and if the serialized `tabs.state` frame exceeds **56 KB** icons are stripped from the end of the list until it fits. The server additionally truncates at 50 tabs — and at 16 groups — as a belt.
 
 **Fixtures:** mandatory only for the phone-facing `tabs.*` family (`protocol/fixtures/tabs/`). The extension leg has exactly one Rust implementation and one JS implementation, with no codec harness — this section's prose plus the server's integration tests are its contract.

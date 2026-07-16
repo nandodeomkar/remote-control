@@ -1,0 +1,48 @@
+{
+  "name": "tabs-list-reply-with-groups",
+  "description": "S→C tabs.list reply (protocol 1.5, BROW-01, quick 260716-sme): the reply shape carries the optional groups array — one GroupEl, one grouped TabEl referencing it. Present groups (including []) round-trip; absent groups stays absent (fixtures 01–05 prove the 1.4 shape).",
+  "wire": {
+    "t": "tabs.list",
+    "p": {
+      "connected": true,
+      "groups": [
+        {
+          "id": 4,
+          "title": "News",
+          "color": "green",
+          "collapsed": false
+        }
+      ],
+      "tabs": [
+        {
+          "id": 3,
+          "title": "BBC",
+          "active": true,
+          "groupId": 4
+        }
+      ]
+    }
+  },
+  "expect": {
+    "t": "tabs.list",
+    "p": {
+      "connected": true,
+      "groups": [
+        {
+          "id": 4,
+          "title": "News",
+          "color": "green",
+          "collapsed": false
+        }
+      ],
+      "tabs": [
+        {
+          "id": 3,
+          "title": "BBC",
+          "active": true,
+          "groupId": 4
+        }
+      ]
+    }
+  }
+}

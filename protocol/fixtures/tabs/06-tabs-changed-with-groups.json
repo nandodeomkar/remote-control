@@ -1,0 +1,71 @@
+{
+  "name": "tabs-changed-with-groups",
+  "description": "S→C tabs.changed push (protocol 1.5, BROW-01, quick 260716-sme): groups array round-trips — first GroupEl carries an unknown `future` field that must be IGNORED on decode (D-05, dropped on canonical re-encode); second GroupEl has an empty title + collapsed:true (both legal). Grouped TabEl keeps its groupId; the ungrouped TabEl re-encodes WITHOUT the key (skip-when-absent, never null).",
+  "wire": {
+    "t": "tabs.changed",
+    "p": {
+      "connected": true,
+      "groups": [
+        {
+          "id": 1,
+          "title": "Work",
+          "color": "blue",
+          "collapsed": false,
+          "future": "ignored"
+        },
+        {
+          "id": 2,
+          "title": "",
+          "color": "orange",
+          "collapsed": true
+        }
+      ],
+      "tabs": [
+        {
+          "id": 7,
+          "title": "GitHub",
+          "active": true,
+          "groupId": 1
+        },
+        {
+          "id": 9,
+          "title": "Docs",
+          "active": false
+        }
+      ]
+    }
+  },
+  "expect": {
+    "t": "tabs.changed",
+    "p": {
+      "connected": true,
+      "groups": [
+        {
+          "id": 1,
+          "title": "Work",
+          "color": "blue",
+          "collapsed": false
+        },
+        {
+          "id": 2,
+          "title": "",
+          "color": "orange",
+          "collapsed": true
+        }
+      ],
+      "tabs": [
+        {
+          "id": 7,
+          "title": "GitHub",
+          "active": true,
+          "groupId": 1
+        },
+        {
+          "id": 9,
+          "title": "Docs",
+          "active": false
+        }
+      ]
+    }
+  }
+}

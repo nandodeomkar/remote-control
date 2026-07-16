@@ -1,12 +1,12 @@
 // Remote Control — Tab Bridge (MV3 service worker).
 //
 // Talks ONLY to the Remote Control server on this machine over
-// ws://127.0.0.1:<PORT>. Sends full tab snapshots (title + favicon, never
-// full URLs beyond what the local favicon cache needs) and executes
-// tabs.activate / tabs.close commands from the server.
+// ws://127.0.0.1:<PORT>. Sends full tab snapshots (title + favicon + tab
+// groups, never full URLs beyond what the local favicon cache needs) and
+// executes tabs.activate / tabs.close commands from the server.
 //
-// Privacy discipline: NEVER log tab titles or urls to the console — they
-// are browsing data. Lifecycle events and counts only.
+// Privacy discipline: NEVER log tab titles, group titles, or urls to the
+// console — they are browsing data. Lifecycle events and counts only.
 
 // Must match the server's RC_EXT_PORT (default 17779). If you change the
 // server port, edit this const and press the reload arrow for the extension
@@ -17,6 +17,12 @@ const PORT = 17779;
 const MAX_TABS = 50;
 const MAX_ICON_B64 = 4096; // chars; icons above this are dropped
 const MAX_FRAME_BYTES = 57344; // 56 KB — under the server's 64 KB WS cap
+const MAX_GROUPS = 16; // tab groups per snapshot (SPEC §15, protoVersion 1.5)
+const MAX_GROUP_TITLE = 32; // chars; group titles truncated above this
+
+// chrome.tabGroups may be absent (older browsers / non-Chromium forks) — the
+// worker must still load and report ungrouped tabs.
+const GROUP_ID_NONE = chrome.tabGroups ? chrome.tabGroups.TAB_GROUP_ID_NONE : -1;
 
 const PING_INTERVAL_MS = 20000; // Chrome >=116: WS message activity keeps the SW alive
 const DEBOUNCE_MS = 200;
@@ -186,6 +192,14 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
     onTabEvent();
   }
 });
+// Group events feed the same debounced snapshot (guarded: the API may be
+// absent on browsers without tab groups — the worker must still load).
+if (chrome.tabGroups) {
+  chrome.tabGroups.onCreated.addListener(onTabEvent);
+  chrome.tabGroups.onUpdated.addListener(onTabEvent);
+  chrome.tabGroups.onRemoved.addListener(onTabEvent);
+  chrome.tabGroups.onMoved.addListener(onTabEvent);
+}
 
 function scheduleSnapshot() {
   clearTimeout(snapshotTimer);
@@ -233,6 +247,10 @@ async function buildAndSend() {
       title: tab.title !== undefined ? tab.title : "",
       active: tab.id === activeId,
     };
+    // groupId only when grouped — never emit -1 (TAB_GROUP_ID_NONE), never null.
+    if (tab.groupId !== undefined && tab.groupId !== GROUP_ID_NONE) {
+      el.groupId = tab.groupId;
+    }
     const icon = tab.url ? await favicon(tab.url) : null;
     if (icon !== null && icon.length <= MAX_ICON_B64) {
       el.icon = icon;
@@ -240,19 +258,48 @@ async function buildAndSend() {
     els.push(el);
   }
 
+  // Tab groups (protoVersion 1.5): degrade to [] on ANY failure — a snapshot
+  // without groups is better than no snapshot. NEVER log group titles.
+  let groups = [];
+  if (chrome.tabGroups) {
+    try {
+      const referenced = new Set(
+        els.filter((e) => e.groupId !== undefined).map((e) => e.groupId)
+      );
+      const all = await chrome.tabGroups.query({});
+      groups = all
+        .filter((g) => referenced.has(g.id)) // drop groups whose tabs fell past the 50-tab cap
+        .slice(0, MAX_GROUPS)
+        .map((g) => ({
+          id: g.id,
+          title: (g.title || "").slice(0, MAX_GROUP_TITLE),
+          color: g.color,
+          collapsed: !!g.collapsed,
+        }));
+    } catch {
+      groups = [];
+    }
+  }
+
   // 56 KB serialized budget: strip icons from the END of the list until under.
-  let frame = JSON.stringify({ t: "tabs.state", p: { tabs: els } });
+  let frame = JSON.stringify({ t: "tabs.state", p: { tabs: els, groups } });
   for (let i = els.length - 1; i >= 0 && frame.length > MAX_FRAME_BYTES; i--) {
     if (els[i].icon !== undefined) {
       delete els[i].icon;
-      frame = JSON.stringify({ t: "tabs.state", p: { tabs: els } });
+      frame = JSON.stringify({ t: "tabs.state", p: { tabs: els, groups } });
     }
   }
 
   if (ws && ws.readyState === WebSocket.OPEN) {
     try {
       ws.send(frame);
-      console.log("[tab-bridge] snapshot sent:", els.length, "tabs");
+      console.log(
+        "[tab-bridge] snapshot sent:",
+        els.length,
+        "tabs,",
+        groups.length,
+        "groups"
+      );
     } catch {
       /* onclose handles it; next connect pushes a fresh snapshot */
     }
