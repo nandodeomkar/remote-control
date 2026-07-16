@@ -52,7 +52,7 @@ Next: 09-08 on-device visual UAT gate re-run — MUST `flutter build apk --relea
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-16 -- Completed quick task 260716-kba: Add QR pairing scanner to Flutter app
+Last activity: 2026-07-16 -- Completed quick task 260716-lp5: Distribution prep (appId rename, signing scaffold, DISTRIBUTION.md)
 
 Progress: [██████████] 100% (8 of 8 phases complete; 62 of 62 plans)
 
@@ -327,6 +327,7 @@ Recent decisions affecting current work:
 | 260708-ejx | Fix WR-01 — pairing window re-pair loop | 2026-07-08 | 54cfcff | [260708-ejx-fix-wr-01-pairing-window-re-pair-loop](./quick/260708-ejx-fix-wr-01-pairing-window-re-pair-loop/) |
 | 260711-huz | Fix browser zoom-in keymap (Plus → '=') + doc Google Slides presenter limitation | 2026-07-11 | b27f617 | [260711-huz-fix-browser-zoom-in-keymap-plus-document](./quick/260711-huz-fix-browser-zoom-in-keymap-plus-document/) |
 | 260716-kba | Add QR pairing scanner to Flutter app | 2026-07-16 | c294a8b | [260716-kba-add-qr-pairing-scanner-to-flutter-app](./quick/260716-kba-add-qr-pairing-scanner-to-flutter-app/) |
+| 260716-lp5 | Distribution prep: appId rename, release signing scaffold, DISTRIBUTION.md | 2026-07-16 | a6eaf8a | [260716-lp5-distribution-prep-appid-rename-release-s](./quick/260716-lp5-distribution-prep-appid-rename-release-s/) |
 
 ## Deferred Items
 
