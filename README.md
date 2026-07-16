@@ -1,8 +1,66 @@
 # Remote Control
 
-An Android app that turns a phone into a wireless mouse, keyboard, and control center for a Windows laptop, paired with a lightweight Windows tray server. The phone controls the laptop over WiFi with zero friction — instant cursor response, full keyboard, and control-center extras (media, power, apps, clipboard, presenter, browser) — all free. This is a protocol-first monorepo: the wire contract in `protocol/` is the source of truth, and both the Rust server and the Dart/Flutter client are tested against the same golden fixtures.
+Turn your Android phone into a wireless mouse, keyboard, and control center for a Windows PC. Your phone controls the computer over your home WiFi — instant cursor response, a full keyboard, and extras like media controls, an app switcher, clipboard sync, presenter mode, and power controls. All free.
 
-## Layout
+## Install
+
+You need two devices: the **Windows PC** you want to control and the **Android phone** that will control it. Both must be on the **same WiFi network**. The whole setup takes about five minutes.
+
+1. **Accept the invite.** This project is private, so first accept the GitHub invitation that was emailed to you (check the email address tied to your GitHub account). Until you accept, the download page will show a "404 not found" error.
+
+2. **Get the files.** Open the [Releases page](../../releases/latest) and you will see two files:
+   - `RemoteControl-Server-v1.0.0.exe` — for the **PC**
+   - `RemoteControl-v1.0.0.apk` — for the **phone**
+
+   Download the `.exe` on the PC. For the `.apk`, open the Releases page in your **phone's browser** and download it directly on the phone — that skips the hassle of transferring the file between devices.
+
+### On your PC
+
+1. Download `RemoteControl-Server-v1.0.0.exe` and double-click it.
+2. Windows shows a blue **"Windows protected your PC"** warning. This is normal for programs that don't come from the Microsoft Store. Click **More info**, then **Run anyway**.
+3. A firewall popup appears next — click **Allow access**.
+4. Success looks like this: a small icon appears in the tray near the clock (you may need to click the **^** arrow to see it).
+
+### On your phone
+
+1. Open the [Releases page](../../releases/latest) in your phone's browser and download `RemoteControl-v1.0.0.apk`.
+2. Tap the downloaded file. Your phone warns about installing apps from outside the Play Store — when asked, allow it for your browser (**"Install unknown apps"** / **"Allow from this source"**).
+3. Install, then open **Remote Control**.
+
+### Pair them
+
+1. Make sure the phone and the PC are on the **same WiFi**.
+2. On the PC, click the tray icon and open the pair window — it shows a QR code.
+3. On the phone, pick your PC from the list and tap **Scan QR**, then point the camera at the code. Done — you're paired.
+
+If the camera scan doesn't work, the pair window also shows a 6-digit PIN you can type into the phone instead. After the first pairing, the phone reconnects by itself.
+
+## What you get
+
+- A trackpad with instant cursor response
+- A full keyboard, including special keys
+- A floating trackpad bubble you can use over any screen
+- Media controls and volume, with the PC's real volume shown live
+- An app switcher to jump between open windows
+- Clipboard sync between phone and PC, with history
+- Power controls: lock, sleep, restart, shutdown — the dangerous ones are double-confirmed so you can't trigger them by accident
+- Presenter mode with slide controls and an on-phone timer
+- Browser shortcuts: back/forward, tabs, zoom
+- Everything is free, no accounts, and it only works on your own WiFi
+
+## Troubleshooting
+
+**The phone can't find the PC.** Confirm BOTH devices are on the same WiFi network — a phone on mobile data won't find it.
+
+**I clicked past the firewall popup (or hit "Cancel").** Close the tray program on the PC and run the `.exe` again to get the popup back — click **Allow access** this time.
+
+**The QR code stopped working.** The code expires after 60 seconds for safety. Close the pair window on the PC and open it again for a fresh code.
+
+## For developers
+
+This is a protocol-first monorepo: the wire contract in `protocol/` is the source of truth, and both the Rust server and the Dart/Flutter client are tested against the same golden fixtures.
+
+### Layout
 
 | Directory | Contents |
 |-----------|----------|
@@ -10,7 +68,7 @@ An Android app that turns a phone into a wireless mouse, keyboard, and control c
 | `server/` | Rust cargo workspace: `server-core` (OS-agnostic protocol/auth/dispatch core) + future `server-windows` binary |
 | `app/` | Flutter client; `app/packages/remote_protocol` is the pure Dart protocol package |
 
-## Testing
+### Testing
 
 The local test suites are the CI gate — both must pass before any commit is considered done:
 
@@ -22,3 +80,5 @@ cd app/packages/remote_protocol && dart test
 The Dart invocation MUST run from the package root (`app/packages/remote_protocol`) — the fixture tests load `protocol/fixtures/` by relative path.
 
 `protocol/fixtures/` is the shared cross-language contract: the Rust and Dart codecs are tested against the same fixture bytes, and no codec may adjust a fixture to match its own output. A dormant GitHub Actions workflow (`.github/workflows/ci.yml`) runs the same two suites and activates automatically if the repo is ever pushed to GitHub.
+
+See [DISTRIBUTION.md](DISTRIBUTION.md) for how to build and distribute the release files.
