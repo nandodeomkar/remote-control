@@ -9,6 +9,9 @@
 ///     tap+mods (D-10 combo), and a gated pad is inert;
 /// (c) the caps are finger-sized — they fill the pad by flex, "dramatically
 ///     larger than the old ~200px strip" (the user-locked acceptance bar);
+/// (d) the tab bar shows the selected pad in accent with a 2px top underline
+///     and is ALWAYS interactive (navigation, never gated).
+///
 /// Pads take injected callbacks, so none of this needs a service fake.
 library;
 
@@ -17,6 +20,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:remote_control/keyboard/key_pads.dart';
 import 'package:remote_control/keyboard/key_rows.dart';
+import 'package:remote_control/theme/tokens.dart';
 
 void main() {
   late List<String> events;
@@ -295,4 +299,113 @@ void main() {
     });
   });
 
+  group('KeyboardTabBar', () {
+    Widget tabHost(KeyboardPad current, {void Function(KeyboardPad)? onSelect}) =>
+        MaterialApp(
+          home: Scaffold(
+            body: KeyboardTabBar(
+              current: current,
+              onSelect: onSelect ?? (_) {},
+            ),
+          ),
+        );
+
+    testWidgets('renders 4 tabs with their labels and icons', (tester) async {
+      await tester.pumpWidget(tabHost(KeyboardPad.type));
+
+      for (final pad in KeyboardPad.values) {
+        expect(find.text(kKeyboardTabLabels[pad]!), findsOneWidget);
+        expect(find.byIcon(kKeyboardTabIcons[pad]!), findsOneWidget);
+      }
+    });
+
+    testWidgets('selected tab is accent with a 2px accent TOP underline; '
+        'unselected are muted over the hairline', (tester) async {
+      await tester.pumpWidget(tabHost(KeyboardPad.numpad));
+
+      Text labelOf(KeyboardPad pad) =>
+          tester.widget<Text>(find.text(kKeyboardTabLabels[pad]!));
+      Icon iconOf(KeyboardPad pad) =>
+          tester.widget<Icon>(find.byIcon(kKeyboardTabIcons[pad]!));
+      BorderSide topOf(KeyboardPad pad) {
+        final container = tester.widget<Container>(
+          find
+              .ancestor(
+                of: find.text(kKeyboardTabLabels[pad]!),
+                matching: find.byType(Container),
+              )
+              .first,
+        );
+        return (container.decoration! as BoxDecoration).border!.top;
+      }
+
+      // Selected.
+      expect(labelOf(KeyboardPad.numpad).style!.color, kAccent);
+      expect(iconOf(KeyboardPad.numpad).color, kAccent);
+      expect(topOf(KeyboardPad.numpad).color, kAccent);
+      expect(topOf(KeyboardPad.numpad).width, 2);
+
+      // Unselected: muted faces; the 2px accent segment gives way to the
+      // bar's 1px hairline top border.
+      for (final pad in [KeyboardPad.type, KeyboardPad.arrows, KeyboardPad.fn]) {
+        expect(labelOf(pad).style!.color, kMuted);
+        expect(iconOf(pad).color, kMuted);
+        expect(topOf(pad).color, kHairline);
+        expect(topOf(pad).width, 1);
+      }
+    });
+
+    testWidgets('tapping a tab fires onSelect with the matching pad',
+        (tester) async {
+      final selected = <KeyboardPad>[];
+      await tester.pumpWidget(
+        tabHost(KeyboardPad.type, onSelect: selected.add),
+      );
+
+      for (final pad in KeyboardPad.values) {
+        await tester.tap(find.text(kKeyboardTabLabels[pad]!));
+        await tester.pump();
+      }
+
+      expect(selected, KeyboardPad.values);
+    });
+
+    testWidgets('tabs are ALWAYS interactive — even the selected one, and '
+        'there is no gated variant', (tester) async {
+      final selected = <KeyboardPad>[];
+      await tester.pumpWidget(
+        tabHost(KeyboardPad.numpad, onSelect: selected.add),
+      );
+
+      // Re-tapping the current tab still fires: the bar is navigation, and
+      // navigation never depends on the connection (caps and chips carry the
+      // gating). The screen owner decides what a same-page select means.
+      await tester.tap(find.text(kKeyboardTabLabels[KeyboardPad.numpad]!));
+      await tester.pump();
+
+      expect(selected, [KeyboardPad.numpad]);
+      for (final tab in tester.widgetList<InkWell>(find.byType(InkWell))) {
+        expect(tab.onTap, isNotNull);
+      }
+    });
+
+    testWidgets('bar is >=56 tall; icons 24, labels 12/400', (tester) async {
+      await tester.pumpWidget(tabHost(KeyboardPad.type));
+
+      expect(
+        tester.getSize(find.byType(KeyboardTabBar)).height,
+        greaterThanOrEqualTo(56),
+      );
+      for (final pad in KeyboardPad.values) {
+        expect(
+          tester.widget<Icon>(find.byIcon(kKeyboardTabIcons[pad]!)).size,
+          24,
+        );
+        final style =
+            tester.widget<Text>(find.text(kKeyboardTabLabels[pad]!)).style!;
+        expect(style.fontSize, 12);
+        expect(style.fontWeight, FontWeight.w400);
+      }
+    });
+  });
 }

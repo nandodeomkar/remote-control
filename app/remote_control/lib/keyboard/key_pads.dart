@@ -32,6 +32,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
+import '../theme/tokens.dart';
 import 'key_rows.dart';
 
 /// The centered hint copy on the Type pad (Copywriting Contract, verbatim
@@ -104,6 +105,21 @@ const double _kDigitLabelSize = 28;
 /// The Arrows pad's inverted-T arrow glyph size (UI-SPEC §Typography).
 const double _kLargeIconSize = 28;
 
+/// The bottom tab bar's height (excluding the bottom SafeArea inset).
+const double _kTabBarHeight = 56;
+
+/// Tab icon size (UI-SPEC §Bottom tab bar).
+const double _kTabIconSize = 24;
+
+/// Tab label size / xs icon→label gap (UI-SPEC §Bottom tab bar).
+const double _kTabLabelSize = 12;
+const double _kTabGap = 4;
+
+/// The selected tab's accent top-edge underline weight; unselected tabs carry
+/// the bar's 1px hairline top border instead (UI-SPEC §Bottom tab bar).
+const double _kTabUnderlineWidth = 2;
+const double _kTabHairlineWidth = 1;
+
 // ── Pads ──────────────────────────────────────────────────────────────────
 
 /// Shared plumbing for the four pads: the [KeyRows] callback contract plus
@@ -163,6 +179,95 @@ abstract class _KeyPad extends StatelessWidget {
         hasArmedMods: hasArmedMods,
         onPressHaptic: onPressHaptic,
       );
+}
+
+/// The bottom pad selector: icon over label, accent top-edge underline on the
+/// selected tab (UI-SPEC §Bottom tab bar). The [KeyRowGroupSwitcher] idiom,
+/// re-shaped from segment to tab.
+///
+/// # Always interactive — there is deliberately no `enabled` parameter
+///
+/// Tabs are NAVIGATION, not sends: they must work offline and unauthed, so
+/// the user can still reach a pad while the socket is down. The caps and the
+/// modifier chips carry the gating. Do not add a gated variant.
+///
+/// # Selection only — no haptics, no animation
+///
+/// The bar reports the tap and nothing else; the screen owner (10-05) runs
+/// `hapticTick()` and animates the PageView on [onSelect]. Keeping the effect
+/// out of here is what lets the bar be tested without a service or a
+/// controller, and lets swipe-settle reuse the same selection path without
+/// double-firing a haptic (UI-SPEC: swipe settle has no extra haptic).
+class KeyboardTabBar extends StatelessWidget {
+  /// The selected pad — accent icon + label + the 2px top underline.
+  final KeyboardPad current;
+
+  /// Fired with the tapped pad (including a re-tap of [current] — the screen
+  /// owner decides what a same-page select means).
+  final void Function(KeyboardPad pad) onSelect;
+
+  /// Creates the tab bar.
+  const KeyboardTabBar({
+    super.key,
+    required this.current,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: kBg,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: _kTabBarHeight,
+          child: Row(
+            children: [
+              for (final pad in KeyboardPad.values)
+                Expanded(
+                  child: InkWell(
+                    onTap: () => onSelect(pad),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        // The bar's 1px hairline top border, with the
+                        // selected tab's 2px accent segment replacing it.
+                        border: Border(
+                          top: BorderSide(
+                            color: pad == current ? kAccent : kHairline,
+                            width: pad == current
+                                ? _kTabUnderlineWidth
+                                : _kTabHairlineWidth,
+                          ),
+                        ),
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            kKeyboardTabIcons[pad],
+                            size: _kTabIconSize,
+                            color: pad == current ? kAccent : kMuted,
+                          ),
+                          const SizedBox(height: _kTabGap),
+                          Text(
+                            kKeyboardTabLabels[pad]!,
+                            style: TextStyle(
+                              color: pad == current ? kAccent : kMuted,
+                              fontSize: _kTabLabelSize,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Page 1 (default) — the system IME's canvas plus one slim extras row.
