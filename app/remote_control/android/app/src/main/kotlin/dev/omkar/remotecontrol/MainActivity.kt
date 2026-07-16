@@ -1,4 +1,4 @@
-package com.example.remote_control
+package dev.omkar.remotecontrol
 
 import android.content.Context
 import android.net.wifi.WifiManager
