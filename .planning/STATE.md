@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 08 complete — all phases done
+status: Ready to execute
 stopped_at: Phase 9 UI-SPEC approved
-last_updated: "2026-07-16T03:08:50.295Z"
-last_activity: 2026-07-15 -- Phase 08 execution started
+last_updated: "2026-07-16T04:02:38.898Z"
+last_activity: 2026-07-16 -- Phase 09 execution started
 progress:
   total_phases: 9
   completed_phases: 8
-  total_plans: 62
-  completed_plans: 62
+  total_plans: 70
+  completed_plans: 63
   percent: 89
 ---
 
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** All phases complete — dogfood/refine hold (no new milestone yet)
+**Current focus:** Phase 09 — ui-refinement-to-design-prototype-visual-pass-across-all-scr
 
 ## Current Position
 
-Phase: 08 (floating-trackpad-bubble-replace-quick-bar-with-draggable-bu) — COMPLETE 2026-07-16
-Plan: 6 of 6 complete
+Phase: 09 (ui-refinement-to-design-prototype-visual-pass-across-all-scr) — EXECUTING
+Plan: 2 of 8
 Next: nothing queued. All 8 phases done (62/62 plans). Phase 08 closed with the
   on-device UAT gate PASS (Xiaomi 25080RABDI, fresh release APK): all six
   human-checks — latency parity vs full Trackpad screen, dual position
@@ -42,7 +42,7 @@ Next: nothing queued. All 8 phases done (62/62 plans). Phase 08 closed with the
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-15 -- Phase 08 execution started
+Last activity: 2026-07-16 -- Phase 09 execution started
 
 Progress: [██████████] 100% (8 of 8 phases complete; 62 of 62 plans)
 
@@ -126,6 +126,7 @@ Progress: [██████████] 100% (8 of 8 phases complete; 62 of 6
 | Phase 08 P04 | ~10min | 2 tasks | 2 files |
 | Phase 08 P05 | 12min | 2 tasks | 2 files |
 | Phase 08 P06 | ~15min + UAT | 2 tasks | 5 files |
+| Phase 09 P01 | 6min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -281,6 +282,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 08]: 08-05: FloatingTrackpadWindow is rendered UNWRAPPED (no ScaleTransition/Opacity) in the expanded branch since it returns a bare Positioned that must be a direct Stack child (Transform/Opacity break the Positioned<->Stack ParentData contract when interposed) -- the 200ms AnimationController instead drives only the bubble's FadeTransition
 - [Phase 08]: 08-06: central wrapper migration — renaming HubTileSpec.showQuickBar->showBubble and swapping the _open wrap in hub_screen.dart alone migrated all 7 tool screens (D8-05); quick-bar deleted outright with no restore toggle (D8-06)
 - [Phase 08]: 08-06: `flutter install` reuses the last-built APK without rebuilding — on-device UAT of any migration REQUIRES an explicit `flutter build apk --release` first (burned: stale 07-15 APK installed with a fresh install timestamp, phone showed the old quick-bar)
+- [Phase ?]: [Phase 09-01]: dot-grid is a leaf CustomPaint (no child, no hitTest) mounted UNDER the Listener as Stack child[0], hint in IgnorePointer above — decoration cannot swallow input; drag still moves, tap still left-clicks (T-09-01 proven)
+- [Phase ?]: [Phase 09-01]: MouseButtonsBar per-button minHeight = height-16 (64->48 byte-identical, 56->40 window, no overflow); kTrackpadHintColor #4A505C a local non-token const so the D-12 seven-literal guard stays untripped
 
 ### Pending Todos
 
@@ -314,6 +317,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-16T03:08:50.282Z
+Last session: 2026-07-16T04:02:04.082Z
 Stopped at: Phase 9 UI-SPEC approved
 Resume file: .planning/phases/09-ui-refinement-to-design-prototype-visual-pass-across-all-scr/09-UI-SPEC.md
