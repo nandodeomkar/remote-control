@@ -25,7 +25,7 @@ reviewed_at: 2026-07-16
 | Tool | none (Flutter / Material 3 — shadcn gate not applicable) |
 | Preset | not applicable |
 | Component library | Flutter Material widgets (existing app at `app/remote_control/`) |
-| Icon library | Flutter built-in `Icons` (Material). Prototype renders Material Symbols Rounded; match the **icon choice**, keep the Flutter `Icons.*` the app already uses |
+| Icon library | Material Symbols Rounded via `material_symbols_icons` — `Symbols.<name>_rounded` consts, axes pinned app-wide in `buildAppTheme()` (`opsz 24 / wght 400 / FILL 0 / GRAD 0`, matching the prototype's Google Fonts request). Classic `Icons.*` is banned in `lib/` (`icons_guard_test`). *Amended 2026-07-16 by 09-09 gap closure: owner overrode the original keep-`Icons` skew acceptance after the 09-08 UAT.* |
 | Font | Roboto (Flutter Android default — matches the prototype's `Roboto` import) |
 
 **Registry safety:** not applicable — no shadcn, no third-party registries. Dimension 6 auto-passes.
