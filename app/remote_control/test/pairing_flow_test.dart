@@ -33,6 +33,12 @@ PairingSheet _sheet({
       explanation: explanation,
       onSubmitPin: onSubmitPin ?? (_) {},
       onRetryConnect: onRetryConnect ?? () {},
+      // Neutral 260716-kba scan-seam defaults: this suite exercises manual
+      // PIN entry only; scan-routing behavior lives in qr_scan_pairing_test.
+      targetHost: '192.168.1.50',
+      targetPort: 17777,
+      onConnectScanned: (_, _) {},
+      scanQr: () async => null,
     );
 
 /// All Text data currently rendered (for negative raw-enum assertions).

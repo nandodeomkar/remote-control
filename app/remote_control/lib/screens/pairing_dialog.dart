@@ -25,13 +25,17 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../net/connection_providers.dart';
 import '../net/handshake.dart';
 import '../net/handshake_fsm.dart';
+import '../net/pair_qr.dart';
 import '../net/reconnect_fsm.dart';
+import '../store/device_store.dart';
 import '../theme/tokens.dart';
 import 'connection_copy.dart';
+import 'qr_scan_screen.dart';
 
 /// The pairing sheet body. Pure widget: state comes in via constructor
 /// parameters, actions go out via callbacks — no Riverpod inside.
@@ -56,6 +60,22 @@ class PairingSheet extends StatefulWidget {
   /// Starts a FRESH dial to the target (the post-authFail retry path).
   final VoidCallback onRetryConnect;
 
+  /// The current target's host — a scanned QR naming this host+port feeds
+  /// the pin through the exact manual-entry path (260716-kba).
+  final String targetHost;
+
+  /// The current target's port (see [targetHost]).
+  final int targetPort;
+
+  /// Starts a fresh dial at a DIFFERENT scanned host/port (the user scanned
+  /// another PC's pair window — the QR is authoritative for where that PIN
+  /// lives). The sheet parks the pin and auto-feeds it at needPin.
+  final void Function(String host, int port) onConnectScanned;
+
+  /// The injected scan seam (house pattern): production pushes the real
+  /// [QrScanScreen] route, tests return a canned [PairQrData] or null.
+  final Future<PairQrData?> Function() scanQr;
+
   /// Creates the sheet.
   const PairingSheet({
     super.key,
@@ -65,6 +85,10 @@ class PairingSheet extends StatefulWidget {
     this.explanation,
     required this.onSubmitPin,
     required this.onRetryConnect,
+    required this.targetHost,
+    required this.targetPort,
+    required this.onConnectScanned,
+    required this.scanQr,
   });
 
   @override
@@ -166,6 +190,26 @@ class _PairingSheetState extends State<PairingSheet> {
     widget.onSubmitPin(pin);
   }
 
+  /// Routes a scan result into the EXISTING pairing path (260716-kba).
+  ///
+  /// Matching target: fill the field and run [_submit] — byte-identical to
+  /// typing (including the failure-retry branch and the lockout no-op:
+  /// during lockout the field fills, the countdown explains, the user taps
+  /// Pair when it ends). Different target: park the pin as [_pendingPin]
+  /// (the existing post-authFail retry mechanism) and fire a fresh dial —
+  /// the didUpdateWidget needPin-transition hook auto-feeds it.
+  Future<void> _scan() async {
+    final result = await widget.scanQr();
+    if (!mounted || result == null) return;
+    if (result.host == widget.targetHost && result.port == widget.targetPort) {
+      _pinCtrl.text = result.pin;
+      _submit();
+      return;
+    }
+    _pendingPin = result.pin;
+    widget.onConnectScanned(result.host, result.port);
+  }
+
   @override
   Widget build(BuildContext context) {
     final errorCopy = _errorCopy;
@@ -240,6 +284,21 @@ class _PairingSheetState extends State<PairingSheet> {
               child: const Text(kPairCta),
             ),
           ),
+          const SizedBox(height: 8),
+          // D-03 secondary affordance: always a TextButton — accent stays
+          // reserved for the primary CTA. Manual PIN entry is unchanged.
+          TextButton.icon(
+            onPressed: _scan,
+            style: TextButton.styleFrom(
+              minimumSize: const Size(48, 48),
+              foregroundColor: kText,
+            ),
+            icon: const Icon(Symbols.qr_code_scanner_rounded, size: 20),
+            label: const Text(
+              kScanQrLabel,
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w400),
+            ),
+          ),
         ],
       ),
     );
@@ -282,6 +341,24 @@ Future<void> showPairingSheet(BuildContext context, DeviceTarget target) {
               explanation: service.pairingExplanation,
               onSubmitPin: service.feedPin,
               onRetryConnect: () => unawaited(service.connectTo(target)),
+              targetHost: target.host,
+              targetPort: target.port,
+              // A scan naming ANOTHER PC dials it with the same manual-key
+              // connect shape as Connect-by-IP; the scanned host still
+              // crosses the RFC1918 dial guard inside connectTo (T-QR-01).
+              onConnectScanned: (host, port) => unawaited(
+                service.connectTo(
+                  DeviceTarget(
+                    key: manualDeviceKey(host, port),
+                    name: host,
+                    host: host,
+                    port: port,
+                  ),
+                ),
+              ),
+              scanQr: () => Navigator.of(sheetContext).push<PairQrData>(
+                MaterialPageRoute(builder: (_) => const QrScanScreen()),
+              ),
             ),
           ),
         );
