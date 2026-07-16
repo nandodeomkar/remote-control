@@ -5,9 +5,12 @@
          app-wide manifest cleartext flag; the code-level private-range
          guard lands in ConnectionService, 03-05).
          The multicast permission backs the WifiManager.MulticastLock —
-         OEM broadcast-filter insurance for UDP beacon discovery. -->
+         OEM broadcast-filter insurance for UDP beacon discovery.
+         Camera backs the QR pairing scanner (260716-kba); mobile_scanner
+         requests the runtime grant itself when the scanner starts. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <uses-permission android:name="android.permission.CAMERA"/>
     <application
         android:label="remote_control"
         android:name="${applicationName}"

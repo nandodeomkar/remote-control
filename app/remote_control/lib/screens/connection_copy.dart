@@ -59,6 +59,31 @@ const String kPinSheetBody = 'Enter the 6-digit PIN shown on your PC';
 /// Pairing sheet heading for [deviceName].
 String pairingSheetHeading(String deviceName) => 'Pair with $deviceName';
 
+// -- QR pairing scanner (260716-kba) --------------------------------------------
+
+/// The pairing sheet's secondary affordance (D-03 — always a TextButton).
+const String kScanQrLabel = 'Scan QR';
+
+/// Scanner screen app-bar title.
+const String kScanQrTitle = 'Scan the QR on your PC';
+
+/// Scanner screen bottom hint.
+const String kScanQrHint = 'Point the camera at the QR code in the pairing window';
+
+/// A scanned code that isn't a valid `rc://pair` payload (scanning continues).
+const String kQrMalformedCopy =
+    "That's not a Remote Control pairing code — scan the QR in the pairing "
+    'window on your PC';
+
+/// Camera permission denied — names the problem AND the next step.
+const String kCameraDeniedCopy =
+    'Camera access is off — allow Camera for Remote Control in Android '
+    'settings, then try again';
+
+/// Any other camera start failure.
+const String kCameraErrorCopy =
+    "Couldn't start the camera — close other camera apps and try again";
+
 // -- Banner & connect errors ---------------------------------------------------
 
 /// Non-blocking reconnect banner text (D-04).
