@@ -12,6 +12,7 @@
 //! `set_nodelay(true)` (Phase-2 latency prerequisite).
 
 pub mod beacon;
+pub mod ext;
 mod listener;
 mod session;
 
@@ -23,7 +24,7 @@ pub use session::SERVER_PROTO_VERSION;
 use std::sync::{Arc, Mutex};
 
 use crate::auth::AuthManager;
-use crate::executors::{Executors, WindowInfo};
+use crate::executors::{Executors, TabsState, WindowInfo};
 
 /// Server-side volume state pushed to authed sessions as `vol.changed`
 /// (MED-02, D-03). Core-owned plain data — ZERO OS deps, so server-core
@@ -100,6 +101,13 @@ pub struct ServerDeps {
     /// NO after-auth snapshot (mirrors apps/clip) — this is a transition
     /// event, not a state prime.
     pub blocked: tokio::sync::watch::Receiver<u64>,
+    /// Latest tab-relay state (BROW-01, protoVersion 1.4): authed sessions
+    /// receive a `tabs.changed` push on every change — including the
+    /// extension connect/disconnect flips. Apps-style: NO after-auth
+    /// snapshot; the phone pulls the current state via `tabs.list` on the
+    /// Browser screen. Producer is [`ext::run_ext`] on the loopback
+    /// extension listener.
+    pub tabs: tokio::sync::watch::Receiver<TabsState>,
 }
 
 /// Run the accept loop on an already-bound listener until the task is

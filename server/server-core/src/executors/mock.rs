@@ -9,7 +9,10 @@ use std::time::Duration;
 
 use tokio::sync::Notify;
 
-use super::{Apps, Button, Clipboard, Executors, KeyCode, Media, Modifier, MouseKeys, Power, WindowInfo};
+use super::{
+    Apps, Button, Clipboard, Executors, KeyCode, Media, Modifier, MouseKeys, Power, Tabs,
+    TabsState, WindowInfo,
+};
 
 /// One recorded executor invocation, in call order.
 #[derive(Debug, Clone, PartialEq)]
@@ -33,6 +36,8 @@ pub enum Call {
     AppsFocus(u64),
     AppsClose(u64),
     ClipSet(String),
+    TabsActivate(i64),
+    TabsClose(i64),
 }
 
 /// Shared, cloneable view of everything the mocks have recorded.
@@ -110,7 +115,8 @@ impl MockExecutors {
             media: Arc::clone(&mock) as Arc<dyn Media>,
             power: Arc::clone(&mock) as Arc<dyn Power>,
             apps: Arc::clone(&mock) as Arc<dyn Apps>,
-            clipboard: mock as Arc<dyn Clipboard>,
+            clipboard: Arc::clone(&mock) as Arc<dyn Clipboard>,
+            tabs: mock as Arc<dyn Tabs>,
         };
         (executors, log)
     }
@@ -222,6 +228,22 @@ impl Apps for MockExecutors {
     fn close(&self, id: u64) -> bool {
         self.log.record(Call::AppsClose(id));
         true
+    }
+}
+
+impl Tabs for MockExecutors {
+    /// Returns the never-connected default state so `tabs.list` routing is
+    /// assertable through the reply payload. A FailingApps-style custom
+    /// impl in tests can return a populated state where needed. Read-only:
+    /// not recorded as a `Call`.
+    fn list(&self) -> TabsState {
+        TabsState::default()
+    }
+    fn activate(&self, id: i64) {
+        self.log.record(Call::TabsActivate(id));
+    }
+    fn close(&self, id: i64) {
+        self.log.record(Call::TabsClose(id));
     }
 }
 

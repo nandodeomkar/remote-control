@@ -32,13 +32,13 @@ use crate::auth::pin::PinOutcome;
 use super::{ClipState, VolumeState};
 use crate::codec::json::{
     AppsChangedPayload, AuthFailPayload, AuthOkPayload, ChallengePayload, ClipChangedPayload,
-    ErrPayload, InputBlockedPayload, Msg, PairOkPayload, VolChangedPayload,
+    ErrPayload, InputBlockedPayload, Msg, PairOkPayload, TabsChangedPayload, VolChangedPayload,
 };
 use crate::codec::{binary, json};
 use crate::dispatch::AuthState;
 use crate::dispatch::held::HeldInput;
 use crate::dispatch::router::{self, SessionCtx};
-use crate::executors::{Executors, WindowInfo};
+use crate::executors::{Executors, TabsState, WindowInfo};
 
 /// The server's protocol version (SPEC §2). Only the MAJOR component is
 /// compared against the client's `hello.protoVersion`. `pub` (re-exported
@@ -97,6 +97,7 @@ pub(super) async fn run_session(
     conn_count: Arc<watch::Sender<usize>>,
     mut revoke: watch::Receiver<u64>,
     mut blocked: watch::Receiver<u64>,
+    mut tabs: watch::Receiver<TabsState>,
 ) {
     let (mut sink, mut stream) = ws.split();
 
@@ -140,6 +141,9 @@ pub(super) async fn run_session(
     // Same discipline for the blocked epoch (SRV-05): producer dropped →
     // disable the branch, never busy-loop.
     let mut blocked_alive = true;
+    // Same discipline for the tabs watch (BROW-01): producer dropped (e.g.
+    // the ext listener failed to bind) → disable the branch, never busy-loop.
+    let mut tabs_alive = true;
     // The phone's `hello.device` name, captured when Hello is processed so
     // the pin (pairing) path can record it via `complete_pairing_named`
     // (D-04/A7). `None` until Hello arrives.
@@ -312,6 +316,30 @@ pub(super) async fn run_session(
                         }
                     }
                     Err(_) => blocked_alive = false,
+                }
+            }
+            // BROW-01 tabs.changed live push, authed-gated: byte-discipline
+            // clone of the apps.changed branch (threat T-TABS-02 / T-06-01 —
+            // tab titles are browsing data and must never cross to an
+            // unauthed socket). watch is latest-value-only (no backlog
+            // flood). Like apps there is NO after-auth snapshot: the client
+            // pulls the current state via `tabs.list` on the Browser screen,
+            // so this branch is the ONLY tabs push site.
+            changed = tabs.changed(), if tabs_alive && ctx.auth_state == AuthState::Authed => {
+                match changed {
+                    Ok(()) => {
+                        // TabsState owns a Vec (not Copy): clone the borrowed
+                        // snapshot. borrow_and_update clears the changed flag.
+                        let state = tabs.borrow_and_update().clone();
+                        // WR-08: non-blocking try_send (see the vol branch) —
+                        // drop on a full queue, the latest-value re-delivers.
+                        match tx.try_send(tabs_changed_frame(state)) {
+                            Ok(()) => {}
+                            Err(mpsc::error::TrySendError::Full(_)) => {}
+                            Err(mpsc::error::TrySendError::Closed(_)) => break 'read,
+                        }
+                    }
+                    Err(_) => tabs_alive = false,
                 }
             }
             incoming = stream.next() => {
@@ -636,6 +664,22 @@ fn clip_changed_frame(text: String) -> Message {
 fn input_blocked_frame(reason: &str) -> Message {
     Message::text(json::encode_msg(
         &Msg::InputBlocked(InputBlockedPayload { reason: reason.to_owned() }),
+        None,
+    ))
+}
+
+/// Encode one `tabs.changed` push frame (S→C, protoVersion 1.4, BROW-01)
+/// from the core-owned tab-relay state. The sole tabs-push encoder — no
+/// after-auth snapshot analog (the client pulls via `tabs.list`). Privacy
+/// backstop (T-06-01 style): this frame only ever leaves through the
+/// authed-gated select! branch above, and tab titles never touch a log sink
+/// (T-01-31).
+fn tabs_changed_frame(state: TabsState) -> Message {
+    Message::text(json::encode_msg(
+        &Msg::TabsChanged(TabsChangedPayload {
+            connected: state.connected,
+            tabs: state.tabs,
+        }),
         None,
     ))
 }

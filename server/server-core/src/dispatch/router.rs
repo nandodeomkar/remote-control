@@ -11,7 +11,7 @@ use tokio::time::Instant;
 use crate::auth::AuthManager;
 use crate::codec::binary::MouseFrame;
 use crate::codec::json::{
-    AppsListPayload, ClipSetPayload, Decoded, ErrPayload, Msg, PongPayload,
+    AppsListPayload, ClipSetPayload, Decoded, ErrPayload, Msg, PongPayload, TabsListPayload,
 };
 use crate::dispatch::AuthState;
 use crate::dispatch::held::HeldInput;
@@ -70,8 +70,8 @@ pub fn route(
 
     // GATE 2 — pause (SPEC §11, threat T-01-21): executor-bound families
     // are silently dropped while paused. `ping`/`pong` (and the read-only
-    // queries `apps.list`/`clip.get`, which SPEC §11 does not list) keep
-    // working — pause never breaks liveness probing.
+    // queries `apps.list`/`clip.get`/`tabs.list`, which SPEC §11 exempts)
+    // keep working — pause never breaks liveness probing.
     if paused && is_executor_bound(&decoded.msg) {
         return Vec::new();
     }
@@ -230,10 +230,27 @@ pub fn route(
             text: exec.clipboard.get(),
         })],
 
-        // ── tabs (protoVersion 1.4) — wired in Task 3 ──────────────────
-        Msg::TabsList(_) => Vec::new(), // wired in Task 3
-        Msg::TabsActivate(_) => Vec::new(), // wired in Task 3
-        Msg::TabsClose(_) => Vec::new(), // wired in Task 3
+        // ── tabs (protoVersion 1.4, BROW-01) ───────────────────────────
+        // tabs.list is a READ (SPEC §11 pause exemption, like apps.list):
+        // the reply carries the relay's current state — including the
+        // never-connected {connected:false, tabs:[]} hint shape.
+        Msg::TabsList(_) => {
+            let state = exec.tabs.list();
+            vec![Msg::TabsList(TabsListPayload {
+                connected: Some(state.connected),
+                tabs: Some(state.tabs),
+            })]
+        }
+        // Fire-and-forget (SPEC §7): no err reply — stale ids self-heal via
+        // the next tabs.changed push. Both are executor-bound (pause gate).
+        Msg::TabsActivate(p) => {
+            exec.tabs.activate(p.id);
+            Vec::new()
+        }
+        Msg::TabsClose(p) => {
+            exec.tabs.close(p.id);
+            Vec::new()
+        }
 
         // ── key-macro families (Phase 1 minimal tables; Phase 5 refines)
         Msg::Browser(p) => {
@@ -280,7 +297,8 @@ pub fn route(
 }
 
 /// SPEC §11's pause drop list: every executor-bound family. `ping`/`pong`
-/// and the read-only queries (`apps.list`, `clip.get`) are exempt.
+/// and the read-only queries (`apps.list`, `clip.get`, `tabs.list`) are
+/// exempt.
 fn is_executor_bound(msg: &Msg) -> bool {
     matches!(
         msg,
@@ -297,6 +315,8 @@ fn is_executor_bound(msg: &Msg) -> bool {
             | Msg::ClipSet(_)
             | Msg::Browser(_)
             | Msg::Present(_)
+            | Msg::TabsActivate(_)
+            | Msg::TabsClose(_)
     )
 }
 
@@ -391,10 +411,12 @@ mod tests {
         AppsClosePayload, AppsFocusPayload, AppsLaunchPayload, AppsListPayload, BrowserPayload,
         ClickPayload, ClipGetPayload, ClipSetPayload, ConfirmPayload, DragPayload, ErrPayload,
         KeyPayload, MediaPayload, PingPayload, PongPayload, PowerPayload, PresentPayload,
-        TextPayload,
+        TabsActivatePayload, TabsClosePayload, TabsListPayload, TextPayload,
     };
     use crate::executors::mock::{Call, MockExecutors};
-    use crate::executors::{Apps, Button, Executors, KeyCode, Modifier, WindowInfo};
+    use crate::executors::{
+        Apps, Button, Executors, KeyCode, Modifier, TabInfo, Tabs, TabsState, WindowInfo,
+    };
     use std::sync::Arc;
 
     /// Apps executor whose actions always FAIL (`false`) — drives the
@@ -413,6 +435,29 @@ mod tests {
         fn close(&self, _id: u64) -> bool {
             false
         }
+    }
+
+    /// Tabs executor with a POPULATED fixed state (the recording mock's
+    /// `list` returns the default) — drives the tabs.list reply assertions,
+    /// including the paused read-exemption test.
+    struct PopulatedTabs;
+    impl PopulatedTabs {
+        fn state() -> TabsState {
+            TabsState {
+                connected: true,
+                tabs: vec![
+                    TabInfo { id: 7, title: "GitHub".into(), active: true, icon: None },
+                    TabInfo { id: 9, title: "Docs".into(), active: false, icon: None },
+                ],
+            }
+        }
+    }
+    impl Tabs for PopulatedTabs {
+        fn list(&self) -> TabsState {
+            Self::state()
+        }
+        fn activate(&self, _id: i64) {}
+        fn close(&self, _id: i64) {}
     }
 
     fn d(msg: Msg) -> Decoded {
@@ -512,11 +557,90 @@ mod tests {
             Msg::ClipSet(ClipSetPayload { text: "t".into() }),
             Msg::Browser(BrowserPayload { action: "back".into() }),
             Msg::Present(PresentPayload { action: "next".into() }),
+            Msg::TabsActivate(TabsActivatePayload { id: 7 }),
+            Msg::TabsClose(TabsClosePayload { id: 9 }),
         ] {
             let reply = route(d(msg), &mut ctx, &exec, &auth, true);
             assert!(reply.is_empty(), "paused executor-bound traffic must produce NO reply");
         }
         assert!(log.calls().is_empty(), "paused traffic must reach NO executor");
+    }
+
+    /// SPEC §11 read exemption (BROW-01): tabs.list still answers while
+    /// paused — the same exemption as apps.list/clip.get — and the reply
+    /// carries the Tabs executor's current state.
+    #[tokio::test]
+    async fn paused_tabs_list_still_answers_with_state() {
+        let (base, log) = MockExecutors::recording();
+        let exec = Executors { tabs: Arc::new(PopulatedTabs), ..base };
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+
+        let reply = route(
+            d(Msg::TabsList(TabsListPayload { connected: None, tabs: None })),
+            &mut ctx, &exec, &auth, true,
+        );
+        match &reply[..] {
+            [Msg::TabsList(TabsListPayload { connected: Some(true), tabs: Some(tabs) })] => {
+                assert_eq!(tabs.len(), 2, "reply must carry the executor's tabs");
+                assert_eq!(tabs[0].id, 7);
+                assert!(tabs[0].active, "active flag must survive the reply");
+                assert_eq!(tabs[1].id, 9);
+            }
+            other => panic!("expected a tabs.list reply with state, got: {other:?}"),
+        }
+        assert!(log.calls().is_empty(), "tabs.list is a read — no recorded call");
+    }
+
+    /// BROW-01 routing: unpaused tabs.activate/close reach the recording
+    /// mock with the right ids and produce NO reply (fire-and-forget).
+    #[tokio::test]
+    async fn tabs_activate_and_close_route_when_unpaused() {
+        let (exec, log) = MockExecutors::recording();
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+
+        assert!(
+            route(
+                d(Msg::TabsActivate(TabsActivatePayload { id: 7 })),
+                &mut ctx, &exec, &auth, false,
+            )
+            .is_empty(),
+            "tabs.activate is fire-and-forget: no reply"
+        );
+        assert!(
+            route(
+                d(Msg::TabsClose(TabsClosePayload { id: 9 })),
+                &mut ctx, &exec, &auth, false,
+            )
+            .is_empty(),
+            "tabs.close is fire-and-forget: no reply"
+        );
+        assert_eq!(
+            log.calls(),
+            vec![Call::TabsActivate(7), Call::TabsClose(9)]
+        );
+    }
+
+    /// The recording mock's tabs.list reply carries its (default) state —
+    /// the never-connected {connected:false, tabs:[]} hint shape.
+    #[tokio::test]
+    async fn tabs_list_replies_mock_default_state() {
+        let (exec, _log) = MockExecutors::recording();
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+        let reply = route(
+            d(Msg::TabsList(TabsListPayload { connected: None, tabs: None })),
+            &mut ctx, &exec, &auth, false,
+        );
+        assert_eq!(
+            reply,
+            vec![Msg::TabsList(TabsListPayload {
+                connected: Some(false),
+                tabs: Some(Vec::new()),
+            })],
+            "mock default state must reply the never-connected hint shape"
+        );
     }
 
     #[tokio::test]

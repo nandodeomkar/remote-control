@@ -75,8 +75,8 @@ pub struct TabInfo {
 /// The full tab-relay state carried by the `tabs.list` reply and the
 /// `tabs.changed` push (protoVersion 1.4, BROW-01). Core-owned plain data —
 /// ZERO OS deps, so server-core keeps compiling on CI Linux. Lives HERE
-/// (next to the `Tabs` trait that returns it — wired in Task 3) per the
-/// WindowInfo precedent: trait-returned types live with the traits.
+/// (next to the [`Tabs`] trait that returns it) per the WindowInfo
+/// precedent: trait-returned types live with the traits.
 ///
 /// `Default` is the never-connected shape `{connected: false, tabs: []}` —
 /// exactly what the phone's install-hint state keys on.
@@ -146,6 +146,18 @@ pub trait Clipboard: Send + Sync {
     fn set(&self, text: &str);
 }
 
+/// Browser tab relay (protoVersion 1.4, BROW-01).
+///
+/// `activate`/`close` return NOTHING — deliberately unlike [`Apps`]' bool
+/// returns: the SPEC §7 tabs family is fire-and-forget (no err reply; a
+/// stale id self-heals via the next `tabs.changed` push), so there is no
+/// failure to surface. `list` is a plain read of the latest relay state.
+pub trait Tabs: Send + Sync {
+    fn list(&self) -> TabsState;
+    fn activate(&self, id: i64);
+    fn close(&self, id: i64);
+}
+
 /// The full executor bundle injected into dispatch and transport.
 #[derive(Clone)]
 pub struct Executors {
@@ -154,4 +166,5 @@ pub struct Executors {
     pub power: Arc<dyn Power>,
     pub apps: Arc<dyn Apps>,
     pub clipboard: Arc<dyn Clipboard>,
+    pub tabs: Arc<dyn Tabs>,
 }

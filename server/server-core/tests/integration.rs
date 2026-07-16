@@ -26,7 +26,7 @@ use server_core::auth::AuthManager;
 use server_core::auth::challenge::auth_proof;
 use server_core::auth::token::hash_token;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
-use server_core::executors::{Button, KeyCode, WindowInfo};
+use server_core::executors::{Button, KeyCode, TabInfo, TabsState, WindowInfo};
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
 use server_core::transport::{ClipState, SERVER_PROTO_VERSION, ServerDeps, VolumeState};
 
@@ -85,6 +85,8 @@ async fn walking_skeleton_pair_auth_input() {
     let (conn_count_tx, _conn_count_rx) = tokio::sync::watch::channel(0usize);
     let (_revoke_tx, revoke_rx) = tokio::sync::watch::channel(0u64);
     let (_blocked_tx, blocked_rx) = tokio::sync::watch::channel(0u64);
+    // Same discipline for the tabs watch (BROW-01): keep the sender alive.
+    let (_tabs_tx, tabs_rx) = tokio::sync::watch::channel(TabsState::default());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
@@ -95,6 +97,7 @@ async fn walking_skeleton_pair_auth_input() {
         conn_count: Arc::new(conn_count_tx),
         revoke: revoke_rx,
         blocked: blocked_rx,
+        tabs: tabs_rx,
     };
 
     let (addr, _server) = spawn_test_server(deps).await;
@@ -199,6 +202,10 @@ struct Harness {
     /// Test-owned producer end of the blocked epoch (SRV-05): the
     /// input_blocked suite bumps it to simulate a UIPI transition.
     blocked_tx: tokio::sync::watch::Sender<u64>,
+    /// Test-owned producer end of the tabs watch (BROW-01): the tabs_ suite
+    /// drives `tabs.changed` pushes through it (standing in for the ext
+    /// relay's run_ext producer).
+    tabs_tx: tokio::sync::watch::Sender<TabsState>,
     _server: tokio::task::JoinHandle<()>,
 }
 
@@ -212,6 +219,7 @@ async fn start_server() -> Harness {
     let conn_count = Arc::new(tokio::sync::watch::channel(0usize).0);
     let (revoke_tx, revoke_rx) = tokio::sync::watch::channel(0u64);
     let (blocked_tx, blocked_rx) = tokio::sync::watch::channel(0u64);
+    let (tabs_tx, tabs_rx) = tokio::sync::watch::channel(TabsState::default());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
@@ -222,6 +230,7 @@ async fn start_server() -> Harness {
         conn_count: Arc::clone(&conn_count),
         revoke: revoke_rx,
         blocked: blocked_rx,
+        tabs: tabs_rx,
     };
     let (addr, server) = spawn_test_server(deps).await;
     Harness {
@@ -235,6 +244,7 @@ async fn start_server() -> Harness {
         conn_count,
         revoke_tx,
         blocked_tx,
+        tabs_tx,
         _server: server,
     }
 }
@@ -1175,4 +1185,100 @@ async fn input_blocked_authed_gate_silence_then_single_push() {
     let reason = recv_input_blocked(&mut ws).await;
     assert_eq!(reason, "elevated");
     assert_no_frame(&mut ws, "duplicate input.blocked after a single post-auth change").await;
+}
+
+// ──────────────── tabs.changed push gating (BROW-01) ────────────────────
+
+/// Receive the next frame, requiring a `tabs.changed` push; returns
+/// `(connected, tabs-json-array)` for field-level assertions.
+async fn recv_tabs_changed(ws: &mut WsClient) -> (bool, Vec<Value>) {
+    let v = recv_json(ws).await;
+    assert_eq!(v["t"], "tabs.changed", "expected a tabs.changed push, got: {v}");
+    (
+        v["p"]["connected"]
+            .as_bool()
+            .expect("tabs.changed must carry p.connected"),
+        v["p"]["tabs"]
+            .as_array()
+            .expect("tabs.changed must carry p.tabs")
+            .clone(),
+    )
+}
+
+/// Two-tab sample state: one with icon, one legacy/iconless.
+fn sample_tabs() -> TabsState {
+    TabsState {
+        connected: true,
+        tabs: vec![
+            TabInfo { id: 7, title: "GitHub".into(), active: true, icon: Some("bbbb".into()) },
+            TabInfo { id: 9, title: "Docs".into(), active: false, icon: None },
+        ],
+    }
+}
+
+/// T-TABS-02 (T-06-01 clone): a tab-state change while the session is still
+/// pre-auth must push NOTHING to the unauthenticated peer. Positive control
+/// on the SAME connection: once paired, the pending pre-auth change is
+/// delivered via the now-enabled tabs branch (after the D-03 vol snapshot) —
+/// proving the silence above was the auth gate, not a dead channel.
+#[tokio::test]
+async fn tabs_no_push_preauth() {
+    let h = start_server().await;
+    let pin = h.auth.lock().unwrap().begin_pairing();
+
+    let mut ws = connect(h.addr).await;
+    let _nonce = hello_challenge(&mut ws).await; // state: AwaitingAuth
+
+    // Tab state changes while unauthed → total silence.
+    h.tabs_tx.send(sample_tabs()).expect("tabs watch alive");
+    assert_no_frame(&mut ws, "tabs.changed leaked to an unauthed session").await;
+
+    // Positive control: pair on the SAME connection → pairOk, then the D-03
+    // vol.changed snapshot, then the pending tab change fires.
+    send_json(&mut ws, json!({"t": "pin", "seq": 2, "p": {"pin": pin}})).await;
+    let pair_ok = recv_json(&mut ws).await;
+    assert_eq!(
+        pair_ok["t"], "pairOk",
+        "expected pairOk after correct pin, got: {pair_ok}"
+    );
+    let _snapshot = recv_vol_changed(&mut ws).await; // D-03 vol snapshot
+    let (connected, tabs) = recv_tabs_changed(&mut ws).await;
+    assert!(connected, "post-auth push must carry connected:true");
+    assert_eq!(tabs.len(), 2, "post-auth push must carry the tabs set while unauthed");
+    assert_eq!(tabs[0]["id"], 7);
+    assert_eq!(tabs[0]["icon"], "bbbb", "icon must survive the push");
+    assert_eq!(tabs[1]["id"], 9);
+    assert!(
+        tabs[1].get("icon").is_none(),
+        "iconless tab must omit the icon key"
+    );
+}
+
+/// BROW-01 live push + disconnect-hint path: an authed session receives
+/// tabs.changed with connected:true on a tab-state change, then the ext
+/// relay's disconnect reset (TabsState::default) arrives as connected:false
+/// — exactly what flips the phone to the install-hint state.
+#[tokio::test]
+async fn tabs_changed_after_auth_then_disconnect_hint() {
+    let h = start_server().await;
+    let mut ws = authed_client(&h).await; // drains the D-03 vol snapshot
+
+    // No after-auth tabs snapshot at the transition (apps precedent): tabs
+    // never changed, so nothing is pushed (the client pulls via tabs.list).
+    assert_no_frame(&mut ws, "unexpected tabs.changed snapshot at the auth transition").await;
+
+    // A tab-state change produces exactly one tabs.changed.
+    h.tabs_tx.send(sample_tabs()).expect("tabs watch alive");
+    let (connected, tabs) = recv_tabs_changed(&mut ws).await;
+    assert!(connected, "push must carry connected:true");
+    assert_eq!(tabs.len(), 2, "push must carry the current tabs");
+    assert_eq!(tabs[0]["title"], "GitHub");
+    assert_eq!(tabs[0]["active"], true, "active flag must survive the push");
+
+    // The disconnect reset (CONN-07-style cleanup in run_ext) delivers the
+    // hint state to the phone.
+    h.tabs_tx.send(TabsState::default()).expect("tabs watch alive");
+    let (connected, tabs) = recv_tabs_changed(&mut ws).await;
+    assert!(!connected, "disconnect reset must carry connected:false");
+    assert!(tabs.is_empty(), "disconnect reset must carry an empty tab list");
 }

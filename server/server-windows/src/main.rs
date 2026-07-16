@@ -18,9 +18,10 @@ use std::sync::{Arc, Mutex};
 use anyhow::Context;
 use server_core::auth::pin::PIN_TTL_SECS;
 use server_core::auth::AuthManager;
-use server_core::executors::{Executors, WindowInfo};
+use server_core::executors::{Executors, TabsState, WindowInfo};
 use server_core::transport::{ClipState, ServerDeps, VolumeState};
 use server_core::transport::beacon::{self, BeaconIdentity};
+use server_core::transport::ext::{self, ExtCmd, TabsRelay};
 use tracing_subscriber::EnvFilter;
 
 use apps_thread::AppsCmd;
@@ -109,6 +110,14 @@ async fn main() -> anyhow::Result<()> {
     //     thread; 07-08's settings window flips it live.
     let (clip_cmd_tx, clip_cmd_rx) = std::sync::mpsc::channel::<ClipCmd>();
     let (clip_tx, clip_rx) = tokio::sync::watch::channel(ClipState::default());
+
+    // 3d. Tab-relay channels (BROW-01, SPEC §15): the ext listener task
+    //     (spawned at step 7d) is the REAL producer on `tabs_tx` and the
+    //     consumer of `ext_cmd_rx`; TabsRelay (the Tabs executor) pairs a
+    //     snapshot receiver with the command sender, exactly how WinApps
+    //     pairs its command sender with the apps snapshot receiver.
+    let (tabs_tx, tabs_rx) = tokio::sync::watch::channel(TabsState::default());
+    let (ext_cmd_tx, ext_cmd_rx) = tokio::sync::mpsc::channel::<ExtCmd>(16);
     //     The shell's settings window holds its own clone (07-08): its
     //     clipboard-sync checkbox flips the gate LIVE — clone BEFORE the
     //     Arc moves onto the clip thread.
@@ -130,6 +139,7 @@ async fn main() -> anyhow::Result<()> {
         power: Arc::new(WinPower),
         apps: Arc::new(WinApps::new(apps_cmd_tx, apps_rx.clone())),
         clipboard: Arc::new(WinClipboard::new(clip_cmd_tx, clip_rx.clone())),
+        tabs: Arc::new(TabsRelay::new(tabs_rx.clone(), ext_cmd_tx)),
     };
 
     // 5. Auth (SRV-03 / D-01): seed the store from config.toml's paired
@@ -247,6 +257,7 @@ async fn main() -> anyhow::Result<()> {
         conn_count: conn_count.clone(),
         revoke: revoke_rx,
         blocked: blocked_rx,
+        tabs: tabs_rx,
     };
 
     // 7. Bind the LAN interface (tests bind 127.0.0.1:0; the real binary
@@ -327,6 +338,32 @@ async fn main() -> anyhow::Result<()> {
         },
         beacon_port,
     ));
+
+    // 7d. Extension listener (BROW-01, SPEC §15): 127.0.0.1 ONLY — the
+    //     loopback bind is the auth boundary for the Tab Bridge extension
+    //     leg. RC_EXT_PORT env override mirrors RC_BEACON_PORT above. A bind
+    //     FAILURE degrades to no-tab-support (the phone renders the install
+    //     hint via the watch default) — the feature is optional; never kill
+    //     the server for it (contrast with the mandatory main listener).
+    let ext_port: u16 = match std::env::var("RC_EXT_PORT") {
+        Ok(v) => v
+            .parse()
+            .with_context(|| format!("RC_EXT_PORT must be a valid port number, got {v:?}"))?,
+        Err(_) => ext::DEFAULT_EXT_PORT,
+    };
+    match tokio::net::TcpListener::bind(("127.0.0.1", ext_port)).await {
+        Ok(ext_listener) => {
+            tracing::info!(port = ext_port, "extension listener on 127.0.0.1");
+            tokio::spawn(ext::run_ext(ext_listener, tabs_tx, ext_cmd_rx));
+        }
+        Err(e) => {
+            tracing::warn!(
+                port = ext_port,
+                error = %e,
+                "extension listener bind failed; browser tab support disabled"
+            );
+        }
+    }
 
     // 7c (SRV-01/SRV-03). Spawn the tray + settings shell thread: it reads
     // `firewall_status` at `StartCause::Init` to render the warning icon
