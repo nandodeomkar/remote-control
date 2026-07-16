@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Segoe+UI:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0a0b0e; }
+  a { color: #38BDF8; text-decoration: none; }
+  a:hover { color: #7dd3fc; }
+  .msr { font-family: 'Material Symbols Rounded'; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
+  .seg { font-family: 'Segoe UI', system-ui, sans-serif; }
+</style>
+</helmet>
+
+<!-- ============================================================ ROW A — REDESIGNED SHELL ============================================================ -->
+<section style="display:flex; flex-direction:row; align-items:flex-start; gap:64px; padding:64px 64px 28px; font-family:'Space Grotesk',sans-serif;">
+
+  <!-- ===== 1a — MAIN WINDOW ===== -->
+  <div id="1a" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">1a</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Main window</span>
+      <span style="color:#6B7280; font-size:13px;">— host status, live devices, manage pairings</span>
+    </div>
+
+    <div style="width:760px; border-radius:11px; overflow:hidden; background:#0E0F12; border:1px solid #2A2D34; box-shadow:0 44px 100px -34px rgba(0,0,0,0.92);">
+      <!-- title bar -->
+      <div style="height:42px; display:flex; align-items:center; gap:11px; padding:0 4px 0 15px; background:#0B0C0F; border-bottom:1px solid #191c22;">
+        <span style="width:17px; height:17px; border-radius:5px; background:linear-gradient(150deg,#38BDF8,#0ea5e0); box-shadow:0 0 10px rgba(56,189,248,0.45); display:flex; align-items:center; justify-content:center;"><span class="msr" style="font-size:12px; color:#06121a;">cast</span></span>
+        <span style="color:#E6E8EB; font-size:12.5px; font-weight:500;">Remote Control</span>
+        <span style="flex:1 1 auto;"></span>
+        <div style="width:44px; height:42px; display:flex; align-items:flex-end; justify-content:center; padding-bottom:19px;"><span style="display:block; width:11px; height:1px; background:#c7ccd4;"></span></div>
+        <div style="width:44px; height:42px; display:flex; align-items:center; justify-content:center;"><span style="display:block; width:9px; height:9px; border:1px solid #c7ccd4; border-radius:1px;"></span></div>
+        <div style="width:46px; height:42px; display:flex; align-items:center; justify-content:center; color:#c7ccd4;"><span class="msr" style="font-size:18px;">close</span></div>
+      </div>
+
+      <!-- body -->
+      <div style="padding:22px 22px 16px;">
+        <!-- hero status card -->
+        <div style="background:linear-gradient(160deg,#181B21,#131519); border:1px solid #2A2D34; border-radius:18px; padding:20px 22px; display:flex; align-items:center; gap:20px;">
+          <div style="width:52px; height:52px; border-radius:15px; background:rgba(56,189,248,0.14); border:1px solid rgba(56,189,248,0.32); display:flex; align-items:center; justify-content:center; color:#38BDF8; flex:0 0 auto;"><span class="msr" style="font-size:28px;">sensors</span></div>
+          <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:7px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="width:9px; height:9px; border-radius:50%; background:#38BDF8; box-shadow:0 0 12px #38BDF8;"></span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:1.8px; color:#38BDF8;">LISTENING</span>
+            </div>
+            <span style="color:#E6E8EB; font-size:22px; font-weight:600; letter-spacing:-0.3px;">OMKAR-LAPTOP</span>
+            <span style="font-family:'IBM Plex Mono',monospace; color:#8b93a1; font-size:12.5px;">192.168.1.24 : 17777 · Wi-Fi</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; flex:0 0 auto;">
+            <div style="height:40px; padding:0 15px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; gap:8px; color:#E6E8EB; font-size:14px; font-weight:600;"><span class="msr" style="font-size:19px;">pause</span>Pause</div>
+            <div style="height:40px; padding:0 16px; border-radius:10px; background:#38BDF8; display:flex; align-items:center; gap:8px; color:#06121a; font-size:14px; font-weight:600;"><span class="msr" style="font-size:19px;">add</span>Pair new device</div>
+          </div>
+        </div>
+
+        <!-- connected now -->
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin:24px 2px 12px;">CONNECTED NOW</div>
+        <div style="background:#16181D; border:1px solid #2A2D34; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;">
+          <div style="width:40px; height:40px; border-radius:11px; background:#1C1F26; display:flex; align-items:center; justify-content:center; color:#cdd2d9; flex:0 0 auto;"><span class="msr" style="font-size:22px;">smartphone</span></div>
+          <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:3px;">
+            <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Pixel 8 Pro</span>
+            <span style="color:#6B7280; font-size:12.5px;">192.168.1.31 · streaming input</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px; padding:5px 10px; border:1px solid #2A2D34; border-radius:9px; background:#0E0F12;">
+            <span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:#38BDF8;">12 ms</span>
+          </div>
+          <div style="height:34px; padding:0 13px; border-radius:9px; border:1px solid #2A2D34; display:flex; align-items:center; color:#8b93a1; font-size:13px; font-weight:600;">Disconnect</div>
+        </div>
+
+        <!-- paired devices -->
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin:22px 2px 12px;">PAIRED DEVICES</div>
+        <div style="background:#16181D; border:1px solid #2A2D34; border-radius:14px; overflow:hidden;">
+          <div style="min-height:56px; padding:11px 16px; display:flex; align-items:center; gap:14px; border-bottom:1px solid #23262d;">
+            <span class="msr" style="font-size:21px; color:#6B7280;">smartphone</span>
+            <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:2px;">
+              <span style="color:#E6E8EB; font-size:14.5px;">Pixel 8 Pro</span>
+              <span style="color:#6B7280; font-size:12px;">paired today</span>
+            </div>
+            <div style="padding:7px 12px; border-radius:8px; color:#FF6B6B; font-size:13px; font-weight:600;">Revoke</div>
+          </div>
+          <div style="min-height:56px; padding:11px 16px; display:flex; align-items:center; gap:14px; border-bottom:1px solid #23262d;">
+            <span class="msr" style="font-size:21px; color:#6B7280;">smartphone</span>
+            <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:2px;">
+              <span style="color:#E6E8EB; font-size:14.5px;">Galaxy S24</span>
+              <span style="color:#6B7280; font-size:12px;">paired 3 days ago</span>
+            </div>
+            <div style="padding:7px 12px; border-radius:8px; color:#FF6B6B; font-size:13px; font-weight:600;">Revoke</div>
+          </div>
+          <div style="min-height:52px; padding:12px 16px; display:flex; align-items:center; gap:12px; color:#38BDF8;"><span class="msr" style="font-size:20px;">add</span><span style="font-size:14px; font-weight:600;">Pair new device</span></div>
+        </div>
+      </div>
+
+      <!-- status bar footer -->
+      <div style="height:38px; border-top:1px solid #191c22; background:#0B0C0F; display:flex; align-items:center; gap:8px; padding:0 16px;">
+        <span style="width:7px; height:7px; border-radius:50%; background:#38BDF8;"></span>
+        <span style="font-family:'IBM Plex Mono',monospace; color:#6B7280; font-size:11px;">Running · protocol 1.1</span>
+        <span style="flex:1 1 auto;"></span>
+        <div style="display:flex; align-items:center; gap:6px; color:#8b93a1; font-size:12.5px;"><span class="msr" style="font-size:17px;">settings</span>Settings</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 1b — SYSTEM TRAY MENU ===== -->
+  <div id="1b" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">1b</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">System tray menu</span>
+      <span style="color:#6B7280; font-size:13px;">— custom flyout from the taskbar</span>
+    </div>
+
+    <!-- desktop scene -->
+    <div style="width:520px; height:596px; border-radius:12px; overflow:hidden; position:relative; background:radial-gradient(130% 120% at 72% 16%, #12202e 0%, #0a0f16 52%, #08090c 100%); border:1px solid #23262d; box-shadow:0 44px 100px -34px rgba(0,0,0,0.92);">
+
+      <!-- flyout -->
+      <div style="position:absolute; right:12px; bottom:60px; width:344px; border-radius:14px; overflow:hidden; background:rgba(18,20,25,0.92); backdrop-filter:blur(28px); -webkit-backdrop-filter:blur(28px); border:1px solid #2f333c; box-shadow:0 30px 70px -20px rgba(0,0,0,0.85);">
+        <!-- header -->
+        <div style="padding:16px 16px 14px; border-bottom:1px solid #23262d;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="width:24px; height:24px; border-radius:7px; background:linear-gradient(150deg,#38BDF8,#0ea5e0); box-shadow:0 0 10px rgba(56,189,248,0.45); display:flex; align-items:center; justify-content:center;"><span class="msr" style="font-size:15px; color:#06121a;">cast</span></span>
+            <span style="flex:1 1 auto; color:#E6E8EB; font-size:14px; font-weight:600;">Remote Control</span>
+            <div style="display:flex; align-items:center; gap:6px; padding:4px 9px; border:1px solid rgba(56,189,248,0.4); border-radius:999px; background:rgba(56,189,248,0.1);">
+              <span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:0.5px; color:#38BDF8;">CONNECTED</span>
+            </div>
+          </div>
+          <div style="margin-top:12px; display:flex; align-items:baseline; justify-content:space-between;">
+            <span style="color:#E6E8EB; font-size:16px; font-weight:600;">OMKAR-LAPTOP</span>
+            <span style="font-family:'IBM Plex Mono',monospace; color:#6B7280; font-size:11px;">:17777</span>
+          </div>
+          <span style="font-family:'IBM Plex Mono',monospace; color:#6B7280; font-size:11px;">192.168.1.24 · Wi-Fi</span>
+        </div>
+
+        <!-- connected devices -->
+        <div style="padding:12px 16px 6px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:600; letter-spacing:2px; color:#6B7280; margin-bottom:10px;">1 DEVICE CONNECTED</div>
+          <div style="display:flex; align-items:center; gap:11px; padding:8px; border-radius:10px; background:#16181D; border:1px solid #2A2D34;">
+            <div style="width:34px; height:34px; border-radius:9px; background:#1C1F26; display:flex; align-items:center; justify-content:center; color:#cdd2d9; flex:0 0 auto;"><span class="msr" style="font-size:19px;">smartphone</span></div>
+            <span style="flex:1 1 auto; color:#E6E8EB; font-size:13.5px; font-weight:500;">Pixel 8 Pro</span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:#38BDF8;">12 ms</span>
+          </div>
+        </div>
+
+        <!-- actions -->
+        <div style="padding:8px; display:flex; flex-direction:column; gap:1px;">
+          <div style="height:40px; display:flex; align-items:center; gap:12px; padding:0 10px; border-radius:9px; color:#E6E8EB;"><span class="msr" style="font-size:20px; color:#8b93a1;">add</span><span style="font-size:13.5px;">Pair new device</span></div>
+          <div style="height:40px; display:flex; align-items:center; gap:12px; padding:0 10px; border-radius:9px; background:rgba(56,189,248,0.08); color:#E6E8EB;"><span class="msr" style="font-size:20px; color:#38BDF8;">pause</span><span style="flex:1 1 auto; font-size:13.5px;">Pause input</span><span style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#6B7280;">running</span></div>
+          <div style="height:40px; display:flex; align-items:center; gap:12px; padding:0 10px; border-radius:9px; color:#E6E8EB;"><span class="msr" style="font-size:20px; color:#8b93a1;">settings</span><span style="font-size:13.5px;">Settings</span></div>
+          <div style="height:1px; background:#23262d; margin:6px 8px;"></div>
+          <div style="height:40px; display:flex; align-items:center; gap:12px; padding:0 10px; border-radius:9px; color:#E6E8EB;"><span class="msr" style="font-size:20px; color:#8b93a1;">power_settings_new</span><span style="font-size:13.5px;">Quit</span></div>
+        </div>
+      </div>
+
+      <!-- taskbar -->
+      <div style="position:absolute; left:0; right:0; bottom:0; height:48px; background:rgba(12,13,16,0.92); backdrop-filter:blur(24px); -webkit-backdrop-filter:blur(24px); border-top:1px solid #23262d; display:flex; align-items:center;">
+        <!-- centered app icons -->
+        <div style="flex:1 1 auto; display:flex; align-items:center; justify-content:center; gap:8px;">
+          <span class="msr" style="font-size:22px; color:#8b93a1;">search</span>
+          <span class="msr" style="font-size:22px; color:#8b93a1;">window</span>
+          <span class="msr" style="font-size:22px; color:#8b93a1;">folder</span>
+          <span class="msr" style="font-size:22px; color:#8b93a1;">chrome_reader_mode</span>
+          <span class="msr" style="font-size:22px; color:#8b93a1;">terminal</span>
+        </div>
+        <!-- system tray -->
+        <div style="flex:0 0 auto; display:flex; align-items:center; gap:14px; padding:0 16px 0 10px;">
+          <span class="msr" style="font-size:16px; color:#8b93a1;">expand_less</span>
+          <!-- active app tray icon -->
+          <span style="width:26px; height:26px; border-radius:7px; background:rgba(56,189,248,0.16); border:1px solid rgba(56,189,248,0.4); display:flex; align-items:center; justify-content:center;"><span style="width:11px; height:11px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span></span>
+          <span class="msr" style="font-size:16px; color:#c7ccd4;">wifi</span>
+          <span class="msr" style="font-size:16px; color:#c7ccd4;">volume_up</span>
+          <div style="display:flex; flex-direction:column; align-items:flex-end; line-height:1.25;">
+            <span class="seg" style="font-size:11px; color:#c7ccd4;">9:41</span>
+            <span class="seg" style="font-size:11px; color:#c7ccd4;">7/16/2026</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ROW B — STATES & DETAIL ============================================================ -->
+<section style="display:flex; flex-direction:row; align-items:flex-start; gap:64px; padding:28px 64px; font-family:'Space Grotesk',sans-serif;">
+
+  <!-- ===== 1c — PAIR NEW DEVICE ===== -->
+  <div id="1c" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">1c</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Pair new device</span>
+      <span style="color:#6B7280; font-size:13px;">— PIN + QR, replaces the toast</span>
+    </div>
+
+    <div style="width:392px; border-radius:11px; overflow:hidden; background:#0E0F12; border:1px solid #2A2D34; box-shadow:0 44px 100px -34px rgba(0,0,0,0.92);">
+      <div style="height:42px; display:flex; align-items:center; gap:11px; padding:0 4px 0 15px; background:#0B0C0F; border-bottom:1px solid #191c22;">
+        <span style="width:17px; height:17px; border-radius:5px; background:linear-gradient(150deg,#38BDF8,#0ea5e0); display:flex; align-items:center; justify-content:center;"><span class="msr" style="font-size:12px; color:#06121a;">cast</span></span>
+        <span style="color:#E6E8EB; font-size:12.5px; font-weight:500;">Pair a new phone</span>
+        <span style="flex:1 1 auto;"></span>
+        <div style="width:46px; height:42px; display:flex; align-items:center; justify-content:center; color:#c7ccd4;"><span class="msr" style="font-size:18px;">close</span></div>
+      </div>
+
+      <div style="padding:26px 28px 28px; display:flex; flex-direction:column; align-items:center;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280;">ENTER THIS PIN ON YOUR PHONE</div>
+        <div style="margin-top:18px; display:flex; gap:9px;">
+          <span style="width:42px; height:56px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; color:#E6E8EB;">4</span>
+          <span style="width:42px; height:56px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; color:#E6E8EB;">8</span>
+          <span style="width:42px; height:56px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; color:#E6E8EB;">2</span>
+          <span style="width:42px; height:56px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; color:#E6E8EB;">9</span>
+          <span style="width:42px; height:56px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; color:#E6E8EB;">1</span>
+          <span style="width:42px; height:56px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:28px; font-weight:600; color:#E6E8EB;">7</span>
+        </div>
+        <div style="margin-top:14px; display:flex; align-items:center; gap:8px;">
+          <span class="msr" style="font-size:16px; color:#E8A33D;">schedule</span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; color:#E8A33D;">Expires in 54s</span>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:14px; width:100%; margin:22px 0;">
+          <span style="flex:1 1 auto; height:1px; background:#23262d;"></span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:1.5px; color:#4a505c;">OR SCAN</span>
+          <span style="flex:1 1 auto; height:1px; background:#23262d;"></span>
+        </div>
+
+        <!-- QR placeholder -->
+        <div style="width:132px; height:132px; border-radius:12px; background-color:#0C0D10; background-image:repeating-linear-gradient(45deg, rgba(56,189,248,0.10) 0 6px, transparent 6px 12px); border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; letter-spacing:1px; color:#4a505c;">QR CODE</span>
+        </div>
+
+        <span style="margin-top:20px; text-align:center; color:#8b93a1; font-size:12.5px; line-height:1.6; text-wrap:pretty;">Open Remote Control on your phone, tap <b style="color:#E6E8EB;">Add PC</b>, then enter the PIN or scan the code.</span>
+        <span style="margin-top:10px; font-family:'IBM Plex Mono',monospace; font-size:11px; color:#6B7280;">OMKAR-LAPTOP · 192.168.1.24:17777</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 1d — SETTINGS ===== -->
+  <div id="1d" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">1d</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Settings</span>
+      <span style="color:#6B7280; font-size:13px;">— every field from the current window, restyled</span>
+    </div>
+
+    <div style="width:440px; border-radius:11px; overflow:hidden; background:#0E0F12; border:1px solid #2A2D34; box-shadow:0 44px 100px -34px rgba(0,0,0,0.92);">
+      <div style="height:42px; display:flex; align-items:center; gap:11px; padding:0 4px 0 15px; background:#0B0C0F; border-bottom:1px solid #191c22;">
+        <span style="width:17px; height:17px; border-radius:5px; background:linear-gradient(150deg,#38BDF8,#0ea5e0); display:flex; align-items:center; justify-content:center;"><span class="msr" style="font-size:12px; color:#06121a;">cast</span></span>
+        <span style="color:#E6E8EB; font-size:12.5px; font-weight:500;">Remote Control — Settings</span>
+        <span style="flex:1 1 auto;"></span>
+        <div style="width:46px; height:42px; display:flex; align-items:center; justify-content:center; color:#c7ccd4;"><span class="msr" style="font-size:18px;">close</span></div>
+      </div>
+
+      <div style="padding:20px 22px 22px;">
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin-bottom:12px;">GENERAL</div>
+
+        <label style="display:block; color:#8b93a1; font-size:12.5px; margin-bottom:7px;">Device name <span style="color:#6B7280;">(shown on your phone)</span></label>
+        <div style="height:42px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; padding:0 13px; color:#E6E8EB; font-size:14px;">Omkar-PC</div>
+
+        <label style="display:block; color:#8b93a1; font-size:12.5px; margin:16px 0 7px;">Port</label>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:110px; height:42px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; padding:0 13px; font-family:'IBM Plex Mono',monospace; color:#E6E8EB; font-size:14px;">17777</div>
+          <span style="display:flex; align-items:center; gap:6px; color:#38BDF8; font-size:12px;"><span class="msr" style="font-size:15px;">info</span>Restart to apply</span>
+        </div>
+
+        <div style="height:1px; background:#23262d; margin:20px 0;"></div>
+
+        <div style="display:flex; align-items:center; gap:14px; min-height:44px;">
+          <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:2px;">
+            <span style="color:#E6E8EB; font-size:14.5px; font-weight:600;">Clipboard sync</span>
+            <span style="color:#6B7280; font-size:12px;">Send this PC's clipboard to the phone</span>
+          </div>
+          <div style="width:48px; height:28px; border-radius:999px; background:#38BDF8; position:relative; flex:0 0 auto;"><div style="position:absolute; left:23px; top:3px; width:22px; height:22px; border-radius:50%; background:#06121a;"></div></div>
+        </div>
+
+        <div style="display:flex; align-items:center; gap:14px; min-height:44px; margin-top:6px;">
+          <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:2px;">
+            <span style="color:#E6E8EB; font-size:14.5px; font-weight:600;">Start with Windows</span>
+            <span style="color:#6B7280; font-size:12px;">Launch for this user at sign-in</span>
+          </div>
+          <div style="width:48px; height:28px; border-radius:999px; background:#2A2D34; position:relative; flex:0 0 auto;"><div style="position:absolute; left:3px; top:3px; width:22px; height:22px; border-radius:50%; background:#E6E8EB;"></div></div>
+        </div>
+
+        <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin:22px 0 12px;">PAIRED DEVICES</div>
+        <div style="background:#16181D; border:1px solid #2A2D34; border-radius:12px; overflow:hidden;">
+          <div style="min-height:50px; padding:9px 14px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #23262d;">
+            <span class="msr" style="font-size:20px; color:#6B7280;">smartphone</span>
+            <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:1px;"><span style="color:#E6E8EB; font-size:14px;">Pixel 8 Pro</span><span style="color:#6B7280; font-size:11.5px;">paired today</span></div>
+            <span style="color:#FF6B6B; font-size:13px; font-weight:600;">Revoke</span>
+          </div>
+          <div style="min-height:50px; padding:9px 14px; display:flex; align-items:center; gap:12px; border-bottom:1px solid #23262d;">
+            <span class="msr" style="font-size:20px; color:#6B7280;">smartphone</span>
+            <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:1px;"><span style="color:#E6E8EB; font-size:14px;">Galaxy S24</span><span style="color:#6B7280; font-size:11.5px;">paired 3 days ago</span></div>
+            <span style="color:#FF6B6B; font-size:13px; font-weight:600;">Revoke</span>
+          </div>
+          <div style="min-height:48px; padding:11px 14px; display:flex; align-items:center; gap:11px; color:#38BDF8;"><span class="msr" style="font-size:19px;">add</span><span style="font-size:13.5px; font-weight:600;">Pair new device</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== 1e — TRAY STATES ===== -->
+  <div id="1e" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">1e</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Tray icon states</span>
+      <span style="color:#6B7280; font-size:13px;">— normal · paused · warning</span>
+    </div>
+
+    <div style="width:320px; display:flex; flex-direction:column; gap:14px;">
+      <!-- normal -->
+      <div style="background:#16181D; border:1px solid #2A2D34; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;">
+        <span style="width:34px; height:34px; border-radius:9px; background:#0E0F12; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; flex:0 0 auto;"><span style="width:14px; height:14px; border-radius:50%; background:#38BDF8; box-shadow:0 0 9px #38BDF8;"></span></span>
+        <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:2px;">
+          <span style="color:#E6E8EB; font-size:14px; font-weight:600;">Running</span>
+          <span style="color:#6B7280; font-size:12px;">1 device connected</span>
+        </div>
+      </div>
+      <!-- paused -->
+      <div style="background:#16181D; border:1px solid #2A2D34; border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px;">
+        <span style="width:34px; height:34px; border-radius:9px; background:#0E0F12; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; flex:0 0 auto;"><span style="width:14px; height:14px; border-radius:50%; background:#6B7280;"></span></span>
+        <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:2px;">
+          <span style="color:#E6E8EB; font-size:14px; font-weight:600;">Input paused</span>
+          <span style="color:#6B7280; font-size:12px;">Connection stays alive</span>
+        </div>
+      </div>
+      <!-- warning -->
+      <div style="background:rgba(255,107,107,0.06); border:1px solid rgba(255,107,107,0.4); border-radius:14px; padding:14px 16px; display:flex; align-items:flex-start; gap:14px;">
+        <span style="width:34px; height:34px; border-radius:9px; background:#0E0F12; border:1px solid rgba(255,107,107,0.4); display:flex; align-items:center; justify-content:center; flex:0 0 auto;"><span style="width:14px; height:14px; border-radius:50%; background:#FF6B6B;"></span></span>
+        <div style="flex:1 1 auto; display:flex; flex-direction:column; gap:4px;">
+          <span style="color:#FF6B6B; font-size:14px; font-weight:600;">Firewall is blocking TCP 17777</span>
+          <span style="color:#8b93a1; font-size:12px; line-height:1.55; text-wrap:pretty;">Your phone can't connect. Allow Remote Control through Windows Firewall.</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ ROW C — CURRENT (faithful recreation) ============================================================ -->
+<section style="display:flex; flex-direction:column; gap:20px; padding:28px 64px 64px; font-family:'Space Grotesk',sans-serif;">
+  <div style="display:flex; align-items:center; gap:12px;">
+    <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:2.5px; color:#6B7280;">TODAY · FAITHFUL RECREATION OF THE SHIPPING BUILD</span>
+    <span style="flex:1 1 auto; max-width:340px; height:1px; background:#23262d;"></span>
+  </div>
+
+  <div style="display:flex; flex-direction:row; align-items:flex-start; gap:64px;">
+    <!-- ===== 1f — CURRENT TRAY MENU ===== -->
+    <div id="1f" style="display:flex; flex-direction:column; gap:18px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#2A2D34; color:#E6E8EB; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">1f</span>
+        <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Current tray menu</span>
+        <span style="color:#6B7280; font-size:13px;">— OS-native muda context menu</span>
+      </div>
+
+      <!-- windows 11 native context menu -->
+      <div class="seg" style="width:232px; padding:5px; border-radius:8px; background:#2b2b2b; border:1px solid #3a3a3a; box-shadow:0 12px 32px -8px rgba(0,0,0,0.7);">
+        <div style="height:34px; display:flex; align-items:center; padding:0 12px; border-radius:5px; color:#e6e6e6; font-size:13.5px;">Settings…</div>
+        <div style="height:34px; display:flex; align-items:center; padding:0 12px; border-radius:5px; color:#e6e6e6; font-size:13.5px;">Pair new device</div>
+        <div style="height:1px; background:#3d3d3d; margin:5px 10px;"></div>
+        <div style="height:34px; display:flex; align-items:center; padding:0 12px; border-radius:5px; color:#e6e6e6; font-size:13.5px;">Pause input</div>
+        <div style="height:1px; background:#3d3d3d; margin:5px 10px;"></div>
+        <div style="height:34px; display:flex; align-items:center; padding:0 12px; border-radius:5px; color:#e6e6e6; font-size:13.5px;">Quit</div>
+      </div>
+
+      <div style="display:flex; align-items:center; gap:9px; padding:8px 12px; border-radius:9px; background:#0E0F12; border:1px solid #23262d; width:232px;">
+        <span style="width:12px; height:12px; border-radius:50%; background:#4C8DFF;"></span>
+        <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; color:#8b93a1;">Remote Control — 1 device connected</span>
+      </div>
+    </div>
+
+    <!-- ===== 1g — CURRENT SETTINGS (egui) ===== -->
+    <div id="1g" style="display:flex; flex-direction:column; gap:18px;">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#2A2D34; color:#E6E8EB; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">1g</span>
+        <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Current settings window</span>
+        <span style="color:#6B7280; font-size:13px;">— egui immediate-mode, 460×560</span>
+      </div>
+
+      <!-- egui window -->
+      <div class="seg" style="width:460px; border-radius:8px; overflow:hidden; background:#0E0F12; border:1px solid #2f2f2f; box-shadow:0 30px 70px -24px rgba(0,0,0,0.85);">
+        <!-- egui title bar -->
+        <div style="height:32px; display:flex; align-items:center; padding:0 10px; background:#1e1e1e; border-bottom:1px solid #2f2f2f;">
+          <span style="flex:1 1 auto; color:#c8c8c8; font-size:12px;">Remote Control — Settings</span>
+          <span style="color:#8a8a8a; font-size:13px;">✕</span>
+        </div>
+
+        <div style="padding:16px;">
+          <div style="color:#e6e6e6; font-size:20px; font-weight:600; margin-bottom:12px;">Settings</div>
+
+          <div style="color:#6B7280; font-size:12.5px; line-height:1.5; margin-bottom:14px;">Couldn't confirm Windows Firewall allows inbound TCP 17777. If your phone can't connect, allow Remote Control through the firewall.</div>
+
+          <div style="color:#c8c8c8; font-size:13px; margin-bottom:6px;">Device name (shown on your phone)</div>
+          <div style="height:26px; border-radius:4px; background:#181818; border:1px solid #3a3a3a; display:flex; align-items:center; padding:0 8px; color:#e6e6e6; font-size:13px; width:270px; margin-bottom:12px;">Omkar-PC</div>
+
+          <div style="color:#c8c8c8; font-size:13px; margin-bottom:6px;">Port</div>
+          <div style="height:26px; border-radius:4px; background:#181818; border:1px solid #3a3a3a; display:flex; align-items:center; padding:0 8px; color:#e6e6e6; font-size:13px; width:110px; margin-bottom:8px;">17777</div>
+          <div style="color:#4C8DFF; font-size:12.5px; margin-bottom:14px;">Restart Remote Control to apply.</div>
+
+          <div style="display:flex; align-items:center; gap:9px; margin-bottom:9px;">
+            <span style="width:16px; height:16px; border-radius:3px; background:#4C8DFF; display:flex; align-items:center; justify-content:center; color:#0E0F12; font-size:12px;">✓</span>
+            <span style="color:#e6e6e6; font-size:13px;">Clipboard sync (send PC clipboard to phone)</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:9px; margin-bottom:14px;">
+            <span style="width:16px; height:16px; border-radius:3px; background:#181818; border:1px solid #4a4a4a;"></span>
+            <span style="color:#e6e6e6; font-size:13px;">Start with Windows (this user)</span>
+          </div>
+
+          <div style="height:1px; background:#2f2f2f; margin:14px 0;"></div>
+          <div style="color:#e6e6e6; font-size:18px; font-weight:600; margin-bottom:10px;">Paired devices</div>
+
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+            <span style="color:#e6e6e6; font-size:13px;">Pixel 8 Pro</span>
+            <span style="color:#8a8a8a; font-size:12.5px;">paired today</span>
+            <span style="flex:1 1 auto;"></span>
+            <span style="padding:4px 10px; border-radius:4px; background:#252525; border:1px solid #3a3a3a; color:#e6e6e6; font-size:12.5px;">Revoke</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px;">
+            <span style="color:#e6e6e6; font-size:13px;">Galaxy S24</span>
+            <span style="color:#8a8a8a; font-size:12.5px;">paired 3 days ago</span>
+            <span style="flex:1 1 auto;"></span>
+            <span style="padding:4px 10px; border-radius:4px; background:#252525; border:1px solid #3a3a3a; color:#e6e6e6; font-size:12.5px;">Revoke</span>
+          </div>
+
+          <span style="display:inline-block; padding:5px 12px; border-radius:4px; background:#252525; border:1px solid #3a3a3a; color:#e6e6e6; font-size:12.5px;">Pair new device</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+// icon name -> codepoint
+cast e307
+close e5cd
+sensors e51e
+pause e034
+add e145
+smartphone e7ba
+settings e8b8
+power_settings_new f8c7
+schedule efd6
+info e88e
+wifi e63e
+volume_up e050
+search ef7a
+folder e2c7
+terminal eb8e
+expand_less e5ce
+play_arrow e037
+content_copy e14d
+qr_code_2 e00a
+lock e899
+desktop_windows e30c

@@ -1,5 +1,6 @@
-//! Tray icon (SRV-01/SRV-03): `TrayIcon` + a `muda` menu (Settings, Pair new
-//! device, Pause, Quit) plus three RGBA icon states.
+//! Tray icon (SRV-01/SRV-03, Phase 10 redesign): a menu-less `TrayIcon`
+//! whose clicks open the custom [`super::flyout::Flyout`] panel — the
+//! OS-native muda context menu is fully replaced by the flyout (handoff 1b).
 //!
 //! **TaskbarCreated re-registration (RESEARCH Pitfall 1 / A1 — CONFIRMED):**
 //! `tray-icon` 0.24 handles `TaskbarCreated` internally — its Win32
@@ -11,11 +12,9 @@
 //!
 //! **Icon assets:** generated programmatically via [`Icon::from_rgba`]
 //! (solid-color circles) instead of bundling a `.ico` resource file — no
-//! build-time asset pipeline needed, and the three colors reuse the D-12
-//! locked Flutter palette (accent blue / muted gray / error red) for visual
-//! consistency with the phone app.
+//! build-time asset pipeline needed. Colors follow the handoff's 1e states:
+//! accent blue #38BDF8 (normal), muted gray (paused), error red (warning).
 
-use tray_icon::menu::{Menu, MenuId, MenuItem, PredefinedMenuItem};
 use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 
 /// Visual/tooltip state of the tray icon (SRV-01 pause + SRV-04 firewall
@@ -24,25 +23,21 @@ use tray_icon::{Icon, TrayIcon, TrayIconBuilder};
 pub enum TrayState {
     /// Running normally, input flowing.
     Normal,
-    /// Input paused via the tray menu (or 07-08's settings window).
+    /// Input paused via the flyout (or the main/settings windows).
     Paused,
     /// The startup self-test found a problem (port-in-use or
     /// firewall-blocked) — SRV-04 / D-06 loud warning.
     Warning,
 }
 
-/// Tray icon side (16x16 canvas is plenty for a solid-color glyph; Windows
-/// scales it for the notification-area DPI).
+/// Tray icon side (32x32 canvas; Windows scales it for the notification-area
+/// DPI).
 const TRAY_ICON_SIZE: u32 = 32;
 
-/// The tray icon + its menu. Built once on `StartCause::Init`
-/// (RESEARCH Pitfall 3 — never at thread-spawn time).
+/// The tray icon — deliberately menu-less: clicks route through
+/// `TrayIconEvent` to the shell loop, which toggles the flyout.
 pub struct Tray {
     icon: TrayIcon,
-    settings_id: MenuId,
-    pair_id: MenuId,
-    pause_id: MenuId,
-    quit_id: MenuId,
 }
 
 impl Tray {
@@ -50,41 +45,11 @@ impl Tray {
     /// loop (RESEARCH Pitfall 2/3) — in practice, from
     /// `ApplicationHandler::new_events` on `StartCause::Init`.
     pub fn new() -> tray_icon::Result<Self> {
-        // Settings opens the on-demand egui window (07-08); Pair-new opens a
-        // fresh 60s PIN window WITHOUT opening settings — D-02 requires the
-        // action in BOTH places.
-        let settings_item = MenuItem::new("Settings…", true, None);
-        let pair_item = MenuItem::new("Pair new device", true, None);
-        let pause_item = MenuItem::new("Pause input", true, None);
-        let quit_item = MenuItem::new("Quit", true, None);
-        let settings_id = settings_item.id().clone();
-        let pair_id = pair_item.id().clone();
-        let pause_id = pause_item.id().clone();
-        let quit_id = quit_item.id().clone();
-
-        let menu = Menu::new();
-        menu.append(&settings_item).map_err(menu_err)?;
-        menu.append(&pair_item).map_err(menu_err)?;
-        menu.append(&PredefinedMenuItem::separator())
-            .map_err(menu_err)?;
-        menu.append(&pause_item).map_err(menu_err)?;
-        menu.append(&PredefinedMenuItem::separator())
-            .map_err(menu_err)?;
-        menu.append(&quit_item).map_err(menu_err)?;
-
         let icon = TrayIconBuilder::new()
-            .with_menu(Box::new(menu))
             .with_icon(icon_for(TrayState::Normal))
             .with_tooltip(tooltip_text(0))
             .build()?;
-
-        Ok(Self {
-            icon,
-            settings_id,
-            pair_id,
-            pause_id,
-            quit_id,
-        })
+        Ok(Self { icon })
     }
 
     /// Sets the tooltip to the device COUNT only — NEVER paired device names
@@ -101,28 +66,6 @@ impl Tray {
     pub fn set_state(&self, state: TrayState) {
         let _ = self.icon.set_icon(Some(icon_for(state)));
     }
-
-    /// The Settings menu item's id — opens the on-demand egui settings
-    /// window (routed through `UserEvent::OpenSettings`).
-    pub fn settings_id(&self) -> &MenuId {
-        &self.settings_id
-    }
-
-    /// The Pair-new menu item's id — on-demand pairing straight from the
-    /// tray, no settings window needed (D-02).
-    pub fn pair_id(&self) -> &MenuId {
-        &self.pair_id
-    }
-
-    /// The Pause menu item's id, compared against incoming `MenuEvent`s.
-    pub fn pause_id(&self) -> &MenuId {
-        &self.pause_id
-    }
-
-    /// The Quit menu item's id, compared against incoming `MenuEvent`s.
-    pub fn quit_id(&self) -> &MenuId {
-        &self.quit_id
-    }
 }
 
 /// Device-count-only tooltip text (T-07-20 — see [`Tray::set_tooltip`]).
@@ -134,20 +77,13 @@ fn tooltip_text(count: usize) -> String {
     }
 }
 
-/// Map a `muda` menu-build error into a `tray_icon::Error` so `Tray::new`'s
-/// `?` chain stays uniform (muda's `Error` has no `From<muda::Error> for
-/// tray_icon::Error`, so this adapts it into the `OsError(io::Error)` arm).
-fn menu_err(e: tray_icon::menu::Error) -> tray_icon::Error {
-    tray_icon::Error::OsError(std::io::Error::other(e.to_string()))
-}
-
 /// Build the state's solid-color circle icon (see module docs — no bundled
 /// `.ico` asset needed).
 fn icon_for(state: TrayState) -> Icon {
     let rgb = match state {
-        TrayState::Normal => (0x4C, 0x8D, 0xFF),  // D-12 locked accent blue
-        TrayState::Paused => (0x6B, 0x72, 0x80),  // D-12 muted token
-        TrayState::Warning => (0xFF, 0x6B, 0x6B), // D-12 error token
+        TrayState::Normal => (0x38, 0xBD, 0xF8),  // handoff accent #38BDF8
+        TrayState::Paused => (0x6B, 0x72, 0x80),  // muted token
+        TrayState::Warning => (0xFF, 0x6B, 0x6B), // error token
     };
     solid_circle_icon(rgb, TRAY_ICON_SIZE)
 }

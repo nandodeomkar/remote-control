@@ -1,13 +1,19 @@
-//! Server tray-daemon shell (SRV-01/SRV-03): a dedicated `std::thread`
-//! running a winit 0.30 event loop (`with_any_thread(true)`) that owns the
-//! `tray-icon` system-tray icon and the on-demand egui settings window
-//! (07-08). `main.rs` stays `#[tokio::main]`; this thread and the tokio
-//! runtime talk over `tokio::sync::watch` channels plus an
-//! `EventLoopProxy<UserEvent>` (RESEARCH Pattern 1 / SHARED-D — the same
-//! dedicated-OS-thread idiom as the input/audio/apps/clip threads in
-//! `main.rs`).
+//! Server tray-daemon shell (SRV-01/SRV-03, Phase 10 redesign): a dedicated
+//! `std::thread` running a winit 0.30 event loop (`with_any_thread(true)`)
+//! that owns the menu-less `tray-icon` tray, the custom [`flyout::Flyout`]
+//! panel (replacing the OS context menu), and the on-demand egui windows —
+//! main dashboard, settings, pair-new-device. `main.rs` stays
+//! `#[tokio::main]`; this thread and the tokio runtime talk over
+//! `tokio::sync::watch` channels plus an `EventLoopProxy<UserEvent>`
+//! (RESEARCH Pattern 1 / SHARED-D).
 
+pub mod chrome;
+pub mod flyout;
+pub mod glwin;
+pub mod main_window;
+pub mod pair_window;
 pub mod settings;
+pub mod style;
 pub mod tray;
 
 use std::sync::atomic::AtomicBool;
@@ -16,8 +22,7 @@ use std::time::{Duration, Instant};
 
 use server_core::auth::AuthManager;
 use tokio::sync::watch;
-use tray_icon::menu::MenuEvent;
-use tray_icon::TrayIconEvent;
+use tray_icon::{MouseButton, MouseButtonState, TrayIconEvent};
 use winit::application::ApplicationHandler;
 use winit::event::{StartCause, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop, EventLoopProxy};
@@ -26,89 +31,69 @@ use winit::window::WindowId;
 
 use crate::config::SharedSettings;
 use crate::firewall::FirewallStatus;
+use chrome::ShellAction;
+use flyout::Flyout;
+use main_window::MainWindow;
+use pair_window::PairWindow;
 use settings::SettingsWindow;
 use tray::{Tray, TrayState};
 
-/// Events delivered INTO the shell thread's winit loop: tray/menu callbacks
+/// Events delivered INTO the shell thread's winit loop: tray callbacks
 /// (which the OS invokes on an arbitrary thread — forwarded via the
 /// `Send + Sync` `EventLoopProxy`), the tokio→shell tooltip push, and the
-/// settings-window open/repaint requests (07-08).
+/// window open/repaint requests.
 pub enum UserEvent {
-    /// Click/hover/enter/leave on the tray icon itself. Carried through as
-    /// an interface-first field (e.g. a left-click could one day open the
-    /// settings window); today's `ShellApp::user_event` intentionally
-    /// discards the payload — muda/tray-icon already draws the OS-native
-    /// context menu without our help (hence `#[allow(dead_code)]`).
-    #[allow(dead_code)]
+    /// Click/hover/enter/leave on the tray icon. A left/right click-up
+    /// toggles the flyout; a double-click opens the dashboard.
     Tray(TrayIconEvent),
-    Menu(MenuEvent),
     /// Live connected-device COUNT — never names (T-07-20).
     Tooltip(usize),
-    /// Open (or focus) the on-demand egui settings window (SRV-03). Sent by
-    /// the tray's Settings menu item; any future caller (e.g. a tray
-    /// left-click) can push the same event through the proxy.
+    /// Open (or focus) the on-demand settings window (SRV-03). Interface-
+    /// first: in-window actions route via `ShellAction`; these proxy events
+    /// exist for any tokio-side caller (e.g. a future toast click).
+    #[allow(dead_code)]
     OpenSettings,
-    /// egui requested a repaint in `delay` (its request-repaint callback —
-    /// zero = now, non-zero = cursor-blink/animation schedule). Riding the
-    /// user-event queue keeps delayed repaints off a busy render loop.
-    SettingsRepaint(Duration),
+    /// Open (or focus) the main dashboard window (handoff 1a).
+    #[allow(dead_code)]
+    OpenMain,
+    /// Open (or focus) the pair-new-device window (handoff 1c).
+    #[allow(dead_code)]
+    OpenPair,
+    /// egui requested a repaint in `delay` (zero = now; non-zero =
+    /// cursor-blink/countdown schedule). One queue serves every open window.
+    Repaint(Duration),
 }
 
 /// Everything the shell thread needs from the composition root (RESEARCH
-/// SHARED-D, interface-first): the tray bootstrap (07-06) reads/drives
-/// `conn_count`/`pause_tx`/quit/`firewall_status`/`notify_firewall`; the
-/// settings window (07-08) additionally drives `auth` (Pair-new / paired
-/// list), `revoke_tx` (per-row Revoke), `config` (the shared editable
-/// settings persisted via the 07-07 save path), and `clip_sync` (the clip
-/// thread's LIVE auto-sync gate).
+/// SHARED-D, interface-first). See field docs — shared by all four windows.
 pub struct ShellCtx {
-    /// Live connected-device count (SRV-01 tooltip source).
+    /// Live connected-device count (SRV-01 tooltip + dashboard/flyout).
     pub conn_count: watch::Receiver<usize>,
-    /// The existing server-side pause seam (SPEC §11) — the tray's Pause
-    /// menu item flips this.
+    /// The existing server-side pause seam (SPEC §11) — flyout/dashboard
+    /// Pause actions flip this.
     pub pause_tx: watch::Sender<bool>,
-    /// Shared pairing state: the settings paired-device list + Revoke and
-    /// the on-demand "Pair new device" (both tray and settings) read/drive
-    /// it via `crate::begin_on_demand_pairing` / `crate::revoke_device`.
+    /// Shared pairing state: paired lists + Revoke + on-demand pairing all
+    /// go through `crate::begin_on_demand_pairing` / `crate::revoke_device`.
     pub auth: Arc<Mutex<AuthManager>>,
-    /// D-05 revocation epoch sender — the settings Revoke button advances it
-    /// (via `crate::revoke_device`) so the 07-05 session branch drops the
-    /// revoked phone's live connection.
+    /// D-05 revocation epoch sender — Revoke advances it so the 07-05
+    /// session branch drops the revoked phone's live connection.
     pub revoke_tx: watch::Sender<u64>,
     /// The shared editable settings (device name/port/autostart/clip-sync).
-    /// The settings window mutates it; the composition root's auth-change
-    /// save task reads it on every config re-serialize (07-07/07-08).
     pub config: Arc<Mutex<SharedSettings>>,
-    /// The clip thread's LIVE clipboard auto-sync gate (RESEARCH Open Q5):
-    /// the settings checkbox flips it immediately; the config write makes
-    /// the choice stick across restarts.
+    /// The clip thread's LIVE clipboard auto-sync gate (RESEARCH Open Q5).
     pub clip_sync: Arc<AtomicBool>,
-    /// The RESOLVED WebSocket port actually bound at startup (`RC_PORT` env
-    /// > config > default) — shown by the settings port field's hint and the
-    /// firewall fix text. Display-only; edits go to `config.port`.
+    /// The RESOLVED WebSocket port actually bound at startup.
     pub resolved_port: u16,
-    /// The startup firewall/bind self-test verdict (SRV-04 / D-06), set by
-    /// `main.rs` BEFORE spawning this thread so the tray can render the
-    /// warning state from `StartCause::Init` onward.
+    /// The startup firewall/bind self-test verdict (SRV-04 / D-06).
     pub firewall_status: FirewallStatus,
-    /// Whether the settings window should show the persistent firewall-hint
-    /// banner: `true` whenever `firewall_status` is anything other than
-    /// `Allowed` (a `BlockedNoRule` warning OR an inconclusive `Unknown`
-    /// read both merit the hint — only a confirmed `Allowed` suppresses it).
+    /// Whether the settings window shows the persistent firewall hint.
     pub notify_firewall: bool,
 }
 
 /// Spawn the shell thread and return its `EventLoopProxy` so the composition
 /// root can push `UserEvent::Tooltip` from a tokio task watching
 /// `conn_count`. MUST be called exactly once, from `main.rs`, AFTER the
-/// startup firewall self-test (`ctx.firewall_status` is read at
-/// `StartCause::Init`) and BEFORE `server_core::run` blocks the tokio main
-/// task forever.
-///
-/// The proxy is handed back over a one-shot `mpsc` (SHARED-D idiom: build
-/// the channel pair BEFORE spawning, same shape as every other dedicated
-/// thread in `main.rs`) because `create_proxy()` needs the `EventLoop`,
-/// which can only be constructed ON the new thread (Pitfall 2).
+/// startup firewall self-test and BEFORE `server_core::run` blocks.
 pub fn spawn_shell_thread(ctx: ShellCtx) -> EventLoopProxy<UserEvent> {
     let (proxy_tx, proxy_rx) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
@@ -117,17 +102,13 @@ pub fn spawn_shell_thread(ctx: ShellCtx) -> EventLoopProxy<UserEvent> {
             .build()
             .expect("winit event loop on the shell thread");
 
-        // Forward tray + menu events into THIS loop's queue. EventLoopProxy
-        // is Send + Sync so the callback (invoked on whatever thread the OS
+        // Forward tray events into THIS loop's queue. EventLoopProxy is
+        // Send + Sync so the callback (invoked on whatever thread the OS
         // delivers it from) can safely push across (RESEARCH Pattern 1).
         let proxy = event_loop.create_proxy();
         let p = proxy.clone();
         TrayIconEvent::set_event_handler(Some(move |event| {
             let _ = p.send_event(UserEvent::Tray(event));
-        }));
-        let p = proxy.clone();
-        MenuEvent::set_event_handler(Some(move |event| {
-            let _ = p.send_event(UserEvent::Menu(event));
         }));
 
         // Hand the proxy back to the caller BEFORE the blocking run_app call
@@ -139,6 +120,9 @@ pub fn spawn_shell_thread(ctx: ShellCtx) -> EventLoopProxy<UserEvent> {
             proxy,
             tray: None,
             settings: None,
+            main: None,
+            pair: None,
+            flyout: None,
             paused: false,
         };
         let _ = event_loop.run_app(&mut app);
@@ -149,26 +133,24 @@ pub fn spawn_shell_thread(ctx: ShellCtx) -> EventLoopProxy<UserEvent> {
         .expect("shell thread panicked before handing back its EventLoopProxy")
 }
 
-/// The winit `ApplicationHandler` driving the tray + settings window. Owns
-/// the [`Tray`] (built lazily on `StartCause::Init` — RESEARCH Pitfall 3,
-/// never at spawn time) and the on-demand [`SettingsWindow`] (built when a
-/// Settings event fires, destroyed on close — Pitfall 4's egui-on-winit
-/// topology).
+/// The winit `ApplicationHandler` driving the tray + every shell window.
+/// The tray is built lazily on `StartCause::Init` (RESEARCH Pitfall 3);
+/// windows are built on demand and destroyed on close (Pitfall 4 topology).
 struct ShellApp {
     ctx: ShellCtx,
-    /// This loop's own proxy — the settings window's egui repaint callback
-    /// pushes `SettingsRepaint` through it; menu handlers route
-    /// `OpenSettings` through it.
+    /// This loop's own proxy — egui repaint callbacks + action fan-out.
     proxy: EventLoopProxy<UserEvent>,
     tray: Option<Tray>,
     settings: Option<SettingsWindow>,
+    main: Option<MainWindow>,
+    pair: Option<PairWindow>,
+    flyout: Option<Flyout>,
     paused: bool,
 }
 
 impl ShellApp {
     /// The icon state implied by current pause/firewall status (pause takes
-    /// visual precedence — the owner explicitly asked for it; the firewall
-    /// warning stays informative-but-secondary once paused).
+    /// visual precedence — the owner explicitly asked for it).
     fn current_state(&self) -> TrayState {
         if self.paused {
             TrayState::Paused
@@ -179,27 +161,56 @@ impl ShellApp {
         }
     }
 
-    /// Create the settings window ON DEMAND on this loop — or focus the one
-    /// already open (a second Settings click must not spawn a twin). A
-    /// creation failure is log-and-continue: a dead settings window must
-    /// never take the tray down with it.
     fn open_settings(&mut self, event_loop: &ActiveEventLoop) {
         if let Some(open) = &self.settings {
             open.focus();
             return;
         }
         match SettingsWindow::new(event_loop, &self.ctx, self.proxy.clone()) {
-            Ok(window) => {
-                window.request_redraw(); // first frame
-                self.settings = Some(window);
-            }
+            Ok(w) => self.settings = Some(w),
             Err(e) => tracing::warn!(error = %e, "settings window creation failed"),
         }
     }
 
-    /// Destroy the settings window (close button): commit any in-progress
-    /// text edits first, release GPU resources, drop the whole GL stack, and
-    /// fall back to a plain Wait control flow (no window left to repaint).
+    fn open_main(&mut self, event_loop: &ActiveEventLoop) {
+        if let Some(open) = &self.main {
+            open.focus();
+            return;
+        }
+        match MainWindow::new(event_loop, self.proxy.clone()) {
+            Ok(w) => self.main = Some(w),
+            Err(e) => tracing::warn!(error = %e, "main window creation failed"),
+        }
+    }
+
+    fn open_pair(&mut self, event_loop: &ActiveEventLoop) {
+        if let Some(open) = &self.pair {
+            open.focus();
+            return;
+        }
+        match PairWindow::new(event_loop, &self.ctx, self.proxy.clone()) {
+            Ok(w) => self.pair = Some(w),
+            Err(e) => tracing::warn!(error = %e, "pair window creation failed"),
+        }
+    }
+
+    fn toggle_flyout(&mut self, event_loop: &ActiveEventLoop) {
+        if self.flyout.is_some() {
+            self.close_flyout();
+            return;
+        }
+        match Flyout::new(event_loop, self.proxy.clone()) {
+            Ok(w) => self.flyout = Some(w),
+            Err(e) => tracing::warn!(error = %e, "flyout creation failed"),
+        }
+    }
+
+    fn close_flyout(&mut self) {
+        if let Some(mut f) = self.flyout.take() {
+            f.destroy();
+        }
+    }
+
     fn close_settings(&mut self, event_loop: &ActiveEventLoop) {
         if let Some(mut window) = self.settings.take() {
             window.commit_pending(&self.ctx);
@@ -207,6 +218,89 @@ impl ShellApp {
         }
         event_loop.set_control_flow(ControlFlow::Wait);
     }
+
+    fn close_main(&mut self, event_loop: &ActiveEventLoop) {
+        if let Some(mut w) = self.main.take() {
+            w.destroy();
+        }
+        event_loop.set_control_flow(ControlFlow::Wait);
+    }
+
+    fn close_pair(&mut self, event_loop: &ActiveEventLoop) {
+        if let Some(mut w) = self.pair.take() {
+            w.destroy();
+        }
+        event_loop.set_control_flow(ControlFlow::Wait);
+    }
+
+    /// Ask every open window for a fresh frame (state changed somewhere).
+    fn redraw_all(&self) {
+        if let Some(w) = &self.settings {
+            w.request_redraw();
+        }
+        if let Some(w) = &self.main {
+            w.request_redraw();
+        }
+        if let Some(w) = &self.pair {
+            w.request_redraw();
+        }
+        if let Some(w) = &self.flyout {
+            w.request_redraw();
+        }
+    }
+
+    /// Execute the actions a window's frame returned. `source` identifies
+    /// which window "Close"/"Minimize" applies to.
+    fn handle_actions(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        source: WindowKind,
+        actions: Vec<ShellAction>,
+    ) {
+        for action in actions {
+            match action {
+                ShellAction::Close => match source {
+                    WindowKind::Settings => self.close_settings(event_loop),
+                    WindowKind::Main => self.close_main(event_loop),
+                    WindowKind::Pair => self.close_pair(event_loop),
+                    WindowKind::Flyout => self.close_flyout(),
+                },
+                ShellAction::Minimize => {
+                    if source == WindowKind::Main {
+                        if let Some(w) = &self.main {
+                            w.minimize();
+                        }
+                    }
+                }
+                ShellAction::OpenSettings => self.open_settings(event_loop),
+                ShellAction::OpenMain => self.open_main(event_loop),
+                ShellAction::OpenPair => self.open_pair(event_loop),
+                ShellAction::TogglePause => {
+                    self.paused = !self.paused;
+                    // Send-and-forget: a closed receiver means the process
+                    // is already tearing down, not an error to recover from.
+                    let _ = self.ctx.pause_tx.send(self.paused);
+                    if let Some(tray) = &self.tray {
+                        tray.set_state(self.current_state());
+                    }
+                    self.redraw_all();
+                }
+                ShellAction::Quit => {
+                    event_loop.exit();
+                    std::process::exit(0);
+                }
+            }
+        }
+    }
+}
+
+/// Which shell window a frame's actions came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WindowKind {
+    Settings,
+    Main,
+    Pair,
+    Flyout,
 }
 
 impl ApplicationHandler<UserEvent> for ShellApp {
@@ -232,13 +326,8 @@ impl ApplicationHandler<UserEvent> for ShellApp {
                     }
                 }
             }
-            // A scheduled egui repaint (SettingsRepaint set WaitUntil) came
-            // due — redraw the settings window.
-            StartCause::ResumeTimeReached { .. } => {
-                if let Some(window) = &self.settings {
-                    window.request_redraw();
-                }
-            }
+            // A scheduled egui repaint came due — redraw open windows.
+            StartCause::ResumeTimeReached { .. } => self.redraw_all(),
             _ => {}
         }
     }
@@ -251,73 +340,145 @@ impl ApplicationHandler<UserEvent> for ShellApp {
                 if let Some(tray) = &self.tray {
                     tray.set_tooltip(count);
                 }
+                // Dashboard/flyout show the live count — refresh them.
+                self.redraw_all();
             }
-            UserEvent::Menu(menu_event) => {
-                let Some(tray) = &self.tray else { return };
-                if *menu_event.id() == *tray.settings_id() {
-                    // Route through OpenSettings (not a direct call) so the
-                    // tray item and any future opener share one entry point.
-                    let _ = self.proxy.send_event(UserEvent::OpenSettings);
-                } else if *menu_event.id() == *tray.pair_id() {
-                    // D-02: on-demand pairing straight from the tray —
-                    // AuthManager::begin_pairing + notify_pin via the
-                    // ShellCtx auth Arc, no settings window needed.
-                    crate::begin_on_demand_pairing(&self.ctx.auth);
-                } else if *menu_event.id() == *tray.pause_id() {
-                    self.paused = !self.paused;
-                    // Send-and-forget: a closed receiver means the process
-                    // is already tearing down, not an error to recover from.
-                    let _ = self.ctx.pause_tx.send(self.paused);
-                    tray.set_state(self.current_state());
-                } else if *menu_event.id() == *tray.quit_id() {
-                    event_loop.exit();
-                    std::process::exit(0);
+            UserEvent::Tray(tray_event) => match tray_event {
+                TrayIconEvent::Click {
+                    button: MouseButton::Left | MouseButton::Right,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } => self.toggle_flyout(event_loop),
+                TrayIconEvent::DoubleClick {
+                    button: MouseButton::Left,
+                    ..
+                } => {
+                    self.close_flyout();
+                    self.open_main(event_loop);
                 }
-            }
+                _ => {}
+            },
             UserEvent::OpenSettings => self.open_settings(event_loop),
-            UserEvent::SettingsRepaint(delay) => {
+            UserEvent::OpenMain => self.open_main(event_loop),
+            UserEvent::OpenPair => self.open_pair(event_loop),
+            UserEvent::Repaint(delay) => {
                 // egui's repaint schedule: zero = redraw now; non-zero =
-                // wake the loop when it comes due (cursor blink at ~2Hz, not
-                // a Poll spin). Ignored when the window has already closed.
-                let Some(window) = &self.settings else { return };
+                // wake the loop when it comes due (cursor blink / countdown,
+                // not a Poll spin).
                 if delay.is_zero() {
-                    window.request_redraw();
+                    self.redraw_all();
                 } else if let Some(due) = Instant::now().checked_add(delay) {
                     event_loop.set_control_flow(ControlFlow::WaitUntil(due));
                 }
-            }
-            UserEvent::Tray(_) => {
-                // Click/hover: tray-icon/muda already draws the OS-native
-                // context menu on left/right click — nothing else to do.
             }
         }
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
-        // The only winit Window this loop owns is the settings window (the
-        // tray's message-only HWND lives inside tray-icon's platform_impl).
-        if self.settings.as_ref().map(SettingsWindow::window_id) != Some(window_id) {
+        let kind = if self.settings.as_ref().map(SettingsWindow::window_id) == Some(window_id) {
+            WindowKind::Settings
+        } else if self.main.as_ref().map(MainWindow::window_id) == Some(window_id) {
+            WindowKind::Main
+        } else if self.pair.as_ref().map(PairWindow::window_id) == Some(window_id) {
+            WindowKind::Pair
+        } else if self.flyout.as_ref().map(Flyout::window_id) == Some(window_id) {
+            WindowKind::Flyout
+        } else {
             return;
-        }
+        };
+
         match event {
             // On-demand lifecycle: close destroys the window; the tray (and
             // server) live on. Reopening builds a fresh one.
             WindowEvent::CloseRequested | WindowEvent::Destroyed => {
-                self.close_settings(event_loop);
+                self.handle_actions(event_loop, kind, vec![ShellAction::Close]);
             }
-            WindowEvent::RedrawRequested => {
-                if let Some(window) = self.settings.as_mut() {
-                    window.redraw(&self.ctx);
+            // The flyout dismisses like a menu when it loses focus (after a
+            // short grace period — a slow initial focus grant must not
+            // insta-close it).
+            WindowEvent::Focused(false) if kind == WindowKind::Flyout => {
+                if self.flyout.as_ref().is_some_and(Flyout::should_dismiss_on_blur) {
+                    self.close_flyout();
                 }
             }
-            other => {
-                if let Some(window) = self.settings.as_mut() {
-                    if let WindowEvent::Resized(size) = &other {
-                        window.resize(*size);
+            WindowEvent::RedrawRequested => {
+                let actions = match kind {
+                    WindowKind::Settings => self
+                        .settings
+                        .as_mut()
+                        .map(|w| w.redraw(&self.ctx))
+                        .unwrap_or_default(),
+                    WindowKind::Main => {
+                        let paused = self.paused;
+                        self.main
+                            .as_mut()
+                            .map(|w| w.redraw(&self.ctx, paused))
+                            .unwrap_or_default()
                     }
-                    // Forward to egui; repaint when it consumed something.
-                    if window.on_window_event(&other) {
-                        window.request_redraw();
+                    WindowKind::Pair => self
+                        .pair
+                        .as_mut()
+                        .map(|w| w.redraw(&self.ctx))
+                        .unwrap_or_default(),
+                    WindowKind::Flyout => {
+                        let paused = self.paused;
+                        self.flyout
+                            .as_mut()
+                            .map(|w| w.redraw(&self.ctx, paused))
+                            .unwrap_or_default()
+                    }
+                };
+                self.handle_actions(event_loop, kind, actions);
+            }
+            other => {
+                let repaint = match kind {
+                    WindowKind::Settings => self.settings.as_mut().map(|w| {
+                        if let WindowEvent::Resized(size) = &other {
+                            w.resize(*size);
+                        }
+                        w.on_window_event(&other)
+                    }),
+                    WindowKind::Main => self.main.as_mut().map(|w| {
+                        if let WindowEvent::Resized(size) = &other {
+                            w.resize(*size);
+                        }
+                        w.on_window_event(&other)
+                    }),
+                    WindowKind::Pair => self.pair.as_mut().map(|w| {
+                        if let WindowEvent::Resized(size) = &other {
+                            w.resize(*size);
+                        }
+                        w.on_window_event(&other)
+                    }),
+                    WindowKind::Flyout => self.flyout.as_mut().map(|w| {
+                        if let WindowEvent::Resized(size) = &other {
+                            w.resize(*size);
+                        }
+                        w.on_window_event(&other)
+                    }),
+                };
+                if repaint.unwrap_or(false) {
+                    match kind {
+                        WindowKind::Settings => {
+                            if let Some(w) = &self.settings {
+                                w.request_redraw();
+                            }
+                        }
+                        WindowKind::Main => {
+                            if let Some(w) = &self.main {
+                                w.request_redraw();
+                            }
+                        }
+                        WindowKind::Pair => {
+                            if let Some(w) = &self.pair {
+                                w.request_redraw();
+                            }
+                        }
+                        WindowKind::Flyout => {
+                            if let Some(w) = &self.flyout {
+                                w.request_redraw();
+                            }
+                        }
                     }
                 }
             }

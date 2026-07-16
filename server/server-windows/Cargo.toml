@@ -115,3 +115,7 @@ egui_glow = { version = "0.35", features = ["winit"] }
 # as winit; RESEARCH audit covers the egui workspace these serve.
 glutin = "0.32"
 glutin-winit = "0.5"
+# QR code generation for the redesigned pair-device window (1c): the pairing
+# payload rendered as egui rects. Pure-Rust, no default image feature (we paint
+# the module matrix ourselves).
+qrcode = { version = "0.14", default-features = false }

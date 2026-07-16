@@ -22,52 +22,31 @@
 //!   request-repaint callback → `SettingsRepaint`), so delayed repaints
 //!   (cursor blink) never busy-spin the loop.
 
-use std::num::NonZeroU32;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
 
-use egui_glow::glow;
-use egui_glow::glow::HasContext as _;
-use egui_glow::EguiGlow;
-use glutin::config::ConfigTemplateBuilder;
-use glutin::context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext};
-use glutin::display::GetGlDisplay as _;
-use glutin::prelude::*;
-use glutin::surface::{Surface, SurfaceAttributesBuilder, SwapInterval, WindowSurface};
-use winit::dpi::{LogicalSize, PhysicalSize};
-use winit::event::WindowEvent;
+use winit::dpi::LogicalSize;
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
-use winit::raw_window_handle::HasWindowHandle as _;
 use winit::window::{Window, WindowId};
 
+use super::chrome::{self, ShellAction};
+use super::glwin::GlWindow;
+use super::style::{self, icon};
 use super::{ShellCtx, UserEvent};
 use crate::firewall::FirewallStatus;
 use crate::{autostart, config};
 
-/// D-12 locked palette (same tokens as the tray icons / Flutter app).
-const ACCENT_BLUE: egui::Color32 = egui::Color32::from_rgb(0x4C, 0x8D, 0xFF);
-const ERROR_RED: egui::Color32 = egui::Color32::from_rgb(0xFF, 0x6B, 0x6B);
-const MUTED_GRAY: egui::Color32 = egui::Color32::from_rgb(0x6B, 0x72, 0x80);
-/// Window clear color — the app's #0E0F12 dark background.
-const BG_CLEAR: (f32, f32, f32) = (0.055, 0.059, 0.071);
-
-/// The on-demand settings window: a winit `Window` + glutin GL context/
-/// surface + [`EguiGlow`] (painter + egui-winit state), all owned together
-/// so a close drops the whole stack at once.
+/// The on-demand settings window: a [`GlWindow`] (winit + glutin + egui)
+/// plus the immediate-mode edit state.
 pub struct SettingsWindow {
-    window: Window,
-    gl_context: PossiblyCurrentContext,
-    gl_surface: Surface<WindowSurface>,
-    gl: Arc<glow::Context>,
-    egui_glow: EguiGlow,
+    gl: GlWindow,
     ui: UiState,
 }
 
 impl SettingsWindow {
-    /// Build the window + GL stack ON the shell loop (must be called from
-    /// the shell thread with its `ActiveEventLoop`). Every fallible step
-    /// surfaces as `anyhow::Error` so the caller can log-and-continue — a
-    /// failed settings window must never kill the tray.
+    /// Build the window ON the shell loop (must be called from the shell
+    /// thread with its `ActiveEventLoop`). Every fallible step surfaces as
+    /// `anyhow::Error` so the caller can log-and-continue — a failed
+    /// settings window must never kill the tray.
     pub fn new(
         event_loop: &ActiveEventLoop,
         ctx: &ShellCtx,
@@ -75,106 +54,13 @@ impl SettingsWindow {
     ) -> anyhow::Result<Self> {
         let attrs = Window::default_attributes()
             .with_title("Remote Control — Settings")
-            .with_inner_size(LogicalSize::new(460.0, 560.0))
-            // Hidden until the GL stack is up; shown at the end of new().
-            .with_visible(false);
-
-        // A bare RGBA config — no depth/stencil needed for a 2D UI.
-        let template = ConfigTemplateBuilder::new()
-            .prefer_hardware_accelerated(None)
-            .with_depth_size(0)
-            .with_stencil_size(0)
-            .with_transparency(false);
-
-        // WR-05: the config-picker closure MUST return a `Config`, so an empty
-        // iterator (a broken/remote GPU stack — RDP, stale drivers, VMs — is
-        // exactly where "no GL config" happens) can only be signalled by
-        // panicking. That panic would unwind through `event_loop.run_app` on
-        // the shell thread and take the tray, Pause, and Quit down with it —
-        // the precise failure this module's own doc contract forbids. Contain
-        // it: catch the unwind and convert it to an `anyhow::Error` so
-        // `open_settings` (shell/mod.rs) logs and continues with the tray alive.
-        let build_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            glutin_winit::DisplayBuilder::new()
-                .with_preference(glutin_winit::ApiPreference::FallbackEgl)
-                .with_window_attributes(Some(attrs.clone()))
-                .build(event_loop, template, |mut configs| {
-                    configs.next().expect("no OpenGL config available")
-                })
-        }));
-        let (window, gl_config) = match build_result {
-            Ok(Ok(pair)) => pair,
-            Ok(Err(e)) => {
-                return Err(anyhow::anyhow!("GL display/config creation failed: {e}"));
-            }
-            Err(_) => return Err(anyhow::anyhow!("no OpenGL config available")),
-        };
-
-        // DisplayBuilder MAY create the window while probing configs; if it
-        // didn't, finalize it against the chosen config now.
-        let window = match window {
-            Some(w) => w,
-            None => glutin_winit::finalize_window(event_loop, attrs, &gl_config)
-                .map_err(|e| anyhow::anyhow!("settings window creation failed: {e}"))?,
-        };
-
-        let raw_handle = window
-            .window_handle()
-            .map_err(|e| anyhow::anyhow!("window handle unavailable: {e}"))?
-            .as_raw();
-        let gl_display = gl_config.display();
-
-        // Core GL first; GLES fallback second (egui_glow example discipline).
-        let context_attrs = ContextAttributesBuilder::new().build(Some(raw_handle));
-        let fallback_attrs = ContextAttributesBuilder::new()
-            .with_context_api(ContextApi::Gles(None))
-            .build(Some(raw_handle));
-        // SAFETY: raw_handle belongs to `window`, which this struct owns for
-        // at least as long as the context/surface built from it.
-        let not_current = unsafe {
-            gl_display
-                .create_context(&gl_config, &context_attrs)
-                .or_else(|_| gl_display.create_context(&gl_config, &fallback_attrs))
-        }
-        .map_err(|e| anyhow::anyhow!("GL context creation failed: {e}"))?;
-
-        let (width, height): (u32, u32) = window.inner_size().into();
-        let surface_attrs = SurfaceAttributesBuilder::<WindowSurface>::new().build(
-            raw_handle,
-            NonZeroU32::new(width).unwrap_or(NonZeroU32::MIN),
-            NonZeroU32::new(height).unwrap_or(NonZeroU32::MIN),
-        );
-        // SAFETY: same raw_handle ownership argument as create_context above.
-        let gl_surface = unsafe { gl_display.create_window_surface(&gl_config, &surface_attrs) }
-            .map_err(|e| anyhow::anyhow!("GL surface creation failed: {e}"))?;
-        let gl_context = not_current
-            .make_current(&gl_surface)
-            .map_err(|e| anyhow::anyhow!("make_current failed: {e}"))?;
-        // Block swap on vsync so a repaint-happy frame can never spin the
-        // shell thread (best-effort — some drivers refuse; that's fine).
-        let _ = gl_surface.set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::MIN));
-
-        // SAFETY: the display outlives `gl` (both owned by this struct); the
-        // loader closure only resolves symbol addresses.
-        let gl = Arc::new(unsafe {
-            glow::Context::from_loader_function(|symbol| {
-                let c = std::ffi::CString::new(symbol)
-                    .expect("GL symbol names never contain interior NULs");
-                gl_display.get_proc_address(&c)
-            })
-        });
-
-        let egui_glow = EguiGlow::new(event_loop, Arc::clone(&gl), None, None, true);
-        // Match the app's locked dark theme regardless of the OS setting.
-        egui_glow.egui_ctx.set_theme(egui::Theme::Dark);
-        // Delayed repaints (cursor blink, animations) ride the shell loop's
-        // user-event queue — `SettingsRepaint` sets Wait/WaitUntil there.
-        let repaint_proxy = egui::mutex::Mutex::new(proxy);
-        egui_glow.egui_ctx.set_request_repaint_callback(move |info| {
-            let _ = repaint_proxy
-                .lock()
-                .send_event(UserEvent::SettingsRepaint(info.delay));
-        });
+            .with_inner_size(LogicalSize::new(440.0, 560.0))
+            .with_resizable(false)
+            .with_decorations(false);
+        let gl = GlWindow::new(event_loop, attrs, proxy)?;
+        chrome::round_corners(gl.window());
+        gl.show();
+        gl.request_redraw();
 
         // Seed the edit buffers from the live shared settings (07-07 values
         // as edited so far this run) + the real registry autostart state.
@@ -190,72 +76,45 @@ impl SettingsWindow {
             restart_needed: false,
             autostart_error: false,
         };
-
-        window.set_visible(true);
-        Ok(Self {
-            window,
-            gl_context,
-            gl_surface,
-            gl,
-            egui_glow,
-            ui,
-        })
+        Ok(Self { gl, ui })
     }
 
     /// The winit id — the shell loop routes `WindowEvent`s by it.
     pub fn window_id(&self) -> WindowId {
-        self.window.id()
+        self.gl.window_id()
     }
 
     /// Bring an already-open window to the front (second Settings click).
     pub fn focus(&self) {
-        self.window.focus_window();
+        self.gl.focus();
     }
 
     /// Ask the OS for a redraw (egui repaint scheduling).
     pub fn request_redraw(&self) {
-        self.window.request_redraw();
+        self.gl.request_redraw();
     }
 
-    /// Resize the GL surface with the window (a zero dimension — minimize —
-    /// is skipped; GL surfaces reject it).
-    pub fn resize(&self, size: PhysicalSize<u32>) {
-        if size.width == 0 || size.height == 0 {
-            return;
-        }
-        self.gl_surface.resize(
-            &self.gl_context,
-            NonZeroU32::new(size.width).unwrap_or(NonZeroU32::MIN),
-            NonZeroU32::new(size.height).unwrap_or(NonZeroU32::MIN),
-        );
+    /// Resize the GL surface with the window.
+    pub fn resize(&self, size: winit::dpi::PhysicalSize<u32>) {
+        self.gl.resize(size);
     }
 
     /// Forward a window event to egui; returns whether egui wants a repaint.
-    pub fn on_window_event(&mut self, event: &WindowEvent) -> bool {
-        self.egui_glow.on_window_event(&self.window, event).repaint
+    pub fn on_window_event(&mut self, event: &winit::event::WindowEvent) -> bool {
+        self.gl.on_window_event(event)
     }
 
     /// Run one egui frame + paint + swap (the `RedrawRequested` handler).
-    pub fn redraw(&mut self, ctx: &ShellCtx) {
-        let Self {
-            window,
-            gl_context,
-            gl_surface,
-            gl,
-            egui_glow,
-            ui,
-        } = self;
-        egui_glow.run(window, |root| ui.render(ctx, root));
-        // SAFETY: plain state-set + clear on our own current GL context.
-        unsafe {
-            gl.clear_color(BG_CLEAR.0, BG_CLEAR.1, BG_CLEAR.2, 1.0);
-            gl.clear(glow::COLOR_BUFFER_BIT);
-        }
-        egui_glow.paint(window);
-        if let Err(e) = gl_surface.swap_buffers(gl_context) {
-            // Cosmetic failure — never panic the shell loop over a frame.
-            tracing::warn!(error = %e, "settings window swap_buffers failed");
-        }
+    pub fn redraw(&mut self, ctx: &ShellCtx) -> Vec<ShellAction> {
+        let mut actions = Vec::new();
+        let ui_state = &mut self.ui;
+        self.gl.redraw(style::BG_CLEAR, |window, ui| {
+            if let Some(a) = chrome::title_bar(ui, window, "Remote Control — Settings", false) {
+                actions.push(a);
+            }
+            ui_state.render(ctx, ui);
+        });
+        actions
     }
 
     /// Commit any in-progress text edits (called on window close so a typed
@@ -267,7 +126,7 @@ impl SettingsWindow {
 
     /// Release GPU resources (called right before the window is dropped).
     pub fn destroy(&mut self) {
-        self.egui_glow.destroy();
+        self.gl.destroy();
     }
 }
 
@@ -288,19 +147,22 @@ struct UiState {
 
 impl UiState {
     /// One immediate-mode frame: fields bound to the shared settings handle,
-    /// the autostart toggle, the paired-device list, and the firewall hint.
+    /// the autostart toggle, the paired-device list, and the firewall hint —
+    /// restyled to the Phase 10 handoff (panel 1d).
     fn render(&mut self, ctx: &ShellCtx, ui: &mut egui::Ui) {
         egui::Frame::new()
-            .inner_margin(16)
+            .inner_margin(egui::Margin::symmetric(22, 20))
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .auto_shrink([false; 2])
                     .show(ui, |ui| {
-                        ui.heading("Settings");
-                        ui.add_space(10.0);
-
                         self.render_firewall_hint(ctx, ui);
+                        style::section_label(ui, "GENERAL");
+                        ui.add_space(12.0);
                         self.render_general(ctx, ui);
+                        ui.add_space(22.0);
+                        style::section_label(ui, "PAIRED DEVICES");
+                        ui.add_space(12.0);
                         self.render_paired_devices(ctx, ui);
                     });
             });
@@ -315,71 +177,106 @@ impl UiState {
             return;
         }
         let port = ctx.resolved_port;
-        match ctx.firewall_status {
-            FirewallStatus::BlockedNoRule => {
-                ui.colored_label(
-                    ERROR_RED,
-                    format!(
-                        "Windows Firewall is blocking inbound TCP {port} — your phone \
-                         can't connect. Fix: Windows Security → Firewall & network \
-                         protection → Allow an app through firewall → add Remote Control."
-                    ),
-                );
-            }
-            _ => {
-                ui.colored_label(
-                    MUTED_GRAY,
-                    format!(
-                        "Couldn't confirm Windows Firewall allows inbound TCP {port}. \
-                         If your phone can't connect, allow Remote Control through the \
-                         firewall."
-                    ),
-                );
-            }
-        }
-        ui.add_space(10.0);
+        let (title, body, accent, fill, border) = match ctx.firewall_status {
+            FirewallStatus::BlockedNoRule => (
+                format!("Firewall is blocking TCP {port}"),
+                "Your phone can't connect. Allow Remote Control through Windows Firewall."
+                    .to_string(),
+                style::RED,
+                style::RED_TINT,
+                style::RED_TINT_BORDER,
+            ),
+            _ => (
+                format!("Couldn't confirm the firewall allows TCP {port}"),
+                "If your phone can't connect, allow Remote Control through Windows Firewall."
+                    .to_string(),
+                style::AMBER,
+                style::SURFACE,
+                style::BORDER,
+            ),
+        };
+        style::card(fill, border, 14, 14).show(ui, |ui| {
+            ui.horizontal_top(|ui| {
+                ui.spacing_mut().item_spacing.x = 12.0;
+                style::status_dot(ui, accent, 14.0);
+                ui.vertical(|ui| {
+                    ui.spacing_mut().item_spacing.y = 4.0;
+                    ui.label(egui::RichText::new(title).font(style::sg_sb(14.0)).color(accent));
+                    ui.label(
+                        egui::RichText::new(body)
+                            .font(style::sg(12.0))
+                            .color(style::MUTED),
+                    );
+                });
+            });
+        });
+        ui.add_space(16.0);
     }
 
     /// Device name / port / clipboard-sync / autostart (SRV-03 + SRV-02).
     fn render_general(&mut self, ctx: &ShellCtx, ui: &mut egui::Ui) {
-        ui.label("Device name (shown on your phone)");
+        // Device name.
+        field_label(ui, "Device name", Some("(shown on your phone)"));
+        ui.add_space(7.0);
         let name = ui.add(
             egui::TextEdit::singleline(&mut self.device_name)
                 .hint_text("This computer's name")
-                .desired_width(260.0),
+                .font(style::sg(14.0))
+                .margin(egui::Margin::symmetric(13, 12))
+                .desired_width(f32::INFINITY),
         );
         if name.lost_focus() {
             self.commit_device_name(ctx);
         }
-        ui.add_space(8.0);
+        ui.add_space(16.0);
 
-        ui.label("Port");
-        let port = ui.add(
-            egui::TextEdit::singleline(&mut self.port_text)
-                .hint_text(format!("{} (current)", ctx.resolved_port))
-                .desired_width(100.0),
-        );
+        // Port + restart hint.
+        field_label(ui, "Port", None);
+        ui.add_space(7.0);
+        ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 12.0;
+            let port = ui.add(
+                egui::TextEdit::singleline(&mut self.port_text)
+                    .hint_text(ctx.resolved_port.to_string())
+                    .font(style::mono(14.0))
+                    .margin(egui::Margin::symmetric(13, 12))
+                    .desired_width(84.0),
+            );
+            if port.lost_focus() {
+                self.commit_port(ctx);
+            }
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 6.0;
+                ui.label(style::icon_rt(icon::INFO, 15.0, style::ACCENT));
+                ui.label(
+                    egui::RichText::new("Restart to apply")
+                        .font(style::sg(12.0))
+                        .color(style::ACCENT),
+                );
+            });
+        });
         if !self.port_text.trim().is_empty() && parse_port(self.port_text.trim()).is_none() {
-            ui.colored_label(ERROR_RED, "Not a valid port (1–65535)");
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new("Not a valid port (1–65535)")
+                    .font(style::sg(12.0))
+                    .color(style::RED),
+            );
         }
-        if port.lost_focus() {
-            self.commit_port(ctx);
-        }
-        if self.restart_needed {
-            // RESEARCH Open Q3: restart-required — the listener and beacon
-            // bind once at startup; no live re-bind.
-            ui.colored_label(ACCENT_BLUE, "Restart Remote Control to apply.");
-        }
-        ui.add_space(10.0);
+        ui.add_space(20.0);
+        hairline(ui);
+        ui.add_space(20.0);
 
         // Clipboard sync (RESEARCH Open Q5): the AtomicBool is the LIVE gate
         // the clip thread's auto-sync push reads — flipping it applies
         // immediately; the config write makes it stick across restarts.
         let mut clip = ctx.clip_sync.load(Ordering::Relaxed);
-        if ui
-            .checkbox(&mut clip, "Clipboard sync (send PC clipboard to phone)")
-            .changed()
-        {
+        if toggle_row(
+            ui,
+            "Clipboard sync",
+            "Send this PC's clipboard to the phone",
+            &mut clip,
+        ) {
             ctx.clip_sync.store(clip, Ordering::Relaxed);
             ctx.config
                 .lock()
@@ -387,14 +284,17 @@ impl UiState {
                 .clipboard_sync = clip;
             persist(ctx);
         }
+        ui.add_space(6.0);
 
-        // Autostart (SRV-02): HKCU-only Run entry via crate::autostart —
-        // reflects/drives autostart::is_enabled/enable/disable (T-07-32:
-        // per-user, no admin, absolute exe path, visible + togglable here).
-        if ui
-            .checkbox(&mut self.autostart_enabled, "Start with Windows (this user)")
-            .changed()
-        {
+        // Autostart (SRV-02): HKCU-only Run entry via crate::autostart.
+        let mut auto = self.autostart_enabled;
+        if toggle_row(
+            ui,
+            "Start with Windows",
+            "Launch for this user at sign-in",
+            &mut auto,
+        ) {
+            self.autostart_enabled = auto;
             let result = if self.autostart_enabled {
                 autostart::enable()
             } else {
@@ -419,7 +319,12 @@ impl UiState {
             }
         }
         if self.autostart_error {
-            ui.colored_label(ERROR_RED, "Couldn't update the Windows startup entry.");
+            ui.add_space(4.0);
+            ui.label(
+                egui::RichText::new("Couldn't update the Windows startup entry.")
+                    .font(style::sg(12.0))
+                    .color(style::RED),
+            );
         }
     }
 
@@ -427,12 +332,6 @@ impl UiState {
     /// on-demand "Pair new device" action. Names render ONLY here — the
     /// local operator's screen; the tray tooltip stays count-only (T-07-33).
     fn render_paired_devices(&mut self, ctx: &ShellCtx, ui: &mut egui::Ui) {
-        ui.add_space(12.0);
-        ui.separator();
-        ui.add_space(6.0);
-        ui.heading("Paired devices");
-        ui.add_space(6.0);
-
         // Clone the records so the auth lock is NOT held while rendering —
         // revoke_device below re-takes it.
         let records = ctx
@@ -442,37 +341,43 @@ impl UiState {
             .paired_records()
             .to_vec();
 
-        if records.is_empty() {
-            ui.weak("No phones paired yet.");
-        }
-        for device in &records {
-            ui.horizontal(|ui| {
-                ui.label(&device.name);
-                ui.weak(paired_ago(device.paired_at));
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button("Revoke").clicked() {
-                        // D-05 (T-07-31): crate::revoke_device =
-                        // AuthManager::revoke via the ShellCtx auth Arc
-                        // (drops the stored hash + bumps auth.changes() →
-                        // the 07-07 config re-save) AND revoke_tx.send_modify
-                        // (advances the revocation epoch → the 07-05 select!
-                        // branch force-disconnects the live session; the
-                        // phone re-pairs with kRevokedExplanation).
-                        crate::revoke_device(&ctx.auth, &ctx.revoke_tx, &device.hash);
-                    }
+        style::card(style::SURFACE, style::BORDER, 12, 0).show(ui, |ui| {
+            ui.spacing_mut().item_spacing = egui::Vec2::ZERO;
+            if records.is_empty() {
+                ui.allocate_ui(egui::vec2(ui.available_width(), 50.0), |ui| {
+                    ui.add_space(9.0);
+                    ui.horizontal(|ui| {
+                        ui.add_space(14.0);
+                        ui.label(
+                            egui::RichText::new("No phones paired yet.")
+                                .font(style::sg(13.5))
+                                .color(style::MUTED),
+                        );
+                    });
                 });
-            });
-        }
-
-        ui.add_space(8.0);
-        if ui.button("Pair new device").clicked() {
-            // D-02 on demand: crate::begin_on_demand_pairing =
-            // AuthManager::begin_pairing via the ShellCtx auth Arc (a fresh
-            // 60s PIN window — works with devices already paired, D-04
-            // multi-phone) + notify::notify_pin (toast + console, never
-            // tracing).
-            crate::begin_on_demand_pairing(&ctx.auth);
-        }
+            }
+            for device in &records {
+                device_row(
+                    ui,
+                    &device.name,
+                    &paired_ago(device.paired_at),
+                    true,
+                    || {
+                        // D-05 (T-07-31): crate::revoke_device drops the
+                        // stored hash + advances the revocation epoch so the
+                        // live session force-disconnects.
+                        crate::revoke_device(&ctx.auth, &ctx.revoke_tx, &device.hash);
+                    },
+                );
+                hairline_full(ui);
+            }
+            // "Pair new device" accent action row.
+            let resp = pair_row(ui);
+            if resp.clicked() {
+                // D-02 on demand: a fresh 60s PIN window + toast.
+                crate::begin_on_demand_pairing(&ctx.auth);
+            }
+        });
     }
 
     /// Commit the device-name buffer to the shared settings + config file
@@ -520,6 +425,68 @@ impl UiState {
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────
+// Panel 1d row/field painting helpers (Phase 10 redesign)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// A field caption: `Label (optional muted suffix)`.
+fn field_label(ui: &mut egui::Ui, label: &str, sub: Option<&str>) {
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 5.0;
+        ui.label(
+            egui::RichText::new(label)
+                .font(style::sg(12.5))
+                .color(style::MUTED),
+        );
+        if let Some(s) = sub {
+            ui.label(
+                egui::RichText::new(s)
+                    .font(style::sg(12.5))
+                    .color(style::MUTED_2),
+            );
+        }
+    });
+}
+
+/// A 1px divider spanning the current available width.
+fn hairline(ui: &mut egui::Ui) {
+    style::hairline(ui, style::BORDER_SOFT);
+}
+
+/// A divider spanning the full width of the enclosing card (list rows).
+fn hairline_full(ui: &mut egui::Ui) {
+    hairline(ui);
+}
+
+/// A title + subtitle row with a right-aligned [`style::toggle`]. Returns
+/// whether the toggle changed this frame.
+fn toggle_row(ui: &mut egui::Ui, title: &str, sub: &str, on: &mut bool) -> bool {
+    let mut changed = false;
+    ui.allocate_ui(egui::vec2(ui.available_width(), 44.0), |ui| {
+        ui.horizontal_centered(|ui| {
+            ui.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = 2.0;
+                ui.label(
+                    egui::RichText::new(title)
+                        .font(style::sg_sb(14.5))
+                        .color(style::TEXT),
+                );
+                ui.label(
+                    egui::RichText::new(sub)
+                        .font(style::sg(12.0))
+                        .color(style::MUTED_2),
+                );
+            });
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                changed = style::toggle(ui, on).changed();
+            });
+        });
+    });
+    changed
+}
+
+use super::style::{device_row, pair_row};
 
 /// Strict settings-side port parse: an integer in `1..=65535` (port 0 is not
 /// a usable listen port — same rule as config.rs's lenient loader).
