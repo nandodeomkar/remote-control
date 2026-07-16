@@ -35,6 +35,10 @@ You need two devices: the **Windows PC** you want to control and the **Android p
 
 If the camera scan doesn't work, the pair window also shows a 6-digit PIN you can type into the phone instead. After the first pairing, the phone reconnects by itself.
 
+### Browser tab list (optional)
+
+Want to see and switch your PC browser's open tabs from the phone? Download `RemoteControl-Extension-vX.zip` from the same [Releases page](../../releases/latest), unzip it, and follow the walkthrough in the zip's README ([view it here](extension/README.md)). It's a small free browser extension for Chrome or Edge that only talks to the Remote Control server on your own PC.
+
 ## What you get
 
 - A trackpad with instant cursor response
@@ -46,6 +50,7 @@ If the camera scan doesn't work, the pair window also shows a 6-digit PIN you ca
 - Power controls: lock, sleep, restart, shutdown — the dangerous ones are double-confirmed so you can't trigger them by accident
 - Presenter mode with slide controls and an on-phone timer
 - Browser shortcuts: back/forward, tabs, zoom
+- See and switch your browser's open tabs from the phone (optional free extension)
 - Everything is free, no accounts, and it only works on your own WiFi
 
 ## Troubleshooting

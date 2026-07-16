@@ -1,6 +1,6 @@
 # Distribution Guide
 
-How to build the two Remote Control release artifacts and hand them to a friend.
+How to build the Remote Control release artifacts and hand them to a friend.
 
 ## 1. Building the release artifacts (owner)
 
@@ -41,6 +41,18 @@ flutter build apk --release
 ```
 
 The APK lands at `build/app/outputs/flutter-apk/app-release.apk`.
+
+### Browser extension
+
+From the repo root, zip the `extension/` folder (PowerShell):
+
+```
+Compress-Archive -Path extension -DestinationPath RemoteControl-Extension-v1.0.0.zip
+```
+
+Attach `RemoteControl-Extension-v1.0.0.zip` to the GitHub release beside the
+exe and the apk. Recipients unzip it and load the `extension` folder unpacked
+in Chrome or Edge — the zip's own `README.md` walks them through it.
 
 > **Signing note:** without `key.properties` the same command still builds,
 > but the APK is DEBUG-signed. That is fine for personal sideloads, NOT for
