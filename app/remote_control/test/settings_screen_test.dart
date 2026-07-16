@@ -19,10 +19,12 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 
 import 'package:remote_control/net/connection_providers.dart';
 import 'package:remote_control/net/connection_service.dart';
+import 'package:remote_control/screens/connection_copy.dart' show deviceMetaPaired;
 import 'package:remote_control/screens/device_list_screen.dart';
 import 'package:remote_control/settings/settings_screen.dart';
 import 'package:remote_control/store/device_list_store.dart';
 import 'package:remote_control/store/device_store.dart';
+import 'package:remote_control/theme/tokens.dart';
 
 class _FakeSecureKv implements SecureKv {
   final Map<String, String> backing = {};
@@ -133,6 +135,47 @@ void main() {
         reason: '"${labels[i]}" must render below "${labels[i - 1]}"',
       );
     }
+  });
+
+  testWidgets('the paired-PC row shows name + "ip · paired" meta', (t) async {
+    await t.pumpWidget(_host(store));
+    await t.pump();
+
+    expect(find.text('Office PC'), findsOneWidget);
+    // Meta line is the shared "ip · paired" copy — exact, from connection_copy.
+    expect(find.text(deviceMetaPaired('192.168.1.50')), findsOneWidget);
+    expect(find.text('192.168.1.50 · paired'), findsOneWidget);
+  });
+
+  testWidgets('the scroll-direction segments accent-mark the selection',
+      (t) async {
+    await t.pumpWidget(_host(store));
+    await t.pump();
+
+    // Default (Natural) is selected: its label is accent, Reversed is muted.
+    final natural = t.widget<Text>(find.text(kScrollNaturalLabel));
+    final reversed = t.widget<Text>(find.text(kScrollReversedLabel));
+    expect(natural.style?.color, kAccent, reason: 'selected segment is accent');
+    expect(reversed.style?.color, kMuted, reason: 'unselected segment is muted');
+  });
+
+  testWidgets('the Accent "Blue" chip is an accent fill with kBg text',
+      (t) async {
+    await t.pumpWidget(_host(store));
+    await t.pump();
+
+    final chipText = t.widget<Text>(find.text(kAccentValueLabel));
+    expect(chipText.style?.color, kBg, reason: 'chip label is on-accent kBg');
+
+    final chipFill = t.widget<Container>(
+      find.ancestor(
+        of: find.text(kAccentValueLabel),
+        matching: find.byType(Container),
+      ).first,
+    );
+    final decoration = chipFill.decoration as BoxDecoration;
+    expect(decoration.color, kAccent, reason: 'chip fill is the locked accent');
+    expect(decoration.borderRadius, BorderRadius.circular(999));
   });
 
   testWidgets('the Accent swatch is a static, non-interactive chip', (t) async {
