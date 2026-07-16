@@ -478,8 +478,42 @@ class KeyCap extends StatefulWidget {
   /// False renders the muted, non-interactive (press-entry gated) state.
   final bool enabled;
 
-  /// Fixed width (null sizes to the content + the 48px minWidth floor).
+  /// Fixed width (null sizes to the content + the [minWidth] floor).
   final double? width;
+
+  /// The width floor — 48px (the touch-target minimum) by default.
+  ///
+  /// Relaxable ROW-LOCALLY (UI-SPEC §Spacing exceptions): the full-screen
+  /// keyboard's Type pad shares one row between 7 caps, so on a narrow phone
+  /// each is ~40–44dp wide. Only the WIDTH floor ever relaxes — the height
+  /// floor below is fixed at 48 and is what keeps the target tappable.
+  ///
+  /// Note this floor only binds under LOOSE width constraints (the docked
+  /// panel's `Wrap`); under an `Expanded` cell the parent's tight width wins
+  /// via [BoxConstraints.enforce] regardless. It is declared here so the
+  /// relaxation is explicit at the call site rather than implicit in layout.
+  final double minWidth;
+
+  /// Breathing room around the face — 12px each side by default.
+  ///
+  /// The pads size caps by `Expanded` flex (the cell owns the width), so they
+  /// relax this: 12px each side would squeeze a 7-across row's labels off a
+  /// ~40dp cap. This is the seam that does the real work for the Type row.
+  final EdgeInsetsGeometry padding;
+
+  /// Label face size — 14 (Body) by default, the docked panel's rows.
+  ///
+  /// UI-SPEC §Typography: the pads' large caps use 16 (Heading) and the
+  /// numpad's digit faces 28 (Display).
+  final double labelSize;
+
+  /// Label face weight — w400 by default; the pads' large caps use w600
+  /// (UI-SPEC §Typography). Only w400 and w600 exist in this design system.
+  final FontWeight labelWeight;
+
+  /// Icon face size — 20 by default (the docked rows and the Type pad's slim
+  /// row); the Arrows pad's inverted-T uses 28 (UI-SPEC §Typography).
+  final double iconSize;
 
   /// Press-down with no armed mods: `key {action: down}` (KEY-04 hold).
   final void Function(String code) onKeyDown;
@@ -506,6 +540,11 @@ class KeyCap extends StatefulWidget {
     required this.onKeyTapWithMods,
     required this.hasArmedMods,
     this.width,
+    this.minWidth = 48,
+    this.padding = const EdgeInsets.symmetric(horizontal: 12),
+    this.labelSize = 14,
+    this.labelWeight = FontWeight.w400,
+    this.iconSize = 20,
     this.onPressHaptic,
   });
 
@@ -583,13 +622,13 @@ class KeyCapState extends State<KeyCap> {
             : kText;
 
     final Widget face = widget.def.icon != null
-        ? Icon(widget.def.icon, size: 20, color: faceColor)
+        ? Icon(widget.def.icon, size: widget.iconSize, color: faceColor)
         : Text(
             widget.def.label!,
             style: TextStyle(
               color: faceColor,
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
+              fontSize: widget.labelSize,
+              fontWeight: widget.labelWeight,
             ),
           );
 
@@ -605,8 +644,11 @@ class KeyCapState extends State<KeyCap> {
       onTapCancel: _onTapCancel,
       child: Container(
         width: widget.width,
-        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        // The HEIGHT floor is fixed at 48 and never relaxes — it is what
+        // keeps every cap tappable. Only [minWidth] is call-site relaxable
+        // (UI-SPEC §Spacing exceptions: the Type pad's 7-across slim row).
+        constraints: BoxConstraints(minWidth: widget.minWidth, minHeight: 48),
+        padding: widget.padding,
         decoration: BoxDecoration(
           color: kSurface,
           border: Border.all(color: borderColor),

@@ -22,15 +22,11 @@ import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
 import '../theme/tokens.dart';
 import 'diff_ops.dart';
+import 'key_pads.dart';
 import 'keyboard_panel.dart';
 
 /// App-bar title (house rule: no inline literals).
 const String kKeyboardTitle = 'Keyboard';
-
-/// The centered hint copy above the panel (Copywriting Contract, verbatim
-/// from the prototype line 130). House rule: no inline copy literals.
-const String kKeyboardHint =
-    'The system keyboard handles typing. These are the extra keys.';
 
 /// Hint text color (Prototype line 130, `#4a505c`). A local non-token const
 /// mirroring `connection_header`/`dot_grid`'s pattern — it is NOT one of the
