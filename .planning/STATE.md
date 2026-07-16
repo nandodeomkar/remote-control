@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 10
-stopped_at: 10-01 complete (keymap vocabulary extension both sides; both coverage gates green)
-last_updated: "2026-07-16T20:33:06Z"
-last_activity: 2026-07-16 -- Phase 10 plan 10-01 executed
+stopped_at: 10-02 complete (Shortcuts tile at hub position 3 + 25-button catalog; 22 verification tests green)
+last_updated: "2026-07-16T20:46:40Z"
+last_activity: 2026-07-16 -- Phase 10 plan 10-02 executed
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 77
-  completed_plans: 72
-  percent: 91
+  completed_plans: 73
+  percent: 92
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 10 (keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke) — EXECUTING
-Plan: 2 of 6 (10-01 complete)
+Plan: 3 of 6 (10-01, 10-02 complete)
 Next: 09-08 on-device visual UAT gate re-run — MUST `flutter build apk --release`
   FRESH first (08-06 stale-APK lesson), then `flutter install` + walkthrough vs
   the prototype. 09-09 (Material Symbols Rounded migration) just landed: all 63
@@ -144,6 +144,7 @@ Progress: [██████████] 100% (8 of 8 phases complete; 62 of 6
 | Phase 09 P06 | 5min | 2 tasks | 0 files |
 | Phase 09 P09 | 18min | 3 tasks | 32 files |
 | Phase 10 P01 | 7min | 2 tasks | 3 files |
+| Phase 10 P02 | 14min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -307,6 +308,7 @@ Recent decisions affecting current work:
 - [Phase ?]: 09-04: Media + Browser screens already matched 09-UI-SPEC; closed as pure test-pinning (transport 64/48/48, tabular readout, full-width Refresh, accent press-flash)
 - [Phase 10-01]: key.code vocabulary extended by 18 codes (letters A C D E F I R S V X Y Z, main-row 0, PrintScreen, promoted T W Plus Minus) with NO SERVER_PROTO_VERSION bump — the accepted vocabulary grows, message shape unchanged, unknown codes still drop silently (T-04-02). keymap.rs CLIENT_KEY_CODES is the single source of truth; Dart kClientKeyCodes mirrors byte-for-byte, both coverage gates green
 - [Phase 10-01]: Key::PrintScr confirmed the enigo 0.6.1 VK_SNAPSHOT variant by reading vendored src (keycodes.rs:525 variant / :1010 -> VK_SNAPSHOT); letters ride Key::Unicode(lowercase) reusing the T/W/B precedent so Ctrl/Win chords resolve via VkKeyScanW. T/W/Plus/Minus promoted OUT of ROUTER_MACRO_CODES (now BrowserBack/BrowserForward/B) keeping the two lists disjoint; B stays router-only (present_macro blank). Plus->'=' Pitfall-11 fix preserved, Equal never introduced
+- [Phase 10-02]: kShortcutCatalog is the single ordered source of truth (4 sections / 25 buttons, kBrowserActions/kHubTiles pattern) driving BOTH the render and the vocabulary coverage test; every ShortcutSpec.code cross-checked against kClientKeyCodes (drift fails the build, T-10-03), excluded combos (Alt+Tab/Win+L/Ctrl+Alt+Del) asserted absent. Buttons fire ONE KeyMsg(action:'tap', mods) on the reliable path via the media _TransportButton press-DOWN + 100ms accent-flash + muted-not-red pattern — no new network surface, no protocol change (T-10-02 accept). All 26 Symbols.*_rounded glyphs verified present in material_symbols_icons 4.2951.0 (zero substitutions). Shortcuts HubTileSpec (bolt_rounded) at kHubTiles index 2 → 9-tile grid, HubTileGrid odd-tail chunker renders the 9th half-width tile with zero grid change
 - [Phase ?]: [Phase 09-09]: Full Material Symbols Rounded migration — all client glyphs are Symbols.<name>_rounded (material_symbols_icons 4.2951.0), axes pinned once via buildAppTheme IconThemeData (opsz 24/wght 400/FILL 0/GRAD 0); classic Icons.* banned in lib/ by icons_guard_test. Owner overrode 09-UI-SPEC line-28 skew acceptance. Release APK grew only +61.7 KB (Symbols font tree-shaken 99.4%).
 
 ### Pending Todos
@@ -347,6 +349,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-16T20:33:06Z
-Stopped at: Completed 10-01-PLAN.md (keymap vocabulary extension; commits 58d1ce8, dac585b)
-Resume file: .planning/phases/10-keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke/10-02-PLAN.md
+Last session: 2026-07-16T20:46:40Z
+Stopped at: Completed 10-02-PLAN.md (Shortcuts tile + 25-button catalog; commits 1202f1c, bd0725a, b8e3107)
+Resume file: .planning/phases/10-keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke/10-03-PLAN.md

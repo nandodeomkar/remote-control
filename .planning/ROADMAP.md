@@ -357,7 +357,7 @@ Plans:
 
 **Wave 2** *(after 10-01)*
 
-- [ ] 10-02-PLAN.md — Shortcuts tile: kShortcutCatalog registry (4 sections / 25 buttons) + ShortcutButton + ShortcutsScreen + hub tile at position 3
+- [x] 10-02-PLAN.md — Shortcuts tile: kShortcutCatalog registry (4 sections / 25 buttons) + ShortcutButton + ShortcutsScreen + hub tile at position 3
 - [ ] 10-03-PLAN.md — Keyboard primitives: public KeyCap + pad cap tables + KeyboardPad enum + capsForPad + keyboard.pad store
 
 **Wave 3** *(after 10-03)*
