@@ -353,7 +353,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 10-01-PLAN.md — Keymap vocabulary extension both sides + coverage (keymap.rs CLIENT_KEY_CODES + Dart kClientKeyCodes mirror; letters/0/PrintScreen; T/W/Plus/Minus promoted; no proto bump)
+- [x] 10-01-PLAN.md — Keymap vocabulary extension both sides + coverage (keymap.rs CLIENT_KEY_CODES + Dart kClientKeyCodes mirror; letters/0/PrintScreen; T/W/Plus/Minus promoted; no proto bump)
 
 **Wave 2** *(after 10-01)*
 
