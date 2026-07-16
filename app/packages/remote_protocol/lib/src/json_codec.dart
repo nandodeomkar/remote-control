@@ -109,6 +109,74 @@ class WindowInfo {
   int get hashCode => Object.hash(id, title, icon, path);
 }
 
+/// Parse a `tabs` array of `{id, title, active, icon?}` entries
+/// (protoVersion 1.4).
+///
+/// `icon` is optional (D-05 tolerant): absent → null, unknown extra fields
+/// ignored. A present value with the wrong type is a decode error.
+List<TabInfo> _tabList(Object? v, String key) {
+  if (v is! List) {
+    throw FormatException('field $key must be an array');
+  }
+  return v.map((e) {
+    if (e is! Map<String, dynamic>) {
+      throw FormatException('entries of $key must be objects');
+    }
+    return TabInfo(
+      id: _req<int>(e, 'id'),
+      title: _req<String>(e, 'title'),
+      active: _req<bool>(e, 'active'),
+      icon: _opt<String>(e, 'icon'),
+    );
+  }).toList();
+}
+
+/// A tab entry in `tabs.list` replies and `tabs.changed` pushes
+/// (protoVersion 1.4, BROW-01). No url field ever crosses the phone-facing
+/// wire — titles are enough (SPEC section 7 privacy rule).
+class TabInfo {
+  /// Browser-assigned tab id.
+  final int id;
+
+  /// Tab title (may be empty).
+  final String title;
+
+  /// Whether this is THE active tab (exactly one per snapshot).
+  final bool active;
+
+  /// Base64 PNG favicon WITHOUT a `data:` prefix (the WindowInfo icon
+  /// convention), or null for iconless tabs.
+  final String? icon;
+
+  /// Creates a tab entry.
+  const TabInfo({
+    required this.id,
+    required this.title,
+    required this.active,
+    this.icon,
+  });
+
+  /// Canonical JSON form: `{id, title, active}` plus `icon` only when
+  /// non-null (mirrors the Rust `skip_serializing_if = "Option::is_none"`).
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'title': title,
+        'active': active,
+        if (icon != null) 'icon': icon,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      other is TabInfo &&
+      other.id == id &&
+      other.title == title &&
+      other.active == active &&
+      other.icon == icon;
+
+  @override
+  int get hashCode => Object.hash(id, title, active, icon);
+}
+
 /// Every message type in the protoVersion 1.0 registry (SPEC section 7),
 /// plus [UnknownMsg] for unregistered `t` values (D-07).
 sealed class RemoteMessage {
@@ -658,6 +726,114 @@ final class InputBlockedMsg extends RemoteMessage {
   Map<String, Object?> toPayload() => {'reason': reason};
 }
 
+/// `tabs.list` (C→S request / S→C reply, protoVersion 1.4): request payload
+/// is `{}`; the reply carries `connected` + `tabs`. With the extension never
+/// connected the reply is `{connected:false, tabs:[]}` — the phone's
+/// install-hint state.
+final class TabsListMsg extends RemoteMessage {
+  /// Present in replies, absent in requests.
+  final bool? connected;
+
+  /// Present in replies, absent in requests.
+  final List<TabInfo>? tabs;
+
+  /// Creates a tabs.list message (const request form: both fields null).
+  const TabsListMsg({this.connected, this.tabs});
+
+  /// Decodes the `tabs.list` payload.
+  factory TabsListMsg.fromPayload(Map<String, dynamic> p) {
+    final raw = p['tabs'];
+    return TabsListMsg(
+      connected: _opt<bool>(p, 'connected'),
+      tabs: raw == null ? null : _tabList(raw, 'tabs'),
+    );
+  }
+
+  @override
+  String get t => 'tabs.list';
+
+  @override
+  Map<String, Object?> toPayload() => {
+        if (connected != null) 'connected': connected,
+        if (tabs != null) 'tabs': tabs!.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// `tabs.changed` (S→C push, protoVersion 1.4): on any tab change AND on
+/// extension connect/disconnect. BOTH fields required — a missing field is a
+/// hard decode error.
+final class TabsChangedMsg extends RemoteMessage {
+  /// Whether the browser extension is connected to the server.
+  final bool connected;
+
+  /// Current full tab snapshot (extension order).
+  final List<TabInfo> tabs;
+
+  /// Creates a tabs.changed message.
+  const TabsChangedMsg({required this.connected, required this.tabs});
+
+  /// Decodes the `tabs.changed` payload.
+  factory TabsChangedMsg.fromPayload(Map<String, dynamic> p) {
+    if (!p.containsKey('tabs')) {
+      throw const FormatException('missing required field: tabs');
+    }
+    return TabsChangedMsg(
+      connected: _req<bool>(p, 'connected'),
+      tabs: _tabList(p['tabs'], 'tabs'),
+    );
+  }
+
+  @override
+  String get t => 'tabs.changed';
+
+  @override
+  Map<String, Object?> toPayload() => {
+        'connected': connected,
+        'tabs': tabs.map((e) => e.toJson()).toList(),
+      };
+}
+
+/// `tabs.activate` (C→S, protoVersion 1.4): switch the PC browser to that
+/// tab. Fire-and-forget — no err reply; stale ids self-heal via the next
+/// `tabs.changed`.
+final class TabsActivateMsg extends RemoteMessage {
+  /// Tab id to activate.
+  final int id;
+
+  /// Creates a tabs.activate message.
+  const TabsActivateMsg({required this.id});
+
+  /// Decodes the `tabs.activate` payload.
+  factory TabsActivateMsg.fromPayload(Map<String, dynamic> p) =>
+      TabsActivateMsg(id: _req<int>(p, 'id'));
+
+  @override
+  String get t => 'tabs.activate';
+
+  @override
+  Map<String, Object?> toPayload() => {'id': id};
+}
+
+/// `tabs.close` (C→S, protoVersion 1.4): close that tab. Fire-and-forget —
+/// same semantics as `tabs.activate`.
+final class TabsCloseMsg extends RemoteMessage {
+  /// Tab id to close.
+  final int id;
+
+  /// Creates a tabs.close message.
+  const TabsCloseMsg({required this.id});
+
+  /// Decodes the `tabs.close` payload.
+  factory TabsCloseMsg.fromPayload(Map<String, dynamic> p) =>
+      TabsCloseMsg(id: _req<int>(p, 'id'));
+
+  @override
+  String get t => 'tabs.close';
+
+  @override
+  Map<String, Object?> toPayload() => {'id': id};
+}
+
 /// `browser` (C→S): key-macro actions.
 final class BrowserMsg extends RemoteMessage {
   /// Browser action string.
@@ -850,6 +1026,10 @@ final class UnknownMsg extends RemoteMessage {
     'clip.get' => ClipGetMsg.fromPayload(p),
     'clip.changed' => ClipChangedMsg.fromPayload(p),
     'input.blocked' => InputBlockedMsg.fromPayload(p),
+    'tabs.list' => TabsListMsg.fromPayload(p),
+    'tabs.changed' => TabsChangedMsg.fromPayload(p),
+    'tabs.activate' => TabsActivateMsg.fromPayload(p),
+    'tabs.close' => TabsCloseMsg.fromPayload(p),
     'browser' => BrowserMsg.fromPayload(p),
     'present' => PresentMsg.fromPayload(p),
     'ping' => PingMsg.fromPayload(p),

@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::CodecError;
-use crate::executors::WindowInfo;
+use crate::executors::{TabInfo, WindowInfo};
 
 /// The wire envelope `{t, seq?, p?}` (SPEC §1) — step 1 of the two-step
 /// parse (RESEARCH Pattern 3). Private: callers only see [`Decoded`].
@@ -217,6 +217,39 @@ pub struct InputBlockedPayload {
     pub reason: String,
 }
 
+/// `tabs.list` payload (protoVersion 1.4): request is `{}` (both fields
+/// absent); the reply carries BOTH `connected` and `tabs` — the
+/// [`AppsListPayload`] optional-fields precedent.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TabsListPayload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connected: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tabs: Option<Vec<TabInfo>>,
+}
+
+/// `tabs.changed` payload (S→C push, protoVersion 1.4): BOTH fields
+/// REQUIRED — a missing field is a hard decode error (unlike the
+/// dual-request/reply `tabs.list` above).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TabsChangedPayload {
+    pub connected: bool,
+    pub tabs: Vec<TabInfo>,
+}
+
+/// `tabs.activate` payload (C→S, protoVersion 1.4): fire-and-forget tab
+/// switch — no err reply, stale ids self-heal via the next `tabs.changed`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TabsActivatePayload {
+    pub id: i64,
+}
+
+/// `tabs.close` payload (C→S, protoVersion 1.4): fire-and-forget tab close.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TabsClosePayload {
+    pub id: i64,
+}
+
 /// `browser` payload (C→S): key-macro actions (SPEC §7).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BrowserPayload {
@@ -291,6 +324,10 @@ pub enum Msg {
     ClipGet(ClipGetPayload),
     ClipChanged(ClipChangedPayload),
     InputBlocked(InputBlockedPayload),
+    TabsList(TabsListPayload),
+    TabsChanged(TabsChangedPayload),
+    TabsActivate(TabsActivatePayload),
+    TabsClose(TabsClosePayload),
     Browser(BrowserPayload),
     Present(PresentPayload),
     Ping(PingPayload),
@@ -342,6 +379,10 @@ pub fn decode_text(s: &str) -> Result<Decoded, CodecError> {
         "clip.get" => Msg::ClipGet(payload(p)?),
         "clip.changed" => Msg::ClipChanged(payload(p)?),
         "input.blocked" => Msg::InputBlocked(payload(p)?),
+        "tabs.list" => Msg::TabsList(payload(p)?),
+        "tabs.changed" => Msg::TabsChanged(payload(p)?),
+        "tabs.activate" => Msg::TabsActivate(payload(p)?),
+        "tabs.close" => Msg::TabsClose(payload(p)?),
         "browser" => Msg::Browser(payload(p)?),
         "present" => Msg::Present(payload(p)?),
         "ping" => Msg::Ping(payload(p)?),
@@ -409,6 +450,10 @@ pub fn encode_msg(msg: &Msg, seq: Option<u64>) -> String {
         Msg::ClipGet(pl) => ("clip.get", val(pl)),
         Msg::ClipChanged(pl) => ("clip.changed", val(pl)),
         Msg::InputBlocked(pl) => ("input.blocked", val(pl)),
+        Msg::TabsList(pl) => ("tabs.list", val(pl)),
+        Msg::TabsChanged(pl) => ("tabs.changed", val(pl)),
+        Msg::TabsActivate(pl) => ("tabs.activate", val(pl)),
+        Msg::TabsClose(pl) => ("tabs.close", val(pl)),
         Msg::Browser(pl) => ("browser", val(pl)),
         Msg::Present(pl) => ("present", val(pl)),
         Msg::Ping(pl) => ("ping", val(pl)),

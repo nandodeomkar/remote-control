@@ -51,7 +51,10 @@ use crate::executors::{Executors, WindowInfo};
 /// 1.3 adds the additive `input.blocked` S→C push (SRV-05, D-07) — a
 /// transient UIPI-elevated-foreground-window notice — still a minor bump,
 /// so 1.0/1.1/1.2 clients remain accepted (§2).
-pub const SERVER_PROTO_VERSION: &str = "1.3";
+/// 1.4 adds the additive `tabs.*` family (BROW-01) — browser tab list fed
+/// by the localhost extension leg (SPEC §15) — minor bump, 1.0–1.3 clients
+/// still accepted (§2).
+pub const SERVER_PROTO_VERSION: &str = "1.4";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
 /// POST-auth liveness deadline: an Authed session receiving NO inbound

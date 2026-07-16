@@ -1,0 +1,11 @@
+{
+  "name": "tabs-activate-missing-id",
+  "description": "NEGATIVE (D-05): tabs.activate without the required `id` field must be a hard decode error in both codecs — missing required fields are never silently coerced.",
+  "wire": {
+    "t": "tabs.activate",
+    "p": {}
+  },
+  "expect": {
+    "error": true
+  }
+}

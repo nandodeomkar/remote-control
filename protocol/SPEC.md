@@ -1,6 +1,6 @@
 # Remote Control Wire Protocol — SPEC
 
-**protoVersion:** `"1.1"`
+**protoVersion:** `"1.4"`
 **Status:** Locked contract. Both codecs (Rust `server-core`, Dart `remote_protocol`) are written against this document and proven byte-identical by the golden fixtures in `protocol/fixtures/`. No codec may adjust a fixture to match its own output.
 
 Transport: a single WebSocket connection per session carrying two frame kinds — JSON text frames (everything) and 9-byte binary frames (mouse hot path only). Discovery is UDP broadcast (out of scope for this document; see design spec §4).
@@ -29,11 +29,14 @@ Every JSON text frame is an object of the shape:
 
 ## 2. Versioning (D-06)
 
-- `protoVersion` is a `"major.minor"` string. Current version: `"1.1"`.
+- `protoVersion` is a `"major.minor"` string. Current version: `"1.4"`.
 - `hello` carries `protoVersion`. The server parses only the **major** component.
 - **Major mismatch:** the server replies `err` with `code:"versionMismatch"` and payload fields `serverVersion` and `clientVersion` (both `"major.minor"` strings), then closes the connection.
 - **Minor mismatch:** accepted. Peers simply do not use features the other side does not know; unknown fields and unknown types are handled by the strictness rules (§1, §10).
 - **1.1 addition (D-03):** the S→C `vol.changed {value, muted}` push (§7). This is a minor bump — a `"1.0"` peer that never receives or ignores the type stays fully interoperable, exactly per the minor-mismatch rule above.
+- **1.2 addition (APPS-02/APPS-03, D-07):** optional `icon` (base64 PNG, 32×32) and `path` (resolved exe path) fields on the `apps.list`/`apps.changed` window elements, plus the `apps.changed` S→C push. Minor bump — legacy elements without the fields stay valid.
+- **1.3 addition (SRV-05, D-07):** the S→C `input.blocked {reason}` push — a transient UIPI-elevated-foreground-window notice. Minor bump.
+- **1.4 addition (BROW-01):** the `tabs.*` family (`tabs.list`, `tabs.changed`, `tabs.activate`, `tabs.close`, §7) — live browser tab list fed by the localhost extension leg (§15). Minor bump — 1.0–1.3 clients stay accepted.
 
 ## 3. Handshake FSM
 
@@ -106,13 +109,18 @@ Direction: C→S (client to server), S→C (server to client), C↔S (both).
 | `text` | C→S | `bs` (integer ≥ 0), `ins` (string) | — | Diff-ops, §8 |
 | `media` | C→S | `action` (`"playpause"`\|`"next"`\|`"prev"`\|`"volup"`\|`"voldown"`\|`"mute"`\|`"setvol"`) | `value` (integer 0–100; **required iff** `action` is `"setvol"`) | |
 | `vol.changed` | S→C | `value` (integer 0–100), `muted` (bool) | — | Server push (protoVersion 1.1, D-03): after auth and on any server-side volume/mute change |
+| `input.blocked` | S→C | `reason` (string, fixed vocabulary — currently `"elevated"`; never PII) | — | Server push (protoVersion 1.3, SRV-05): injected input is being dropped by UIPI (elevated foreground window) |
 | `power` | C→S | `action` (`"lock"`\|`"sleep"`\|`"restart"`\|`"shutdown"`) | — | Requires follow-up `confirm` |
 | `confirm` | C→S | `action` (same enum as `power`) | — | Must match a pending `power` action within **10 seconds**, else server replies `err {code:"noPendingAction"}` |
-| `apps.list` | C→S request / S→C reply | request: — (`p` is `{}`); reply: `windows` (array of `{id: integer, title: string}`) | — | |
+| `apps.list` | C→S request / S→C reply | request: — (`p` is `{}`); reply: `windows` (array of `{id: integer, title: string, icon?: string, path?: string}`) | — | `icon` is a base64 PNG (32×32) WITHOUT a `data:` prefix; `path` is the resolved exe path. Both are protoVersion-1.2 additive fields — skipped entirely when absent, never emitted as null |
 | `apps.launch` | C→S | `path` (string) | — | |
 | `apps.focus` | C→S | `id` (integer) | — | |
 | `apps.close` | C→S | `id` (integer) | — | |
-| `apps.changed` | S→C | `windows` (array of `{id: integer, title: string}`) | — | Server push |
+| `apps.changed` | S→C | `windows` (array of `{id: integer, title: string, icon?: string, path?: string}`) | — | Server push; same element shape (and skip-when-absent convention) as the `apps.list` reply |
+| `tabs.list` | C→S request / S→C reply | request: — (`p` is `{}`); reply: `connected` (bool), `tabs` (array of TabEl) | — | Pull on Browser-screen open (protoVersion 1.4). With the extension never connected the reply is `{connected:false, tabs:[]}` |
+| `tabs.changed` | S→C | `connected` (bool), `tabs` (array of TabEl) | — | Server push (protoVersion 1.4): on any tab change AND on extension connect/disconnect |
+| `tabs.activate` | C→S | `id` (integer) | — | Switch the PC browser to that tab (window focused too). Fire-and-forget — no err reply; stale ids self-heal via the next `tabs.changed`. Executor-bound (§11) |
+| `tabs.close` | C→S | `id` (integer) | — | Close that tab. Fire-and-forget — same semantics as `tabs.activate`. Executor-bound (§11) |
 | `clip.set` | C↔S | `text` (string) | — | Both directions |
 | `clip.get` | C→S | — (`p` is `{}`) | — | Server replies with `clip.set` |
 | `clip.changed` | S→C | `text` (string) | — | Server push (auto-sync) |
@@ -121,6 +129,8 @@ Direction: C→S (client to server), S→C (server to client), C↔S (both).
 | `ping` | C→S | `ts` (integer) | — | Latency probe |
 | `pong` | S→C | `ts` (integer, echoed from `ping`) | — | |
 | `err` | S→C | `code` (string), `msg` (string) | code-specific fields | Human-readable `msg`; see codes below |
+
+**TabEl element (protoVersion 1.4):** `{id: integer, title: string, active: bool, icon?: string}` — `icon` is a base64 PNG WITHOUT a `data:` prefix (the exact WindowInfo icon convention: skipped entirely when absent, never emitted as null). Exactly one element carries `active:true`. **No `url` field ever crosses the phone-facing wire** — titles are enough (privacy).
 
 **`err` codes:**
 
@@ -174,7 +184,7 @@ The full byte layout is documented in `protocol/schema/mouse-binary.md`.
 
 ## 11. Pause semantics and session cleanup
 
-- While server-side **pause** is active, all executor-bound messages are **silently dropped**: binary frames, `click`, `drag`, `key`, `text`, `media`, `power`, `confirm`, `apps.launch`, `apps.focus`, `apps.close`, `clip.set`, `browser`, `present`. The handshake family (`hello`, `pin`, `auth`) and `ping`/`pong` continue to work — pause never breaks connectivity or liveness probing.
+- While server-side **pause** is active, all executor-bound messages are **silently dropped**: binary frames, `click`, `drag`, `key`, `text`, `media`, `power`, `confirm`, `apps.launch`, `apps.focus`, `apps.close`, `clip.set`, `browser`, `present`, `tabs.activate`, `tabs.close`. The handshake family (`hello`, `pin`, `auth`) and `ping`/`pong` continue to work — pause never breaks connectivity or liveness probing. `tabs.list` is a read and stays answered while paused (the same exemption as `apps.list`/`clip.get`).
 - **Activating pause immediately releases any held input** (buttons held via `drag start`, keys held via `key down`).
 - **Session end for ANY reason** — clean close, socket error, auth revoke, server shutdown — **releases all held keys and buttons** (CONN-07). No phantom held input may survive a mid-drag disconnect.
 
@@ -195,3 +205,27 @@ The full byte layout is documented in `protocol/schema/mouse-binary.md`.
 ## 14. Fixtures
 
 Golden fixtures live in `protocol/fixtures/` (format documented in `protocol/fixtures/README.md`). Every fixture scenario references a section of this SPEC; the strictness rules of §1 (ignore-unknown / missing-required), §2 (version reject), and §9 (binary strictness) are encoded as negative fixtures. Both codecs load the same files; per-language fixture copies are forbidden.
+
+## 15. Extension leg (localhost)
+
+The browser tab list (protoVersion 1.4, §7 `tabs.*`) is fed by a SECOND WebSocket listener bound to **`127.0.0.1` only** (default port **17779**, `RC_EXT_PORT` env override), spoken by the "Tab Bridge" browser extension running on the same machine.
+
+- **Envelope:** the same `{t, seq?, p}` JSON envelope as the main protocol (§1). Same strictness rules.
+- **Auth boundary:** the loopback bind IS the authentication — a LAN device cannot complete a TCP handshake to a loopback-bound socket; the kernel enforces it. There is no PIN/token handshake on this leg, and no role handshake ever exists on the LAN-exposed main listener. Belt-and-braces: the accept loop drops any stream whose peer address is not loopback.
+- **Accepted residual (consistent with the v1 LAN threat model, §12):** any LOCAL process can connect and feed fake tab state or receive activate/close tab ids. A malicious local process already owns the machine.
+- **Single-extension policy:** newest connection wins — a second accepted connection replaces the current extension session (the old stream is dropped).
+
+Message table (extension ↔ server):
+
+| Type | Direction | `p` | Notes |
+|------|-----------|-----|-------|
+| `ext.hello` | ext→srv | `extVersion` (string) | First frame after connect |
+| `tabs.state` | ext→srv | `tabs` (array of TabEl, §7) | ALWAYS a full snapshot, never a diff |
+| `ext.ping` | ext→srv | `{}` | 20 s keepalive (holds the MV3 service worker alive) |
+| `ext.pong` | srv→ext | `{}` | Keepalive reply |
+| `tabs.activate` | srv→ext | `id` (integer) | Same payload as the phone-facing message |
+| `tabs.close` | srv→ext | `id` (integer) | Same payload as the phone-facing message |
+
+**Limits:** the 64 KB `max_message_size`/`max_frame_size` caps (§13) apply per-listener — an oversize frame kills the extension session. Extension-side caps enforced BEFORE send: max **50 tabs**, max **4096 base64 chars** per icon (icon dropped above), and if the serialized `tabs.state` frame exceeds **56 KB** icons are stripped from the end of the list until it fits. The server additionally truncates at 50 tabs as a belt.
+
+**Fixtures:** mandatory only for the phone-facing `tabs.*` family (`protocol/fixtures/tabs/`). The extension leg has exactly one Rust implementation and one JS implementation, with no codec harness — this section's prose plus the server's integration tests are its contract.

@@ -53,6 +53,42 @@ pub struct WindowInfo {
     pub path: Option<String>,
 }
 
+/// One entry of the `tabs.list` / `tabs.changed` tab table (protoVersion
+/// 1.4, BROW-01). `id` is the browser-assigned tab id — `i64` (not `u64`)
+/// because chrome.tabs.TAB_ID_NONE is `-1` (defensive; a real tab id is
+/// always non-negative).
+///
+/// `icon` is a base64 PNG WITHOUT a `data:` prefix — the exact
+/// [`WindowInfo::icon`] convention: `Option` with `skip_serializing_if` so
+/// an iconless tab decodes and re-encodes without emitting the key.
+/// NO url field exists anywhere on the phone-facing wire (SPEC §7 privacy
+/// rule: titles are enough).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TabInfo {
+    pub id: i64,
+    pub title: String,
+    pub active: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+}
+
+/// The full tab-relay state carried by the `tabs.list` reply and the
+/// `tabs.changed` push (protoVersion 1.4, BROW-01). Core-owned plain data —
+/// ZERO OS deps, so server-core keeps compiling on CI Linux. Lives HERE
+/// (next to the `Tabs` trait that returns it — wired in Task 3) per the
+/// WindowInfo precedent: trait-returned types live with the traits.
+///
+/// `Default` is the never-connected shape `{connected: false, tabs: []}` —
+/// exactly what the phone's install-hint state keys on.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct TabsState {
+    /// Whether a browser extension is currently connected to the ext
+    /// listener (SPEC §15).
+    pub connected: bool,
+    /// The current full tab snapshot (extension order, max 50).
+    pub tabs: Vec<TabInfo>,
+}
+
 /// Mouse + keyboard injection.
 ///
 /// Explicit `*_down`/`*_up` pairs exist (not just tap/click) because the

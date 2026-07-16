@@ -1,0 +1,43 @@
+{
+  "name": "tabs-changed-with-icon",
+  "description": "S→C tabs.changed push (protocol 1.4, BROW-01): connected:true with two TabEls — the first carries an icon (base64 PNG, WindowInfo convention) plus an unknown `future` field that must be IGNORED on decode (D-05, dropped on canonical re-encode); the second has no icon and re-encodes WITHOUT the key (skip-when-absent).",
+  "wire": {
+    "t": "tabs.changed",
+    "p": {
+      "connected": true,
+      "tabs": [
+        {
+          "id": 7,
+          "title": "GitHub",
+          "active": true,
+          "icon": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC",
+          "future": "ignored"
+        },
+        {
+          "id": 9,
+          "title": "Docs",
+          "active": false
+        }
+      ]
+    }
+  },
+  "expect": {
+    "t": "tabs.changed",
+    "p": {
+      "connected": true,
+      "tabs": [
+        {
+          "id": 7,
+          "title": "GitHub",
+          "active": true,
+          "icon": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC"
+        },
+        {
+          "id": 9,
+          "title": "Docs",
+          "active": false
+        }
+      ]
+    }
+  }
+}

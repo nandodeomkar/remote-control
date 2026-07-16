@@ -230,6 +230,11 @@ pub fn route(
             text: exec.clipboard.get(),
         })],
 
+        // ── tabs (protoVersion 1.4) — wired in Task 3 ──────────────────
+        Msg::TabsList(_) => Vec::new(), // wired in Task 3
+        Msg::TabsActivate(_) => Vec::new(), // wired in Task 3
+        Msg::TabsClose(_) => Vec::new(), // wired in Task 3
+
         // ── key-macro families (Phase 1 minimal tables; Phase 5 refines)
         Msg::Browser(p) => {
             if let Some((code, mods)) = browser_macro(&p.action) {
@@ -268,6 +273,7 @@ pub fn route(
         | Msg::ClipChanged(_)
         | Msg::VolChanged(_)
         | Msg::InputBlocked(_)
+        | Msg::TabsChanged(_)
         | Msg::Pong(_)
         | Msg::Err(_) => Vec::new(),
     }

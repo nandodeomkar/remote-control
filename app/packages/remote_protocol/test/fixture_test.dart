@@ -190,4 +190,14 @@ void main() {
   group('input_blocked fixtures', () {
     runJsonFamily('input_blocked');
   });
+
+  // protocol 1.4 (BROW-01): the additive tabs.* family. 01 round-trips a
+  // tabs.changed with an icon-carrying TabEl (unknown `future` field dropped
+  // per D-05) and an iconless one (icon key omitted on re-encode); 02 is the
+  // never-connected tabs.list reply; 03/05 round-trip tabs.activate/close;
+  // 04 proves a missing required `id` is a hard decode error — the same
+  // shared golden fixtures the Rust harness exercises.
+  group('tabs fixtures', () {
+    runJsonFamily('tabs');
+  });
 }

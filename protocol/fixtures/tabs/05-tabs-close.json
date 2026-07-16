@@ -1,0 +1,16 @@
+{
+  "name": "tabs-close",
+  "description": "C→S tabs.close (protocol 1.4): close tab id 9. Fire-and-forget — same semantics as tabs.activate. Round-trips.",
+  "wire": {
+    "t": "tabs.close",
+    "p": {
+      "id": 9
+    }
+  },
+  "expect": {
+    "t": "tabs.close",
+    "p": {
+      "id": 9
+    }
+  }
+}

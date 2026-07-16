@@ -174,6 +174,16 @@ fn codec_fixtures_input_blocked() {
 }
 
 #[test]
+fn codec_fixtures_tabs() {
+    // protocol 1.4 (BROW-01): the tabs.* family — tabs.changed round-trips
+    // two TabEls (icon present + absent, unknown `future` field dropped per
+    // D-05), the never-connected tabs.list reply shape, tabs.activate/close
+    // round trips, and the missing-required-id negative. Hard-registered:
+    // neither harness globs directories (07-02 lesson).
+    run_json_family("tabs");
+}
+
+#[test]
 fn auth_proof_fixture() {
     let path = Path::new(FIXTURES_ROOT).join("handshake/05-auth-proof.json");
     let fixture = load(&path);
