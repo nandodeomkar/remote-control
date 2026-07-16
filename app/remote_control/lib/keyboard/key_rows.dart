@@ -276,6 +276,79 @@ List<KeyCapDef> capsForPad(KeyboardPad pad) => switch (pad) {
       KeyboardPad.fn => [kFnEscCap, ...kFnCaps],
     };
 
+// ── Pad persistence (10-03 — a NEW key, NOT a mutation of rowGroup) ────────
+
+/// The shared_preferences key holding the last-open pad (10-UI-SPEC §Pad
+/// persistence). Deliberately DISTINCT from [kKeyRowGroupPrefsKey]: the
+/// full-screen keyboard and the D-07 trackpad-docked panel persist their
+/// surfaces independently.
+const String kKeyboardPadPrefsKey = 'keyboard.pad';
+
+/// Typed store for the last-open pad over the [PrefsKv] seam — the
+/// [KeyRowGroupStore] pattern under the new key (non-secret by rule; never
+/// secure storage).
+class KeyboardPadStore {
+  final PrefsKv _prefs;
+
+  /// Creates the store over [prefs], defaulting to the real adapter. An
+  /// instance may be injected for tests.
+  KeyboardPadStore({PrefsKv? prefs}) : _prefs = prefs ?? SharedPrefsKv();
+
+  /// The persisted pad; [KeyboardPad.type] when unset, unknown, or when the
+  /// platform read fails — a broken prefs read must never take the keyboard
+  /// down (T-10-04); the default pad is always available.
+  Future<KeyboardPad> load() async {
+    try {
+      final stored = await _prefs.getString(kKeyboardPadPrefsKey);
+      return KeyboardPad.values.firstWhere(
+        (pad) => pad.name == stored,
+        orElse: () => KeyboardPad.type,
+      );
+    } on Object {
+      return KeyboardPad.type;
+    }
+  }
+
+  /// Persists [pad] (its enum name: 'type' | 'arrows' | 'numpad' | 'fn')
+  /// under [kKeyboardPadPrefsKey].
+  Future<void> save(KeyboardPad pad) =>
+      _prefs.setString(kKeyboardPadPrefsKey, pad.name);
+}
+
+/// The [KeyboardPadStore] singleton (overridable in tests).
+final keyboardPadStoreProvider = Provider<KeyboardPadStore>(
+  (ref) => KeyboardPadStore(),
+);
+
+/// Riverpod 3 unified [Notifier] over the last-open pad: synchronous
+/// [KeyboardPad.type] seed (the default), async load on build,
+/// persist-through on [set].
+class KeyboardPadNotifier extends Notifier<KeyboardPad> {
+  @override
+  KeyboardPad build() {
+    // Seed synchronously with the default so the first frame renders;
+    // replace with the persisted value as soon as it loads.
+    unawaited(_load(ref.watch(keyboardPadStoreProvider)));
+    return KeyboardPad.type;
+  }
+
+  Future<void> _load(KeyboardPadStore store) async {
+    state = await store.load();
+  }
+
+  /// Selects [pad], applying live and persisting immediately
+  /// (fire-and-forget — a failed prefs write costs persistence only).
+  void set(KeyboardPad pad) {
+    state = pad;
+    unawaited(ref.read(keyboardPadStoreProvider).save(pad));
+  }
+}
+
+/// The persisted last-open pad the full-screen keyboard's PageView binds to.
+final keyboardPadProvider = NotifierProvider<KeyboardPadNotifier, KeyboardPad>(
+  KeyboardPadNotifier.new,
+);
+
 // ── Widgets ────────────────────────────────────────────────────────────────
 
 /// The active group's key caps. See the library doc for the emission model.
