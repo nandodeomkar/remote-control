@@ -10,6 +10,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_control/browser/browser_screen.dart';
+import 'package:remote_control/theme/tokens.dart';
 
 /// The exact router vocabulary (router.rs `browser_macro`).
 const Set<String> kRouterBrowserVocabulary = {
@@ -71,6 +72,61 @@ void main() {
     }
 
     expect(actions, labelToAction.values.toList());
+  });
+
+  testWidgets('Refresh renders full-width on its own row (unpaired)',
+      (t) async {
+    await t.pumpWidget(host(onAction: (_) {}, enabled: true));
+
+    Size keyBox(String label) {
+      final box = find
+          .ancestor(of: find.text(label), matching: find.byType(Container))
+          .first;
+      return t.getSize(box);
+    }
+
+    // A paired key (Back) sits in a 2-column Row with an Expanded sibling, so
+    // it is roughly half the grid width; Refresh spans its own stretched row.
+    final refreshWidth = keyBox('Refresh').width;
+    final backWidth = keyBox('Back').width;
+    expect(
+      refreshWidth,
+      greaterThan(backWidth * 1.5),
+      reason: 'Refresh must be full-width (its own row), not paired',
+    );
+  });
+
+  testWidgets('a pressed key flashes accent border + label', (t) async {
+    await t.pumpWidget(host(onAction: (_) {}, enabled: true));
+
+    Color labelColor(String label) =>
+        t.widget<Text>(find.text(label)).style!.color!;
+    Color borderColor(String label) {
+      final container = t.widget<Container>(
+        find
+            .ancestor(of: find.text(label), matching: find.byType(Container))
+            .first,
+      );
+      final decoration = container.decoration! as BoxDecoration;
+      return decoration.border!.top.color;
+    }
+
+    // At rest: text is kText, border is kHairline.
+    expect(labelColor('Refresh'), kText);
+    expect(borderColor('Refresh'), kHairline);
+
+    // Press-down (hold): the key flashes accent border + accent label.
+    final gesture = await t.startGesture(t.getCenter(find.text('Refresh')));
+    await t.pump();
+
+    expect(labelColor('Refresh'), kAccent);
+    expect(borderColor('Refresh'), kAccent);
+
+    await gesture.up();
+    await t.pump();
+    // Released: back to the rest palette.
+    expect(labelColor('Refresh'), kText);
+    expect(borderColor('Refresh'), kHairline);
   });
 
   testWidgets('disabled grid records nothing', (t) async {
