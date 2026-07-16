@@ -1,0 +1,16 @@
+# Release signing config template.
+#
+# Copy this file to key.properties in THIS directory (android/), then fill in
+# the real values. key.properties is gitignored — NEVER commit it, and never
+# commit the keystore itself (store the .jks OUTSIDE the repo).
+#
+# One-time keystore creation (see DISTRIBUTION.md for the full walkthrough):
+#   keytool -genkey -v -keystore C:/Users/YOUR_NAME/keys/remotecontrol-release.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# Note: use FORWARD slashes in storeFile — java.util.Properties treats
+# backslash as an escape character.
+
+storePassword=REPLACE_WITH_STORE_PASSWORD
+keyPassword=REPLACE_WITH_KEY_PASSWORD
+keyAlias=upload
+storeFile=C:/Users/YOUR_NAME/keys/remotecontrol-release.jks
