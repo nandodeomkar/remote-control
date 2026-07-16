@@ -4,13 +4,13 @@ milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
 stopped_at: Completed 10-02-PLAN.md (Shortcuts tile + 25-button catalog; commits 1202f1c, bd0725a, b8e3107)
-last_updated: "2026-07-16T21:00:16.424Z"
+last_updated: "2026-07-16T21:17:27.156Z"
 last_activity: 2026-07-16 -- Phase 10 execution resumed (wave continue)
 progress:
   total_phases: 10
   completed_phases: 9
   total_plans: 77
-  completed_plans: 74
+  completed_plans: 75
   percent: 90
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 10 (keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke) — EXECUTING
-Plan: 4 of 6 (10-01, 10-02 complete)
+Plan: 5 of 6 (10-01, 10-02 complete)
 Next: 09-08 on-device visual UAT gate re-run — MUST `flutter build apk --release`
   FRESH first (08-06 stale-APK lesson), then `flutter install` + walkthrough vs
   the prototype. 09-09 (Material Symbols Rounded migration) just landed: all 63
@@ -145,6 +145,7 @@ Progress: [██████████] 100% (8 of 8 phases complete; 62 of 6
 | Phase 09 P09 | 18min | 3 tasks | 32 files |
 | Phase 10 P01 | 7min | 2 tasks | 3 files |
 | Phase 10 P02 | 14min | 3 tasks | 5 files |
+| Phase 10 P04 | ~14min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -310,6 +311,10 @@ Recent decisions affecting current work:
 - [Phase 10-01]: Key::PrintScr confirmed the enigo 0.6.1 VK_SNAPSHOT variant by reading vendored src (keycodes.rs:525 variant / :1010 -> VK_SNAPSHOT); letters ride Key::Unicode(lowercase) reusing the T/W/B precedent so Ctrl/Win chords resolve via VkKeyScanW. T/W/Plus/Minus promoted OUT of ROUTER_MACRO_CODES (now BrowserBack/BrowserForward/B) keeping the two lists disjoint; B stays router-only (present_macro blank). Plus->'=' Pitfall-11 fix preserved, Equal never introduced
 - [Phase 10-02]: kShortcutCatalog is the single ordered source of truth (4 sections / 25 buttons, kBrowserActions/kHubTiles pattern) driving BOTH the render and the vocabulary coverage test; every ShortcutSpec.code cross-checked against kClientKeyCodes (drift fails the build, T-10-03), excluded combos (Alt+Tab/Win+L/Ctrl+Alt+Del) asserted absent. Buttons fire ONE KeyMsg(action:'tap', mods) on the reliable path via the media _TransportButton press-DOWN + 100ms accent-flash + muted-not-red pattern — no new network surface, no protocol change (T-10-02 accept). All 26 Symbols.*_rounded glyphs verified present in material_symbols_icons 4.2951.0 (zero substitutions). Shortcuts HubTileSpec (bolt_rounded) at kHubTiles index 2 → 9-tile grid, HubTileGrid odd-tail chunker renders the 9th half-width tile with zero grid change
 - [Phase ?]: [Phase 09-09]: Full Material Symbols Rounded migration — all client glyphs are Symbols.<name>_rounded (material_symbols_icons 4.2951.0), axes pinned once via buildAppTheme IconThemeData (opsz 24/wght 400/FILL 0/GRAD 0); classic Icons.* banned in lib/ by icons_guard_test. Owner overrode 09-UI-SPEC line-28 skew acceptance. Release APK grew only +61.7 KB (Symbols font tree-shaken 99.4%).
+- [Phase 10]: Type-row cap relaxation is the padding seam, not minWidth — Under an Expanded cell BoxConstraints.enforce already clamps KeyCap's 48px minWidth floor to the parent's tight width, so the predicted 'fight' cannot occur and minWidth is inert there. The real squeeze at ~40dp is the 12px horizontal padding (16px left for a 25px 'Esc'), so the Type row passes 4px. minWidth still ships: UI-SPEC names the relaxation and it does bind under the docked panel's loose Wrap constraints.
+- [Phase 10]: KeyCap's 48px HEIGHT floor stays hard-coded; only width is parameterized — UI-SPEC relaxes width only ('Height stays >=48dp'). The height floor is what actually keeps a cap tappable, so it must not be call-site relaxable.
+- [Phase 10]: kKeyboardHint moved (not copied) to key_pads.dart — A duplicate const would break the house one-named-const rule and, blocking, would leave 10-05 unable to import both key_pads.dart and keyboard_screen.dart (kKeyboardTitle) without an ambiguous-name collision.
+- [Phase 10]: KeyboardTabBar reports selection only — no haptic, no page animation, no enabled param — The screen owner (10-05) runs hapticTick() + the 200ms PageView animate on onSelect, so swipe-settle can reuse the selection path without double-firing a haptic (UI-SPEC: no extra haptic on settle). Tabs are navigation and must work offline, so no gated variant exists.
 
 ### Pending Todos
 
@@ -349,6 +354,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-16T21:00:16.405Z
+Last session: 2026-07-16T21:16:45.243Z
 Stopped at: Completed 10-02-PLAN.md (Shortcuts tile + 25-button catalog; commits 1202f1c, bd0725a, b8e3107)
 Resume file: .planning/phases/10-keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke/10-03-PLAN.md
