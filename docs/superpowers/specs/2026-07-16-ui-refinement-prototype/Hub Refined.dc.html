@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #0a0b0e; }
+  a { color: #38BDF8; text-decoration: none; }
+  a:hover { color: #7dd3fc; }
+  .msr { font-family: 'Material Symbols Rounded'; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
+  .mi { font-family: 'Material Icons'; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; }
+  @keyframes dotpulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+</style>
+</helmet>
+
+<section style="display:flex; flex-direction:row; align-items:flex-start; gap:72px; padding:64px 64px 24px; font-family:'Space Grotesk',sans-serif;">
+
+  <!-- ===================== 3a — APPS ===================== -->
+  <div id="3a" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">3a</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Apps</span>
+    </div>
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0C0D10; display:flex; flex-direction:column;">
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;"><span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;">9:41</span><div style="display:flex; align-items:center; gap:7px;"><span class="msr" style="font-size:17px;">signal_cellular_alt</span><span class="msr" style="font-size:17px;">wifi</span><span class="msr" style="font-size:19px;">battery_full</span></div></div>
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 14px 0 6px;"><div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:26px;">chevron_left</span></div><span style="flex:1 1 auto; color:#E6E8EB; font-size:17px; font-weight:600;">Apps</span><div style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:9px; background:#131519;"><span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span><span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; color:#38BDF8;">12 ms</span></div></div>
+        <div style="flex:1 1 auto; overflow-y:auto; padding:24px 20px 20px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin-bottom:14px;">FAVORITES</div>
+          <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:28px;">
+            <div style="aspect-ratio:1; border-radius:16px; background:#16181D; border:1px solid #2A2D34; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; position:relative;"><span class="msr" style="font-size:26px; color:#cdd2d9;">code</span><span style="color:#E6E8EB; font-size:10px;">Code</span><span style="position:absolute; top:6px; right:6px; width:5px; height:5px; border-radius:50%; background:#38BDF8;"></span></div>
+            <div style="aspect-ratio:1; border-radius:16px; background:#16181D; border:1px solid #2A2D34; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; position:relative;"><span class="msr" style="font-size:26px; color:#cdd2d9;">language</span><span style="color:#E6E8EB; font-size:10px;">Chrome</span><span style="position:absolute; top:6px; right:6px; width:5px; height:5px; border-radius:50%; background:#38BDF8;"></span></div>
+            <div style="aspect-ratio:1; border-radius:16px; background:#16181D; border:1px solid #2A2D34; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; position:relative;"><span class="msr" style="font-size:26px; color:#cdd2d9;">terminal</span><span style="color:#E6E8EB; font-size:10px;">Term</span><span style="position:absolute; top:6px; right:6px; width:5px; height:5px; border-radius:50%; background:#38BDF8;"></span></div>
+            <div style="aspect-ratio:1; border-radius:16px; background:#16181D; border:1px solid #2A2D34; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; position:relative;"><span class="msr" style="font-size:26px; color:#cdd2d9;">mail</span><span style="color:#E6E8EB; font-size:10px;">Mail</span><span style="position:absolute; top:6px; right:6px; width:5px; height:5px; border-radius:50%; background:#38BDF8;"></span></div>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin-bottom:14px;">OPEN WINDOWS</div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="min-height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; gap:12px; padding:0 6px 0 14px;"><span class="msr" style="font-size:22px; color:#cdd2d9;">code</span><span style="flex:1 1 auto; color:#E6E8EB; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Visual Studio Code</span><div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#6B7280;"><span class="msr" style="font-size:20px;">close</span></div></div>
+            <div style="min-height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; gap:12px; padding:0 6px 0 14px;"><span class="msr" style="font-size:22px; color:#cdd2d9;">language</span><span style="flex:1 1 auto; color:#E6E8EB; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Chrome — Design docs</span><div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#6B7280;"><span class="msr" style="font-size:20px;">close</span></div></div>
+            <div style="min-height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; gap:12px; padding:0 6px 0 14px;"><span class="msr" style="font-size:22px; color:#cdd2d9;">music_note</span><span style="flex:1 1 auto; color:#E6E8EB; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Spotify</span><div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#6B7280;"><span class="msr" style="font-size:20px;">close</span></div></div>
+          </div>
+        </div>
+        <div style="flex:0 0 auto; height:56px; border-top:1px solid #2A2D34; background:#16181D; display:flex; align-items:center; justify-content:center; gap:8px; color:#38BDF8;"><span class="msr" style="font-size:22px;">touch_app</span><span style="font-size:16px; font-weight:600;">Trackpad</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 3b — CLIPBOARD ===================== -->
+  <div id="3b" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">3b</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Clipboard</span>
+    </div>
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0C0D10; display:flex; flex-direction:column;">
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;"><span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;">9:41</span><div style="display:flex; align-items:center; gap:7px;"><span class="msr" style="font-size:17px;">signal_cellular_alt</span><span class="msr" style="font-size:17px;">wifi</span><span class="msr" style="font-size:19px;">battery_full</span></div></div>
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 14px 0 6px;"><div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:26px;">chevron_left</span></div><span style="flex:1 1 auto; color:#E6E8EB; font-size:17px; font-weight:600;">Clipboard</span><div style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:9px; background:#131519;"><span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span><span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; color:#38BDF8;">12 ms</span></div></div>
+        <div style="flex:1 1 auto; overflow-y:auto; padding:24px 20px 20px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div style="height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; gap:8px; color:#E6E8EB;"><span class="msr" style="font-size:20px;">arrow_upward</span><span style="font-size:15px; font-weight:600;">Send to PC</span></div>
+            <div style="height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; gap:8px; color:#E6E8EB;"><span class="msr" style="font-size:20px;">arrow_downward</span><span style="font-size:15px; font-weight:600;">Fetch from PC</span></div>
+          </div>
+          <div style="display:flex; align-items:center; margin-top:26px;"><span style="flex:1 1 auto; color:#E6E8EB; font-size:16px; font-weight:600;">Auto-sync clipboard</span><div style="width:48px; height:28px; border-radius:999px; background:#2A2D34; position:relative;"><div style="position:absolute; left:3px; top:3px; width:22px; height:22px; border-radius:50%; background:#E6E8EB;"></div></div></div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-top:12px;"><span class="msr" style="font-size:16px; color:#6B7280;">info</span><span style="flex:1 1 auto; color:#6B7280; font-size:12px; line-height:1.5;">Phone → PC syncs when you open this app. PC → phone syncs live.</span></div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin:26px 0 14px;">RECENT</div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <div style="min-height:48px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; padding:12px 14px; color:#E6E8EB; font-size:14px; line-height:1.4;">https://github.com/remote-control/app/pull/218</div>
+            <div style="min-height:48px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; padding:12px 14px; color:#E6E8EB; font-size:14px; line-height:1.4;">docker compose up -d --build</div>
+            <div style="min-height:48px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; padding:12px 14px; color:#E6E8EB; font-size:14px; line-height:1.4;">Meeting moved to 3:30 — same room.</div>
+          </div>
+        </div>
+        <div style="flex:0 0 auto; height:56px; border-top:1px solid #2A2D34; background:#16181D; display:flex; align-items:center; justify-content:center; gap:8px; color:#38BDF8;"><span class="msr" style="font-size:22px;">touch_app</span><span style="font-size:16px; font-weight:600;">Trackpad</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 3c — POWER ===================== -->
+  <div id="3c" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">3c</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Power</span>
+    </div>
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0C0D10; display:flex; flex-direction:column;">
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;"><span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;">9:41</span><div style="display:flex; align-items:center; gap:7px;"><span class="msr" style="font-size:17px;">signal_cellular_alt</span><span class="msr" style="font-size:17px;">wifi</span><span class="msr" style="font-size:19px;">battery_full</span></div></div>
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 14px 0 6px;"><div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:26px;">chevron_left</span></div><span style="flex:1 1 auto; color:#E6E8EB; font-size:17px; font-weight:600;">Power</span><div style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:9px; background:#131519;"><span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span><span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; color:#38BDF8;">12 ms</span></div></div>
+        <div style="flex:1 1 auto; overflow-y:auto; padding:32px 20px 20px;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin-bottom:14px;">SAFE</div>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="height:62px; border-radius:16px; background:#16181D; border:1px solid #2A2D34; position:relative; display:flex; align-items:center;"><div style="position:absolute; left:4px; top:4px; width:54px; height:54px; border-radius:12px; background:#38BDF8; display:flex; align-items:center; justify-content:center; color:#0C0D10;"><span class="msr" style="font-size:20px;">lock</span><span class="msr" style="font-size:16px;">chevron_right</span></div><span style="width:100%; text-align:center; color:#6B7280; font-size:14px;">Slide to lock</span></div>
+            <div style="height:62px; border-radius:16px; background:#16181D; border:1px solid #2A2D34; position:relative; display:flex; align-items:center;"><div style="position:absolute; left:4px; top:4px; width:54px; height:54px; border-radius:12px; background:#38BDF8; display:flex; align-items:center; justify-content:center; color:#0C0D10;"><span class="msr" style="font-size:20px;">bedtime</span><span class="msr" style="font-size:16px;">chevron_right</span></div><span style="width:100%; text-align:center; color:#6B7280; font-size:14px;">Slide to sleep</span></div>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin:28px 0 14px;">DESTRUCTIVE</div>
+          <div style="display:flex; flex-direction:column; gap:12px;">
+            <div style="height:62px; border-radius:16px; background:#16181D; border:1px solid #2A2D34; position:relative; display:flex; align-items:center;"><div style="position:absolute; left:4px; top:4px; width:54px; height:54px; border-radius:12px; background:#FF6B6B; display:flex; align-items:center; justify-content:center; color:#0C0D10;"><span class="msr" style="font-size:20px;">restart_alt</span><span class="msr" style="font-size:16px;">chevron_right</span></div><span style="width:100%; text-align:center; color:#6B7280; font-size:14px;">Slide to restart</span></div>
+            <div style="height:62px; border-radius:16px; background:#16181D; border:1px solid #2A2D34; position:relative; display:flex; align-items:center;"><div style="position:absolute; left:4px; top:4px; width:54px; height:54px; border-radius:12px; background:#FF6B6B; display:flex; align-items:center; justify-content:center; color:#0C0D10;"><span class="msr" style="font-size:20px;">power_settings_new</span><span class="msr" style="font-size:16px;">chevron_right</span></div><span style="width:100%; text-align:center; color:#6B7280; font-size:14px;">Slide to shut down</span></div>
+          </div>
+        </div>
+        <div style="flex:0 0 auto; height:56px; border-top:1px solid #2A2D34; background:#16181D; display:flex; align-items:center; justify-content:center; gap:8px; color:#38BDF8;"><span class="msr" style="font-size:22px;">touch_app</span><span style="font-size:16px; font-weight:600;">Trackpad</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 3d — PRESENTER ===================== -->
+  <div id="3d" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">3d</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Presenter</span>
+    </div>
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0C0D10; display:flex; flex-direction:column;">
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;"><span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;">9:41</span><div style="display:flex; align-items:center; gap:7px;"><span class="msr" style="font-size:17px;">signal_cellular_alt</span><span class="msr" style="font-size:17px;">wifi</span><span class="msr" style="font-size:19px;">battery_full</span></div></div>
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 14px 0 6px;"><div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:26px;">chevron_left</span></div><span style="flex:1 1 auto; color:#E6E8EB; font-size:17px; font-weight:600;">Presenter</span><div style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:9px; background:#131519;"><span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span><span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; color:#38BDF8;">12 ms</span></div></div>
+        <!-- split tap zones -->
+        <div style="flex:1 1 auto; display:flex; min-height:0;">
+          <div style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#6B7280;"><span class="msr" style="font-size:48px;">chevron_left</span><span style="font-size:12px;">Previous</span></div>
+          <div style="width:1px; background:#2A2D34;"></div>
+          <div style="flex:2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; color:#38BDF8;"><span class="msr" style="font-size:48px;">chevron_right</span><span style="font-size:12px;">Next</span></div>
+        </div>
+        <!-- presenter bottom bar -->
+        <div style="flex:0 0 auto; height:64px; border-top:1px solid #2A2D34; display:flex; align-items:center; gap:8px; padding:0 12px;">
+          <div style="border-radius:8px; background:#16181D; border:1px solid #2A2D34; padding:8px 12px; color:#E6E8EB; font-size:15px; font-weight:600;">Start show</div>
+          <div style="border-radius:8px; background:#16181D; border:1px solid #2A2D34; padding:8px 12px; color:#E6E8EB; font-size:15px; font-weight:600;">End show</div>
+          <div style="border-radius:8px; background:#16181D; border:1px solid #38BDF8; padding:8px 10px; color:#38BDF8; font-size:15px; font-weight:600; display:flex; align-items:center; gap:6px;"><span class="msr" style="font-size:16px;">crop_din</span>Blank</div>
+          <span style="flex:1 1 auto;"></span>
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:26px; font-weight:600; color:#38BDF8; font-feature-settings:'tnum';">12:04</span>
+        </div>
+        <div style="flex:0 0 auto; height:56px; border-top:1px solid #2A2D34; background:#16181D; display:flex; align-items:center; justify-content:center; gap:8px; color:#38BDF8;"><span class="msr" style="font-size:22px;">touch_app</span><span style="font-size:16px; font-weight:600;">Trackpad</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 3e — BROWSER ===================== -->
+  <div id="3e" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">3e</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Browser</span>
+    </div>
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0C0D10; display:flex; flex-direction:column;">
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;"><span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;">9:41</span><div style="display:flex; align-items:center; gap:7px;"><span class="msr" style="font-size:17px;">signal_cellular_alt</span><span class="msr" style="font-size:17px;">wifi</span><span class="msr" style="font-size:19px;">battery_full</span></div></div>
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 14px 0 6px;"><div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:26px;">chevron_left</span></div><span style="flex:1 1 auto; color:#E6E8EB; font-size:17px; font-weight:600;">Browser</span><div style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:9px; background:#131519;"><span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span><span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; color:#38BDF8;">12 ms</span></div></div>
+        <div style="flex:1 1 auto; overflow-y:auto; padding:32px 20px 20px; display:flex; flex-direction:column; gap:10px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div style="height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; gap:8px; color:#E6E8EB;"><span class="msr" style="font-size:20px;">arrow_back</span><span style="font-size:15px; font-weight:600;">Back</span></div>
+            <div style="height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; gap:8px; color:#E6E8EB;"><span class="msr" style="font-size:20px;">arrow_forward</span><span style="font-size:15px; font-weight:600;">Forward</span></div>
+            <div style="height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; gap:8px; color:#E6E8EB;"><span class="msr" style="font-size:20px;">add</span><span style="font-size:15px; font-weight:600;">New tab</span></div>
+            <div style="height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; gap:8px; color:#E6E8EB;"><span class="msr" style="font-size:20px;">close</span><span style="font-size:15px; font-weight:600;">Close tab</span></div>
+          </div>
+          <div style="height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; gap:8px; color:#E6E8EB;"><span class="msr" style="font-size:20px;">refresh</span><span style="font-size:15px; font-weight:600;">Refresh</span></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div style="height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; gap:8px; color:#E6E8EB;"><span class="msr" style="font-size:20px;">zoom_out</span><span style="font-size:15px; font-weight:600;">Zoom out</span></div>
+            <div style="height:56px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; gap:8px; color:#E6E8EB;"><span class="msr" style="font-size:20px;">zoom_in</span><span style="font-size:15px; font-weight:600;">Zoom in</span></div>
+          </div>
+        </div>
+        <div style="flex:0 0 auto; height:56px; border-top:1px solid #2A2D34; background:#16181D; display:flex; align-items:center; justify-content:center; gap:8px; color:#38BDF8;"><span class="msr" style="font-size:22px;">touch_app</span><span style="font-size:16px; font-weight:600;">Trackpad</span></div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<section style="display:flex; flex-direction:row; align-items:flex-start; gap:72px; padding:64px 64px 24px; font-family:'Space Grotesk',sans-serif;">
+
+  <!-- ===================== 2a — TRACKPAD ===================== -->
+  <div id="2a" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">2a</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Trackpad</span>
+    </div>
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0C0D10; display:flex; flex-direction:column;">
+        <!-- status bar -->
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;">9:41</span>
+          <div style="display:flex; align-items:center; gap:7px;">
+            <span class="msr" style="font-size:17px;">signal_cellular_alt</span><span class="msr" style="font-size:17px;">wifi</span><span class="msr" style="font-size:19px;">battery_full</span>
+          </div>
+        </div>
+        <!-- app bar -->
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 14px 0 6px;">
+          <div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:26px;">chevron_left</span></div>
+          <span style="flex:1 1 auto; color:#E6E8EB; font-size:17px; font-weight:600;">Trackpad</span>
+          <div style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:9px; background:#131519;">
+            <span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:0.5px; color:#38BDF8;">12 ms</span>
+          </div>
+        </div>
+        <!-- surface -->
+        <div style="flex:1 1 auto; padding:12px 16px 16px; display:flex; flex-direction:column; gap:14px; min-height:0;">
+          <div style="flex:1 1 auto; position:relative; border-radius:22px; border:1px solid #2A2D34; background-color:#101216; background-image:radial-gradient(circle at center, rgba(255,255,255,0.05) 1.2px, transparent 1.2px); background-size:24px 24px; overflow:hidden;">
+            <!-- drag-lock pill -->
+            <div style="position:absolute; top:16px; left:0; right:0; display:flex; justify-content:center;">
+              <div style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:#16181D; border:1px solid #38BDF8;">
+                <span class="msr" style="font-size:14px; color:#38BDF8;">lock</span>
+                <span style="color:#E6E8EB; font-size:12px;">Drag locked — tap to drop</span>
+              </div>
+            </div>
+            <!-- centered hint -->
+            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center;">
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:1px; color:#4a505c;">DRAG TO MOVE · TAP TO CLICK</span>
+            </div>
+            <!-- floating cluster -->
+            <div style="position:absolute; bottom:16px; right:16px; display:flex; flex-direction:column; gap:10px;">
+              <div style="width:48px; height:48px; border-radius:50%; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:20px;">keyboard</span></div>
+              <div style="width:48px; height:48px; border-radius:50%; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:20px;">tune</span></div>
+            </div>
+          </div>
+          <!-- L / M / R -->
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px;">
+            <div style="height:54px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:14px; font-weight:600;">Left</div>
+            <div style="height:54px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#8b93a1; font-size:14px; font-weight:600;">Middle</div>
+            <div style="height:54px; border-radius:14px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:14px; font-weight:600;">Right</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 2b — KEYBOARD ===================== -->
+  <div id="2b" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">2b</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Keyboard</span>
+    </div>
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0C0D10; display:flex; flex-direction:column;">
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;">9:41</span>
+          <div style="display:flex; align-items:center; gap:7px;"><span class="msr" style="font-size:17px;">signal_cellular_alt</span><span class="msr" style="font-size:17px;">wifi</span><span class="msr" style="font-size:19px;">battery_full</span></div>
+        </div>
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 14px 0 6px;">
+          <div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:26px;">chevron_left</span></div>
+          <span style="flex:1 1 auto; color:#E6E8EB; font-size:17px; font-weight:600;">Keyboard</span>
+          <div style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:9px; background:#131519;">
+            <span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; color:#38BDF8;">12 ms</span>
+          </div>
+        </div>
+        <!-- empty breathing canvas + hint -->
+        <div style="flex:1 1 auto; display:flex; align-items:center; justify-content:center; padding:24px; min-height:0;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:0.5px; color:#4a505c; text-align:center; line-height:1.7;">System keyboard handles typing.<br>These are the extra keys.</span>
+        </div>
+        <!-- panel -->
+        <div style="flex:0 0 auto; border-top:1px solid #2A2D34; background:#0E0F12; padding:16px;">
+          <!-- modifier chips -->
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px;">
+            <div style="height:48px; border-radius:10px; background:#38BDF8; display:flex; align-items:center; justify-content:center; gap:4px; color:#06121a; font-size:15px; font-weight:600;">Ctrl<span class="msr" style="font-size:15px;">lock</span></div>
+            <div style="height:48px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:15px; font-weight:600;">Alt</div>
+            <div style="height:48px; border-radius:10px; background:#16181D; border:1px solid #38BDF8; display:flex; align-items:center; justify-content:center; color:#38BDF8; font-size:15px; font-weight:600;">Shift</div>
+            <div style="height:48px; border-radius:10px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:15px; font-weight:600;">Win</div>
+          </div>
+          <!-- switcher -->
+          <div style="display:flex; margin:20px 0 14px;">
+            <div style="flex:1; text-align:center; padding-bottom:8px; border-bottom:2px solid #38BDF8; color:#38BDF8; font-size:13px; font-weight:600;">Nav</div>
+            <div style="flex:1; text-align:center; padding-bottom:8px; border-bottom:2px solid transparent; color:#6B7280; font-size:13px; font-weight:600;">Fn</div>
+            <div style="flex:1; text-align:center; padding-bottom:8px; border-bottom:2px solid transparent; color:#6B7280; font-size:13px; font-weight:600;">Num</div>
+          </div>
+          <!-- nav caps -->
+          <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center;">
+            <div style="min-width:52px; height:48px; padding:0 12px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:14px;">Esc</div>
+            <div style="min-width:52px; height:48px; padding:0 12px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:14px;">Tab</div>
+            <div style="min-width:52px; height:48px; padding:0 12px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:14px;">Home</div>
+            <div style="min-width:52px; height:48px; padding:0 12px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:14px;">End</div>
+            <div style="min-width:52px; height:48px; padding:0 12px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:14px;">PgUp</div>
+            <div style="min-width:52px; height:48px; padding:0 12px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:14px;">PgDn</div>
+            <div style="min-width:52px; height:48px; padding:0 12px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; font-size:14px;">Del</div>
+          </div>
+          <!-- inverted-T arrows -->
+          <div style="display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:12px;">
+            <div style="width:64px; height:48px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:20px;">arrow_upward</span></div>
+            <div style="display:flex; gap:8px;">
+              <div style="width:64px; height:48px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:20px;">arrow_back</span></div>
+              <div style="width:64px; height:48px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:20px;">arrow_downward</span></div>
+              <div style="width:64px; height:48px; border-radius:9px; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:20px;">arrow_forward</span></div>
+            </div>
+          </div>
+        </div>
+        <!-- trackpad quick-bar -->
+        <div style="flex:0 0 auto; height:56px; border-top:1px solid #2A2D34; background:#16181D; display:flex; align-items:center; justify-content:center; gap:8px; color:#38BDF8;">
+          <span class="msr" style="font-size:22px;">touch_app</span>
+          <span style="font-size:16px; font-weight:600;">Trackpad</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 2c — MEDIA ===================== -->
+  <div id="2c" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">2c</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Media</span>
+    </div>
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0C0D10; display:flex; flex-direction:column;">
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500;">9:41</span>
+          <div style="display:flex; align-items:center; gap:7px;"><span class="msr" style="font-size:17px;">signal_cellular_alt</span><span class="msr" style="font-size:17px;">wifi</span><span class="msr" style="font-size:19px;">battery_full</span></div>
+        </div>
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 14px 0 6px;">
+          <div style="width:44px; height:44px; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:26px;">chevron_left</span></div>
+          <span style="flex:1 1 auto; color:#E6E8EB; font-size:17px; font-weight:600;">Media</span>
+          <div style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:9px; background:#131519;">
+            <span style="width:7px; height:7px; border-radius:50%; background:#38BDF8; box-shadow:0 0 8px #38BDF8;"></span>
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; color:#38BDF8;">12 ms</span>
+          </div>
+        </div>
+        <div style="flex:1 1 auto; padding:40px 22px 16px; display:flex; flex-direction:column; min-height:0;">
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; text-align:center; margin-bottom:36px;">TRANSPORT</div>
+          <!-- transport row -->
+          <div style="display:flex; align-items:center; justify-content:center; gap:20px;">
+            <div style="width:60px; height:60px; border-radius:50%; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:28px;">skip_previous</span></div>
+            <div style="width:80px; height:80px; border-radius:50%; background:rgba(56,189,248,0.14); border:1px solid rgba(56,189,248,0.45); display:flex; align-items:center; justify-content:center; color:#38BDF8;"><span class="msr" style="font-size:40px;">play_arrow</span></div>
+            <div style="width:60px; height:60px; border-radius:50%; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB;"><span class="msr" style="font-size:28px;">skip_next</span></div>
+          </div>
+          <!-- volume block -->
+          <div style="margin-top:56px;">
+            <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin-bottom:16px;">VOLUME</div>
+            <div style="display:flex; align-items:center; gap:14px;">
+              <div style="width:48px; height:48px; border-radius:50%; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; flex:0 0 auto;"><span class="msr" style="font-size:22px;">volume_up</span></div>
+              <div style="flex:1 1 auto; height:6px; border-radius:999px; background:#2A2D34; position:relative;">
+                <div style="position:absolute; left:0; top:0; bottom:0; width:50%; border-radius:999px; background:#38BDF8;"></div>
+                <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:18px; height:18px; border-radius:50%; background:#38BDF8; box-shadow:0 0 10px rgba(56,189,248,0.6);"></div>
+              </div>
+              <span style="font-family:'IBM Plex Mono',monospace; font-size:14px; font-weight:600; color:#E6E8EB; width:44px; text-align:right; font-feature-settings:'tnum';">50%</span>
+            </div>
+          </div>
+        </div>
+        <!-- trackpad quick-bar -->
+        <div style="flex:0 0 auto; height:56px; border-top:1px solid #2A2D34; background:#16181D; display:flex; align-items:center; justify-content:center; gap:8px; color:#38BDF8;">
+          <span class="msr" style="font-size:22px;">touch_app</span>
+          <span style="font-size:16px; font-weight:600;">Trackpad</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+
+<section style="display:flex; flex-direction:row; align-items:flex-start; gap:72px; padding:24px 64px 64px; font-family:'Space Grotesk',sans-serif;">
+
+  <!-- ===================== 1a — REFINED ===================== -->
+  <div id="1a" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#38BDF8; color:#06121a; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">1a</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Refined hub</span>
+      <span style="color:#6B7280; font-size:13px;">— hero status, primary Trackpad, grouped tools</span>
+    </div>
+
+    <!-- phone -->
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0C0D10; display:flex; flex-direction:column; position:relative;">
+
+        <!-- status bar -->
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;">
+          <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500; letter-spacing:0.5px;">9:41</span>
+          <div style="display:flex; align-items:center; gap:7px; font-size:17px;">
+            <span class="msr" style="font-size:17px;">signal_cellular_alt</span>
+            <span class="msr" style="font-size:17px;">wifi</span>
+            <span class="msr" style="font-size:19px;">battery_full</span>
+          </div>
+        </div>
+
+        <!-- scroll body -->
+        <div style="flex:1 1 auto; overflow-y:auto; padding:8px 20px 24px;">
+
+          <!-- top row -->
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:6px 2px 16px;">
+            <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:500; letter-spacing:2.5px; color:#6B7280;">REMOTE CONTROL</span>
+            <div style="width:40px; height:40px; border-radius:12px; display:flex; align-items:center; justify-content:center; background:#16181D; border:1px solid #2A2D34; color:#E6E8EB;">
+              <span class="msr" style="font-size:22px;">settings</span>
+            </div>
+          </div>
+
+          <!-- hero connection card -->
+          <div style="background:linear-gradient(160deg,#181B21,#131519); border:1px solid #2A2D34; border-radius:22px; padding:20px; display:flex; flex-direction:column; gap:18px;">
+            <div style="display:flex; align-items:flex-start; justify-content:space-between;">
+              <div style="display:flex; flex-direction:column; gap:9px;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="width:9px; height:9px; border-radius:50%; background:#38BDF8; box-shadow:0 0 12px #38BDF8;"></span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; letter-spacing:1.8px; color:#38BDF8;">CONNECTED</span>
+                </div>
+                <span style="color:#E6E8EB; font-size:23px; font-weight:600; letter-spacing:-0.3px;">Studio Laptop</span>
+                <span style="color:#6B7280; font-size:13px;">192.168.1.24 · Wi-Fi</span>
+              </div>
+              <div style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
+                <div style="display:flex; align-items:baseline; gap:3px;">
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:30px; font-weight:600; color:#E6E8EB; font-feature-settings:'tnum';">12</span>
+                  <span style="font-family:'IBM Plex Mono',monospace; font-size:13px; font-weight:500; color:#6B7280;">ms</span>
+                </div>
+                <span style="font-family:'IBM Plex Mono',monospace; font-size:9px; font-weight:500; letter-spacing:1.5px; color:#6B7280;">LATENCY p50</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- primary trackpad affordance -->
+          <div style="margin-top:14px; background:linear-gradient(135deg, rgba(56,189,248,0.14), rgba(56,189,248,0.05)); border:1px solid rgba(56,189,248,0.38); border-radius:20px; padding:17px 18px; display:flex; align-items:center; gap:16px;">
+            <div style="width:52px; height:52px; border-radius:15px; background:rgba(56,189,248,0.16); display:flex; align-items:center; justify-content:center; color:#38BDF8; flex:0 0 auto;">
+              <span class="msr" style="font-size:28px;">touch_app</span>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:3px; flex:1 1 auto;">
+              <span style="color:#E6E8EB; font-size:18px; font-weight:600;">Trackpad</span>
+              <span style="color:#8b93a1; font-size:13px;">Move the pointer · tap, scroll, drag</span>
+            </div>
+            <span class="msr" style="font-size:22px; color:#38BDF8;">arrow_forward</span>
+          </div>
+
+          <!-- INPUT group -->
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin:22px 2px 12px;">INPUT</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div style="background:#16181D; border:1px solid #2A2D34; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:16px; min-height:78px;"><div style="width:38px; height:38px; border-radius:11px; background:#1C1F26; display:flex; align-items:center; justify-content:center; color:#cdd2d9;"><span class="msr" style="font-size:21px;">keyboard</span></div><span style="color:#E6E8EB; font-size:14px; font-weight:600;">Keyboard</span></div>
+            <div style="background:#16181D; border:1px solid #2A2D34; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:16px; min-height:78px;"><div style="width:38px; height:38px; border-radius:11px; background:#1C1F26; display:flex; align-items:center; justify-content:center; color:#cdd2d9;"><span class="msr" style="font-size:21px;">music_note</span></div><span style="color:#E6E8EB; font-size:14px; font-weight:600;">Media</span></div>
+            <div style="background:#16181D; border:1px solid #2A2D34; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:16px; min-height:78px;"><div style="width:38px; height:38px; border-radius:11px; background:#1C1F26; display:flex; align-items:center; justify-content:center; color:#cdd2d9;"><span class="msr" style="font-size:21px;">content_paste</span></div><span style="color:#E6E8EB; font-size:14px; font-weight:600;">Clipboard</span></div>
+          </div>
+
+          <!-- SYSTEM group -->
+          <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; font-weight:600; letter-spacing:2.5px; color:#6B7280; margin:22px 2px 12px;">SYSTEM</div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div style="background:#16181D; border:1px solid #2A2D34; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:16px; min-height:78px;"><div style="width:38px; height:38px; border-radius:11px; background:#1C1F26; display:flex; align-items:center; justify-content:center; color:#cdd2d9;"><span class="msr" style="font-size:21px;">apps</span></div><span style="color:#E6E8EB; font-size:14px; font-weight:600;">Apps</span></div>
+            <div style="background:#16181D; border:1px solid #2A2D34; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:16px; min-height:78px;"><div style="width:38px; height:38px; border-radius:11px; background:#1C1F26; display:flex; align-items:center; justify-content:center; color:#cdd2d9;"><span class="msr" style="font-size:21px;">public</span></div><span style="color:#E6E8EB; font-size:14px; font-weight:600;">Browser</span></div>
+            <div style="background:#16181D; border:1px solid #2A2D34; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:16px; min-height:78px;"><div style="width:38px; height:38px; border-radius:11px; background:#1C1F26; display:flex; align-items:center; justify-content:center; color:#cdd2d9;"><span class="msr" style="font-size:21px;">slideshow</span></div><span style="color:#E6E8EB; font-size:14px; font-weight:600;">Presenter</span></div>
+            <div style="background:#16181D; border:1px solid #2A2D34; border-radius:16px; padding:14px; display:flex; flex-direction:column; gap:16px; min-height:78px;"><div style="width:38px; height:38px; border-radius:11px; background:#1C1F26; display:flex; align-items:center; justify-content:center; color:#cdd2d9;"><span class="msr" style="font-size:21px;">power_settings_new</span></div><span style="color:#E6E8EB; font-size:14px; font-weight:600;">Power</span></div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== 1b — CURRENT ===================== -->
+  <div id="1b" style="display:flex; flex-direction:column; gap:18px;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <span style="display:inline-flex; align-items:center; justify-content:center; min-width:30px; height:24px; padding:0 8px; border-radius:6px; background:#2A2D34; color:#E6E8EB; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:13px;">1b</span>
+      <span style="color:#E6E8EB; font-size:15px; font-weight:600;">Current hub</span>
+      <span style="color:#6B7280; font-size:13px;">— faithful recreation, uniform 2×4 grid</span>
+    </div>
+
+    <div style="width:392px; height:812px; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #23262d;">
+      <div style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0E0F12; display:flex; flex-direction:column; position:relative; font-family:'Roboto',sans-serif;">
+
+        <!-- status bar -->
+        <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB;">
+          <span style="font-size:13px; font-weight:500;">9:41</span>
+          <div style="display:flex; align-items:center; gap:7px;">
+            <span class="msr" style="font-size:17px;">signal_cellular_alt</span>
+            <span class="msr" style="font-size:17px;">wifi</span>
+            <span class="msr" style="font-size:19px;">battery_full</span>
+          </div>
+        </div>
+
+        <!-- app bar -->
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:12px; padding:0 8px 0 16px;">
+          <span style="flex:1 1 auto; color:#E6E8EB; font-size:16px; font-weight:600;">Remote</span>
+          <div style="display:flex; align-items:center; gap:6px; padding:4px 8px; border:1px solid #2A2D34; border-radius:8px; background:rgba(14,15,18,0.8);">
+            <span style="width:8px; height:8px; border-radius:50%; background:#4C8DFF;"></span>
+            <span style="color:#4C8DFF; font-size:12px; font-weight:600;">Connected</span>
+            <span style="color:#E6E8EB; font-size:12px;">· 12 ms</span>
+          </div>
+          <div style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; color:#E6E8EB;">
+            <span class="mi" style="font-size:24px;">settings</span>
+          </div>
+        </div>
+
+        <!-- grid -->
+        <div style="flex:1 1 auto; overflow-y:auto; padding:32px 16px 16px;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <div style="aspect-ratio:1.4; background:#16181D; border:1px solid #2A2D34; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;"><span class="mi" style="font-size:32px; color:#6B7280;">touch_app</span><span style="color:#E6E8EB; font-size:16px; font-weight:600;">Trackpad</span></div>
+            <div style="aspect-ratio:1.4; background:#16181D; border:1px solid #2A2D34; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;"><span class="mi" style="font-size:32px; color:#6B7280;">keyboard</span><span style="color:#E6E8EB; font-size:16px; font-weight:600;">Keyboard</span></div>
+            <div style="aspect-ratio:1.4; background:#16181D; border:1px solid #2A2D34; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;"><span class="mi" style="font-size:32px; color:#6B7280;">music_note</span><span style="color:#E6E8EB; font-size:16px; font-weight:600;">Media</span></div>
+            <div style="aspect-ratio:1.4; background:#16181D; border:1px solid #2A2D34; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;"><span class="mi" style="font-size:32px; color:#6B7280;">apps</span><span style="color:#E6E8EB; font-size:16px; font-weight:600;">Apps</span></div>
+            <div style="aspect-ratio:1.4; background:#16181D; border:1px solid #2A2D34; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;"><span class="mi" style="font-size:32px; color:#6B7280;">content_paste</span><span style="color:#E6E8EB; font-size:16px; font-weight:600;">Clipboard</span></div>
+            <div style="aspect-ratio:1.4; background:#16181D; border:1px solid #2A2D34; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;"><span class="mi" style="font-size:32px; color:#6B7280;">power_settings_new</span><span style="color:#E6E8EB; font-size:16px; font-weight:600;">Power</span></div>
+            <div style="aspect-ratio:1.4; background:#16181D; border:1px solid #2A2D34; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;"><span class="mi" style="font-size:32px; color:#6B7280;">slideshow</span><span style="color:#E6E8EB; font-size:16px; font-weight:600;">Presenter</span></div>
+            <div style="aspect-ratio:1.4; background:#16181D; border:1px solid #2A2D34; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;"><span class="mi" style="font-size:32px; color:#6B7280;">public</span><span style="color:#E6E8EB; font-size:16px; font-weight:600;">Browser</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1100,&quot;height&quot;:960}}">
+const INPUT_TOOLS = [
+  { label: 'Keyboard',  icon: 'keyboard' },
+  { label: 'Media',     icon: 'music_note' },
+  { label: 'Clipboard', icon: 'content_paste' },
+];
+const SYSTEM_TOOLS = [
+  { label: 'Apps',      icon: 'apps' },
+  { label: 'Browser',   icon: 'public' },
+  { label: 'Presenter', icon: 'slideshow' },
+  { label: 'Power',     icon: 'power_settings_new' },
+];
+const ALL_TOOLS = [
+  { label: 'Trackpad',  icon: 'touch_app' },
+  { label: 'Keyboard',  icon: 'keyboard' },
+  { label: 'Media',     icon: 'music_note' },
+  { label: 'Apps',      icon: 'apps' },
+  { label: 'Clipboard', icon: 'content_paste' },
+  { label: 'Power',     icon: 'power_settings_new' },
+  { label: 'Presenter', icon: 'slideshow' },
+  { label: 'Browser',   icon: 'public' },
+];
+const STATE_MAP = {
+  Connected:    { color: '#38BDF8', word: 'CONNECTED',    live: true },
+  Reconnecting: { color: '#E8A33D', word: 'RECONNECTING', live: false },
+  Disconnected: { color: '#6B7280', word: 'DISCONNECTED', live: false },
+};
+
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

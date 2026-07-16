@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #08090c; }
+  a { color: #4C8DFF; text-decoration: none; }
+  a:hover { color: #7fb0ff; }
+  .msr { font-family: 'Material Symbols Rounded'; font-weight: normal; font-style: normal; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; pointer-events: none; }
+  @keyframes rippop { from { transform: translate(-50%,-50%) scale(0.3); opacity: 0.7; } to { transform: translate(-50%,-50%) scale(2.2); opacity: 0; } }
+  @keyframes toastin { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  @keyframes winpop { from { transform: scale(0.85); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+</style>
+</helmet>
+
+<div style="min-height:100vh; display:flex; align-items:flex-start; justify-content:center; gap:56px; padding:56px 32px; font-family:'Roboto',sans-serif; -webkit-user-select:none; user-select:none;">
+
+  <!-- ============ PHONE ============ -->
+  <div style="width:392px; height:812px; flex:0 0 auto; border-radius:46px; background:#000; padding:11px; box-shadow:0 40px 90px -30px rgba(0,0,0,0.9), 0 0 0 1px #1c1f26;">
+    <div data-phone style="width:100%; height:100%; border-radius:36px; overflow:hidden; background:#0E0F12; display:flex; flex-direction:column; position:relative;">
+
+      <!-- status bar -->
+      <div style="height:44px; flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; padding:0 26px 0 30px; color:#E6E8EB; z-index:5;">
+        <span style="font-size:13px; font-weight:500; font-feature-settings:'tnum';">9:41</span>
+        <div style="display:flex; align-items:center; gap:7px;"><span class="msr" style="font-size:17px;">signal_cellular_alt</span><span class="msr" style="font-size:17px;">wifi</span><span class="msr" style="font-size:19px;">battery_full</span></div>
+      </div>
+
+      <!-- HUB app bar -->
+      <sc-if value="{{ isHub }}" hint-placeholder-val="{{ true }}">
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:0 12px 0 20px;">
+          <span style="flex:1 1 auto; color:#E6E8EB; font-size:16px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ deviceName }}</span>
+          <div onClick="{{ cycleConn }}" style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:8px; background:rgba(14,15,18,0.8); cursor:pointer;">
+            <span style="width:8px; height:8px; border-radius:50%; background:{{ dotColor }};"></span>
+            <span style="font-size:12px; font-weight:600; color:{{ dotColor }};">{{ statusWord }}</span>
+            <sc-if value="{{ online }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px; color:#E6E8EB; font-feature-settings:'tnum';">· {{ latency }} ms</span></sc-if>
+          </div>
+          <div onClick="{{ goSettings }}" style="width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#E6E8EB; cursor:pointer;" style-hover="background:#16181D;"><span class="msr" style="font-size:24px;">settings</span></div>
+        </div>
+      </sc-if>
+
+      <!-- TOOL app bar -->
+      <sc-if value="{{ isTool }}" hint-placeholder-val="{{ false }}">
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 12px 0 6px;">
+          <div onClick="{{ goHub }}" style="width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#E6E8EB; cursor:pointer;" style-hover="background:#16181D;"><span class="msr" style="font-size:26px;">arrow_back</span></div>
+          <span style="flex:1 1 auto; color:#E6E8EB; font-size:16px; font-weight:600;">{{ screenTitle }}</span>
+          <div onClick="{{ cycleConn }}" style="display:flex; align-items:center; gap:6px; padding:5px 9px; border:1px solid #2A2D34; border-radius:8px; background:rgba(14,15,18,0.8); cursor:pointer; margin-right:6px;">
+            <span style="width:8px; height:8px; border-radius:50%; background:{{ dotColor }};"></span>
+            <span style="font-size:12px; font-weight:600; color:{{ dotColor }};">{{ statusWord }}</span>
+            <sc-if value="{{ online }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px; color:#E6E8EB; font-feature-settings:'tnum';">· {{ latency }} ms</span></sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- SETTINGS app bar -->
+      <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+        <div style="height:56px; flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:0 12px 0 6px;">
+          <div onClick="{{ goHub }}" style="width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center; color:#E6E8EB; cursor:pointer;" style-hover="background:#16181D;"><span class="msr" style="font-size:26px;">arrow_back</span></div>
+          <span style="flex:1 1 auto; color:#E6E8EB; font-size:16px; font-weight:600;">Settings</span>
+        </div>
+      </sc-if>
+
+      <!-- reconnecting banner -->
+      <sc-if value="{{ reconnecting }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:0 0 auto; display:flex; align-items:center; gap:8px; padding:12px 16px; background:#16181D; border-top:1px solid #2A2D34; border-bottom:1px solid #2A2D34;">
+          <span class="msr" style="font-size:20px; color:#E8A33D;">wifi_off</span>
+          <span style="flex:1 1 auto; color:#E6E8EB; font-size:14px;">Reconnecting…</span>
+          <div onClick="{{ retryNow }}" style="padding:6px 8px; color:#4C8DFF; font-size:14px; font-weight:500; cursor:pointer;">Retry now</div>
+        </div>
+      </sc-if>
+
+      <!-- ============ HUB ============ -->
+      <sc-if value="{{ isHub }}" hint-placeholder-val="{{ true }}">
+        <div style="flex:1 1 auto; overflow-y:auto; padding:32px 16px 16px; min-height:0;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+            <sc-for list="{{ hubTiles }}" as="t" hint-placeholder-count="8">
+              <div onClick="{{ t.onTap }}" style="aspect-ratio:1.4; background:#16181D; border:1px solid #2A2D34; border-radius:16px; display:flex; flex-direction:column; align-items:center; justify-content:center; cursor:{{ t.cursor }};" style-hover="border-color:#3a3e47;">
+                <span class="msr" style="font-size:32px; color:#6B7280;">{{ t.icon }}</span>
+                <span style="margin-top:4px; font-size:16px; font-weight:600; color:{{ t.labelColor }};">{{ t.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ TRACKPAD (full) ============ -->
+      <sc-if value="{{ isTrackpad }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1 1 auto; display:flex; flex-direction:column; min-height:0;">
+          <div onPointerDown="{{ padMainDown }}" onPointerMove="{{ padMainMove }}" onPointerUp="{{ padMainUp }}" style="flex:1 1 auto; position:relative; border:none; background-color:#0E0F12; background-image:radial-gradient(circle at center, rgba(255,255,255,0.045) 1.2px, transparent 1.2px); background-size:24px 24px; overflow:hidden; touch-action:none; cursor:crosshair;">
+            <div style="position:absolute; top:16px; left:0; right:0; display:flex; justify-content:center; opacity:{{ pillOp }}; transition:opacity 150ms; pointer-events:none;">
+              <div style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:999px; background:#16181D; border:1px solid #4C8DFF;">
+                <span class="msr" style="font-size:14px; color:#4C8DFF;">lock</span>
+                <span style="color:#E6E8EB; font-size:12px;">Drag locked — tap to drop</span>
+              </div>
+            </div>
+            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none;">
+              <span style="font-size:14px; color:#4a505c;">{{ padHint }}</span>
+            </div>
+            <div style="position:absolute; left:{{ mainCurX }}%; top:{{ mainCurY }}%; width:14px; height:14px; border-radius:50%; background:#4C8DFF; box-shadow:0 0 14px rgba(76,141,255,0.8); transform:translate(-50%,-50%); pointer-events:none;"></div>
+            <sc-if value="{{ ripple }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute; left:{{ mainCurX }}%; top:{{ mainCurY }}%; width:34px; height:34px; border-radius:50%; border:2px solid #4C8DFF; animation:rippop 320ms ease-out forwards; pointer-events:none;"></div>
+            </sc-if>
+            <div style="position:absolute; bottom:16px; right:16px; display:flex; flex-direction:column; gap:8px;">
+              <div onClick="{{ goKeyboard }}" style="width:48px; height:48px; border-radius:50%; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; cursor:pointer;"><span class="msr" style="font-size:20px;">keyboard</span></div>
+              <div onClick="{{ openSheet }}" style="width:48px; height:48px; border-radius:50%; background:#16181D; border:1px solid #2A2D34; display:flex; align-items:center; justify-content:center; color:#E6E8EB; cursor:pointer;"><span class="msr" style="font-size:20px;">tune</span></div>
+            </div>
+          </div>
+          <div style="flex:0 0 auto; height:64px; background:#0E0F12; padding:8px 16px; display:flex; gap:8px;">
+            <sc-for list="{{ mainBtns }}" as="b" hint-placeholder-count="3">
+              <div onPointerDown="{{ b.down }}" style="flex:{{ b.flex }}; border-radius:8px; background:#16181D; border:1px solid {{ b.bc }}; display:flex; align-items:center; justify-content:center; color:{{ b.fc }}; font-size:16px; font-weight:600; cursor:pointer; touch-action:none;">{{ b.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ KEYBOARD ============ -->
+      <sc-if value="{{ isKeyboard }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1 1 auto; display:flex; flex-direction:column; min-height:0;">
+          <div style="flex:1 1 auto; display:flex; align-items:center; justify-content:center; padding:24px;">
+            <span style="font-size:13px; color:#4a505c; text-align:center; line-height:1.7;">The system keyboard handles typing.<br>These are the extra keys.</span>
+          </div>
+          <div style="flex:0 0 auto; border-top:1px solid #2A2D34; background:#0E0F12; padding:16px;">
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:8px;">
+              <sc-for list="{{ modChips }}" as="m" hint-placeholder-count="4">
+                <div onPointerDown="{{ m.down }}" onPointerUp="{{ m.up }}" onPointerLeave="{{ m.up }}" style="height:48px; border-radius:8px; background:{{ m.bg }}; border:1px solid {{ m.bc }}; display:flex; align-items:center; justify-content:center; gap:4px; color:{{ m.fc }}; font-size:15px; font-weight:600; cursor:pointer; touch-action:none; transition:background 150ms,border-color 150ms;">{{ m.label }}<sc-if value="{{ m.locked }}" hint-placeholder-val="{{ false }}"><span class="msr" style="font-size:15px;">lock</span></sc-if></div>
+              </sc-for>
+            </div>
+            <div style="display:flex; margin:20px 0 14px;">
+              <sc-for list="{{ kbTabs }}" as="g" hint-placeholder-count="3">
+                <div onClick="{{ g.onTap }}" style="flex:1; text-align:center; padding-bottom:8px; border-bottom:2px solid {{ g.uc }}; color:{{ g.fc }}; font-size:12px; cursor:pointer;">{{ g.label }}</div>
+              </sc-for>
+            </div>
+            <sc-if value="{{ kbNav }}" hint-placeholder-val="{{ true }}">
+              <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center;">
+                <sc-for list="{{ navCaps }}" as="c" hint-placeholder-count="7">
+                  <div onPointerDown="{{ c.down }}" onPointerUp="{{ c.up }}" onPointerLeave="{{ c.up }}" style="min-width:52px; height:48px; padding:0 12px; border-radius:8px; background:#16181D; border:1px solid {{ c.bc }}; display:flex; align-items:center; justify-content:center; color:{{ c.fc }}; font-size:14px; cursor:pointer; touch-action:none;">{{ c.label }}</div>
+                </sc-for>
+              </div>
+              <div style="display:flex; flex-direction:column; align-items:center; gap:8px; margin-top:12px;">
+                <div style="display:flex; gap:8px;">
+                  <sc-for list="{{ arrowTop }}" as="c" hint-placeholder-count="1">
+                    <div onPointerDown="{{ c.down }}" onPointerUp="{{ c.up }}" onPointerLeave="{{ c.up }}" style="width:64px; height:48px; border-radius:8px; background:#16181D; border:1px solid {{ c.bc }}; display:flex; align-items:center; justify-content:center; color:{{ c.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:20px;">{{ c.icon }}</span></div>
+                  </sc-for>
+                </div>
+                <div style="display:flex; gap:8px;">
+                  <sc-for list="{{ arrowRow }}" as="c" hint-placeholder-count="3">
+                    <div onPointerDown="{{ c.down }}" onPointerUp="{{ c.up }}" onPointerLeave="{{ c.up }}" style="width:64px; height:48px; border-radius:8px; background:#16181D; border:1px solid {{ c.bc }}; display:flex; align-items:center; justify-content:center; color:{{ c.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:20px;">{{ c.icon }}</span></div>
+                  </sc-for>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ kbFn }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex; flex-wrap:wrap; gap:8px; justify-content:center;">
+                <sc-for list="{{ fnCaps }}" as="c" hint-placeholder-count="12">
+                  <div onPointerDown="{{ c.down }}" onPointerUp="{{ c.up }}" onPointerLeave="{{ c.up }}" style="width:56px; height:48px; border-radius:8px; background:#16181D; border:1px solid {{ c.bc }}; display:flex; align-items:center; justify-content:center; color:{{ c.fc }}; font-size:14px; cursor:pointer; touch-action:none;">{{ c.label }}</div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <sc-if value="{{ kbNum }}" hint-placeholder-val="{{ false }}">
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px;">
+                <sc-for list="{{ numCaps }}" as="c" hint-placeholder-count="12">
+                  <div onPointerDown="{{ c.down }}" onPointerUp="{{ c.up }}" onPointerLeave="{{ c.up }}" style="height:48px; border-radius:8px; background:#16181D; border:1px solid {{ c.bc }}; display:flex; align-items:center; justify-content:center; color:{{ c.fc }}; font-size:14px; cursor:pointer; touch-action:none;">{{ c.label }}</div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ MEDIA ============ -->
+      <sc-if value="{{ isMedia }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1 1 auto; overflow-y:auto; padding:32px 16px 16px; min-height:0;">
+          <div style="display:flex; align-items:center; justify-content:center; gap:8px;">
+            <div onPointerDown="{{ prevBtn.down }}" style="width:48px; height:48px; border-radius:50%; background:#16181D; border:1px solid {{ prevBtn.bc }}; display:flex; align-items:center; justify-content:center; color:{{ prevBtn.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:24px;">skip_previous</span></div>
+            <div onPointerDown="{{ playBtn.down }}" style="width:64px; height:64px; border-radius:50%; background:#16181D; border:1px solid {{ playBtn.bc }}; display:flex; align-items:center; justify-content:center; color:{{ playBtn.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:34px;">play_arrow</span></div>
+            <div onPointerDown="{{ nextBtn.down }}" style="width:48px; height:48px; border-radius:50%; background:#16181D; border:1px solid {{ nextBtn.bc }}; display:flex; align-items:center; justify-content:center; color:{{ nextBtn.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:24px;">skip_next</span></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:4px; margin-top:24px;">
+            <div onClick="{{ muteTap }}" style="width:48px; height:48px; border-radius:50%; background:{{ muteBg }}; border:1px solid {{ muteBc }}; display:flex; align-items:center; justify-content:center; color:{{ muteFc }}; flex:0 0 auto; cursor:pointer; transition:background 150ms;"><span class="msr" style="font-size:24px;">{{ muteIcon }}</span></div>
+            <div onPointerDown="{{ volDown }}" onPointerMove="{{ volMove }}" onPointerUp="{{ volUp }}" style="flex:1 1 auto; padding:14px 8px; cursor:pointer; touch-action:none;">
+              <div style="height:4px; border-radius:999px; background:#2A2D34; position:relative;">
+                <div style="position:absolute; left:0; top:0; bottom:0; width:{{ volPct }}%; border-radius:999px; background:{{ volFill }};"></div>
+                <div style="position:absolute; left:{{ volPct }}%; top:50%; transform:translate(-50%,-50%); width:16px; height:16px; border-radius:50%; background:{{ volFill }};"></div>
+              </div>
+            </div>
+            <span style="font-size:12px; color:#E6E8EB; width:44px; text-align:right; font-feature-settings:'tnum';">{{ volLabel }}</span>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ APPS ============ -->
+      <sc-if value="{{ isApps }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1 1 auto; overflow-y:auto; padding:32px 16px 16px; min-height:0;">
+          <div style="color:#E6E8EB; font-size:16px; font-weight:600; margin-bottom:8px;">Favorites</div>
+          <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:24px;">
+            <sc-for list="{{ favorites }}" as="f" hint-placeholder-count="4">
+              <div onPointerDown="{{ f.onTap }}" style="width:80px; height:80px; border-radius:16px; background:#16181D; border:1px solid {{ f.bc }}; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; position:relative; cursor:pointer; touch-action:none;">
+                <span class="msr" style="font-size:32px; color:#cdd2d9;">{{ f.icon }}</span>
+                <span style="color:{{ f.fc }}; font-size:12px;">{{ f.name }}</span>
+                <span class="msr" style="position:absolute; top:4px; right:4px; font-size:12px; color:#4C8DFF;">push_pin</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="color:#E6E8EB; font-size:16px; font-weight:600; margin-bottom:8px;">Open windows</div>
+          <sc-if value="{{ hasWindows }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <sc-for list="{{ windows }}" as="w" hint-placeholder-count="3">
+                <div onPointerDown="{{ w.onFocus }}" style="min-height:56px; border-radius:16px; background:#16181D; border:1px solid {{ w.bc }}; display:flex; align-items:center; gap:4px; padding:0 4px 0 12px; cursor:pointer; touch-action:none;">
+                  <span class="msr" style="font-size:24px; color:#cdd2d9;">{{ w.icon }}</span>
+                  <span style="flex:1 1 auto; color:{{ w.fc }}; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding-left:8px;">{{ w.title }}</span>
+                  <div onPointerDown="{{ w.onClose }}" style="width:48px; height:48px; display:flex; align-items:center; justify-content:center; color:#6B7280; cursor:pointer;" style-hover="color:#E6E8EB;"><span class="msr" style="font-size:20px;">close</span></div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{ noWindows }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:24px 0; text-align:center;">
+              <div style="color:#E6E8EB; font-size:16px; font-weight:600;">No open windows</div>
+              <div style="color:#6B7280; font-size:14px; margin-top:8px;">Windows you open on your PC will show up here.</div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ============ CLIPBOARD ============ -->
+      <sc-if value="{{ isClipboard }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1 1 auto; overflow-y:auto; padding:32px 16px 16px; min-height:0;">
+          <div style="display:flex; gap:8px;">
+            <div onPointerDown="{{ clipSend.down }}" style="flex:1; height:56px; border-radius:16px; background:#16181D; border:1px solid {{ clipSend.bc }}; display:flex; align-items:center; justify-content:center; gap:8px; color:{{ clipSend.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:20px;">arrow_upward</span><span style="font-size:16px; font-weight:600;">Send to PC</span></div>
+            <div onPointerDown="{{ clipFetch.down }}" style="flex:1; height:56px; border-radius:16px; background:#16181D; border:1px solid {{ clipFetch.bc }}; display:flex; align-items:center; justify-content:center; gap:8px; color:{{ clipFetch.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:20px;">arrow_downward</span><span style="font-size:16px; font-weight:600;">Fetch from PC</span></div>
+          </div>
+          <div style="display:flex; align-items:center; min-height:48px; margin-top:24px;">
+            <span style="flex:1 1 auto; color:#E6E8EB; font-size:16px; font-weight:600;">Auto-sync clipboard</span>
+            <div onClick="{{ toggleSync }}" style="width:48px; height:28px; border-radius:999px; background:{{ syncTrack }}; position:relative; transition:background 200ms; cursor:pointer;">
+              <div style="position:absolute; left:{{ syncKnob }}px; top:3px; width:22px; height:22px; border-radius:50%; background:{{ syncKnobBg }}; transition:left 200ms;"></div>
+            </div>
+          </div>
+          <div style="display:flex; align-items:flex-start; gap:8px; margin-top:8px;">
+            <span class="msr" style="font-size:16px; color:#6B7280;">info</span>
+            <span style="flex:1 1 auto; color:#6B7280; font-size:12px; line-height:1.5;">Phone → PC syncs when you open this app. PC → phone syncs live.</span>
+          </div>
+          <div style="color:#E6E8EB; font-size:16px; font-weight:600; margin:24px 0 8px;">Recent</div>
+          <div style="display:flex; flex-direction:column; gap:8px;">
+            <sc-for list="{{ history }}" as="h" hint-placeholder-count="3">
+              <div onPointerDown="{{ h.onTap }}" style="min-height:48px; border-radius:16px; background:#16181D; border:1px solid {{ h.bc }}; padding:12px; color:{{ h.fc }}; font-size:14px; line-height:1.4; cursor:pointer; touch-action:none; overflow:hidden; text-overflow:ellipsis;">{{ h.text }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ POWER ============ -->
+      <sc-if value="{{ isPower }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1 1 auto; overflow-y:auto; padding:32px 16px 16px; min-height:0;">
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <sc-for list="{{ safeTracks }}" as="t" hint-placeholder-count="2">
+              <div onPointerDown="{{ t.down }}" onPointerMove="{{ t.move }}" onPointerUp="{{ t.up }}" style="height:64px; border-radius:16px; background:#16181D; border:1px solid #2A2D34; position:relative; display:flex; align-items:center; overflow:hidden; touch-action:none; cursor:grab;">
+                <div style="position:absolute; left:0; top:0; bottom:0; width:{{ t.fill }}; background:{{ t.fillBg }}; transition:{{ t.trans }};"></div>
+                <div style="position:absolute; left:{{ t.left }}; top:4px; width:56px; height:56px; border-radius:12px; background:{{ t.thumbBg }}; display:flex; align-items:center; justify-content:center; color:#0E0F12; transition:{{ t.trans }}; pointer-events:none;"><span class="msr" style="font-size:20px;">{{ t.icon }}</span><span class="msr" style="font-size:16px;">chevron_right</span></div>
+                <span style="width:100%; text-align:center; color:#6B7280; font-size:14px; opacity:{{ t.labelOp }}; pointer-events:none;">{{ t.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div style="height:24px;"></div>
+          <div style="display:flex; flex-direction:column; gap:16px;">
+            <sc-for list="{{ destTracks }}" as="t" hint-placeholder-count="2">
+              <div onPointerDown="{{ t.down }}" onPointerMove="{{ t.move }}" onPointerUp="{{ t.up }}" style="height:64px; border-radius:16px; background:#16181D; border:1px solid #2A2D34; position:relative; display:flex; align-items:center; overflow:hidden; touch-action:none; cursor:grab;">
+                <div style="position:absolute; left:0; top:0; bottom:0; width:{{ t.fill }}; background:{{ t.fillBg }}; transition:{{ t.trans }};"></div>
+                <div style="position:absolute; left:{{ t.left }}; top:4px; width:56px; height:56px; border-radius:12px; background:{{ t.thumbBg }}; display:flex; align-items:center; justify-content:center; color:#0E0F12; transition:{{ t.trans }}; pointer-events:none;"><span class="msr" style="font-size:20px;">{{ t.icon }}</span><span class="msr" style="font-size:16px;">chevron_right</span></div>
+                <span style="width:100%; text-align:center; color:#6B7280; font-size:14px; opacity:{{ t.labelOp }}; pointer-events:none;">{{ t.label }}</span>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ PRESENTER ============ -->
+      <sc-if value="{{ isPresenter }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1 1 auto; display:flex; min-height:0;">
+          <div onPointerDown="{{ presPrev }}" style="flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:{{ prevZoneFc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:48px;">chevron_left</span><span style="font-size:12px;">Previous</span></div>
+          <div style="width:1px; background:#2A2D34;"></div>
+          <div onPointerDown="{{ presNext }}" style="flex:2; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:{{ nextZoneFc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:48px;">chevron_right</span><span style="font-size:12px;">Next</span></div>
+        </div>
+        <div style="flex:0 0 auto; height:64px; border-top:1px solid #2A2D34; display:flex; align-items:center; gap:8px; padding:0 12px;">
+          <div onClick="{{ startShow }}" style="border-radius:8px; background:#16181D; border:1px solid #2A2D34; padding:8px 12px; color:{{ startFc }}; font-size:16px; font-weight:600; cursor:pointer;">Start show</div>
+          <div onClick="{{ endShow }}" style="border-radius:8px; background:#16181D; border:1px solid #2A2D34; padding:8px 12px; color:{{ endFc }}; font-size:16px; font-weight:600; cursor:pointer;">End show</div>
+          <div onClick="{{ blankTap }}" style="border-radius:8px; background:#16181D; border:1px solid {{ blankBc }}; padding:8px 10px; color:{{ blankFc }}; font-size:16px; font-weight:600; display:flex; align-items:center; gap:6px; cursor:pointer;"><span class="msr" style="font-size:18px;">crop_din</span>Blank</div>
+          <span style="flex:1 1 auto;"></span>
+          <span onPointerDown="{{ timerDown }}" onPointerUp="{{ timerUp }}" onPointerLeave="{{ timerUp }}" style="font-size:28px; font-weight:600; color:{{ timerFc }}; font-feature-settings:'tnum'; cursor:pointer; padding:8px 0 8px 8px;">{{ timerText }}</span>
+        </div>
+      </sc-if>
+
+      <!-- ============ BROWSER ============ -->
+      <sc-if value="{{ isBrowser }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1 1 auto; overflow-y:auto; padding:32px 16px 16px; display:flex; flex-direction:column; gap:8px; min-height:0;">
+          <div style="display:flex; gap:8px;">
+            <sc-for list="{{ browserA }}" as="b" hint-placeholder-count="2">
+              <div onPointerDown="{{ b.down }}" style="flex:1; height:56px; border-radius:8px; background:#16181D; border:1px solid {{ b.bc }}; display:flex; align-items:center; justify-content:center; gap:4px; color:{{ b.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:20px;">{{ b.icon }}</span><span style="font-size:16px; font-weight:600;">{{ b.label }}</span></div>
+            </sc-for>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <sc-for list="{{ browserB }}" as="b" hint-placeholder-count="2">
+              <div onPointerDown="{{ b.down }}" style="flex:1; height:56px; border-radius:8px; background:#16181D; border:1px solid {{ b.bc }}; display:flex; align-items:center; justify-content:center; gap:4px; color:{{ b.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:20px;">{{ b.icon }}</span><span style="font-size:16px; font-weight:600;">{{ b.label }}</span></div>
+            </sc-for>
+          </div>
+          <sc-for list="{{ browserR }}" as="b" hint-placeholder-count="1">
+            <div onPointerDown="{{ b.down }}" style="height:56px; border-radius:8px; background:#16181D; border:1px solid {{ b.bc }}; display:flex; align-items:center; justify-content:center; gap:4px; color:{{ b.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:20px;">{{ b.icon }}</span><span style="font-size:16px; font-weight:600;">{{ b.label }}</span></div>
+          </sc-for>
+          <div style="display:flex; gap:8px;">
+            <sc-for list="{{ browserZ }}" as="b" hint-placeholder-count="2">
+              <div onPointerDown="{{ b.down }}" style="flex:1; height:56px; border-radius:8px; background:#16181D; border:1px solid {{ b.bc }}; display:flex; align-items:center; justify-content:center; gap:4px; color:{{ b.fc }}; cursor:pointer; touch-action:none;"><span class="msr" style="font-size:20px;">{{ b.icon }}</span><span style="font-size:16px; font-weight:600;">{{ b.label }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ SETTINGS ============ -->
+      <sc-if value="{{ isSettings }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1 1 auto; overflow-y:auto; padding:16px; min-height:0;">
+          <div style="color:#6B7280; font-size:14px; font-weight:600; margin:0 0 8px 4px;">Paired PCs</div>
+          <div style="background:#16181D; border-radius:12px; overflow:hidden;">
+            <sc-for list="{{ pairedPcs }}" as="p" hint-placeholder-count="1">
+              <div style="min-height:48px; padding:8px 16px; display:flex; align-items:center; gap:8px; border-bottom:1px solid #2A2D34;">
+                <div style="flex:1 1 auto; display:flex; flex-direction:column;">
+                  <span style="color:#E6E8EB; font-size:16px;">{{ p.name }}</span>
+                  <span style="color:#6B7280; font-size:14px; margin-top:2px;">{{ p.meta }}</span>
+                </div>
+                <div onClick="{{ p.revoke }}" style="padding:8px 10px; color:#FF6B6B; font-size:14px; font-weight:600; cursor:pointer;">Revoke</div>
+              </div>
+            </sc-for>
+            <div onClick="{{ addSwitch }}" style="min-height:48px; padding:12px 16px; display:flex; align-items:center; gap:12px; cursor:pointer;" style-hover="background:#1a1d23;">
+              <span class="msr" style="font-size:20px; color:#E6E8EB;">add</span>
+              <span style="color:#E6E8EB; font-size:16px;">Add / switch PC</span>
+            </div>
+          </div>
+
+          <div style="height:24px;"></div>
+          <div style="background:#16181D; border-radius:12px; padding:8px 16px;">
+            <div style="color:#E6E8EB; font-size:16px;">Pointer sensitivity</div>
+            <div onPointerDown="{{ senDown }}" onPointerMove="{{ senMove }}" onPointerUp="{{ senUp }}" style="padding:16px 0; cursor:pointer; touch-action:none;">
+              <div style="height:4px; border-radius:999px; background:#2A2D34; position:relative;">
+                <div style="position:absolute; left:0; top:0; bottom:0; width:{{ senPct }}%; border-radius:999px; background:#4C8DFF;"></div>
+                <div style="position:absolute; left:{{ senPct }}%; top:50%; transform:translate(-50%,-50%); width:16px; height:16px; border-radius:50%; background:#4C8DFF;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:24px;"></div>
+          <div style="background:#16181D; border-radius:12px; padding:12px 16px;">
+            <div style="color:#E6E8EB; font-size:16px; margin-bottom:8px;">Scroll direction</div>
+            <div style="display:flex; gap:8px;">
+              <sc-for list="{{ scrollSegs }}" as="s" hint-placeholder-count="2">
+                <div onClick="{{ s.onTap }}" style="flex:1; min-height:40px; border-radius:8px; border:1px solid {{ s.bc }}; display:flex; align-items:center; justify-content:center; color:{{ s.fc }}; font-size:14px; cursor:pointer;">{{ s.label }}</div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="height:24px;"></div>
+          <div style="background:#16181D; border-radius:12px; padding:4px 16px;">
+            <div style="min-height:48px; display:flex; align-items:center;">
+              <span style="flex:1 1 auto; color:#E6E8EB; font-size:16px;">Haptic feedback</span>
+              <div onClick="{{ toggleHaptics }}" style="width:48px; height:28px; border-radius:999px; background:{{ hapticsTrack }}; position:relative; transition:background 200ms; cursor:pointer;">
+                <div style="position:absolute; left:{{ hapticsKnob }}px; top:3px; width:22px; height:22px; border-radius:50%; background:{{ hapticsKnobBg }}; transition:left 200ms;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="height:24px;"></div>
+          <div style="background:#16181D; border-radius:12px; padding:8px 16px;">
+            <div style="min-height:48px; display:flex; align-items:center;">
+              <span style="flex:1 1 auto; color:#E6E8EB; font-size:16px;">Accent</span>
+              <span style="padding:6px 12px; border-radius:999px; background:#4C8DFF; color:#0E0F12; font-size:12px; font-weight:600;">Blue</span>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- ============ FLOATING TRACKPAD BUBBLE ============ -->
+      <sc-if value="{{ showBubble }}" hint-placeholder-val="{{ false }}">
+        <div onPointerDown="{{ bubbleDown }}" onPointerMove="{{ bubbleMove }}" onPointerUp="{{ bubbleUp }}" style="position:absolute; left:{{ bubbleLeft }}px; top:{{ bubbleTop }}px; width:56px; height:56px; border-radius:50%; background:{{ bubbleFill }}; border:1px solid #2A2D34; box-shadow:0 2px 8px rgba(0,0,0,0.4); display:flex; align-items:center; justify-content:center; color:{{ bubbleIcon }}; cursor:grab; touch-action:none; z-index:30;"><span class="msr" style="font-size:24px;">touch_app</span></div>
+      </sc-if>
+
+      <!-- ============ FLOATING TRACKPAD WINDOW ============ -->
+      <sc-if value="{{ windowOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; left:{{ winLeft }}px; top:{{ winTop }}px; width:{{ winW }}px; height:{{ winH }}px; background:#16181D; border:1px solid #2A2D34; border-radius:16px; box-shadow:0 8px 16px rgba(0,0,0,0.4); display:flex; flex-direction:column; overflow:hidden; z-index:30; animation:winpop 200ms ease-out; transform-origin:center;">
+          <div style="height:48px; flex:0 0 auto; display:flex; align-items:center;">
+            <div onPointerDown="{{ winHeaderDown }}" onPointerMove="{{ winHeaderMove }}" onPointerUp="{{ winHeaderUp }}" style="padding:0 12px; height:48px; display:flex; align-items:center; color:#6B7280; cursor:grab; touch-action:none;"><span class="msr" style="font-size:20px;">drag_indicator</span></div>
+            <div style="flex:1 1 auto; display:flex; justify-content:center;">
+              <sc-if value="{{ winDragLock }}" hint-placeholder-val="{{ false }}">
+                <div style="display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:999px; background:#16181D; border:1px solid #4C8DFF;"><span class="msr" style="font-size:12px; color:#4C8DFF;">lock</span><span style="color:#E6E8EB; font-size:12px;">Drag locked</span></div>
+              </sc-if>
+            </div>
+            <div onClick="{{ expandFull }}" style="width:44px; height:48px; display:flex; align-items:center; justify-content:center; color:#E6E8EB; cursor:pointer;"><span class="msr" style="font-size:18px;">open_in_full</span></div>
+            <div onClick="{{ collapseWin }}" style="width:44px; height:48px; display:flex; align-items:center; justify-content:center; color:#E6E8EB; cursor:pointer;"><span class="msr" style="font-size:18px;">close</span></div>
+          </div>
+          <div onPointerDown="{{ padWinDown }}" onPointerMove="{{ padWinMove }}" onPointerUp="{{ padWinUp }}" style="flex:1 1 auto; position:relative; background-color:#0E0F12; background-image:radial-gradient(circle at center, rgba(255,255,255,0.045) 1.2px, transparent 1.2px); background-size:22px 22px; overflow:hidden; touch-action:none; cursor:crosshair;">
+            <div style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none;"><span style="font-size:12px; color:#4a505c;">{{ winPadHint }}</span></div>
+            <div style="position:absolute; left:{{ winCurX }}%; top:{{ winCurY }}%; width:12px; height:12px; border-radius:50%; background:#4C8DFF; box-shadow:0 0 12px rgba(76,141,255,0.8); transform:translate(-50%,-50%); pointer-events:none;"></div>
+            <sc-if value="{{ winRipple }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute; left:{{ winCurX }}%; top:{{ winCurY }}%; width:30px; height:30px; border-radius:50%; border:2px solid #4C8DFF; animation:rippop 320ms ease-out forwards; pointer-events:none;"></div>
+            </sc-if>
+          </div>
+          <div style="flex:0 0 auto; height:56px; background:#0E0F12; padding:6px 12px; display:flex; gap:8px;">
+            <sc-for list="{{ winBtns }}" as="b" hint-placeholder-count="3">
+              <div onPointerDown="{{ b.down }}" style="flex:{{ b.flex }}; border-radius:8px; background:#16181D; border:1px solid {{ b.bc }}; display:flex; align-items:center; justify-content:center; color:{{ b.fc }}; font-size:16px; font-weight:600; cursor:pointer; touch-action:none;">{{ b.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- toast -->
+      <sc-if value="{{ toast }}" hint-placeholder-val="{{ false }}">
+        <div style="position:absolute; left:20px; right:20px; bottom:32px; display:flex; justify-content:center; pointer-events:none; z-index:40;">
+          <div style="background:#16181D; border:1px solid #2A2D34; border-radius:12px; padding:11px 18px; color:#E6E8EB; font-size:13px; box-shadow:0 12px 30px rgba(0,0,0,0.5); animation:toastin 180ms ease-out;">{{ toast }}</div>
+        </div>
+      </sc-if>
+
+      <!-- power countdown dialog -->
+      <sc-if value="{{ dialogOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ dialogCancel }}" style="position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; padding:28px; z-index:50;">
+          <div onClick="{{ swallow }}" style="width:100%; background:#16181D; border-radius:16px; padding:20px;">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span class="msr" style="font-size:22px; color:#FF6B6B;">warning</span>
+              <span style="color:#E6E8EB; font-size:16px; font-weight:600;">{{ dialogVerb }} PC?</span>
+            </div>
+            <div style="color:#E6E8EB; font-size:14px; margin-top:12px;">This will close everything open on your PC.</div>
+            <div style="color:#6B7280; font-size:12px; margin-top:8px; font-feature-settings:'tnum';">Confirm within {{ countdown }}s</div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+              <div onClick="{{ dialogCancel }}" style="padding:12px 14px; color:#6B7280; font-size:14px; font-weight:600; cursor:pointer;">Cancel</div>
+              <div onClick="{{ dialogConfirm }}" style="padding:12px 18px; border-radius:10px; background:#FF6B6B; color:#0E0F12; font-size:16px; font-weight:600; cursor:pointer;">{{ dialogVerb }}</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- revoke dialog -->
+      <sc-if value="{{ revokeOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ revokeCancel }}" style="position:absolute; inset:0; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; padding:28px; z-index:50;">
+          <div onClick="{{ swallow }}" style="width:100%; background:#16181D; border-radius:16px; padding:20px;">
+            <div style="color:#E6E8EB; font-size:16px; font-weight:600;">Revoke this PC?</div>
+            <div style="color:#6B7280; font-size:14px; margin-top:12px;">This phone will need to pair again to control it.</div>
+            <div style="display:flex; justify-content:flex-end; gap:10px; margin-top:20px;">
+              <div onClick="{{ revokeCancel }}" style="padding:12px 14px; color:#6B7280; font-size:14px; font-weight:600; cursor:pointer;">Cancel</div>
+              <div onClick="{{ revokeConfirm }}" style="padding:12px 18px; border-radius:10px; background:#FF6B6B; color:#0E0F12; font-size:16px; font-weight:600; cursor:pointer;">Revoke</div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+      <!-- sensitivity sheet -->
+      <sc-if value="{{ sheetOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ closeSheet }}" style="position:absolute; inset:0; background:rgba(0,0,0,0.45); z-index:50; display:flex; flex-direction:column; justify-content:flex-end;">
+          <div onClick="{{ swallow }}" style="background:#0E0F12; border-top:1px solid #2A2D34; border-radius:20px 20px 0 0; padding:20px 20px 28px;">
+            <div style="width:36px; height:4px; border-radius:999px; background:#2A2D34; margin:0 auto 18px;"></div>
+            <div style="color:#E6E8EB; font-size:14px; margin-bottom:8px;">Pointer speed</div>
+            <div onPointerDown="{{ senDown }}" onPointerMove="{{ senMove }}" onPointerUp="{{ senUp }}" style="padding:14px 0; cursor:pointer; touch-action:none;">
+              <div style="height:4px; border-radius:999px; background:#2A2D34; position:relative;">
+                <div style="position:absolute; left:0; top:0; bottom:0; width:{{ senPct }}%; border-radius:999px; background:#4C8DFF;"></div>
+                <div style="position:absolute; left:{{ senPct }}%; top:50%; transform:translate(-50%,-50%); width:16px; height:16px; border-radius:50%; background:#4C8DFF;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+
+  <!-- ============ SIDE NOTE ============ -->
+  <sc-if value="{{ showSideNote }}" hint-placeholder-val="{{ true }}">
+    <div style="width:290px; flex:0 0 auto; display:flex; flex-direction:column; gap:14px; padding-top:8px;">
+      <span style="font-size:11px; font-weight:600; letter-spacing:2px; color:#6B7280;">WORKING PROTOTYPE</span>
+      <div style="color:#8b93a1; font-size:13px; line-height:1.7;">
+        Synced to the Flutter source. Things to try:
+        <ul style="margin:10px 0 0; padding-left:18px; display:flex; flex-direction:column; gap:6px;">
+          <li>Tap the <b style="color:#E6E8EB;">status chip</b> to cycle Connected → Reconnecting → Disconnected (disconnected greys out the hub tiles)</li>
+          <li>Every tool screen has a <b style="color:#E6E8EB;">floating Trackpad bubble</b> — drag it to an edge, tap to pop the trackpad window; ⤢ opens full screen</li>
+          <li><b style="color:#E6E8EB;">Trackpad</b>: drag to move, tap to click, long-press to lock dragging, tap to drop</li>
+          <li><b style="color:#E6E8EB;">Keyboard</b>: tap a modifier to arm, long-press to lock; switch Nav / Fn / Num</li>
+          <li><b style="color:#E6E8EB;">Power</b>: slide a track to the end — destructive ones open the red countdown</li>
+          <li><b style="color:#E6E8EB;">Presenter</b>: Start show runs the timer; tap it to pause, hold to reset</li>
+          <li>The <b style="color:#E6E8EB;">gear</b> opens Settings — sensitivity, scroll, haptics, the locked Blue accent</li>
+        </ul>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:880,&quot;height&quot;:980},&quot;deviceName&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;Studio Laptop&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Prototype&quot;},&quot;showSideNote&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Prototype&quot;}}">
+const HUB = [
+  ['trackpad', 'Trackpad', 'touch_app'],
+  ['keyboard', 'Keyboard', 'keyboard'],
+  ['media', 'Media', 'music_note'],
+  ['apps', 'Apps', 'apps'],
+  ['clipboard', 'Clipboard', 'content_paste'],
+  ['power', 'Power', 'power_settings_new'],
+  ['presenter', 'Presenter', 'slideshow'],
+  ['browser', 'Browser', 'public'],
+];
+const TITLES = { trackpad: 'Trackpad', keyboard: 'Keyboard', media: 'Media', apps: 'Apps', clipboard: 'Clipboard', power: 'Power', presenter: 'Presenter', browser: 'Browser' };
+const NAV = ['Esc', 'Tab', 'Home', 'End', 'PgUp', 'PgDn', 'Del'];
+const FN = ['F1','F2','F3','F4','F5','F6','F7','F8','F9','F10','F11','F12'];
+const NUM = ['7','8','9','4','5','6','1','2','3','0','Enter','.'];
+const BUBBLE_HOSTS = ['keyboard', 'media', 'apps', 'clipboard', 'power', 'presenter', 'browser'];
+const POWER = {
+  lock:     { icon: 'lock', label: 'Slide to lock', toast: 'PC locked' },
+  sleep:    { icon: 'bedtime', label: 'Slide to sleep', toast: 'PC sleeping' },
+  restart:  { icon: 'restart_alt', label: 'Slide to restart', verb: 'Restart' },
+  shutdown: { icon: 'power_settings_new', label: 'Slide to shut down', verb: 'Shut down' },
+};
+// approx phone inner dims (px) — used only until a real rect is measured on first drag
+const PW = 370, PH = 790, BUB = 56;
+
+class Component extends DCLogic {
+  state = {
+    screen: 'hub', conn: 'connected', latency: 12, toast: null,
+    volume: 50, muted: false,
+    kbGroup: 'nav', mods: { Ctrl: 'rest', Alt: 'rest', Shift: 'rest', Win: 'rest' }, pressedKey: null,
+    windows: [
+      { id: 1, icon: 'code', title: 'Visual Studio Code' },
+      { id: 2, icon: 'language', title: 'Chrome — Design docs' },
+      { id: 3, icon: 'music_note', title: 'Spotify' },
+    ],
+    favorites: [
+      { id: 'code', icon: 'code', name: 'Code' },
+      { id: 'chrome', icon: 'language', name: 'Chrome' },
+      { id: 'term', icon: 'terminal', name: 'Terminal' },
+      { id: 'slack', icon: 'chat', name: 'Slack' },
+    ],
+    autoSync: false,
+    history: ['https://github.com/remote-control/app/pull/218', 'docker compose up -d --build', 'Meeting moved to 3:30 — same room.'],
+    slide: { lock: 0, sleep: 0, restart: 0, shutdown: 0 }, sliding: null,
+    dialog: null, countdown: 10,
+    blanked: false, timerState: 'stopped', elapsed: 0,
+    cursor: { x: 50, y: 42 }, ripple: false, dragLock: false,
+    winCursor: { x: 50, y: 45 }, winRipple: false, winDragLock: false,
+    sheetOpen: false, sensitivity: 0.5,
+    scrollReversed: false, haptics: true,
+    pairedPcs: [{ id: 'studio', name: 'Studio Laptop', host: '192.168.1.24' }],
+    revoke: null,
+    bubbleEdge: 'right', bubbleYFrac: 0.5, bubblePx: null, bubbleExpanded: false, winPx: null,
+    flash: null,
+  };
+
+  componentDidMount() {
+    this._lat = setInterval(() => {
+      if (this.state.conn === 'connected') this.setState({ latency: 9 + Math.floor(Math.random() * 8) });
+    }, 2000);
+    this._tick = setInterval(() => {
+      if (this.state.timerState === 'running') this.setState(s => ({ elapsed: s.elapsed + 1 }));
+    }, 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this._lat); clearInterval(this._tick);
+    clearInterval(this._cd); clearTimeout(this._toastT); clearTimeout(this._flashT);
+    clearTimeout(this._mainRip); clearTimeout(this._mainLp);
+    clearTimeout(this._winRip); clearTimeout(this._winLp); clearTimeout(this._timerT);
+  }
+
+  toastMsg(msg) {
+    clearTimeout(this._toastT);
+    this.setState({ toast: msg });
+    this._toastT = setTimeout(() => this.setState({ toast: null }), 1900);
+  }
+  flash(id) {
+    clearTimeout(this._flashT);
+    this.setState({ flash: id });
+    this._flashT = setTimeout(() => this.setState({ flash: null }), 140);
+  }
+  online() { return this.state.conn === 'connected'; }
+
+  go(screen) { this.setState({ screen, bubbleExpanded: false, winPx: null }); }
+
+  cycleConn() {
+    const next = { connected: 'reconnecting', reconnecting: 'disconnected', disconnected: 'connected' }[this.state.conn];
+    const extra = next !== 'connected'
+      ? { dragLock: false, winDragLock: false, timerState: this.state.timerState === 'running' ? 'paused' : this.state.timerState }
+      : {};
+    this.setState({ conn: next, ...extra });
+    if (next === 'connected') this.toastMsg('Connected to ' + (this.props.deviceName || 'Studio Laptop'));
+  }
+
+  openDialog(action) {
+    clearInterval(this._cd);
+    this.setState({ dialog: action, countdown: 10 });
+    this._cd = setInterval(() => {
+      const c = this.state.countdown - 1;
+      if (c <= 0) { clearInterval(this._cd); this.setState({ dialog: null }); }
+      else this.setState({ countdown: c });
+    }, 1000);
+  }
+
+  // ---- power slide ----
+  slideDown(a, e) {
+    if (!this.online()) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    this.setState({ sliding: a });
+    this._slideRect = e.currentTarget.getBoundingClientRect();
+  }
+  slideMove(a, e) {
+    if (this.state.sliding !== a || !this._slideRect) return;
+    const travel = this._slideRect.width - 64;
+    const p = Math.max(0, Math.min(1, (e.clientX - this._slideRect.left - 32) / travel));
+    this.setState(s => ({ slide: { ...s.slide, [a]: p } }));
+  }
+  slideUp(a) {
+    if (this.state.sliding !== a) return;
+    const p = this.state.slide[a];
+    this.setState(s => ({ sliding: null, slide: { ...s.slide, [a]: 0 } }));
+    if (p >= 0.9) {
+      const spec = POWER[a];
+      if (spec.verb) this.openDialog(a);
+      else this.toastMsg(spec.toast);
+    }
+  }
+  track(a) {
+    const s = this.state;
+    const spec = POWER[a];
+    const p = s.slide[a];
+    const dest = !!spec.verb;
+    return {
+      icon: spec.icon, label: spec.label,
+      left: 'calc(4px + ' + p + ' * (100% - 64px))',
+      fill: 'calc(56px + ' + p + ' * (100% - 64px))',
+      thumbBg: dest ? '#FF6B6B' : '#4C8DFF',
+      fillBg: dest ? 'rgba(255,107,107,0.2)' : 'rgba(76,141,255,0.2)',
+      labelOp: Math.max(0, 1 - p * 1.6).toFixed(2),
+      trans: s.sliding === a ? 'none' : 'left 200ms ease, width 200ms ease',
+      down: (e) => this.slideDown(a, e),
+      move: (e) => this.slideMove(a, e),
+      up: () => this.slideUp(a),
+    };
+  }
+
+  // ---- generic slider (volume / sensitivity) ----
+  sliderPct(e) {
+    const r = e.currentTarget.getBoundingClientRect();
+    return Math.max(0, Math.min(100, ((e.clientX - r.left) / r.width) * 100));
+  }
+
+  // ---- keyboard ----
+  cap(code, icon) {
+    const pressed = this.state.pressedKey === code;
+    return {
+      label: code, icon,
+      bc: pressed ? '#4C8DFF' : '#2A2D34',
+      fc: pressed ? '#4C8DFF' : '#E6E8EB',
+      down: (e) => { if (e.currentTarget.setPointerCapture) e.currentTarget.setPointerCapture(e.pointerId); this.setState({ pressedKey: code }); },
+      up: () => {
+        if (this.state.pressedKey !== code) return;
+        const mods = { ...this.state.mods };
+        let hadArmed = false;
+        for (const k in mods) if (mods[k] === 'armed') { mods[k] = 'rest'; hadArmed = true; }
+        this.setState({ pressedKey: null, mods });
+        if (hadArmed) this.toastMsg('Combo sent');
+      },
+    };
+  }
+  modChip(label) {
+    const st = this.state.mods[label];
+    return {
+      label,
+      locked: st === 'locked',
+      bg: st === 'locked' ? '#4C8DFF' : '#16181D',
+      bc: st === 'locked' || st === 'armed' ? '#4C8DFF' : '#2A2D34',
+      fc: st === 'locked' ? '#0E0F12' : st === 'armed' ? '#4C8DFF' : '#E6E8EB',
+      down: () => {
+        this._modLpFired = false;
+        clearTimeout(this._modLp);
+        this._modLp = setTimeout(() => {
+          this._modLpFired = true;
+          this.setState(s => ({ mods: { ...s.mods, [label]: 'locked' } }));
+          this.toastMsg(label + ' locked — held on PC');
+        }, 450);
+      },
+      up: () => {
+        clearTimeout(this._modLp);
+        if (this._modLpFired) { this._modLpFired = false; return; }
+        this.setState(s => {
+          const cur = s.mods[label];
+          return { mods: { ...s.mods, [label]: cur === 'rest' ? 'armed' : 'rest' } };
+        });
+      },
+    };
+  }
+
+  // ---- trackpad (main + window) ----
+  padDown(t, e) {
+    if (!this.online()) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const k = t === 'win' ? '_win' : '_main';
+    this[k + 'Pt'] = { x: e.clientX, y: e.clientY };
+    this[k + 'Moved'] = false;
+    this[k + 'LpFired'] = false;
+    this[k + 'Rect'] = e.currentTarget.getBoundingClientRect();
+    const lockKey = t === 'win' ? 'winDragLock' : 'dragLock';
+    clearTimeout(this[k + 'Lp']);
+    this[k + 'Lp'] = setTimeout(() => {
+      if (!this[k + 'Moved']) {
+        this[k + 'LpFired'] = true;
+        const on = !this.state[lockKey];
+        this.setState({ [lockKey]: on });
+        this.toastMsg(on ? 'Drag locked' : 'Drag released');
+      }
+    }, 480);
+  }
+  padMove(t, e) {
+    const k = t === 'win' ? '_win' : '_main';
+    if (!this[k + 'Pt']) return;
+    const dx = e.clientX - this[k + 'Pt'].x, dy = e.clientY - this[k + 'Pt'].y;
+    if (Math.abs(dx) + Math.abs(dy) > 2) this[k + 'Moved'] = true;
+    this[k + 'Pt'] = { x: e.clientX, y: e.clientY };
+    const gain = 0.6 + this.state.sensitivity * 1.8;
+    const rect = this[k + 'Rect'];
+    const curKey = t === 'win' ? 'winCursor' : 'cursor';
+    const c = this.state[curKey];
+    this.setState({ [curKey]: {
+      x: Math.max(2, Math.min(98, c.x + (dx * gain / rect.width) * 100)),
+      y: Math.max(2, Math.min(98, c.y + (dy * gain / rect.height) * 100)),
+    } });
+  }
+  padUp(t) {
+    const k = t === 'win' ? '_win' : '_main';
+    clearTimeout(this[k + 'Lp']);
+    if (this[k + 'LpFired']) { this[k + 'LpFired'] = false; this[k + 'Pt'] = null; return; }
+    const lockKey = t === 'win' ? 'winDragLock' : 'dragLock';
+    const ripKey = t === 'win' ? 'winRipple' : 'ripple';
+    const ripT = t === 'win' ? '_winRip' : '_mainRip';
+    if (this[k + 'Pt'] && !this[k + 'Moved']) {
+      if (this.state[lockKey]) {
+        this.setState({ [lockKey]: false });
+        this.toastMsg('Drag released');
+      } else {
+        clearTimeout(this[ripT]);
+        this.setState({ [ripKey]: false });
+        requestAnimationFrame(() => this.setState({ [ripKey]: true }));
+        this[ripT] = setTimeout(() => this.setState({ [ripKey]: false }), 340);
+      }
+    }
+    this[k + 'Pt'] = null;
+  }
+
+  // ---- floating bubble ----
+  bubblePos() {
+    const w = this._phone ? this._phone.width : PW;
+    const h = this._phone ? this._phone.height : PH;
+    const left = this.state.bubbleEdge === 'left' ? 8 : w - BUB - 8;
+    const top = Math.max(48, Math.min(h - BUB - 12, this.state.bubbleYFrac * h - BUB / 2));
+    return { left, top };
+  }
+  bubbleDown(e) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    this._phone = e.currentTarget.closest('[data-phone]').getBoundingClientRect();
+    this._bubStart = { x: e.clientX, y: e.clientY };
+    this._bubOrig = this.bubblePos();
+    this._bubMoved = false;
+    this.setState({ bubblePx: this._bubOrig });
+  }
+  bubbleMove(e) {
+    if (!this._bubStart) return;
+    const dx = e.clientX - this._bubStart.x, dy = e.clientY - this._bubStart.y;
+    if (Math.abs(dx) + Math.abs(dy) > 6) this._bubMoved = true;
+    const w = this._phone.width, h = this._phone.height;
+    const left = Math.max(0, Math.min(w - BUB, this._bubOrig.left + dx));
+    const top = Math.max(44, Math.min(h - BUB - 8, this._bubOrig.top + dy));
+    this.setState({ bubblePx: { left, top } });
+  }
+  bubbleUp() {
+    if (!this._bubStart) return;
+    const moved = this._bubMoved;
+    this._bubStart = null;
+    if (!moved) { this.setState({ bubblePx: null, bubbleExpanded: true }); return; }
+    const px = this.state.bubblePx, w = this._phone.width, h = this._phone.height;
+    const edge = (px.left + BUB / 2) > w / 2 ? 'right' : 'left';
+    const yFrac = Math.max(0, Math.min(1, (px.top + BUB / 2) / h));
+    this.setState({ bubbleEdge: edge, bubbleYFrac: yFrac, bubblePx: null });
+  }
+
+  // ---- floating window drag (header) ----
+  winPos() {
+    const w = this._phone ? this._phone.width : PW;
+    const h = this._phone ? this._phone.height : PH;
+    const ww = Math.round(w * 0.78), wh = Math.round(h * 0.38);
+    if (this.state.winPx) return { left: this.state.winPx.left, top: this.state.winPx.top, w: ww, h: wh };
+    return { left: Math.round((w - ww) / 2), top: Math.round((h - wh) / 2), w: ww, h: wh };
+  }
+  winHeaderDown(e) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    this._phone = e.currentTarget.closest('[data-phone]').getBoundingClientRect();
+    this._winStart = { x: e.clientX, y: e.clientY };
+    const p = this.winPos();
+    this._winOrig = { left: p.left, top: p.top };
+  }
+  winHeaderMove(e) {
+    if (!this._winStart) return;
+    const dx = e.clientX - this._winStart.x, dy = e.clientY - this._winStart.y;
+    const w = this._phone.width, h = this._phone.height;
+    const ww = Math.round(w * 0.78), wh = Math.round(h * 0.38);
+    const left = Math.max(0, Math.min(w - ww, this._winOrig.left + dx));
+    const top = Math.max(44, Math.min(h - wh, this._winOrig.top + dy));
+    this.setState({ winPx: { left, top } });
+  }
+  winHeaderUp() { this._winStart = null; }
+
+  // ---- presenter timer ----
+  timerDown() {
+    this._timerLpFired = false;
+    clearTimeout(this._timerT);
+    this._timerT = setTimeout(() => {
+      this._timerLpFired = true;
+      this.setState({ elapsed: 0, timerState: 'stopped' });
+      this.toastMsg('Timer reset');
+    }, 500);
+  }
+  timerUp() {
+    clearTimeout(this._timerT);
+    if (this._timerLpFired) { this._timerLpFired = false; return; }
+    this.setState(x => ({ timerState: x.timerState === 'running' ? 'paused' : 'running' }));
+  }
+
+  renderVals() {
+    const s = this.state;
+    const online = s.conn === 'connected';
+    const deviceName = this.props.deviceName || 'Studio Laptop';
+    const showSideNote = this.props.showSideNote !== false;
+    const dotColor = { connected: '#4C8DFF', reconnecting: '#E8A33D', disconnected: '#6B7280' }[s.conn];
+    const fb = (id) => s.flash === id;
+    const bc = (id) => (online && fb(id) ? '#4C8DFF' : '#2A2D34');
+    const fc = (id) => (!online ? '#6B7280' : fb(id) ? '#4C8DFF' : '#E6E8EB');
+    const tapBtn = (id, msg) => ({
+      bc: bc(id), fc: fc(id),
+      down: () => { if (!online) return; this.flash(id); if (msg) this.toastMsg(msg); },
+    });
+    const mmss = (t) => String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+
+    const bubbleHost = BUBBLE_HOSTS.includes(s.screen);
+    const bpos = this.bubblePos();
+    const wpos = this.winPos();
+    const padGate = (t) => ({
+      down: (e) => this.padDown(t, e), move: (e) => this.padMove(t, e), up: () => this.padUp(t),
+    });
+    const mainPad = padGate('main'), winPad = padGate('win');
+    const mkMouse = (prefix) => ['L', 'M', 'R'].map((lab, i) => ({
+      label: lab, flex: i === 1 ? 1 : 2,
+      bc: bc(prefix + lab), fc: fc(prefix + lab),
+      down: () => { if (!online) return; this.flash(prefix + lab); },
+    }));
+
+    const hubEnabled = s.conn !== 'disconnected';
+    const browserBtn = (icon, label) => ({ icon, label, ...tapBtn('br-' + label, null) });
+
+    return {
+      deviceName, showSideNote,
+      // chrome
+      isHub: s.screen === 'hub',
+      isSettings: s.screen === 'settings',
+      isTool: s.screen !== 'hub' && s.screen !== 'settings',
+      isTrackpad: s.screen === 'trackpad',
+      isKeyboard: s.screen === 'keyboard',
+      isMedia: s.screen === 'media',
+      isApps: s.screen === 'apps',
+      isClipboard: s.screen === 'clipboard',
+      isPower: s.screen === 'power',
+      isPresenter: s.screen === 'presenter',
+      isBrowser: s.screen === 'browser',
+      screenTitle: TITLES[s.screen] || '',
+      reconnecting: s.conn === 'reconnecting' && s.screen !== 'settings',
+      dotColor, online,
+      statusWord: { connected: 'Connected', reconnecting: 'Reconnecting', disconnected: 'Disconnected' }[s.conn],
+      latency: s.latency,
+      toast: s.toast,
+      goHub: () => this.go('hub'),
+      goSettings: () => this.setState({ screen: 'settings', bubbleExpanded: false }),
+      goKeyboard: () => this.go('keyboard'),
+      cycleConn: () => this.cycleConn(),
+      retryNow: () => { this.setState({ conn: 'connected' }); this.toastMsg('Connected to ' + deviceName); },
+      swallow: (e) => e.stopPropagation(),
+
+      // hub
+      hubTiles: HUB.map(([screen, label, icon]) => ({
+        label, icon,
+        labelColor: hubEnabled ? '#E6E8EB' : '#6B7280',
+        cursor: hubEnabled ? 'pointer' : 'default',
+        onTap: () => { if (hubEnabled) this.go(screen); },
+      })),
+
+      // trackpad (full)
+      mainCurX: s.cursor.x.toFixed(1), mainCurY: s.cursor.y.toFixed(1),
+      ripple: s.ripple,
+      pillOp: s.dragLock ? '1' : '0',
+      padHint: online ? 'Drag to move the cursor' : 'Not connected',
+      padMainDown: mainPad.down, padMainMove: mainPad.move, padMainUp: mainPad.up,
+      mainBtns: mkMouse('m'),
+      openSheet: () => this.setState({ sheetOpen: true }),
+      closeSheet: () => this.setState({ sheetOpen: false }),
+      sheetOpen: s.sheetOpen,
+      senPct: Math.round(s.sensitivity * 100),
+      senDown: (e) => { e.currentTarget.setPointerCapture(e.pointerId); this._senDrag = true; this.setState({ sensitivity: this.sliderPct(e) / 100 }); },
+      senMove: (e) => { if (this._senDrag) this.setState({ sensitivity: this.sliderPct(e) / 100 }); },
+      senUp: () => { this._senDrag = false; },
+
+      // keyboard
+      kbNav: s.kbGroup === 'nav', kbFn: s.kbGroup === 'fn', kbNum: s.kbGroup === 'num',
+      kbTabs: ['nav', 'fn', 'num'].map(g => ({
+        label: { nav: 'Nav', fn: 'Fn', num: 'Num' }[g],
+        uc: s.kbGroup === g ? '#4C8DFF' : 'transparent',
+        fc: s.kbGroup === g ? '#4C8DFF' : '#6B7280',
+        onTap: () => this.setState({ kbGroup: g }),
+      })),
+      modChips: ['Ctrl', 'Alt', 'Shift', 'Win'].map(m => this.modChip(m)),
+      navCaps: NAV.map(c => this.cap(c)),
+      arrowTop: [{ ...this.cap('Up'), icon: 'arrow_upward' }],
+      arrowRow: [
+        { ...this.cap('Left'), icon: 'arrow_back' },
+        { ...this.cap('Down'), icon: 'arrow_downward' },
+        { ...this.cap('Right'), icon: 'arrow_forward' },
+      ],
+      fnCaps: FN.map(c => this.cap(c)),
+      numCaps: NUM.map((lab, i) => ({ ...this.cap('n' + lab), label: lab })),
+
+      // media
+      prevBtn: tapBtn('prev', 'Previous'),
+      playBtn: tapBtn('play', 'Play / pause'),
+      nextBtn: tapBtn('next', 'Next'),
+      volPct: (online && !s.muted) ? s.volume : 0,
+      volLabel: !online ? '--' : s.muted ? '0%' : Math.round(s.volume) + '%',
+      volFill: online ? '#4C8DFF' : '#6B7280',
+      muteBg: (online && s.muted) ? '#4C8DFF' : '#16181D',
+      muteBc: (online && s.muted) ? 'transparent' : '#2A2D34',
+      muteFc: !online ? '#6B7280' : s.muted ? '#0E0F12' : '#E6E8EB',
+      muteIcon: s.muted ? 'volume_off' : 'volume_up',
+      muteTap: () => { if (!online) return; this.setState(x => ({ muted: !x.muted })); },
+      volDown: (e) => { if (!online) return; e.currentTarget.setPointerCapture(e.pointerId); this._volDrag = true; this.setState({ volume: this.sliderPct(e), muted: false }); },
+      volMove: (e) => { if (this._volDrag) this.setState({ volume: this.sliderPct(e) }); },
+      volUp: () => { this._volDrag = false; },
+
+      // apps
+      favorites: s.favorites.map(f => ({
+        ...f, bc: bc('fav-' + f.id), fc: fc('fav-' + f.id),
+        onTap: () => { if (!online) return; this.flash('fav-' + f.id); this.toastMsg('Launching ' + f.name + '…'); },
+      })),
+      windows: s.windows.map(w => ({
+        ...w, bc: bc('win-' + w.id), fc: fc('win-' + w.id),
+        onFocus: () => { if (!online) return; this.flash('win-' + w.id); this.toastMsg('Focused ' + w.title); },
+        onClose: (e) => {
+          e.stopPropagation();
+          if (!online) return;
+          this.setState(x => ({ windows: x.windows.filter(v => v.id !== w.id) }));
+          this.toastMsg('Closed ' + w.title);
+        },
+      })),
+      hasWindows: s.windows.length > 0,
+      noWindows: s.windows.length === 0,
+
+      // clipboard
+      clipSend: { ...tapBtn('send', null), down: () => {
+        if (!online) return;
+        this.flash('send');
+        this.setState(x => ({ history: ['Copied on phone at 9:41', ...x.history].slice(0, 5) }));
+        this.toastMsg('Sent to PC.');
+      } },
+      clipFetch: { ...tapBtn('fetch', null), down: () => { if (!online) return; this.flash('fetch'); this.toastMsg('Copied to phone.'); } },
+      toggleSync: () => this.setState(x => ({ autoSync: !x.autoSync })),
+      syncTrack: s.autoSync ? '#4C8DFF' : '#2A2D34',
+      syncKnob: s.autoSync ? 23 : 3,
+      syncKnobBg: s.autoSync ? '#0E0F12' : '#E6E8EB',
+      history: s.history.map((h, i) => ({ text: h, bc: bc('h' + i), fc: fc('h' + i), onTap: () => { if (!online) return; this.flash('h' + i); this.toastMsg('Sent to PC.'); } })),
+
+      // power
+      safeTracks: ['lock', 'sleep'].map(a => this.track(a)),
+      destTracks: ['restart', 'shutdown'].map(a => this.track(a)),
+      dialogOpen: !!s.dialog,
+      dialogVerb: s.dialog ? POWER[s.dialog].verb : '',
+      countdown: s.countdown,
+      dialogCancel: () => { clearInterval(this._cd); this.setState({ dialog: null }); },
+      dialogConfirm: () => {
+        clearInterval(this._cd);
+        const verb = POWER[s.dialog].verb;
+        this.setState({ dialog: null, conn: 'reconnecting' });
+        this.toastMsg(verb + ' confirmed — PC going down');
+      },
+
+      // presenter
+      prevZoneFc: (online && fb('pz')) ? '#4C8DFF' : '#6B7280',
+      nextZoneFc: (online && fb('nz')) ? '#4C8DFF' : '#6B7280',
+      presPrev: () => { if (!online) return; this.flash('pz'); this.toastMsg('Previous slide'); },
+      presNext: () => { if (!online) return; this.flash('nz'); this.toastMsg('Next slide'); },
+      startFc: online ? '#E6E8EB' : '#6B7280',
+      endFc: online ? '#E6E8EB' : '#6B7280',
+      startShow: () => { if (!online) return; this.setState({ timerState: 'running' }); this.toastMsg('Show started'); },
+      endShow: () => { if (!online) return; this.toastMsg('Show ended'); },
+      blankTap: () => { if (!online) return; this.setState(x => ({ blanked: !x.blanked })); },
+      blankBc: (online && s.blanked) ? '#4C8DFF' : '#2A2D34',
+      blankFc: !online ? '#6B7280' : s.blanked ? '#4C8DFF' : '#E6E8EB',
+      timerText: mmss(s.elapsed),
+      timerFc: s.timerState === 'running' ? '#4C8DFF' : s.timerState === 'paused' ? '#E6E8EB' : '#6B7280',
+      timerDown: () => this.timerDown(),
+      timerUp: () => this.timerUp(),
+
+      // browser
+      browserA: [browserBtn('arrow_back', 'Back'), browserBtn('arrow_forward', 'Forward')],
+      browserB: [browserBtn('add', 'New tab'), browserBtn('close', 'Close tab')],
+      browserR: [browserBtn('refresh', 'Refresh')],
+      browserZ: [browserBtn('zoom_out', 'Zoom out'), browserBtn('zoom_in', 'Zoom in')],
+
+      // settings
+      pairedPcs: s.pairedPcs.map(p => ({ ...p, meta: p.host + ' · paired', revoke: () => this.setState({ revoke: p.id }) })),
+      addSwitch: () => this.toastMsg('Add / switch PC — not in this prototype'),
+      revokeOpen: !!s.revoke,
+      revokeCancel: () => this.setState({ revoke: null }),
+      revokeConfirm: () => {
+        const id = s.revoke;
+        const pc = s.pairedPcs.find(p => p.id === id);
+        this.setState(x => ({ revoke: null, pairedPcs: x.pairedPcs.filter(p => p.id !== id) }));
+        if (pc) this.toastMsg('Revoked ' + pc.name);
+      },
+      scrollSegs: [['Natural', false], ['Reversed', true]].map(([label, rev]) => ({
+        label,
+        bc: s.scrollReversed === rev ? '#4C8DFF' : '#2A2D34',
+        fc: s.scrollReversed === rev ? '#4C8DFF' : '#6B7280',
+        onTap: () => this.setState({ scrollReversed: rev }),
+      })),
+      toggleHaptics: () => this.setState(x => ({ haptics: !x.haptics })),
+      hapticsTrack: s.haptics ? '#4C8DFF' : '#2A2D34',
+      hapticsKnob: s.haptics ? 23 : 3,
+      hapticsKnobBg: s.haptics ? '#0E0F12' : '#E6E8EB',
+
+      // floating bubble + window
+      showBubble: bubbleHost && !s.bubbleExpanded,
+      windowOpen: bubbleHost && s.bubbleExpanded,
+      bubbleLeft: Math.round(s.bubblePx ? s.bubblePx.left : bpos.left),
+      bubbleTop: Math.round(s.bubblePx ? s.bubblePx.top : bpos.top),
+      bubbleFill: online ? '#4C8DFF' : '#16181D',
+      bubbleIcon: online ? '#E6E8EB' : '#6B7280',
+      bubbleDown: (e) => this.bubbleDown(e),
+      bubbleMove: (e) => this.bubbleMove(e),
+      bubbleUp: () => this.bubbleUp(),
+      winLeft: wpos.left, winTop: wpos.top, winW: wpos.w, winH: wpos.h,
+      winHeaderDown: (e) => this.winHeaderDown(e),
+      winHeaderMove: (e) => this.winHeaderMove(e),
+      winHeaderUp: () => this.winHeaderUp(),
+      collapseWin: () => this.setState({ bubbleExpanded: false, winPx: null }),
+      expandFull: () => this.setState({ bubbleExpanded: false, winPx: null, screen: 'trackpad' }),
+      winDragLock: s.winDragLock,
+      winPadHint: online ? 'Drag to move' : 'Not connected',
+      winCurX: s.winCursor.x.toFixed(1), winCurY: s.winCursor.y.toFixed(1),
+      winRipple: s.winRipple,
+      padWinDown: winPad.down, padWinMove: winPad.move, padWinUp: winPad.up,
+      winBtns: mkMouse('w'),
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -319,3 +319,14 @@ Plans:
 **Wave 4** *(after Wave 3)*
 
 - [x] 08-06-PLAN.md — Central migration to `BubbleScaffold` + quick-bar deleted outright + on-device UAT gate (D8-05/06, SC1/SC5) [after 08-05] (completed 2026-07-16)
+
+### Phase 9: UI refinement to design prototype — visual pass across all screens to match docs/superpowers/specs/2026-07-16-ui-refinement-prototype/Prototype.dc.html (dot-grid trackpad texture, status chip + reconnecting banner, hub/keyboard/media/apps/clipboard/power/presenter/browser/settings refinements, floating window header; zero palette changes)
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 8
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 9 to break down)
