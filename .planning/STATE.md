@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 09-07-PLAN.md
-last_updated: "2026-07-16T05:00:00.000Z"
-last_activity: 2026-07-16 -- Phase 09 plan 07 (Settings confirm) executed
+stopped_at: Completed 09-09-PLAN.md
+last_updated: "2026-07-16T05:14:58.684Z"
+last_activity: 2026-07-16 -- Phase 09 execution started
 progress:
   total_phases: 9
   completed_phases: 8
-  total_plans: 70
-  completed_plans: 68
+  total_plans: 71
+  completed_plans: 70
   percent: 89
 ---
 
@@ -26,8 +26,15 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 09 (ui-refinement-to-design-prototype-visual-pass-across-all-scr) — EXECUTING
-Plan: 8 of 8
-Next: 09-08 on-device visual UAT gate (Wave 2). Wave 1 complete (09-01..09-07);
+Plan: 09-09 COMPLETE (gap-closure). 8 of 9 plan SUMMARYs on disk (09-08 UAT gate outstanding).
+Next: 09-08 on-device visual UAT gate re-run — MUST `flutter build apk --release`
+  FRESH first (08-06 stale-APK lesson), then `flutter install` + walkthrough vs
+  the prototype. 09-09 (Material Symbols Rounded migration) just landed: all 63
+  lib + 41 test Icons.* refs -> Symbols.<name>_rounded, axes pinned in
+  buildAppTheme (opsz 24/wght 400/FILL 0/GRAD 0), classic Icons.* banned by
+  icons_guard_test, release APK +61.7 KB (Symbols font tree-shaken 99.4%),
+  09-UI-SPEC icon-library row amended. Analyzer clean, full suite 423 green.
+  Wave 1 complete (09-01..09-07);
   09-07 confirmed the Settings screen against 09-UI-SPEC with zero source delta
   and strengthened settings_screen_test.dart (meta copy, scroll-segment accent,
   accent-chip fill/text). Phase 08 closed with the
@@ -45,7 +52,7 @@ Next: 09-08 on-device visual UAT gate (Wave 2). Wave 1 complete (09-01..09-07);
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-16 -- Phase 09 execution started
+Last activity: 2026-07-16 -- Phase 09 plan 09-09 (Material Symbols Rounded migration) executed
 
 Progress: [██████████] 100% (8 of 8 phases complete; 62 of 62 plans)
 
@@ -135,6 +142,7 @@ Progress: [██████████] 100% (8 of 8 phases complete; 62 of 6
 | Phase 09 P04 | 12min | 2 tasks | 2 files |
 | Phase 09 P05 | 4min | 2 tasks | 0 files |
 | Phase 09 P06 | 5min | 2 tasks | 0 files |
+| Phase 09 P09 | 18min | 3 tasks | 32 files |
 
 ## Accumulated Context
 
@@ -295,6 +303,7 @@ Recent decisions affecting current work:
 - [Phase 09]: 09-02: Status chip+banner and Hub confirmed As-is vs 09-UI-SPEC; parity pinned by tests, zero source/palette change — Confirm-pass plan: every named spec value already matched source, so deltas closed were test-coverage gaps only
 - [Phase ?]: 09-03: Keyboard hint copy added (#4a505c local const _kKeyboardHintColor, not a token); switcher/caps/chips confirmed at-spec — source unchanged, deltas closed were test-coverage only
 - [Phase ?]: 09-04: Media + Browser screens already matched 09-UI-SPEC; closed as pure test-pinning (transport 64/48/48, tabular readout, full-width Refresh, accent press-flash)
+- [Phase ?]: [Phase 09-09]: Full Material Symbols Rounded migration — all client glyphs are Symbols.<name>_rounded (material_symbols_icons 4.2951.0), axes pinned once via buildAppTheme IconThemeData (opsz 24/wght 400/FILL 0/GRAD 0); classic Icons.* banned in lib/ by icons_guard_test. Owner overrode 09-UI-SPEC line-28 skew acceptance. Release APK grew only +61.7 KB (Symbols font tree-shaken 99.4%).
 
 ### Pending Todos
 
@@ -328,6 +337,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-16T04:30:29.340Z
-Stopped at: Completed 09-04-PLAN.md
+Last session: 2026-07-16T05:14:58.667Z
+Stopped at: Completed 09-09-PLAN.md
 Resume file: None
