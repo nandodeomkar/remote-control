@@ -1,6 +1,7 @@
-/// The Browser tool screen (BROW-01, 05-02, 260716-oi2) — the live PC tab
-/// list (Tab Bridge extension, proto 1.4) above a 2-column macro grid that
-/// drives the focused PC browser via the reliable path.
+/// The Browser tool screen (BROW-01, 05-02, 260716-oi2, 260716-sme) — the
+/// live PC tab list (Tab Bridge extension, proto 1.4; tab groups proto 1.5)
+/// above a 2-column macro grid that drives the focused PC browser via the
+/// reliable path.
 ///
 /// Tab section (260716-oi2): renders from the value-equal [TabsViewState] —
 /// the install hint when the extension is not connected (regardless of
@@ -9,6 +10,12 @@
 /// long-press closes; all three gated on `ChipStatus.connected`. The screen
 /// sends `tabs.list` once on open to prime (tabs.changed has no after-auth
 /// snapshot — the apps pull-on-open contract).
+///
+/// Tab groups (260716-sme, proto 1.5): a [_GroupHeader] row (color dot +
+/// tinted title) precedes each consecutive run of grouped tabs; ungrouped
+/// tabs render flat exactly as before. VIEW-ONLY — the header has zero
+/// gesture handlers; collapsed groups dim the header (display metadata; the
+/// phone still lists the tabs the PC shows collapsed — accepted).
 ///
 /// [kBrowserActions] is the single source of truth for the macro vocabulary:
 /// each action string MUST byte-match the server router's `browser_macro`
@@ -47,6 +54,27 @@ import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'tabs_store.dart';
+
+/// Chrome's named group colors mapped to their dark-theme swatches —
+/// readable on kBg `#0E0F12` (Chrome dark-UI group palette). These are NEW
+/// local consts, NOT theme tokens (the D-12 guard only pins the 7 locked
+/// token literals; theme/tokens.dart stays untouched). Unknown color names
+/// fall back to [kMuted] via [groupColor] — the SPEC §7 pass-through rule.
+const Map<String, Color> kGroupColors = {
+  'grey': Color(0xFF8E918F),
+  'blue': Color(0xFF8AB4F8),
+  'red': Color(0xFFF28B82),
+  'yellow': Color(0xFFFDD663),
+  'green': Color(0xFF81C995),
+  'pink': Color(0xFFFF8BCB),
+  'purple': Color(0xFFC58AF9),
+  'cyan': Color(0xFF78D9EC),
+  'orange': Color(0xFFFCAD70),
+};
+
+/// Map a Chrome named group color to its swatch; unknown names render
+/// neutrally as [kMuted].
+Color groupColor(String name) => kGroupColors[name] ?? kMuted;
 
 /// One browser macro: UI label + icon + the router-vocabulary action string.
 class BrowserActionSpec {
@@ -352,13 +380,19 @@ class _SectionHeader extends StatelessWidget {
       );
 }
 
-/// The tab section body (260716-oi2), keyed off [TabsViewState]:
+/// The tab section body (260716-oi2, groups 260716-sme), keyed off
+/// [TabsViewState]:
 ///
 /// - `connected == false` (regardless of phone-auth state — locked
 ///   fallback): the install-hint card.
 /// - connected + zero tabs: a small muted one-liner.
 /// - connected + tabs: swipe-to-close rows in extension order (no client
-///   sort).
+///   sort), with a view-only [_GroupHeader] before each consecutive run of
+///   grouped tabs (proto 1.5). Tabs whose groupId is null or unresolved
+///   (the group fell past the 16-group cap) render flat exactly as before.
+///   Chrome keeps a group's tabs contiguous in the strip, so
+///   consecutive-run detection is correct; a non-contiguous edge case would
+///   just repeat the header (harmless — no dedupe machinery).
 class _TabsSection extends StatelessWidget {
   final TabsViewState tabs;
   final bool enabled;
@@ -389,38 +423,53 @@ class _TabsSection extends StatelessWidget {
       );
     }
     final list = tabs.tabs;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        for (var i = 0; i < list.length; i++) ...[
-          if (i > 0) const SizedBox(height: 8),
-          Dismissible(
-            key: ValueKey(list[i].id),
-            direction: DismissDirection.horizontal,
-            // A kSurface panel with the muted close glyph revealed under the
-            // swiping row.
-            background: Container(
-              decoration: BoxDecoration(
-                color: kSurface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Symbols.close_rounded,
-                size: 20,
-                color: kMuted,
-              ),
+    // Resolve group ids once (proto 1.5): a tab whose groupId misses this
+    // map (group fell past the cap) renders flat, exactly like ungrouped.
+    final groupById = {for (final g in tabs.groups) g.id: g};
+    final children = <Widget>[];
+    int? prevGroupId;
+    for (var i = 0; i < list.length; i++) {
+      final tab = list[i];
+      final group =
+          tab.groupId != null ? groupById[tab.groupId] : null;
+      final resolvedId = group?.id;
+      if (children.isNotEmpty) children.add(const SizedBox(height: 8));
+      if (group != null && resolvedId != prevGroupId) {
+        children.add(_GroupHeader(group: group));
+        children.add(const SizedBox(height: 8));
+      }
+      prevGroupId = resolvedId;
+      children.add(
+        Dismissible(
+          key: ValueKey(tab.id),
+          direction: DismissDirection.horizontal,
+          // A kSurface panel with the muted close glyph revealed under the
+          // swiping row.
+          background: Container(
+            decoration: BoxDecoration(
+              color: kSurface,
+              borderRadius: BorderRadius.circular(16),
             ),
-            confirmDismiss: (_) async => _confirmSwipe(list[i].id),
-            child: _TabRow(
-              tab: list[i],
-              enabled: enabled,
-              onActivate: onActivate,
-              onClose: onClose,
+            alignment: Alignment.center,
+            child: const Icon(
+              Symbols.close_rounded,
+              size: 20,
+              color: kMuted,
             ),
           ),
-        ],
-      ],
+          confirmDismiss: (_) async => _confirmSwipe(tab.id),
+          child: _TabRow(
+            tab: tab,
+            enabled: enabled,
+            onActivate: onActivate,
+            onClose: onClose,
+          ),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: children,
     );
   }
 
@@ -487,6 +536,60 @@ class _InstallHintCard extends StatelessWidget {
           ],
         ),
       );
+}
+
+/// A view-only tab-group header (proto 1.5, 260716-sme): an 8px dot in the
+/// mapped Chrome group color + the group title at 12/600 tinted the SAME
+/// color; an empty title renders the dot alone. Collapsed groups wrap the
+/// content in Opacity(0.5) and append a small muted unfold-less glyph —
+/// display metadata ONLY.
+///
+/// VIEW-ONLY IS STRUCTURAL: this widget has NO gesture handlers and no
+/// callbacks — the phone cannot create/collapse/move groups (SPEC §7
+/// GroupEl). Grouped tab rows below it render at full strength even when
+/// the PC shows the group collapsed (the phone lists what exists —
+/// accepted).
+class _GroupHeader extends StatelessWidget {
+  final GroupInfo group;
+
+  const _GroupHeader({required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = groupColor(group.color);
+    final content = Row(
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        if (group.title.isNotEmpty) ...[
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              group.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+        if (group.collapsed) ...[
+          const SizedBox(width: 8),
+          const Icon(Symbols.unfold_less_rounded, size: 14, color: kMuted),
+        ],
+      ],
+    );
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: group.collapsed ? Opacity(opacity: 0.5, child: content) : content,
+    );
+  }
 }
 
 /// One tab row: chrome byte-matches the apps screen's `_WindowRow` (kSurface

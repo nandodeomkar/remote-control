@@ -156,10 +156,10 @@ class AppsSnapshot {
 }
 
 /// The last server-pushed browser tab state (BROW-01 `tabs.changed` /
-/// `tabs.list` reply, proto 1.4). Value-equal over element equality so the
-/// tabs Notifier suppresses no-op rebuilds on identical pushes (mirrors
-/// [AppsSnapshot] discipline — hand-rolled element-wise ==, 06-03
-/// no-package:collection rule).
+/// `tabs.list` reply, proto 1.4; groups proto 1.5, quick 260716-sme).
+/// Value-equal over element equality so the tabs Notifier suppresses no-op
+/// rebuilds on identical pushes (mirrors [AppsSnapshot] discipline —
+/// hand-rolled element-wise ==, 06-03 no-package:collection rule).
 class TabsSnapshot {
   /// Whether the Tab Bridge extension is connected on the PC —
   /// `false` renders the install hint.
@@ -168,8 +168,16 @@ class TabsSnapshot {
   /// The tab list in extension order (no client sort).
   final List<TabInfo> tabs;
 
+  /// The tab groups (proto 1.5) — empty when the server sent none (or is a
+  /// 1.4 server without the field).
+  final List<GroupInfo> groups;
+
   /// Creates a snapshot.
-  const TabsSnapshot({required this.connected, required this.tabs});
+  const TabsSnapshot({
+    required this.connected,
+    required this.tabs,
+    required this.groups,
+  });
 
   @override
   bool operator ==(Object other) {
@@ -179,11 +187,16 @@ class TabsSnapshot {
     for (var i = 0; i < tabs.length; i++) {
       if (other.tabs[i] != tabs[i]) return false;
     }
+    if (other.groups.length != groups.length) return false;
+    for (var i = 0; i < groups.length; i++) {
+      if (other.groups[i] != groups[i]) return false;
+    }
     return true;
   }
 
   @override
-  int get hashCode => Object.hash(connected, Object.hashAll(tabs));
+  int get hashCode =>
+      Object.hash(connected, Object.hashAll(tabs), Object.hashAll(groups));
 }
 
 /// The last server-pushed clipboard state (D-03 `clip.changed`). Value-equal so
@@ -648,7 +661,11 @@ class ConnectionService {
       // BROW-01 live tab push: park the value-equal snapshot and ping the
       // tabs store. S→C only — never routed to the driver, and NO payload
       // logging anywhere (SPEC §12 — tab titles are browsing data).
-      _tabsSnapshot = TabsSnapshot(connected: msg.connected, tabs: msg.tabs);
+      _tabsSnapshot = TabsSnapshot(
+        connected: msg.connected,
+        tabs: msg.tabs,
+        groups: msg.groups ?? const [],
+      );
       _notify();
       return;
     }
@@ -659,6 +676,7 @@ class ConnectionService {
       _tabsSnapshot = TabsSnapshot(
         connected: msg.connected ?? false,
         tabs: msg.tabs ?? const [],
+        groups: msg.groups ?? const [],
       );
       _notify();
       return;

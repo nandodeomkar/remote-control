@@ -72,12 +72,18 @@ void main() {
           TabInfo(id: 7, title: 'GitHub', active: true, icon: 'AA=='),
           TabInfo(id: 9, title: 'Docs', active: false),
         ],
+        groups: [
+          GroupInfo(id: 1, title: 'Work', color: 'blue', collapsed: false),
+        ],
       );
       const b = TabsViewState(
         connected: true,
         tabs: [
           TabInfo(id: 7, title: 'GitHub', active: true, icon: 'AA=='),
           TabInfo(id: 9, title: 'Docs', active: false),
+        ],
+        groups: [
+          GroupInfo(id: 1, title: 'Work', color: 'blue', collapsed: false),
         ],
       );
       expect(a, b);
@@ -88,17 +94,37 @@ void main() {
       const a = TabsViewState(
         connected: true,
         tabs: [TabInfo(id: 7, title: 'GitHub', active: true)],
+        groups: [],
       );
       const b = TabsViewState(
         connected: true,
         tabs: [TabInfo(id: 7, title: 'GitHub', active: false)],
+        groups: [],
+      );
+      expect(a, isNot(b));
+    });
+
+    test('a differing group collapsed flag makes them unequal (1.5)', () {
+      const a = TabsViewState(
+        connected: true,
+        tabs: [TabInfo(id: 7, title: 'GitHub', active: true, groupId: 1)],
+        groups: [
+          GroupInfo(id: 1, title: 'Work', color: 'blue', collapsed: false),
+        ],
+      );
+      const b = TabsViewState(
+        connected: true,
+        tabs: [TabInfo(id: 7, title: 'GitHub', active: true, groupId: 1)],
+        groups: [
+          GroupInfo(id: 1, title: 'Work', color: 'blue', collapsed: true),
+        ],
       );
       expect(a, isNot(b));
     });
 
     test('a differing connected flag makes them unequal', () {
-      const a = TabsViewState(connected: true, tabs: []);
-      const b = TabsViewState(connected: false, tabs: []);
+      const a = TabsViewState(connected: true, tabs: [], groups: []);
+      const b = TabsViewState(connected: false, tabs: [], groups: []);
       expect(a, isNot(b));
     });
   });
@@ -164,7 +190,7 @@ void main() {
         () {
       expect(
         container.read(tabsStateProvider),
-        const TabsViewState(connected: false, tabs: []),
+        const TabsViewState(connected: false, tabs: [], groups: []),
       );
     });
 
@@ -174,7 +200,10 @@ void main() {
 
       service.parked = const TabsSnapshot(
         connected: true,
-        tabs: [TabInfo(id: 7, title: 'GitHub', active: true)],
+        tabs: [TabInfo(id: 7, title: 'GitHub', active: true, groupId: 1)],
+        groups: [
+          GroupInfo(id: 1, title: 'Work', color: 'blue', collapsed: false),
+        ],
       );
       service.pings.add(null);
       await Future<void>.delayed(Duration.zero);
@@ -183,6 +212,26 @@ void main() {
       expect(state.connected, isTrue);
       expect(state.tabs.single.id, 7);
       expect(state.tabs.single.active, isTrue);
+      expect(state.tabs.single.groupId, 1,
+          reason: 'groupId must map through to the view (1.5)');
+      expect(state.groups.single.color, 'blue',
+          reason: 'groups must map through to the view (1.5)');
+    });
+
+    test('a snapshot with empty groups yields the flat view (1.5)', () async {
+      container.read(tabsStateProvider);
+
+      service.parked = const TabsSnapshot(
+        connected: true,
+        tabs: [TabInfo(id: 7, title: 'GitHub', active: true)],
+        groups: [],
+      );
+      service.pings.add(null);
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(tabsStateProvider);
+      expect(state.groups, isEmpty);
+      expect(state.tabs.single.groupId, isNull);
     });
 
     test('extension disconnect (connected:false push) flips to hint state',
@@ -192,17 +241,18 @@ void main() {
       service.parked = const TabsSnapshot(
         connected: true,
         tabs: [TabInfo(id: 7, title: 'GitHub', active: true)],
+        groups: [],
       );
       service.pings.add(null);
       await Future<void>.delayed(Duration.zero);
 
-      service.parked = const TabsSnapshot(connected: false, tabs: []);
+      service.parked = const TabsSnapshot(connected: false, tabs: [], groups: []);
       service.pings.add(null);
       await Future<void>.delayed(Duration.zero);
 
       expect(
         container.read(tabsStateProvider),
-        const TabsViewState(connected: false, tabs: []),
+        const TabsViewState(connected: false, tabs: [], groups: []),
       );
     });
   });

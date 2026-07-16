@@ -1,6 +1,6 @@
-/// The Tabs store (BROW-01, proto 1.4) — the Riverpod-3 notifier that turns
-/// the pushed [TabsSnapshot] into a value-equal view the Browser screen's tab
-/// section renders.
+/// The Tabs store (BROW-01, proto 1.4; groups proto 1.5, quick 260716-sme)
+/// — the Riverpod-3 notifier that turns the pushed [TabsSnapshot] into a
+/// value-equal view the Browser screen's tab section renders.
 ///
 /// Clones the [AppsNotifier] shape minus favorites: subscribe to
 /// `service.changes`, re-snapshot `service.tabsSnapshot` into a value-equal
@@ -29,8 +29,16 @@ class TabsViewState {
   /// Tabs in extension order (windowId then index, resolved extension-side).
   final List<TabInfo> tabs;
 
+  /// Tab groups (proto 1.5) — empty when none exist or the server predates
+  /// groups. View-only display metadata.
+  final List<GroupInfo> groups;
+
   /// Creates a view snapshot.
-  const TabsViewState({required this.connected, required this.tabs});
+  const TabsViewState({
+    required this.connected,
+    required this.tabs,
+    required this.groups,
+  });
 
   @override
   bool operator ==(Object other) {
@@ -40,11 +48,16 @@ class TabsViewState {
     for (var i = 0; i < tabs.length; i++) {
       if (other.tabs[i] != tabs[i]) return false;
     }
+    if (other.groups.length != groups.length) return false;
+    for (var i = 0; i < groups.length; i++) {
+      if (other.groups[i] != groups[i]) return false;
+    }
     return true;
   }
 
   @override
-  int get hashCode => Object.hash(connected, Object.hashAll(tabs));
+  int get hashCode =>
+      Object.hash(connected, Object.hashAll(tabs), Object.hashAll(groups));
 }
 
 /// Re-snapshots [TabsViewState] on every service `changes` ping and drives
@@ -75,6 +88,7 @@ class TabsNotifier extends Notifier<TabsViewState> {
     return TabsViewState(
       connected: snapshot?.connected ?? false,
       tabs: snapshot?.tabs ?? const [],
+      groups: snapshot?.groups ?? const [],
     );
   }
 

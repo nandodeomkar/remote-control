@@ -127,6 +127,29 @@ List<TabInfo> _tabList(Object? v, String key) {
       title: _req<String>(e, 'title'),
       active: _req<bool>(e, 'active'),
       icon: _opt<String>(e, 'icon'),
+      groupId: _opt<int>(e, 'groupId'),
+    );
+  }).toList();
+}
+
+/// Parse a `groups` array of `{id, title, color, collapsed}` entries
+/// (protoVersion 1.5, quick 260716-sme).
+///
+/// All four fields are REQUIRED per element (a missing field is a hard
+/// decode error — fixture 08); unknown extra fields are ignored (D-05).
+List<GroupInfo> _groupList(Object? v, String key) {
+  if (v is! List) {
+    throw FormatException('field $key must be an array');
+  }
+  return v.map((e) {
+    if (e is! Map<String, dynamic>) {
+      throw FormatException('entries of $key must be objects');
+    }
+    return GroupInfo(
+      id: _req<int>(e, 'id'),
+      title: _req<String>(e, 'title'),
+      color: _req<String>(e, 'color'),
+      collapsed: _req<bool>(e, 'collapsed'),
     );
   }).toList();
 }
@@ -148,21 +171,27 @@ class TabInfo {
   /// convention), or null for iconless tabs.
   final String? icon;
 
+  /// Owning tab-group id (protoVersion 1.5), or null when ungrouped.
+  /// Absent on the wire = ungrouped — never emitted as null or `-1`.
+  final int? groupId;
+
   /// Creates a tab entry.
   const TabInfo({
     required this.id,
     required this.title,
     required this.active,
     this.icon,
+    this.groupId,
   });
 
-  /// Canonical JSON form: `{id, title, active}` plus `icon` only when
-  /// non-null (mirrors the Rust `skip_serializing_if = "Option::is_none"`).
+  /// Canonical JSON form: `{id, title, active}` plus `icon`/`groupId` only
+  /// when non-null (mirrors the Rust `skip_serializing_if = "Option::is_none"`).
   Map<String, Object?> toJson() => {
         'id': id,
         'title': title,
         'active': active,
         if (icon != null) 'icon': icon,
+        if (groupId != null) 'groupId': groupId,
       };
 
   @override
@@ -171,10 +200,61 @@ class TabInfo {
       other.id == id &&
       other.title == title &&
       other.active == active &&
-      other.icon == icon;
+      other.icon == icon &&
+      other.groupId == groupId;
 
   @override
-  int get hashCode => Object.hash(id, title, active, icon);
+  int get hashCode => Object.hash(id, title, active, icon, groupId);
+}
+
+/// A tab-group entry in the optional `groups` array on `tabs.list` replies
+/// and `tabs.changed` pushes (protoVersion 1.5, BROW-01, quick 260716-sme).
+///
+/// `color` is Chrome's NAMED group-color string
+/// (`grey|blue|red|yellow|green|pink|purple|cyan|orange`) passed through
+/// verbatim — map it to a color in the app layer; unknown names fall back
+/// neutrally. `title` may be empty (Chrome allows unnamed groups).
+/// `collapsed` is display metadata only — view-only, no wire message
+/// toggles it.
+class GroupInfo {
+  /// Browser-assigned group id (referenced by [TabInfo.groupId]).
+  final int id;
+
+  /// Group title (may be empty; capped at 32 chars extension-side).
+  final String title;
+
+  /// Chrome named group color, passed through verbatim.
+  final String color;
+
+  /// Whether the group is collapsed on the PC (display metadata only).
+  final bool collapsed;
+
+  /// Creates a group entry.
+  const GroupInfo({
+    required this.id,
+    required this.title,
+    required this.color,
+    required this.collapsed,
+  });
+
+  /// Canonical JSON form: all four keys, always.
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'title': title,
+        'color': color,
+        'collapsed': collapsed,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      other is GroupInfo &&
+      other.id == id &&
+      other.title == title &&
+      other.color == color &&
+      other.collapsed == collapsed;
+
+  @override
+  int get hashCode => Object.hash(id, title, color, collapsed);
 }
 
 /// Every message type in the protoVersion 1.0 registry (SPEC section 7),
@@ -737,15 +817,22 @@ final class TabsListMsg extends RemoteMessage {
   /// Present in replies, absent in requests.
   final List<TabInfo>? tabs;
 
-  /// Creates a tabs.list message (const request form: both fields null).
-  const TabsListMsg({this.connected, this.tabs});
+  /// Tab groups (protoVersion 1.5): null when absent (a 1.4 server), a list
+  /// (possibly empty) when present. Absent stays absent on canonical
+  /// re-encode; present round-trips.
+  final List<GroupInfo>? groups;
+
+  /// Creates a tabs.list message (const request form: all fields null).
+  const TabsListMsg({this.connected, this.tabs, this.groups});
 
   /// Decodes the `tabs.list` payload.
   factory TabsListMsg.fromPayload(Map<String, dynamic> p) {
     final raw = p['tabs'];
+    final rawGroups = p['groups'];
     return TabsListMsg(
       connected: _opt<bool>(p, 'connected'),
       tabs: raw == null ? null : _tabList(raw, 'tabs'),
+      groups: rawGroups == null ? null : _groupList(rawGroups, 'groups'),
     );
   }
 
@@ -756,12 +843,14 @@ final class TabsListMsg extends RemoteMessage {
   Map<String, Object?> toPayload() => {
         if (connected != null) 'connected': connected,
         if (tabs != null) 'tabs': tabs!.map((e) => e.toJson()).toList(),
+        if (groups != null) 'groups': groups!.map((e) => e.toJson()).toList(),
       };
 }
 
 /// `tabs.changed` (S→C push, protoVersion 1.4): on any tab change AND on
-/// extension connect/disconnect. BOTH fields required — a missing field is a
-/// hard decode error.
+/// extension connect/disconnect. `connected` and `tabs` required — a missing
+/// field is a hard decode error. `groups` (protoVersion 1.5) is optional:
+/// a 1.4 frame without it must decode (additive).
 final class TabsChangedMsg extends RemoteMessage {
   /// Whether the browser extension is connected to the server.
   final bool connected;
@@ -769,17 +858,24 @@ final class TabsChangedMsg extends RemoteMessage {
   /// Current full tab snapshot (extension order).
   final List<TabInfo> tabs;
 
+  /// Tab groups (protoVersion 1.5): null when absent (a 1.4 server), a list
+  /// (possibly empty) when present. Absent stays absent on canonical
+  /// re-encode; present round-trips.
+  final List<GroupInfo>? groups;
+
   /// Creates a tabs.changed message.
-  const TabsChangedMsg({required this.connected, required this.tabs});
+  const TabsChangedMsg({required this.connected, required this.tabs, this.groups});
 
   /// Decodes the `tabs.changed` payload.
   factory TabsChangedMsg.fromPayload(Map<String, dynamic> p) {
     if (!p.containsKey('tabs')) {
       throw const FormatException('missing required field: tabs');
     }
+    final rawGroups = p['groups'];
     return TabsChangedMsg(
       connected: _req<bool>(p, 'connected'),
       tabs: _tabList(p['tabs'], 'tabs'),
+      groups: rawGroups == null ? null : _groupList(rawGroups, 'groups'),
     );
   }
 
@@ -790,6 +886,7 @@ final class TabsChangedMsg extends RemoteMessage {
   Map<String, Object?> toPayload() => {
         'connected': connected,
         'tabs': tabs.map((e) => e.toJson()).toList(),
+        if (groups != null) 'groups': groups!.map((e) => e.toJson()).toList(),
       };
 }
 

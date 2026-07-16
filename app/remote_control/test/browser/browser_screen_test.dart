@@ -127,6 +127,21 @@ const TabsSnapshot _twoTabs = TabsSnapshot(
     TabInfo(id: 7, title: 'GitHub', active: true),
     TabInfo(id: 9, title: 'Docs', active: false),
   ],
+  groups: [],
+);
+
+/// One blue "Work" group owning two tabs + one ungrouped tab (proto 1.5,
+/// 260716-sme) — drives the group-header rendering assertions.
+const TabsSnapshot _groupedTabs = TabsSnapshot(
+  connected: true,
+  tabs: [
+    TabInfo(id: 7, title: 'GitHub', active: true, groupId: 1),
+    TabInfo(id: 8, title: 'PRs', active: false, groupId: 1),
+    TabInfo(id: 9, title: 'Docs', active: false),
+  ],
+  groups: [
+    GroupInfo(id: 1, title: 'Work', color: 'blue', collapsed: false),
+  ],
 );
 
 /// The row-chrome border color: the nearest Material ancestor's shape side.
@@ -304,7 +319,7 @@ void main() {
     testWidgets('connected with zero tabs shows the muted one-liner',
         (t) async {
       final service = _FakeService()
-        ..parked = const TabsSnapshot(connected: true, tabs: []);
+        ..parked = const TabsSnapshot(connected: true, tabs: [], groups: []);
       await _pumpScreen(t, service);
 
       expect(find.text('No tabs open.'), findsOneWidget);
@@ -406,6 +421,88 @@ void main() {
     });
 
     testWidgets(
+        'grouped tabs render ONE header tinted the mapped Chrome color; '
+        'the ungrouped tab has no header (proto 1.5)', (t) async {
+      final service = _FakeService()..parked = _groupedTabs;
+      await _pumpScreen(t, service);
+
+      // Exactly one "Work" header for the two-tab consecutive run.
+      expect(find.text('Work'), findsOneWidget);
+      expect(
+        t.widget<Text>(find.text('Work')).style!.color,
+        kGroupColors['blue'],
+        reason: 'header title must be tinted the mapped group color',
+      );
+      // All three tab rows still render (grouped rows unchanged chrome).
+      expect(find.text('GitHub'), findsOneWidget);
+      expect(find.text('PRs'), findsOneWidget);
+      expect(find.text('Docs'), findsOneWidget);
+      expect(_rowBorder(t, 'GitHub'), kAccent,
+          reason: 'active-tab accent border survives grouping');
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'a collapsed group header renders dimmed inside Opacity(0.5) '
+        'with the unfold-less glyph', (t) async {
+      final service = _FakeService()
+        ..parked = const TabsSnapshot(
+          connected: true,
+          tabs: [TabInfo(id: 7, title: 'GitHub', active: true, groupId: 1)],
+          groups: [
+            GroupInfo(id: 1, title: 'Work', color: 'blue', collapsed: true),
+          ],
+        );
+      await _pumpScreen(t, service);
+
+      final opacity = t.widget<Opacity>(
+        find.ancestor(of: find.text('Work'), matching: find.byType(Opacity)),
+      );
+      expect(opacity.opacity, 0.5, reason: 'collapsed = dimmed header');
+      expect(find.byIcon(Symbols.unfold_less_rounded), findsOneWidget);
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'the group header is view-only: tapping it fires no activate/close',
+        (t) async {
+      final service = _FakeService()..parked = _groupedTabs;
+      await _pumpScreen(t, service);
+
+      await t.tap(find.text('Work'), warnIfMissed: false);
+      await t.pump();
+      await t.longPress(find.text('Work'), warnIfMissed: false);
+      await t.pump();
+
+      expect(service.reliable.whereType<TabsActivateMsg>(), isEmpty,
+          reason: 'header has no gesture handlers — view-only is structural');
+      expect(service.reliable.whereType<TabsCloseMsg>(), isEmpty);
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'an unresolved groupId (group past the cap) renders flat — no header',
+        (t) async {
+      final service = _FakeService()
+        ..parked = const TabsSnapshot(
+          connected: true,
+          // groupId 99 has NO GroupInfo — the group fell past the 16 cap.
+          tabs: [TabInfo(id: 7, title: 'GitHub', active: true, groupId: 99)],
+          groups: [],
+        );
+      await _pumpScreen(t, service);
+
+      expect(find.text('GitHub'), findsOneWidget);
+      expect(find.byIcon(Symbols.unfold_less_rounded), findsNothing);
+      expect(t.takeException(), isNull);
+
+      await _unmount(t);
+    });
+
+    testWidgets(
         'a broken base64 favicon renders the fallback glyph (never throws)',
         (t) async {
       final service = _FakeService()
@@ -415,6 +512,7 @@ void main() {
             TabInfo(id: 1, title: 'Bad', active: true, icon: '%%%not-b64%%%'),
             TabInfo(id: 2, title: 'None', active: false), // null icon
           ],
+          groups: [],
         );
       await _pumpScreen(t, service);
 
