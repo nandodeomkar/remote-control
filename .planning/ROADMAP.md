@@ -348,7 +348,7 @@ Plans:
 **Goal:** The Keyboard screen becomes four full-screen swipeable pads (Type with the system IME + a slim extras row, Arrows, Numpad, Fn) with persistent Ctrl/Alt/Shift/Win chips and a bottom tab bar replacing the cramped Nav/Fn/Num strip — every key dramatically larger, every sacred stuck-key invariant preserved — and a new Shortcuts hub tile (position 3) fires 25 one-tap Windows shortcuts (show desktop, snip, screenshots, task manager, snap, refresh, tabs, find, zoom, edit ops) over the existing `key {action:tap, mods}` path, with the `keymap.rs` CLIENT_KEY_CODES vocabulary + its Dart mirror extended in lockstep (letters, PrintScreen, main-row 0; T/W/Plus/Minus promoted). No protocol version bump.
 **Requirements**: extends KEY-01, KEY-02, KEY-03, KEY-04 (no new REQ-IDs — phase added ad-hoc)
 **Depends on:** Phase 9
-**Plans:** 6 plans
+**Plans:** 3/6 plans executed
 
 Plans:
 **Wave 1**
@@ -358,7 +358,7 @@ Plans:
 **Wave 2** *(after 10-01)*
 
 - [x] 10-02-PLAN.md — Shortcuts tile: kShortcutCatalog registry (4 sections / 25 buttons) + ShortcutButton + ShortcutsScreen + hub tile at position 3
-- [ ] 10-03-PLAN.md — Keyboard primitives: public KeyCap + pad cap tables + KeyboardPad enum + capsForPad + keyboard.pad store
+- [x] 10-03-PLAN.md — Keyboard primitives: public KeyCap + pad cap tables + KeyboardPad enum + capsForPad + keyboard.pad store
 
 **Wave 3** *(after 10-03)*
 
