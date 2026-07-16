@@ -1,5 +1,6 @@
 /// BubbleScaffold (08-05, D8-05) — the per-screen overlay scaffold that
-/// replaces [QuickBarScaffold] (07-13, D-10).
+/// replaces the deleted quick-bar scaffold (07-13, D-10; removed 08-06,
+/// D8-06).
 ///
 /// Composes the tool `body` + the verbatim UIPI-banner slot + an expand-gated
 /// bubble/window subtree in one `Stack` — Approach A per the design spec
@@ -50,7 +51,7 @@ const Duration kBubbleExpandDuration = Duration(milliseconds: 200);
 
 /// Wraps a tool screen with the expand-gated bubble/floating-window (D8-01,
 /// D8-02, D8-03) and the contextual UIPI banner (D8-05, cloned verbatim from
-/// [QuickBarScaffold]). See the library doc for the full contract.
+/// the deleted quick-bar scaffold). See the library doc for the full contract.
 class BubbleScaffold extends ConsumerStatefulWidget {
   /// The tool screen this scaffold hosts.
   final Widget body;
@@ -109,7 +110,7 @@ class _BubbleScaffoldState extends ConsumerState<BubbleScaffold>
 
   /// D8-08: collapse, then push the full [TrackpadScreen] wrapped
   /// `showBubble: false` (the existing `_openTrackpad` push idiom, renamed
-  /// `showQuickBar` -> `showBubble`).
+  /// from the deleted quick-bar scaffold's equivalent param).
   void _openFullTrackpad(BuildContext context) {
     _collapse();
     unawaited(
@@ -168,9 +169,9 @@ class _BubbleScaffoldState extends ConsumerState<BubbleScaffold>
           children: [
             // NEVER rebuilds off _expanded (Pitfall 3/6).
             Positioned.fill(child: widget.body),
-            // The verbatim-preserved UIPI contract (quick_bar_scaffold.dart):
-            // top-anchored, IgnorePointer inside UipiBanner, never steals a
-            // body touch.
+            // The verbatim-preserved UIPI contract (from the deleted
+            // quick-bar scaffold): top-anchored, IgnorePointer inside
+            // UipiBanner, never steals a body touch.
             Positioned(
               top: 0,
               left: 0,
