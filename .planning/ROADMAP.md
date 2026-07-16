@@ -345,11 +345,29 @@ Plans:
 
 ### Phase 10: Keyboard rethink and Shortcuts tile — full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn) with persistent modifier chips, plus a new Shortcuts hub tile of one-tap Windows shortcut buttons over the existing key tap+mods path (keymap vocabulary extension both sides)
 
-**Goal:** [To be planned]
-**Requirements**: TBD
+**Goal:** The Keyboard screen becomes four full-screen swipeable pads (Type with the system IME + a slim extras row, Arrows, Numpad, Fn) with persistent Ctrl/Alt/Shift/Win chips and a bottom tab bar replacing the cramped Nav/Fn/Num strip — every key dramatically larger, every sacred stuck-key invariant preserved — and a new Shortcuts hub tile (position 3) fires 25 one-tap Windows shortcuts (show desktop, snip, screenshots, task manager, snap, refresh, tabs, find, zoom, edit ops) over the existing `key {action:tap, mods}` path, with the `keymap.rs` CLIENT_KEY_CODES vocabulary + its Dart mirror extended in lockstep (letters, PrintScreen, main-row 0; T/W/Plus/Minus promoted). No protocol version bump.
+**Requirements**: extends KEY-01, KEY-02, KEY-03, KEY-04 (no new REQ-IDs — phase added ad-hoc)
 **Depends on:** Phase 9
-**Plans:** 0 plans
+**Plans:** 6 plans
 
 Plans:
+**Wave 1**
 
-- [ ] TBD (run /gsd-plan-phase 10 to break down)
+- [ ] 10-01-PLAN.md — Keymap vocabulary extension both sides + coverage (keymap.rs CLIENT_KEY_CODES + Dart kClientKeyCodes mirror; letters/0/PrintScreen; T/W/Plus/Minus promoted; no proto bump)
+
+**Wave 2** *(after 10-01)*
+
+- [ ] 10-02-PLAN.md — Shortcuts tile: kShortcutCatalog registry (4 sections / 25 buttons) + ShortcutButton + ShortcutsScreen + hub tile at position 3
+- [ ] 10-03-PLAN.md — Keyboard primitives: public KeyCap + pad cap tables + KeyboardPad enum + capsForPad + keyboard.pad store
+
+**Wave 3** *(after 10-03)*
+
+- [ ] 10-04-PLAN.md — Keyboard pads (Type/Arrows/Numpad/Fn, Expanded-flex caps) + bottom KeyboardTabBar
+
+**Wave 4** *(after 10-04)*
+
+- [ ] 10-05-PLAN.md — Keyboard screen rebuild: PageView pads + persistent chips + IME raise/lower + sacred stuck-key invariant migration (CR-01/CR-02/IN-04/D-12/dispose-flush)
+
+**Wave 5** *(after 10-02 + 10-05)*
+
+- [ ] 10-06-PLAN.md — On-device UAT gate: fresh release APK + full regression + per-surface walkthrough
