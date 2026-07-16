@@ -1,12 +1,13 @@
-/// The Remote dashboard (D-08/D-09, finalized 07-13) — the app's home screen
-/// and its final identity: 8 tools, one tile tap away.
+/// The Remote dashboard (D-08/D-09, finalized 07-13; Shortcuts added 10-02) —
+/// the app's home screen and its final identity: 9 tools, one tile tap away.
 ///
-/// [kHubTiles] is the ORDERED tile registry the grid renders from, LOCKED to
-/// the exact D-09 reading order: Trackpad, Keyboard, Media, Apps, Clipboard,
-/// Power, Presenter, Browser. The grid is a UNIFORM 2×4 (07-UI-SPEC §1,
-/// Pitfall 9): the legacy full-width Trackpad primary row is gone — the
-/// floating trackpad bubble (`BubbleScaffold`, 08-06) now carries
-/// Trackpad primacy on every tool screen.
+/// [kHubTiles] is the ORDERED tile registry the grid renders from: Trackpad,
+/// Keyboard, Shortcuts, Media, Apps, Clipboard, Power, Presenter, Browser
+/// (Shortcuts inserted at position 3, 10-02). The grid is a UNIFORM 2-column
+/// chunk (07-UI-SPEC §1, Pitfall 9): the legacy full-width Trackpad primary
+/// row is gone — the floating trackpad bubble (`BubbleScaffold`, 08-06) now
+/// carries Trackpad primacy on every tool screen. An odd tail (the 9th tile)
+/// renders half-width beside an empty slot.
 ///
 /// [HubTileGrid] is widget-only (the MouseButtonsBar callback pattern):
 /// taps surface through the injected `onOpen(spec)` so widget tests never
@@ -46,6 +47,7 @@ import '../net/connection_service.dart' show ChipStatus, ConnectionService;
 import '../power/power_screen.dart';
 import '../presenter/presenter_screen.dart';
 import '../settings/settings_screen.dart';
+import '../shortcuts/shortcuts_screen.dart';
 import '../theme/tokens.dart';
 import '../trackpad/trackpad_screen.dart';
 import '../widgets/bubble_scaffold.dart';
@@ -92,6 +94,13 @@ final List<HubTileSpec> kHubTiles = [
     label: 'Keyboard',
     icon: Symbols.keyboard_rounded,
     builder: (_) => const KeyboardScreen(),
+  ),
+  // 10-02: Shortcuts inserted at position 3 (after Keyboard, before Media) —
+  // one-tap Windows shortcut buttons over the reliable key tap+mods path.
+  HubTileSpec(
+    label: 'Shortcuts',
+    icon: Symbols.bolt_rounded,
+    builder: (_) => const ShortcutsScreen(),
   ),
   // 05-07: Media inserted ahead of Power — the final UI-SPEC reading order is
   // now Trackpad, Media, Power, Presenter, Browser (D-01 complete at 5 tiles).
