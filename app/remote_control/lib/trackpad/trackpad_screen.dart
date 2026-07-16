@@ -22,6 +22,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
@@ -245,8 +246,8 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                                   height: 48,
                                   child: Icon(
                                     expanded
-                                        ? Icons.keyboard_hide
-                                        : Icons.keyboard,
+                                        ? Symbols.keyboard_hide_rounded
+                                        : Symbols.keyboard_rounded,
                                     size: 20,
                                     color: kText,
                                   ),
@@ -270,7 +271,7 @@ class _TrackpadScreenState extends ConsumerState<TrackpadScreen> {
                                 width: 48,
                                 height: 48,
                                 child: Icon(
-                                  Icons.tune,
+                                  Symbols.tune_rounded,
                                   size: 20,
                                   color: kText,
                                 ),
@@ -333,7 +334,7 @@ class _DragLockPill extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.lock, size: 14, color: kAccent),
+          Icon(Symbols.lock_rounded, size: 14, color: kAccent),
           SizedBox(width: 4),
           Text(
             'Drag locked — tap to drop',

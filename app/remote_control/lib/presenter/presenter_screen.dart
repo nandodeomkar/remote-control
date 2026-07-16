@@ -31,6 +31,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
@@ -224,7 +225,7 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
                   Expanded(
                     flex: 1,
                     child: _TapZone(
-                      icon: Icons.chevron_left,
+                      icon: Symbols.chevron_left_rounded,
                       caption: 'Previous',
                       flashing: _prevFlash,
                       enabled: authed,
@@ -239,7 +240,7 @@ class _PresenterScreenState extends ConsumerState<PresenterScreen> {
                   Expanded(
                     flex: 2,
                     child: _TapZone(
-                      icon: Icons.chevron_right,
+                      icon: Symbols.chevron_right_rounded,
                       caption: 'Next',
                       flashing: _nextFlash,
                       enabled: authed,
@@ -445,7 +446,7 @@ class _BlankToggle extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.crop_din, size: 18, color: fgColor),
+              Icon(Symbols.crop_din_rounded, size: 18, color: fgColor),
               const SizedBox(width: 6),
               Text(
                 'Blank',

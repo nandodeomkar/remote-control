@@ -24,6 +24,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
@@ -322,7 +323,7 @@ class _FavoriteTileState extends State<_FavoriteTile> {
               const Positioned(
                 top: 4,
                 right: 4,
-                child: Icon(Icons.push_pin, size: 12, color: kAccent),
+                child: Icon(Symbols.push_pin_rounded, size: 12, color: kAccent),
               ),
             ],
           ),
@@ -499,14 +500,14 @@ class _CloseButtonState extends State<_CloseButton> {
         child: SizedBox(
           width: 48,
           height: 48,
-          child: Icon(Icons.close, size: 20, color: color),
+          child: Icon(Symbols.close_rounded, size: 20, color: color),
         ),
       ),
     );
   }
 }
 
-/// A decoded base64-PNG app icon, or the muted [Icons.desktop_windows]
+/// A decoded base64-PNG app icon, or the muted [Symbols.desktop_windows_rounded]
 /// fallback (null icon OR a decode failure — never throws into the UI).
 class _AppIcon extends StatelessWidget {
   final String? iconB64;
@@ -535,7 +536,7 @@ class _AppIcon extends StatelessWidget {
   }
 
   Widget _fallback() =>
-      Icon(Icons.desktop_windows, size: size, color: kMuted);
+      Icon(Symbols.desktop_windows_rounded, size: size, color: kMuted);
 }
 
 /// A centered empty state: 16/600 heading over 14/400 muted body copy.

@@ -9,6 +9,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../theme/tokens.dart';
 import 'modifier_fsm.dart';
@@ -85,7 +86,7 @@ class ModifierChip extends StatelessWidget {
             ),
             if (locked) ...[
               const SizedBox(width: 4), // xs gap after the label
-              const Icon(Icons.lock, size: 16, color: kBg),
+              const Icon(Symbols.lock_rounded, size: 16, color: kBg),
             ],
           ],
         ),

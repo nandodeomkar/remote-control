@@ -1,7 +1,7 @@
 /// The D8-02 minimized floating bubble that replaces the reserved-slot
 /// quick-bar affordance (UI-01 quick-bar → bubble replacement).
 ///
-/// A 56dp circle carrying [Icons.touch_app]: `kAccent` fill + `kText` icon when
+/// A 56dp circle carrying [Symbols.touch_app_rounded]: `kAccent` fill + `kText` icon when
 /// authed, `kSurface` fill + `kMuted` icon when not — STILL tappable in both
 /// states ("muted, not red", mirroring `mouse_buttons.dart` L119-121). Tapping
 /// fires a haptic tick + the injected [TrackpadBubble.onTap] (expand). Dragging
@@ -17,6 +17,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../settings/bubble_position.dart';
@@ -202,7 +203,7 @@ class _TrackpadBubbleState extends ConsumerState<TrackpadBubble>
                   ),
                 ],
               ),
-              child: Icon(Icons.touch_app, size: 24, color: iconColor),
+              child: Icon(Symbols.touch_app_rounded, size: 24, color: iconColor),
             ),
           ),
         ),

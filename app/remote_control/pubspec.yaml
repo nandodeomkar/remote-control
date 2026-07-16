@@ -34,6 +34,11 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
+  # 09-09 gap-closure icon migration: the design prototype renders Material
+  # Symbols Rounded (opsz 24 / wght 400 / FILL 0 / GRAD 0). The owner overrode
+  # the 09-UI-SPEC line-28 skew acceptance on 2026-07-16 — full glyph-style
+  # fidelity wanted. Const IconData only (tree-shakeable); never use get().
+  material_symbols_icons: ^4.2951.0
   flutter_riverpod: ^3.3.2
   web_socket_channel: ^3.0.3
   wakelock_plus: ^1.6.1

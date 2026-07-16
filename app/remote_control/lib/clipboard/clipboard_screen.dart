@@ -28,6 +28,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -194,7 +195,7 @@ class _ClipboardScreenState extends ConsumerState<ClipboardScreen> {
                       children: [
                         Expanded(
                           child: _ActionButton(
-                            icon: Icons.arrow_upward,
+                            icon: Symbols.arrow_upward_rounded,
                             label: 'Send to PC',
                             enabled: authed,
                             onPress: _onSend,
@@ -203,7 +204,7 @@ class _ClipboardScreenState extends ConsumerState<ClipboardScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: _ActionButton(
-                            icon: Icons.arrow_downward,
+                            icon: Symbols.arrow_downward_rounded,
                             label: 'Fetch from PC',
                             enabled: authed,
                             onPress: _onFetch,
@@ -298,7 +299,7 @@ class _AutoSyncRow extends StatelessWidget {
 }
 
 /// The persistent Android-honesty note (D-08) — ALWAYS visible regardless of
-/// the toggle: leading `Icons.info_outline` + 12/400 `#6B7280` copy explaining
+/// the toggle: leading `Symbols.info_rounded` + 12/400 `#6B7280` copy explaining
 /// the platform limit (phone→PC only on foreground, PC→phone live).
 class _HonestyNote extends StatelessWidget {
   const _HonestyNote();
@@ -307,7 +308,7 @@ class _HonestyNote extends StatelessWidget {
   Widget build(BuildContext context) => const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 16, color: kMuted),
+          Icon(Symbols.info_rounded, size: 16, color: kMuted),
           SizedBox(width: 8),
           Expanded(
             child: Text(

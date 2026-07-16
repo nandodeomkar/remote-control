@@ -21,6 +21,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../store/device_store.dart';
@@ -161,10 +162,10 @@ const List<KeyCapDef> kNavClusterCaps = [
 
 /// The four arrow caps (inverted-T: Up above Left/Down/Right).
 const List<KeyCapDef> kNavArrowCaps = [
-  KeyCapDef('Up', icon: Icons.arrow_upward, tooltip: 'Up'),
-  KeyCapDef('Left', icon: Icons.arrow_back, tooltip: 'Left'),
-  KeyCapDef('Down', icon: Icons.arrow_downward, tooltip: 'Down'),
-  KeyCapDef('Right', icon: Icons.arrow_forward, tooltip: 'Right'),
+  KeyCapDef('Up', icon: Symbols.arrow_upward_rounded, tooltip: 'Up'),
+  KeyCapDef('Left', icon: Symbols.arrow_back_rounded, tooltip: 'Left'),
+  KeyCapDef('Down', icon: Symbols.arrow_downward_rounded, tooltip: 'Down'),
+  KeyCapDef('Right', icon: Symbols.arrow_forward_rounded, tooltip: 'Right'),
 ];
 
 /// F1..F12 caps (wrapping grid).

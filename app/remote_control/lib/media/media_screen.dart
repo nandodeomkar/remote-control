@@ -9,7 +9,7 @@
 ///     the accent border + icon and fires a haptic tick; each sends
 ///     `media {prev|playpause|next}` on the reliable path (MED-01 — the exact
 ///     router vocabulary). The play/pause button renders a neutral
-///     `Icons.play_arrow` (the wire has no playback-state readback) but always
+///     `Symbols.play_arrow_rounded` (the wire has no playback-state readback) but always
 ///     sends `playpause`.
 ///   - lg gap, then the volume block: a mute icon-button + a Material slider +
 ///     a fixed-width tabular % readout.
@@ -26,6 +26,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
@@ -121,7 +122,7 @@ class _MediaScreenState extends ConsumerState<MediaScreen> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         _TransportButton(
-                          icon: Icons.skip_previous,
+                          icon: Symbols.skip_previous_rounded,
                           size: 48,
                           tooltip: 'Previous',
                           enabled: authed,
@@ -131,7 +132,7 @@ class _MediaScreenState extends ConsumerState<MediaScreen> {
                         _TransportButton(
                           // Neutral toggle glyph — the wire has no playback
                           // readback, so this always sends `playpause`.
-                          icon: Icons.play_arrow,
+                          icon: Symbols.play_arrow_rounded,
                           size: 64,
                           tooltip: 'Play or pause',
                           enabled: authed,
@@ -139,7 +140,7 @@ class _MediaScreenState extends ConsumerState<MediaScreen> {
                         ),
                         const SizedBox(width: 8),
                         _TransportButton(
-                          icon: Icons.skip_next,
+                          icon: Symbols.skip_next_rounded,
                           size: 48,
                           tooltip: 'Next',
                           enabled: authed,
@@ -278,7 +279,7 @@ class _TransportButtonState extends State<_TransportButton> {
 
 /// The mute icon-button (MED-02). Server-authoritative: engaged renders the
 /// Phase-4 locked-chip solid pattern (solid `#4C8DFF` fill + `#0E0F12`
-/// `Icons.volume_off`), rest renders `#16181D` + border + `Icons.volume_up`.
+/// `Symbols.volume_off_rounded`), rest renders `#16181D` + border + `Symbols.volume_up_rounded`.
 /// Gated muted (`#6B7280`, inert) when not live. Tapping sends `media {mute}`;
 /// the rendered state follows the next push — NO optimistic flip.
 class _MuteButton extends StatelessWidget {
@@ -302,17 +303,17 @@ class _MuteButton extends StatelessWidget {
       fill = kSurface;
       iconColor = kMuted;
       side = const BorderSide(color: kHairline);
-      icon = Icons.volume_up;
+      icon = Symbols.volume_up_rounded;
     } else if (muted) {
       fill = kAccent;
       iconColor = kBg;
       side = BorderSide.none;
-      icon = Icons.volume_off;
+      icon = Symbols.volume_off_rounded;
     } else {
       fill = kSurface;
       iconColor = kText;
       side = const BorderSide(color: kHairline);
-      icon = Icons.volume_up;
+      icon = Symbols.volume_up_rounded;
     }
     return Tooltip(
       message: muted ? 'Unmute' : 'Mute',

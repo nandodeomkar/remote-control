@@ -25,6 +25,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
@@ -58,17 +59,17 @@ class BrowserActionSpec {
 /// New tab/Close tab, Refresh, Zoom out/Zoom in). Action strings are the
 /// exact server vocabulary — see the library doc.
 const List<BrowserActionSpec> kBrowserActions = [
-  BrowserActionSpec(label: 'Back', icon: Icons.arrow_back, action: 'back'),
+  BrowserActionSpec(label: 'Back', icon: Symbols.arrow_back_rounded, action: 'back'),
   BrowserActionSpec(
     label: 'Forward',
-    icon: Icons.arrow_forward,
+    icon: Symbols.arrow_forward_rounded,
     action: 'forward',
   ),
-  BrowserActionSpec(label: 'New tab', icon: Icons.add, action: 'newtab'),
-  BrowserActionSpec(label: 'Close tab', icon: Icons.close, action: 'closetab'),
-  BrowserActionSpec(label: 'Refresh', icon: Icons.refresh, action: 'refresh'),
-  BrowserActionSpec(label: 'Zoom out', icon: Icons.zoom_out, action: 'zoomout'),
-  BrowserActionSpec(label: 'Zoom in', icon: Icons.zoom_in, action: 'zoomin'),
+  BrowserActionSpec(label: 'New tab', icon: Symbols.add_rounded, action: 'newtab'),
+  BrowserActionSpec(label: 'Close tab', icon: Symbols.close_rounded, action: 'closetab'),
+  BrowserActionSpec(label: 'Refresh', icon: Symbols.refresh_rounded, action: 'refresh'),
+  BrowserActionSpec(label: 'Zoom out', icon: Symbols.zoom_out_rounded, action: 'zoomout'),
+  BrowserActionSpec(label: 'Zoom in', icon: Symbols.zoom_in_rounded, action: 'zoomin'),
 ];
 
 /// The 2-column macro grid. Widget-only: fires [onAction] with the spec's

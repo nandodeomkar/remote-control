@@ -20,6 +20,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../net/connection_service.dart';
 import '../theme/tokens.dart';
@@ -135,7 +136,7 @@ class _UipiBannerStrip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: const Row(
         children: [
-          Icon(Icons.info_outline, color: kMuted, size: 16),
+          Icon(Symbols.info_rounded, color: kMuted, size: 16),
           SizedBox(width: 8),
           Expanded(
             child: Text(

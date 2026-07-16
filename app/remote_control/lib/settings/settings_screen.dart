@@ -25,6 +25,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../net/connection_providers.dart';
@@ -312,7 +313,7 @@ class _AddSwitchPcRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
               children: const [
-                Icon(Icons.add, color: kText, size: 20),
+                Icon(Symbols.add_rounded, color: kText, size: 20),
                 SizedBox(width: 12),
                 Text(kAddSwitchPcLabel, style: _rowTitle),
               ],

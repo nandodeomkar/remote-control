@@ -20,6 +20,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 
 import '../hud/latency_probe.dart';
 import '../net/connection_service.dart';
@@ -195,7 +196,7 @@ class ReconnectingBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          const Icon(Icons.wifi_off, color: _reconnectingColor, size: 20),
+          const Icon(Symbols.wifi_off_rounded, color: _reconnectingColor, size: 20),
           const SizedBox(width: 8),
           const Expanded(
             child: Text(

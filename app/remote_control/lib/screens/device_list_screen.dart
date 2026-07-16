@@ -27,6 +27,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../hub/hub_screen.dart';
@@ -266,7 +267,7 @@ Widget _connectByIpButton(VoidCallback onPressed) {
       minimumSize: const Size(48, 48),
       foregroundColor: kText,
     ),
-    icon: const Icon(Icons.lan, size: 20),
+    icon: const Icon(Symbols.lan_rounded, size: 20),
     label: const Text(kConnectByIpLabel, style: _body),
   );
 }
@@ -308,7 +309,7 @@ class _DeviceRow extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Icon(Icons.computer, color: iconColor),
+                Icon(Symbols.computer_rounded, color: iconColor),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
@@ -354,7 +355,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.computer, size: 48, color: kMuted),
+            const Icon(Symbols.computer_rounded, size: 48, color: kMuted),
             const SizedBox(height: 32),
             Row(
               mainAxisSize: MainAxisSize.min,

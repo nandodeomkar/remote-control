@@ -35,6 +35,7 @@ library;
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../settings/window_position.dart';
@@ -251,7 +252,7 @@ class _FloatingTrackpadWindowState
             onPanEnd: _onPanEnd,
             child: const Padding(
               padding: EdgeInsets.symmetric(horizontal: 12),
-              child: Icon(Icons.drag_indicator, size: 20, color: kMuted),
+              child: Icon(Symbols.drag_indicator_rounded, size: 20, color: kMuted),
             ),
           ),
           // The inline drag-lock pill — visible ONLY while the core reports a
@@ -270,12 +271,12 @@ class _FloatingTrackpadWindowState
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.open_in_full, size: 18, color: kText),
+            icon: const Icon(Symbols.open_in_full_rounded, size: 18, color: kText),
             tooltip: 'Open full screen',
             onPressed: widget.onExpandFull,
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18, color: kText),
+            icon: const Icon(Symbols.close_rounded, size: 18, color: kText),
             tooltip: 'Collapse',
             onPressed: widget.onCollapse,
           ),
@@ -302,7 +303,7 @@ class _WindowDragLockPill extends StatelessWidget {
       child: const Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.lock, size: 12, color: kAccent),
+          Icon(Symbols.lock_rounded, size: 12, color: kAccent),
           SizedBox(width: 4),
           Text(
             'Drag locked',

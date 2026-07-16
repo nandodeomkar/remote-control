@@ -36,6 +36,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:remote_protocol/remote_protocol.dart';
@@ -75,13 +76,13 @@ const List<_PowerAction> _kSafePair = [
   _PowerAction(
     action: 'lock',
     label: 'Slide to lock',
-    icon: Icons.lock_outline,
+    icon: Symbols.lock_rounded,
     destructive: false,
   ),
   _PowerAction(
     action: 'sleep',
     label: 'Slide to sleep',
-    icon: Icons.bedtime_outlined,
+    icon: Symbols.bedtime_rounded,
     destructive: false,
   ),
 ];
@@ -90,13 +91,13 @@ const List<_PowerAction> _kDestructivePair = [
   _PowerAction(
     action: 'restart',
     label: 'Slide to restart',
-    icon: Icons.restart_alt,
+    icon: Symbols.restart_alt_rounded,
     destructive: true,
   ),
   _PowerAction(
     action: 'shutdown',
     label: 'Slide to shut down',
-    icon: Icons.power_settings_new,
+    icon: Symbols.power_settings_new_rounded,
     destructive: true,
   ),
 ];
@@ -386,7 +387,7 @@ class _SlideTrackState extends State<_SlideTrack> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(widget.spec.icon, size: 20, color: kBg),
-                        const Icon(Icons.chevron_right, size: 16, color: kBg),
+                        const Icon(Symbols.chevron_right_rounded, size: 16, color: kBg),
                       ],
                     ),
                   ),
@@ -456,7 +457,7 @@ class _CountdownDialogState extends State<_CountdownDialog> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: kError),
+          const Icon(Symbols.warning_rounded, color: kError),
           const SizedBox(width: 8),
           Text(
             '${widget.verb} PC?',

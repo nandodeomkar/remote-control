@@ -33,6 +33,7 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:material_symbols_icons/symbols.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../apps/apps_screen.dart';
@@ -81,7 +82,7 @@ class HubTileSpec {
 final List<HubTileSpec> kHubTiles = [
   HubTileSpec(
     label: 'Trackpad',
-    icon: Icons.touch_app,
+    icon: Symbols.touch_app_rounded,
     builder: (_) => const TrackpadScreen(),
     // D8-05: never a bubble shortcut to the screen you are on.
     showBubble: false,
@@ -89,44 +90,44 @@ final List<HubTileSpec> kHubTiles = [
   // 07-13: Keyboard promoted to a first-class screen at position 2 (D-09).
   HubTileSpec(
     label: 'Keyboard',
-    icon: Icons.keyboard,
+    icon: Symbols.keyboard_rounded,
     builder: (_) => const KeyboardScreen(),
   ),
   // 05-07: Media inserted ahead of Power — the final UI-SPEC reading order is
   // now Trackpad, Media, Power, Presenter, Browser (D-01 complete at 5 tiles).
   HubTileSpec(
     label: 'Media',
-    icon: Icons.music_note,
+    icon: Symbols.music_note_rounded,
     builder: (_) => const MediaScreen(),
   ),
   // 06-03: Apps inserted after Media, before Power (06-UI-SPEC placement).
   HubTileSpec(
     label: 'Apps',
-    icon: Icons.apps,
+    icon: Symbols.apps_rounded,
     builder: (_) => const AppsScreen(),
   ),
   // 06-05: Clipboard inserted after Apps, before Power (06-UI-SPEC placement) —
   // reading order Trackpad, Media, Apps, Clipboard, Power, Presenter, Browser.
   HubTileSpec(
     label: 'Clipboard',
-    icon: Icons.content_paste,
+    icon: Symbols.content_paste_rounded,
     builder: (_) => const ClipboardScreen(),
   ),
   // 05-06: Power sits between Media and Presenter.
   HubTileSpec(
     label: 'Power',
-    icon: Icons.power_settings_new,
+    icon: Symbols.power_settings_new_rounded,
     builder: (_) => const PowerScreen(),
   ),
   // 05-04: Presenter sits between Power and Browser.
   HubTileSpec(
     label: 'Presenter',
-    icon: Icons.slideshow,
+    icon: Symbols.slideshow_rounded,
     builder: (_) => const PresenterScreen(),
   ),
   HubTileSpec(
     label: 'Browser',
-    icon: Icons.public,
+    icon: Symbols.public_rounded,
     builder: (_) => const BrowserScreen(),
   ),
 ];
@@ -322,7 +323,7 @@ class _HubScreenState extends ConsumerState<HubScreen> {
             child: IconButton(
               tooltip: kSettingsTitle,
               onPressed: _openSettings,
-              icon: const Icon(Icons.settings, size: 24, color: kText),
+              icon: const Icon(Symbols.settings_rounded, size: 24, color: kText),
             ),
           ),
         ],

@@ -49,5 +49,19 @@ ThemeData buildAppTheme() {
       seedColor: kAccent,
       brightness: Brightness.dark,
     ),
+    // 09-09 gap closure: pin the prototype's Material Symbols Rounded axis tuple
+    // app-wide. The prototype's Google Fonts request is
+    // `Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0`, i.e. optical
+    // size 24, weight 400, fill 0 (outlined), grade 0. Without this pin the
+    // material_symbols_icons font defaults to opsz 48, rendering visibly thinner
+    // strokes than the prototype at the app's 12–32px icon sizes. Flutter's Icon
+    // widget reads these four values from IconTheme and emits matching
+    // FontVariations; per-call-site size:/color: overrides are unaffected.
+    iconTheme: const IconThemeData(
+      fill: 0,
+      weight: 400,
+      grade: 0,
+      opticalSize: 24,
+    ),
   );
 }
