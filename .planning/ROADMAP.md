@@ -326,7 +326,7 @@ Plans:
 **Goal:** Every shipped screen is brought up to the approved 09-UI-SPEC prototype values — the headline being the decorative dot-grid trackpad texture on BOTH the full Trackpad surface (24px tiles) and the floating window (22px tiles) — while the seven locked palette tokens stay byte-identical (no fake cursor dot, no tap ripple). Every other screen is a confirm-or-close-small-delta pass, closing the two real gaps found during planning (the missing Keyboard hint copy and the #4a505c trackpad-hint / 56px floating-window-bar values), all verified end-to-end by an on-device visual UAT.
 **Requirements**: none (visual refinement — maps no REQ-IDs)
 **Depends on:** Phase 8
-**Plans:** 6/8 plans executed
+**Plans:** 7/8 plans executed
 
 Plans:
 **Wave 1** *(all parallel — zero file overlap)*
@@ -337,7 +337,7 @@ Plans:
 - [x] 09-04-PLAN.md — Media + Browser confirm (new media widget test, strengthened browser test)
 - [x] 09-05-PLAN.md — Apps + Clipboard confirm (geometry/copy parity)
 - [x] 09-06-PLAN.md — Power + Presenter confirm (track/dialog + split-zone/timer parity)
-- [ ] 09-07-PLAN.md — Settings confirm (grouped cards, revoke copy, static "Blue" chip)
+- [x] 09-07-PLAN.md — Settings confirm (grouped cards, revoke copy, static "Blue" chip)
 
 **Wave 2** *(after all of Wave 1)*
 
