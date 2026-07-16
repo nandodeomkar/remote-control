@@ -70,6 +70,30 @@ pub struct TabInfo {
     pub active: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Owning tab-group id (protoVersion 1.5, quick 260716-sme). Absent =
+    /// ungrouped — the WindowInfo `icon`/`path` skip-when-absent convention:
+    /// never emitted as null, and never emitted as `-1` (the extension omits
+    /// the key for TAB_GROUP_ID_NONE).
+    #[serde(rename = "groupId", default, skip_serializing_if = "Option::is_none")]
+    pub group_id: Option<i64>,
+}
+
+/// One entry of the optional `groups` array on the `tabs.list` reply /
+/// `tabs.changed` push / ext-leg `tabs.state` (protoVersion 1.5, BROW-01,
+/// quick 260716-sme). All four fields are wire-required (a missing field is
+/// a hard decode error, exactly like TabEl's id/title/active).
+///
+/// `color` is Chrome's NAMED group-color string (SPEC §7 GroupEl:
+/// `grey|blue|red|yellow|green|pink|purple|cyan|orange`) passed through
+/// verbatim — the server never validates the vocabulary (the codec stays
+/// value-lenient, the Phase-01 enum-string rule); unknown names render as a
+/// neutral fallback client-side.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GroupInfo {
+    pub id: i64,
+    pub title: String,
+    pub color: String,
+    pub collapsed: bool,
 }
 
 /// The full tab-relay state carried by the `tabs.list` reply and the
@@ -78,8 +102,9 @@ pub struct TabInfo {
 /// (next to the [`Tabs`] trait that returns it) per the WindowInfo
 /// precedent: trait-returned types live with the traits.
 ///
-/// `Default` is the never-connected shape `{connected: false, tabs: []}` —
-/// exactly what the phone's install-hint state keys on.
+/// `Default` is the never-connected shape
+/// `{connected: false, tabs: [], groups: []}` — exactly what the phone's
+/// install-hint state keys on.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct TabsState {
     /// Whether a browser extension is currently connected to the ext
@@ -87,6 +112,8 @@ pub struct TabsState {
     pub connected: bool,
     /// The current full tab snapshot (extension order, max 50).
     pub tabs: Vec<TabInfo>,
+    /// The current tab groups (protoVersion 1.5, max 16 — server belt).
+    pub groups: Vec<GroupInfo>,
 }
 
 /// Mouse + keyboard injection.

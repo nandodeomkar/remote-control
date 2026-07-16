@@ -5,7 +5,9 @@
 //! Six scenarios (plan Task 3): tabs.state → watch, disconnect → reset,
 //! ExtCmd → activate frame, ExtCmd with no session dropped, newest-wins
 //! replacement, and the oversize-frame kill + recovery (pitfall-2
-//! regression).
+//! regression). Plus the protoVersion-1.5 group scenarios (quick
+//! 260716-sme): groups → watch, 16-group belt, malformed-groups
+//! tolerant-degrade.
 
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -258,6 +260,89 @@ async fn oversize_frame_kills_session_and_relay_recovers() {
         "relay dead after the oversize-frame kill",
     )
     .await;
+}
+
+/// protoVersion 1.5 (quick 260716-sme): a `tabs.state` frame WITH groups +
+/// per-tab groupId lands in the watch with both intact; the ungrouped tab
+/// decodes group_id=None.
+#[tokio::test]
+async fn tabs_state_with_groups_populates_watch() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(
+        &mut ext,
+        json!({"t": "tabs.state", "p": {
+            "tabs": [
+                {"id": 7, "title": "GitHub", "active": true, "groupId": 1},
+                {"id": 9, "title": "Docs", "active": false}
+            ],
+            "groups": [
+                {"id": 1, "title": "Work", "color": "blue", "collapsed": false}
+            ]
+        }}),
+    )
+    .await;
+
+    let state =
+        wait_watch(&mut r.tabs_rx, |s| s.connected, "watch never showed connected:true").await;
+    assert_eq!(state.tabs[0].group_id, Some(1), "grouped tab must carry its groupId");
+    assert_eq!(state.tabs[1].group_id, None, "ungrouped tab must decode group_id=None");
+    assert_eq!(state.groups.len(), 1, "watch must carry the group");
+    assert_eq!(state.groups[0].id, 1);
+    assert_eq!(state.groups[0].title, "Work");
+    assert_eq!(state.groups[0].color, "blue");
+    assert!(!state.groups[0].collapsed);
+}
+
+/// protoVersion 1.5 belt: 17+ groups in one snapshot are truncated to 16
+/// server-side (the MAX_EXT_TABS pattern applied to MAX_EXT_GROUPS).
+#[tokio::test]
+async fn groups_belt_truncates_at_sixteen() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    let groups: Vec<Value> = (0..20)
+        .map(|i| json!({"id": i, "title": format!("g{i}"), "color": "grey", "collapsed": false}))
+        .collect();
+    send_json(
+        &mut ext,
+        json!({"t": "tabs.state", "p": {
+            "tabs": [{"id": 1, "title": "Tab", "active": true}],
+            "groups": groups
+        }}),
+    )
+    .await;
+
+    let state =
+        wait_watch(&mut r.tabs_rx, |s| s.connected, "watch never showed connected:true").await;
+    assert_eq!(state.groups.len(), 16, "server must belt groups at 16");
+    assert_eq!(state.groups[0].id, 0);
+    assert_eq!(state.groups[15].id, 15, "truncation must keep the FIRST 16");
+}
+
+/// protoVersion 1.5 tolerant-degrade: a malformed `groups` value must NOT
+/// discard the frame — tabs still land, groups degrade to empty. (Unlike a
+/// malformed `tabs`, which ignores the whole frame.)
+#[tokio::test]
+async fn malformed_groups_degrade_to_empty() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(
+        &mut ext,
+        json!({"t": "tabs.state", "p": {
+            "tabs": [{"id": 5, "title": "Solo", "active": true}],
+            "groups": "garbage"
+        }}),
+    )
+    .await;
+
+    let state =
+        wait_watch(&mut r.tabs_rx, |s| s.connected, "tabs must land despite bad groups").await;
+    assert_eq!(state.tabs.len(), 1, "tabs must survive a malformed groups value");
+    assert_eq!(state.tabs[0].id, 5);
+    assert!(state.groups.is_empty(), "malformed groups must degrade to []");
 }
 
 /// Bonus liveness check rolled into the suite: `ext.ping` gets an

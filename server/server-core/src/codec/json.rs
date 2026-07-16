@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::CodecError;
-use crate::executors::{TabInfo, WindowInfo};
+use crate::executors::{GroupInfo, TabInfo, WindowInfo};
 
 /// The wire envelope `{t, seq?, p?}` (SPEC §1) — step 1 of the two-step
 /// parse (RESEARCH Pattern 3). Private: callers only see [`Decoded`].
@@ -226,15 +226,25 @@ pub struct TabsListPayload {
     pub connected: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tabs: Option<Vec<TabInfo>>,
+    /// Tab groups (protoVersion 1.5, quick 260716-sme): optional because a
+    /// 1.4 reply without it must decode (additive). Absent stays absent on
+    /// canonical re-encode; present (including `[]`) round-trips.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub groups: Option<Vec<GroupInfo>>,
 }
 
-/// `tabs.changed` payload (S→C push, protoVersion 1.4): BOTH fields
-/// REQUIRED — a missing field is a hard decode error (unlike the
-/// dual-request/reply `tabs.list` above).
+/// `tabs.changed` payload (S→C push, protoVersion 1.4): `connected` and
+/// `tabs` REQUIRED — a missing field is a hard decode error (unlike the
+/// dual-request/reply `tabs.list` above). `groups` (protoVersion 1.5) is the
+/// exception: optional because a 1.4 frame without it must decode
+/// (additive); absent stays absent on canonical re-encode, present
+/// (including `[]`) round-trips.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TabsChangedPayload {
     pub connected: bool,
     pub tabs: Vec<TabInfo>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub groups: Option<Vec<GroupInfo>>,
 }
 
 /// `tabs.activate` payload (C→S, protoVersion 1.4): fire-and-forget tab

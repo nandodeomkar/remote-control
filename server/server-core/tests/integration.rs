@@ -26,7 +26,7 @@ use server_core::auth::AuthManager;
 use server_core::auth::challenge::auth_proof;
 use server_core::auth::token::hash_token;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
-use server_core::executors::{Button, KeyCode, TabInfo, TabsState, WindowInfo};
+use server_core::executors::{Button, GroupInfo, KeyCode, TabInfo, TabsState, WindowInfo};
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
 use server_core::transport::{ClipState, SERVER_PROTO_VERSION, ServerDeps, VolumeState};
 
@@ -1190,8 +1190,9 @@ async fn input_blocked_authed_gate_silence_then_single_push() {
 // ──────────────── tabs.changed push gating (BROW-01) ────────────────────
 
 /// Receive the next frame, requiring a `tabs.changed` push; returns
-/// `(connected, tabs-json-array)` for field-level assertions.
-async fn recv_tabs_changed(ws: &mut WsClient) -> (bool, Vec<Value>) {
+/// `(connected, tabs-json-array, groups-json-array)` for field-level
+/// assertions. The 1.5 server ALWAYS emits `groups` in its pushes.
+async fn recv_tabs_changed(ws: &mut WsClient) -> (bool, Vec<Value>, Vec<Value>) {
     let v = recv_json(ws).await;
     assert_eq!(v["t"], "tabs.changed", "expected a tabs.changed push, got: {v}");
     (
@@ -1202,17 +1203,35 @@ async fn recv_tabs_changed(ws: &mut WsClient) -> (bool, Vec<Value>) {
             .as_array()
             .expect("tabs.changed must carry p.tabs")
             .clone(),
+        v["p"]["groups"]
+            .as_array()
+            .expect("1.5 tabs.changed must always carry p.groups")
+            .clone(),
     )
 }
 
-/// Two-tab sample state: one with icon, one legacy/iconless.
+/// Two-tab sample state: one with icon + group, one legacy/iconless/
+/// ungrouped. One group (protoVersion 1.5) so the push assertions cover the
+/// groups leg.
 fn sample_tabs() -> TabsState {
     TabsState {
         connected: true,
         tabs: vec![
-            TabInfo { id: 7, title: "GitHub".into(), active: true, icon: Some("bbbb".into()) },
-            TabInfo { id: 9, title: "Docs".into(), active: false, icon: None },
+            TabInfo {
+                id: 7,
+                title: "GitHub".into(),
+                active: true,
+                icon: Some("bbbb".into()),
+                group_id: Some(1),
+            },
+            TabInfo { id: 9, title: "Docs".into(), active: false, icon: None, group_id: None },
         ],
+        groups: vec![GroupInfo {
+            id: 1,
+            title: "Work".into(),
+            color: "blue".into(),
+            collapsed: false,
+        }],
     }
 }
 
@@ -1242,16 +1261,24 @@ async fn tabs_no_push_preauth() {
         "expected pairOk after correct pin, got: {pair_ok}"
     );
     let _snapshot = recv_vol_changed(&mut ws).await; // D-03 vol snapshot
-    let (connected, tabs) = recv_tabs_changed(&mut ws).await;
+    let (connected, tabs, groups) = recv_tabs_changed(&mut ws).await;
     assert!(connected, "post-auth push must carry connected:true");
     assert_eq!(tabs.len(), 2, "post-auth push must carry the tabs set while unauthed");
     assert_eq!(tabs[0]["id"], 7);
     assert_eq!(tabs[0]["icon"], "bbbb", "icon must survive the push");
+    assert_eq!(tabs[0]["groupId"], 1, "groupId must survive the push (1.5)");
     assert_eq!(tabs[1]["id"], 9);
     assert!(
         tabs[1].get("icon").is_none(),
         "iconless tab must omit the icon key"
     );
+    assert!(
+        tabs[1].get("groupId").is_none(),
+        "ungrouped tab must omit the groupId key (never -1, never null)"
+    );
+    assert_eq!(groups.len(), 1, "post-auth push must carry the groups (1.5)");
+    assert_eq!(groups[0]["color"], "blue");
+    assert_eq!(groups[0]["collapsed"], false);
 }
 
 /// BROW-01 live push + disconnect-hint path: an authed session receives
@@ -1269,16 +1296,19 @@ async fn tabs_changed_after_auth_then_disconnect_hint() {
 
     // A tab-state change produces exactly one tabs.changed.
     h.tabs_tx.send(sample_tabs()).expect("tabs watch alive");
-    let (connected, tabs) = recv_tabs_changed(&mut ws).await;
+    let (connected, tabs, groups) = recv_tabs_changed(&mut ws).await;
     assert!(connected, "push must carry connected:true");
     assert_eq!(tabs.len(), 2, "push must carry the current tabs");
     assert_eq!(tabs[0]["title"], "GitHub");
     assert_eq!(tabs[0]["active"], true, "active flag must survive the push");
+    assert_eq!(groups.len(), 1, "push must carry the current groups (1.5)");
+    assert_eq!(groups[0]["title"], "Work");
 
     // The disconnect reset (CONN-07-style cleanup in run_ext) delivers the
     // hint state to the phone.
     h.tabs_tx.send(TabsState::default()).expect("tabs watch alive");
-    let (connected, tabs) = recv_tabs_changed(&mut ws).await;
+    let (connected, tabs, groups) = recv_tabs_changed(&mut ws).await;
     assert!(!connected, "disconnect reset must carry connected:false");
     assert!(tabs.is_empty(), "disconnect reset must carry an empty tab list");
+    assert!(groups.is_empty(), "disconnect reset must carry an empty groups list");
 }

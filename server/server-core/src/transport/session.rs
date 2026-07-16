@@ -54,7 +54,10 @@ use crate::executors::{Executors, TabsState, WindowInfo};
 /// 1.4 adds the additive `tabs.*` family (BROW-01) — browser tab list fed
 /// by the localhost extension leg (SPEC §15) — minor bump, 1.0–1.3 clients
 /// still accepted (§2).
-pub const SERVER_PROTO_VERSION: &str = "1.4";
+/// 1.5 adds tab-group visibility (BROW-01, quick 260716-sme) — the GroupEl
+/// element, optional `groups` on the tabs payloads, and the optional TabEl
+/// `groupId` — minor bump, 1.0–1.4 clients still accepted (§2).
+pub const SERVER_PROTO_VERSION: &str = "1.5";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
 /// POST-auth liveness deadline: an Authed session receiving NO inbound
@@ -679,6 +682,9 @@ fn tabs_changed_frame(state: TabsState) -> Message {
         &Msg::TabsChanged(TabsChangedPayload {
             connected: state.connected,
             tabs: state.tabs,
+            // The 1.5 server ALWAYS emits groups in its pushes (empty when
+            // none); 1.4 clients ignore the unknown key per D-05.
+            groups: Some(state.groups),
         }),
         None,
     ))

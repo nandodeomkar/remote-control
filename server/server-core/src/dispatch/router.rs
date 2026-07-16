@@ -239,6 +239,9 @@ pub fn route(
             vec![Msg::TabsList(TabsListPayload {
                 connected: Some(state.connected),
                 tabs: Some(state.tabs),
+                // 1.5 server always emits groups (empty when none) — 1.4
+                // clients drop the unknown key per D-05.
+                groups: Some(state.groups),
             })]
         }
         // Fire-and-forget (SPEC §7): no err reply — stale ids self-heal via
@@ -415,7 +418,8 @@ mod tests {
     };
     use crate::executors::mock::{Call, MockExecutors};
     use crate::executors::{
-        Apps, Button, Executors, KeyCode, Modifier, TabInfo, Tabs, TabsState, WindowInfo,
+        Apps, Button, Executors, GroupInfo, KeyCode, Modifier, TabInfo, Tabs, TabsState,
+        WindowInfo,
     };
     use std::sync::Arc;
 
@@ -446,9 +450,27 @@ mod tests {
             TabsState {
                 connected: true,
                 tabs: vec![
-                    TabInfo { id: 7, title: "GitHub".into(), active: true, icon: None },
-                    TabInfo { id: 9, title: "Docs".into(), active: false, icon: None },
+                    TabInfo {
+                        id: 7,
+                        title: "GitHub".into(),
+                        active: true,
+                        icon: None,
+                        group_id: Some(1),
+                    },
+                    TabInfo {
+                        id: 9,
+                        title: "Docs".into(),
+                        active: false,
+                        icon: None,
+                        group_id: None,
+                    },
                 ],
+                groups: vec![GroupInfo {
+                    id: 1,
+                    title: "Work".into(),
+                    color: "blue".into(),
+                    collapsed: false,
+                }],
             }
         }
     }
@@ -577,15 +599,24 @@ mod tests {
         let mut ctx = ctx(AuthState::Authed);
 
         let reply = route(
-            d(Msg::TabsList(TabsListPayload { connected: None, tabs: None })),
+            d(Msg::TabsList(TabsListPayload { connected: None, tabs: None, groups: None })),
             &mut ctx, &exec, &auth, true,
         );
         match &reply[..] {
-            [Msg::TabsList(TabsListPayload { connected: Some(true), tabs: Some(tabs) })] => {
+            [Msg::TabsList(TabsListPayload {
+                connected: Some(true),
+                tabs: Some(tabs),
+                groups: Some(groups),
+            })] => {
                 assert_eq!(tabs.len(), 2, "reply must carry the executor's tabs");
                 assert_eq!(tabs[0].id, 7);
                 assert!(tabs[0].active, "active flag must survive the reply");
+                assert_eq!(tabs[0].group_id, Some(1), "groupId must survive the reply");
                 assert_eq!(tabs[1].id, 9);
+                assert_eq!(tabs[1].group_id, None, "ungrouped tab stays groupId-less");
+                assert_eq!(groups.len(), 1, "reply must carry the executor's groups (1.5)");
+                assert_eq!(groups[0].id, 1);
+                assert_eq!(groups[0].color, "blue");
             }
             other => panic!("expected a tabs.list reply with state, got: {other:?}"),
         }
@@ -630,7 +661,7 @@ mod tests {
         let auth = auth();
         let mut ctx = ctx(AuthState::Authed);
         let reply = route(
-            d(Msg::TabsList(TabsListPayload { connected: None, tabs: None })),
+            d(Msg::TabsList(TabsListPayload { connected: None, tabs: None, groups: None })),
             &mut ctx, &exec, &auth, false,
         );
         assert_eq!(
@@ -638,6 +669,7 @@ mod tests {
             vec![Msg::TabsList(TabsListPayload {
                 connected: Some(false),
                 tabs: Some(Vec::new()),
+                groups: Some(Vec::new()),
             })],
             "mock default state must reply the never-connected hint shape"
         );

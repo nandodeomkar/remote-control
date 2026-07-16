@@ -23,7 +23,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::codec::json::{self, Msg, TabsActivatePayload, TabsClosePayload};
-use crate::executors::{TabInfo, Tabs, TabsState};
+use crate::executors::{GroupInfo, TabInfo, Tabs, TabsState};
 
 /// Default extension-listener port (SPEC §15). Doc-pinned against the
 /// sibling defaults: the main WS listener is 17777, the UDP discovery
@@ -40,6 +40,10 @@ const MAX_WS_MESSAGE_BYTES: usize = 65536;
 /// `tabs.state` snapshot is truncated here regardless of what the extension
 /// sent.
 const MAX_EXT_TABS: usize = 50;
+
+/// Server-side belt for the extension-side 16-group cap (SPEC §15,
+/// protoVersion 1.5) — the MAX_EXT_TABS pattern applied to groups.
+const MAX_EXT_GROUPS: usize = 16;
 
 /// A phone-originated command relayed to the connected extension
 /// (router → [`TabsRelay`] → [`run_ext`] → extension socket).
@@ -209,7 +213,19 @@ fn handle_ext_text(text: &str, tabs_tx: &watch::Sender<TabsState>) -> Option<Mes
             if let Ok(mut tabs) = serde_json::from_value::<Vec<TabInfo>>(raw) {
                 // Server-side belt for the extension-side cap (SPEC §15).
                 tabs.truncate(MAX_EXT_TABS);
-                let _ = tabs_tx.send(TabsState { connected: true, tabs });
+                // Groups (protoVersion 1.5): MORE tolerant than tabs — a
+                // malformed/absent groups array degrades to empty rather
+                // than discarding the whole frame (tabs are the payload
+                // that matters; groups are decoration).
+                let mut groups = frame
+                    .p
+                    .get("groups")
+                    .cloned()
+                    .map(serde_json::from_value::<Vec<GroupInfo>>)
+                    .and_then(Result::ok)
+                    .unwrap_or_default();
+                groups.truncate(MAX_EXT_GROUPS);
+                let _ = tabs_tx.send(TabsState { connected: true, tabs, groups });
             }
             None
         }
