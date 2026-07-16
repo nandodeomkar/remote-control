@@ -53,6 +53,13 @@ pub const CLIENT_KEY_CODES: &[&str] = &[
     "Num9", "NumEnter", "NumDot",
     // Modifier hold codes (D-10 locked-modifier physical hold path)
     "ControlLeft", "AltLeft", "ShiftLeft", "WinLeft",
+    // Shortcut vocabulary (10-01): letters for Ctrl/Win chords, the main-row
+    // zero (distinct from Num0), PrintScreen, and the four browser/present
+    // macro codes promoted out of ROUTER_MACRO_CODES now that the client emits
+    // them directly (T/W tab macros, Plus/Minus zoom). Consumed by the 10-02
+    // Shortcuts catalog; mirrored byte-for-byte by the Dart kClientKeyCodes.
+    "A", "C", "D", "E", "F", "I", "R", "S", "V", "X", "Y", "Z",
+    "0", "PrintScreen", "T", "W", "Plus", "Minus",
 ];
 
 /// Codes the router's Phase-1 browser/present macro tables emit through
@@ -60,10 +67,15 @@ pub const CLIENT_KEY_CODES: &[&str] = &[
 /// of the client key-row vocabulary. They must map too, or browser/present
 /// actions silently no-op ("F5"/"Right"/"Left"/"Esc" overlap
 /// [`CLIENT_KEY_CODES`] and are covered there).
+///
+/// `T`/`W`/`Plus`/`Minus` were promoted into [`CLIENT_KEY_CODES`] (10-01) —
+/// the client now emits them directly for the Shortcuts catalog, so they are
+/// covered there and removed here to keep the two lists disjoint and honest.
+/// `B` stays router-only (the present_macro "black screen" code — no client
+/// cap emits it).
 // Contract artifact: consumed by the coverage tests only (see above).
 #[allow(dead_code)]
-pub const ROUTER_MACRO_CODES: &[&str] =
-    &["BrowserBack", "BrowserForward", "T", "W", "B", "Plus", "Minus"];
+pub const ROUTER_MACRO_CODES: &[&str] = &["BrowserBack", "BrowserForward", "B"];
 
 /// Media transport `key.code`s injected by [`crate::executors::media::WinMedia`]
 /// through the input thread (MED-01). System-wide by SMTC design: the OS routes
@@ -143,6 +155,25 @@ pub fn map_key(code: &KeyCode) -> Option<Key> {
         "B" => Key::Unicode('b'),
         "Plus" => Key::Unicode('='),
         "Minus" => Key::Unicode('-'),
+        // ── Shortcut vocabulary (10-01): letters ride Key::Unicode (lowercase)
+        // exactly like the T/W/B precedent above — enigo resolves the layout VK
+        // via VkKeyScanW so Ctrl+<letter> / Win+<letter> chord correctly.
+        "A" => Key::Unicode('a'),
+        "C" => Key::Unicode('c'),
+        "D" => Key::Unicode('d'),
+        "E" => Key::Unicode('e'),
+        "F" => Key::Unicode('f'),
+        "I" => Key::Unicode('i'),
+        "R" => Key::Unicode('r'),
+        "S" => Key::Unicode('s'),
+        "V" => Key::Unicode('v'),
+        "X" => Key::Unicode('x'),
+        "Y" => Key::Unicode('y'),
+        "Z" => Key::Unicode('z'),
+        // Main-row zero for Ctrl+0 (browser reset-zoom) — distinct from Num0.
+        "0" => Key::Unicode('0'),
+        // PrintScreen (VK_SNAPSHOT): bare + Win-modified screenshot chords.
+        "PrintScreen" => Key::PrintScr,
         _ => return None, // unknown code → silent drop (T-04-02)
     })
 }
