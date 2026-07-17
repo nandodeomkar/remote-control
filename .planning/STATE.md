@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 10-02-PLAN.md (Shortcuts tile + 25-button catalog; commits 1202f1c, bd0725a, b8e3107)
-last_updated: "2026-07-17T03:43:07.919Z"
-last_activity: 2026-07-16 -- Phase 10 execution resumed (wave continue)
+status: Phase 10 complete — awaiting phase verification
+stopped_at: Completed 10-06-PLAN.md (on-device UAT gate APPROVED; commits ce935a9, 9ba8358)
+last_updated: "2026-07-17T04:14:52.347Z"
+last_activity: 2026-07-17 -- Phase 10 complete (all 6 plans; UAT approved on v1.3.0-rc1)
 progress:
   total_phases: 10
-  completed_phases: 9
+  completed_phases: 10
   total_plans: 77
-  completed_plans: 76
-  percent: 90
+  completed_plans: 77
+  percent: 100
 ---
 
 # Project State
@@ -25,16 +25,15 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 
 ## Current Position
 
-Phase: 10 (keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke) — EXECUTING
-Plan: 6 of 6 (10-01, 10-02 complete)
-Next: 09-08 on-device visual UAT gate re-run — MUST `flutter build apk --release`
-  FRESH first (08-06 stale-APK lesson), then `flutter install` + walkthrough vs
-  the prototype. 09-09 (Material Symbols Rounded migration) just landed: all 63
-  lib + 41 test Icons.* refs -> Symbols.<name>_rounded, axes pinned in
-  buildAppTheme (opsz 24/wght 400/FILL 0/GRAD 0), classic Icons.* banned by
-  icons_guard_test, release APK +61.7 KB (Symbols font tree-shaken 99.4%),
-  09-UI-SPEC icon-library row amended. Analyzer clean, full suite 423 green.
-  Wave 1 complete (09-01..09-07);
+Phase: 10 (keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke) — COMPLETE
+Plan: 6 of 6 complete (10-06 UAT gate APPROVED 2026-07-17)
+Next: phase 10 verification (gsd-verifier), then milestone close-out / next phase.
+  Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
+  with persistent modifier chips + tab bar, keyboard.pad persistence, sacred FSM
+  lifted to screen owner (donor keyboard_panel.dart byte-untouched), Shortcuts hub
+  tile (25 chords, position 3), keymap vocabulary +18 codes both sides, no protocol
+  bump. Suites: 539 flutter green, 38 cargo green, analyzer clean. Distributed as
+  GitHub prerelease v1.3.0-rc1 (fresh APK + server exe), field-approved by owner.
   09-07 confirmed the Settings screen against 09-UI-SPEC with zero source delta
   and strengthened settings_screen_test.dart (meta copy, scroll-segment accent,
   accent-chip fill/text). Phase 08 closed with the
