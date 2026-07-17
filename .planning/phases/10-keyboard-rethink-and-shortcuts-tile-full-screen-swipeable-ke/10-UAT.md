@@ -19,17 +19,23 @@ On-device UAT gate (plan 10-06). Owner device: Xiaomi 25080RABDI. PC: Windows 11
 
 ## Task 2 — On-device walkthrough (blocking human gate)
 
-Owner's initial verdict: **"works, its not perfect but it works"** — per-check results pending owner's gap report.
+Owner's verdict: **"works, its not perfect but it works"**, followed by **"pass"** when asked to
+name specific gaps against the checklist — i.e. a batch approval with no itemized defects. The
+"not perfect" impression was not tied to any numbered check; no gap-closure plan is scoped from
+this gate. If specific irritations surface during daily driving, they enter the backlog as
+new items rather than reopening this phase.
 
 | # | Check | Result |
 |---|-------|--------|
-| 1 | Four pads swipe; tab bar highlights; chips on every pad | pending |
-| 2 | Type pad IME raised + extras row; IME lowers on swipe to Arrows | pending |
-| 3 | Keys dramatically larger (inverted-T, calculator grid, F-row) | pending |
-| 4 | Cross-pad combos (Ctrl-lock + F5, Ctrl+→, arrow autorepeat) | pending |
-| 5 | No stuck keys (swipe mid-hold, leave screen mid-hold) | pending |
-| 6 | Pad persistence across app restart | pending |
-| 7 | Shortcuts tile 3rd; 4 sections; effect labels + chord subtext | pending |
-| 8 | Representative chords fire on PC (Win+D, Win+Shift+S, PrtScn, Ctrl+Shift+Esc, Ctrl+C/V, Ctrl+Plus/0) | pending |
-| 9 | Offline gating: muted grey (not red), inert; tabs still navigate | pending |
-| 10 | Overall feel: IME raise/lower smooth, swipes instant | pending |
+| 1 | Four pads swipe; tab bar highlights; chips on every pad | ✅ pass (owner batch approval) |
+| 2 | Type pad IME raised + extras row; IME lowers on swipe to Arrows | ✅ pass (owner batch approval) |
+| 3 | Keys dramatically larger (inverted-T, calculator grid, F-row) | ✅ pass (owner batch approval) |
+| 4 | Cross-pad combos (Ctrl-lock + F5, Ctrl+→, arrow autorepeat) | ✅ pass (owner batch approval) |
+| 5 | No stuck keys (swipe mid-hold, leave screen mid-hold) | ✅ pass (owner batch approval) |
+| 6 | Pad persistence across app restart | ✅ pass (owner batch approval) |
+| 7 | Shortcuts tile 3rd; 4 sections; effect labels + chord subtext | ✅ pass (owner batch approval) |
+| 8 | Representative chords fire on PC (Win+D, Win+Shift+S, PrtScn, Ctrl+Shift+Esc, Ctrl+C/V, Ctrl+Plus/0) | ✅ pass (owner batch approval) |
+| 9 | Offline gating: muted grey (not red), inert; tabs still navigate | ✅ pass (owner batch approval) |
+| 10 | Overall feel: IME raise/lower smooth, swipes instant | ✅ pass (owner batch approval) |
+
+**Gate result: APPROVED** (build under test: GitHub prerelease `v1.3.0-rc1`, APK + server exe, 2026-07-17)
