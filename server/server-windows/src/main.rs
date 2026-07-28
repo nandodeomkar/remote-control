@@ -1,3 +1,13 @@
+// No console window in release builds (quick 260729-4rg). The app is
+// tray-first: every launch point the installer creates — Start Menu, desktop
+// icon, autostart Run entry — used to pop a terminal beside the tray icon.
+//
+// Gated on `debug_assertions` so `cargo run` keeps its console and its stdout
+// logs during development. Losing stdout in release is survivable only
+// because `logging.rs` writes a rolling file — do not remove one without the
+// other.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 //! server-windows binary — the composition root every later phase extends
 //! (RESEARCH Pattern 5): DPI awareness, tracing subscriber, dedicated input
 //! thread, `ServerDeps` assembly, and `server_core::run` on a LAN listener.
@@ -10,6 +20,7 @@ mod config;
 mod executors;
 mod firewall;
 mod input_thread;
+mod logging;
 mod notify;
 mod shell;
 mod single_instance;
@@ -23,7 +34,6 @@ use server_core::executors::{Executors, TabsState, WindowInfo};
 use server_core::transport::{ClipState, ServerDeps, VolumeState};
 use server_core::transport::beacon::{self, BeaconIdentity};
 use server_core::transport::ext::{self, ExtCmd, TabsRelay};
-use tracing_subscriber::EnvFilter;
 
 use apps_thread::AppsCmd;
 use audio_thread::AudioCmd;
@@ -49,10 +59,14 @@ async fn main() -> anyhow::Result<()> {
 
     // 2. This binary OWNS logging (server-core is deliberately log-free).
     //    SECURITY (threat T-02-ID): log only lifecycle events and counts —
-    //    NEVER frame contents, move deltas, PINs, or tokens.
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .init();
+    //    NEVER frame contents, move deltas, PINs, or tokens. That rule binds
+    //    harder now that the sink is a file on disk rather than a console
+    //    that closes with the process (logging.rs).
+    //
+    //    The guard is bound at `main` scope on purpose: it owns the
+    //    non-blocking writer's background thread, and dropping it early
+    //    truncates the log to nothing.
+    let _log_guard = logging::init();
 
     // 2a. Single-instance gate (quick 260729-38z), AFTER the subscriber (so
     //     the refusal is logged) and BEFORE any config load, thread spawn or

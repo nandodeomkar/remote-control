@@ -76,6 +76,12 @@ dirs = "6.0"
 # server-core already uses for the token hex (no new supply-chain surface).
 hex = "0.4"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# Rolling daily log files under %APPDATA%/RemoteControl/logs (quick 260729-4rg).
+# Not optional convenience: the release binary is windows_subsystem="windows",
+# so there is no console and the file IS the log. Locked by CLAUDE.md
+# ("Spec requires file logging with level filter"); tokio-rs org, same lineage
+# as tracing/tracing-subscriber already in tree.
+tracing-appender = "0.2"
 anyhow = "1"
 # Machine GUID read (HKLM\SOFTWARE\Microsoft\Cryptography) for the beacon
 # identity — Windows-only, injected into server-core (CONN-01).

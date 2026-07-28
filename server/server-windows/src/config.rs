@@ -111,6 +111,19 @@ pub fn config_path() -> PathBuf {
         .join("config.toml")
 }
 
+/// `%APPDATA%/RemoteControl/logs` — where [`crate::logging`] writes the
+/// rolling daily log (quick 260729-4rg).
+///
+/// Lives beside [`config_path`] so both known-folder resolutions share one
+/// home, and degrades identically: a `None` known folder yields a relative
+/// `RemoteControl/logs` rather than panicking.
+pub fn log_dir() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_default()
+        .join("RemoteControl")
+        .join("logs")
+}
+
 /// Read + parse the config file. Missing file (the normal first run) or any
 /// read/parse error yields [`Config::default`] — never a panic (T-07-27).
 pub fn load() -> Config {
