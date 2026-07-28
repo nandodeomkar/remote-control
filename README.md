@@ -9,8 +9,8 @@ You need two devices: the **Windows PC** you want to control and the **Android p
 1. **Accept the invite.** This project is private, so first accept the GitHub invitation that was emailed to you (check the email address tied to your GitHub account). Until you accept, the download page will show a "404 not found" error.
 
 2. **Get the files.** Open the [Releases page](../../releases/latest) and you will see two files (the numbers at the end are the version, so they change with each update):
-   - `RemoteControl-Setup-1.3.0.exe` — for the **PC**
-   - `RemoteControl-1.3.0.apk` — for the **phone**
+   - `RemoteControl-Setup-v1.3.0.exe` — for the **PC**
+   - `RemoteControl-v1.3.0.apk` — for the **phone**
 
    Download the `.exe` on the PC. For the `.apk`, open the Releases page in your **phone's browser** and download it directly on the phone — that skips the hassle of transferring the file between devices.
 
