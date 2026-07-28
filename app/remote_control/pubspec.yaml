@@ -19,9 +19,9 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # The build number (after the +) is Android's versionCode and must only ever
 # INCREASE -- Android refuses to install a lower code over a higher one. It sat
 # at 1 through the v1.0.0, v1.1.0, v1.2.0, and v1.3.0-rc1 releases, so every
-# one of those APKs reported itself as 1.0.0; 4 is the fourth shipped build
-# (quick 260729-42w). Bump both halves on every release.
-version: 1.3.1+5
+# one of those APKs reported itself as 1.0.0; it has been bumped per release
+# since (quick 260729-42w). Bump both halves on every release.
+version: 1.3.2+6
 
 environment:
   sdk: ^3.12.2
