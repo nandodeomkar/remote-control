@@ -32,6 +32,31 @@ pub fn notify_pin(pin: &str) {
     }
 }
 
+/// Tell the owner the server is already up (quick 260729-38z).
+///
+/// Fires from the `single_instance` guard when a second launch is refused.
+/// With a Start Menu entry, a desktop icon AND an autostart Run value all
+/// pointing at the same exe, an accidental re-launch is routine — silence
+/// would read as "the icon is broken", so the duplicate says so and points at
+/// the tray.
+///
+/// Console line first (the guaranteed path, same as [`notify_pin`]), then a
+/// best-effort toast. No secrets, no interpolated text on the failure log.
+pub fn notify_already_running() {
+    // ASCII-only on purpose: the Windows console defaults to a legacy OEM
+    // codepage, where a UTF-8 em-dash renders as mojibake.
+    println!("Remote Control is already running - look for the tray icon near the clock.");
+
+    let result = Toast::new(Toast::POWERSHELL_APP_ID)
+        .title("Remote Control is already running")
+        .text1("Look for the icon in the tray near the clock.")
+        .duration(Duration::Short)
+        .show();
+    if result.is_err() {
+        tracing::warn!("already-running toast failed");
+    }
+}
+
 /// Show a loud firewall-block warning toast (D-06 / SRV-04): the phone can't
 /// reach the server, and the one-line `hint` tells the owner how to fix it
 /// (e.g. "Allow Remote Control through Windows Firewall (TCP port 17777)").

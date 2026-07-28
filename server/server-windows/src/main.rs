@@ -12,6 +12,7 @@ mod firewall;
 mod input_thread;
 mod notify;
 mod shell;
+mod single_instance;
 
 use std::sync::{Arc, Mutex};
 
@@ -52,6 +53,26 @@ async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
         .init();
+
+    // 2a. Single-instance gate (quick 260729-38z), AFTER the subscriber (so
+    //     the refusal is logged) and BEFORE any config load, thread spawn or
+    //     bind. Without it a duplicate launch — routine once the installer
+    //     gives the owner a Start Menu entry, a desktop icon and an autostart
+    //     entry for the same exe — walks the whole composition root and dies
+    //     at step 7's bind() with a misleading "another app is using port"
+    //     toast, the other app being itself.
+    //
+    //     Returning Ok is deliberate: a second click is expected user
+    //     behaviour, not a failure. The guard binds to a local that lives for
+    //     the rest of `main`, so the mutex is held for the process lifetime.
+    let _instance_guard = match single_instance::acquire() {
+        Some(guard) => guard,
+        None => {
+            tracing::warn!("another instance already holds the instance mutex; exiting");
+            notify::notify_already_running();
+            return Ok(());
+        }
+    };
 
     // 2b. Persistent config (SRV-03 / D-01): load %APPDATA%/RemoteControl/
     //     config.toml FIRST — it seeds the auth store (step 5), the resolved
