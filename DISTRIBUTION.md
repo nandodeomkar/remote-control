@@ -114,9 +114,16 @@ location, settings, and paired devices. If the server is running, Setup asks
 for it to be closed first — quit it from the tray menu so it can save its
 config cleanly.
 
+**Logs:** the server runs windowed with no console, so nothing is printed
+anywhere visible. It writes a rolling daily log to
+`%APPDATA%\RemoteControl\logs\server.log.<date>` instead — that is the first
+place to look when something misbehaves. Set `RUST_LOG=debug` before launching
+for more detail. The files are dated in UTC, so late-evening local sessions
+land in the next day's file.
+
 **Uninstalling:** Settings → Apps → *Remote Control* → Uninstall. That removes
 the exe, both shortcuts, and the autostart entry, then asks whether to delete
-`%APPDATA%\RemoteControl` (settings and paired devices). Answering No keeps a
+`%APPDATA%\RemoteControl` (settings, paired devices, and logs). Answering No keeps a
 later reinstall paired.
 
 ### Android (the phone doing the controlling)

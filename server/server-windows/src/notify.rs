@@ -1,24 +1,37 @@
-//! Pairing-PIN display (D-09 / CONN-02): console print first (the
-//! guaranteed path — Focus Assist / notification settings can suppress
-//! toasts entirely), then a best-effort WinRT toast.
+//! Pairing-PIN display (D-09 / CONN-02): a console print, then a best-effort
+//! WinRT toast.
+//!
+//! THE CONSOLE IS NO LONGER THE GUARANTEED PATH (quick 260729-4rg). Two things
+//! changed since that was written: the Phase-10 pair window renders the PIN as
+//! digit boxes beside a QR code, and the release binary is now
+//! `windows_subsystem = "windows"` so it has no console at all. The pair
+//! window is the path that always works; the toast is a convenience that Focus
+//! Assist can still suppress.
+//!
+//! The `println!` calls below are kept deliberately — they are real output
+//! under `cargo run` and a harmless no-op in a windowed build. They are not
+//! dead code to be cleaned up.
 //!
 //! Accepted v1 quirk: the toast uses `Toast::POWERSHELL_APP_ID` because an
 //! unpackaged exe has no registered AUMID — Windows attributes the toast to
 //! "Windows PowerShell". Proper AUMID registration lands with the Phase-7
 //! tray.
 //!
-//! SECURITY (threat T-03-04): the PIN goes to stdout + toast ONLY — never
-//! through tracing (the same discipline as main.rs steps 2/5). The `warn!`
+//! SECURITY (threat T-03-04): the PIN goes to stdout + toast + the pair
+//! window ONLY — never through tracing (the same discipline as main.rs steps
+//! 2/5). That rule matters more now that tracing writes to a FILE on disk
+//! (logging.rs) instead of a console that closed with the process. The `warn!`
 //! on toast failure deliberately carries no pin.
 
 use tauri_winrt_notification::{Duration, Toast};
 
-/// Show the pairing PIN: console line first, then a best-effort toast.
+/// Show the pairing PIN: console line, then a best-effort toast.
 ///
 /// Both pairing call sites (initial `begin_pairing` and the WR-01 refresh
 /// loop) route through here, so this function owns the console format.
 pub fn notify_pin(pin: &str) {
-    // Console FIRST — always works, even when toasts are suppressed.
+    // Dev-build convenience only: no console exists in a release build. The
+    // pair window is what the owner actually reads (see the module docs).
     println!("Pairing PIN: {pin}");
 
     let result = Toast::new(Toast::POWERSHELL_APP_ID)
