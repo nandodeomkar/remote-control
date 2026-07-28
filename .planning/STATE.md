@@ -51,7 +51,7 @@ Next: phase 10 verification (gsd-verifier), then milestone close-out / next phas
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-29 -- Completed quick task 260729-4rg: no console window + file logging
+Last activity: 2026-07-29 -- Completed quick task 260729-58x: tab-group visual hierarchy (_GroupBlock containment)
 
 Progress: [██████████] 100% (8 of 8 phases complete; 62 of 62 plans)
 
@@ -346,6 +346,7 @@ Recent decisions affecting current work:
 | 260729-38z | Windows installer for the tray server (Inno Setup, shortcuts, autostart migration, single-instance guard) | 2026-07-29 | 9b10180 | [260729-38z-windows-installer-for-tray-server](./quick/260729-38z-windows-installer-for-tray-server/) |
 | 260729-42w | App version identity (1.3.0+4) + Settings About row | 2026-07-29 | cf7005c | [260729-42w-app-version-identity-and-about-row](./quick/260729-42w-app-version-identity-and-about-row/) |
 | 260729-4rg | No console window on launch + rolling file logging | 2026-07-29 | 564a744 | [260729-4rg-hide-console-window-and-add-file-logging](./quick/260729-4rg-hide-console-window-and-add-file-logging/) |
+| 260729-58x | Tab-group visual hierarchy — grouped runs contained in a tinted `_GroupBlock` | 2026-07-29 | 088c53b | [260729-58x-fix-tab-group-visual-hierarchy-on-the-br](./quick/260729-58x-fix-tab-group-visual-hierarchy-on-the-br/) |
 
 ## Deferred Items
 
