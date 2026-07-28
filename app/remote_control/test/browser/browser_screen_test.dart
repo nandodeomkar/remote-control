@@ -144,6 +144,21 @@ const TabsSnapshot _groupedTabs = TabsSnapshot(
   ],
 );
 
+/// Two adjacent single-tab groups (260729-58x) — the run-boundary fixture:
+/// each group must render as its OWN block, so the two tints differing is the
+/// proof that the chunker split the runs instead of merging them.
+const TabsSnapshot _twoGroups = TabsSnapshot(
+  connected: true,
+  tabs: [
+    TabInfo(id: 7, title: 'GitHub', active: true, groupId: 1),
+    TabInfo(id: 8, title: 'PRs', active: false, groupId: 2),
+  ],
+  groups: [
+    GroupInfo(id: 1, title: 'Work', color: 'blue', collapsed: false),
+    GroupInfo(id: 2, title: 'Play', color: 'green', collapsed: false),
+  ],
+);
+
 /// The row-chrome border color: the nearest Material ancestor's shape side.
 Color _rowBorder(WidgetTester t, String title) {
   final material = t.widget<Material>(
@@ -151,6 +166,29 @@ Color _rowBorder(WidgetTester t, String title) {
   );
   final shape = material.shape! as RoundedRectangleBorder;
   return shape.side.color;
+}
+
+/// The group block's [BoxDecoration] (260729-58x): the NEAREST [Container]
+/// ancestor of the header title. The header's color dot is a Container
+/// SIBLING of the title, not an ancestor, so `.first` resolves to the block
+/// container — the same nearest-ancestor idiom [_rowBorder] relies on.
+BoxDecoration _blockDecoration(WidgetTester t, String headerTitle) {
+  final container = t.widget<Container>(
+    find
+        .ancestor(of: find.text(headerTitle), matching: find.byType(Container))
+        .first,
+  );
+  return container.decoration! as BoxDecoration;
+}
+
+/// A tab row's corner radius: the nearest Material ancestor's shape radius
+/// (16 flat, 10 nested inside a group block — the concentric-radius rule).
+double _rowRadius(WidgetTester t, String title) {
+  final material = t.widget<Material>(
+    find.ancestor(of: find.text(title), matching: find.byType(Material)).first,
+  );
+  final shape = material.shape! as RoundedRectangleBorder;
+  return (shape.borderRadius as BorderRadius).topLeft.x;
 }
 
 void main() {
@@ -518,6 +556,121 @@ void main() {
 
       expect(find.byIcon(Symbols.language_rounded), findsNWidgets(2));
       expect(t.takeException(), isNull);
+
+      await _unmount(t);
+    });
+  });
+
+  // -- 260729-58x: tab-group visual hierarchy --------------------------------
+  //
+  // A floating label above flat rows gave a group a visible START but no
+  // visible END, so a tab inside a group looked identical to the tab after
+  // it. These pin the fix: one tinted, bordered container per consecutive
+  // grouped run, nested-radius rows inside it, and a separate count suffix.
+
+  group('tab-group visual hierarchy (260729-58x)', () {
+    testWidgets(
+        'a grouped run renders inside a tinted group block; grouped rows use '
+        'the nested radius, flat rows keep 16', (t) async {
+      final service = _FakeService()..parked = _groupedTabs;
+      await _pumpScreen(t, service);
+
+      final blue = kGroupColors['blue']!;
+      final decoration = _blockDecoration(t, 'Work');
+      expect(decoration.color, blue.withValues(alpha: 0.06),
+          reason: 'block fill is the group color at 6% — derived with '
+              'withValues, never an Opacity wrapper');
+      expect(decoration.border!.top.color, blue.withValues(alpha: 0.40),
+          reason: 'the block border is what gives the group a visible END');
+      expect(decoration.border!.top.width, 1);
+      expect((decoration.borderRadius! as BorderRadius).topLeft.x, 16);
+
+      // Concentric-radius rule: outer 16 − 6px block padding = nested 10.
+      expect(_rowRadius(t, 'GitHub'), 10);
+      expect(_rowRadius(t, 'PRs'), 10);
+      expect(_rowRadius(t, 'Docs'), 16,
+          reason: 'the tab AFTER the group keeps the flat radius-16 chrome');
+
+      expect(_rowBorder(t, 'GitHub'), kAccent,
+          reason: 'active-tab marking survives nesting');
+      expect(t.takeException(), isNull);
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'two adjacent groups render as two separate blocks, each with exactly '
+        'one header', (t) async {
+      final service = _FakeService()..parked = _twoGroups;
+      await _pumpScreen(t, service);
+
+      expect(find.text('Work'), findsOneWidget);
+      expect(find.text('Play'), findsOneWidget);
+      // Differing tints prove two DISTINCT block Containers — i.e. the run
+      // chunker split at the group boundary instead of merging.
+      expect(
+        _blockDecoration(t, 'Work').color,
+        kGroupColors['blue']!.withValues(alpha: 0.06),
+      );
+      expect(
+        _blockDecoration(t, 'Play').color,
+        kGroupColors['green']!.withValues(alpha: 0.06),
+      );
+      expect(
+        find.ancestor(of: find.text('Work'), matching: find.byType(Opacity)),
+        findsNothing,
+        reason: 'an expanded group must introduce NO Opacity — the collapsed '
+            'header owns the only one in the tab section, which is what keeps '
+            "the collapsed test's single-Opacity lookup unambiguous",
+      );
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'a grouped run shows a separate muted count suffix; the title Text is '
+        'unchanged', (t) async {
+      final service = _FakeService()..parked = _groupedTabs;
+      await _pumpScreen(t, service);
+
+      expect(find.text('· 2'), findsOneWidget);
+      expect(t.widget<Text>(find.text('· 2')).style!.color, kMuted);
+      // The count must be a SEPARATE Text, never concatenated into the title.
+      expect(find.text('Work'), findsOneWidget);
+      expect(
+        t.widget<Text>(find.text('Work')).style!.color,
+        kGroupColors['blue'],
+      );
+
+      await _unmount(t);
+    });
+
+    testWidgets('an untitled group falls back to the dot plus the count alone',
+        (t) async {
+      final service = _FakeService()
+        ..parked = const TabsSnapshot(
+          connected: true,
+          tabs: [TabInfo(id: 7, title: 'GitHub', active: true, groupId: 1)],
+          groups: [
+            GroupInfo(id: 1, title: '', color: 'red', collapsed: false),
+          ],
+        );
+      await _pumpScreen(t, service);
+
+      expect(find.text('· 1'), findsOneWidget);
+      expect(t.takeException(), isNull);
+
+      // No title to hang _blockDecoration off — reach the block through the
+      // count Text instead (still the nearest Container ancestor).
+      final block = t.widget<Container>(
+        find
+            .ancestor(of: find.text('· 1'), matching: find.byType(Container))
+            .first,
+      );
+      expect(
+        (block.decoration! as BoxDecoration).color,
+        kGroupColors['red']!.withValues(alpha: 0.06),
+      );
 
       await _unmount(t);
     });
