@@ -1,4 +1,5 @@
-/// The Browser tool screen (BROW-01, 05-02, 260716-oi2, 260716-sme) — the
+/// The Browser tool screen (BROW-01, 05-02, 260716-oi2, 260716-sme,
+/// 260729-58x) — the
 /// live PC tab list (Tab Bridge extension, proto 1.4; tab groups proto 1.5)
 /// above a 2-column macro grid that drives the focused PC browser via the
 /// reliable path.
@@ -11,11 +12,20 @@
 /// sends `tabs.list` once on open to prime (tabs.changed has no after-auth
 /// snapshot — the apps pull-on-open contract).
 ///
-/// Tab groups (260716-sme, proto 1.5): a [_GroupHeader] row (color dot +
-/// tinted title) precedes each consecutive run of grouped tabs; ungrouped
-/// tabs render flat exactly as before. VIEW-ONLY — the header has zero
-/// gesture handlers; collapsed groups dim the header (display metadata; the
-/// phone still lists the tabs the PC shows collapsed — accepted).
+/// Tab groups (260716-sme, proto 1.5; containment 260729-58x): the strip is
+/// chunked into consecutive same-group runs ([_TabRun]) and each GROUPED run
+/// renders inside one [_GroupBlock] — a group-tinted, group-bordered
+/// container holding its [_GroupHeader] (dot + tinted title + muted `· N`
+/// count) and its nested radius-10 rows. Ungrouped runs emit flat radius-16
+/// rows exactly as before, and a 16px gap separates runs.
+///
+/// The container is the point: the original floating-label design gave a
+/// group a visible START but no visible END, so a tab inside a group looked
+/// identical to the tab after it. A box has an end.
+///
+/// VIEW-ONLY — neither the header nor the block has any gesture handler or
+/// callback; collapsed groups dim the header (display metadata; the phone
+/// still lists the tabs the PC shows collapsed — accepted).
 ///
 /// [kBrowserActions] is the single source of truth for the macro vocabulary:
 /// each action string MUST byte-match the server router's `browser_macro`
@@ -380,19 +390,47 @@ class _SectionHeader extends StatelessWidget {
       );
 }
 
-/// The tab section body (260716-oi2, groups 260716-sme), keyed off
-/// [TabsViewState]:
+/// One consecutive run of tabs sharing the same resolved group (260729-58x).
+///
+/// [group] is null for a FLAT run — both genuinely ungrouped tabs and tabs
+/// whose groupId resolves to nothing (the group fell past the 16-group cap),
+/// which is why an unresolved id silently joins the surrounding flat run
+/// instead of opening a headerless block.
+class _TabRun {
+  /// The run's group, or null for a flat (ungrouped) run.
+  final GroupInfo? group;
+
+  /// The tabs in this run, in extension order.
+  final List<TabInfo> tabs;
+
+  /// Creates a run. [tabs] is grown in place by the chunker.
+  _TabRun({required this.group, required this.tabs});
+}
+
+/// The tab section body (260716-oi2, groups 260716-sme + 260729-58x), keyed
+/// off [TabsViewState]:
 ///
 /// - `connected == false` (regardless of phone-auth state — locked
 ///   fallback): the install-hint card.
 /// - connected + zero tabs: a small muted one-liner.
 /// - connected + tabs: swipe-to-close rows in extension order (no client
-///   sort), with a view-only [_GroupHeader] before each consecutive run of
-///   grouped tabs (proto 1.5). Tabs whose groupId is null or unresolved
-///   (the group fell past the 16-group cap) render flat exactly as before.
-///   Chrome keeps a group's tabs contiguous in the strip, so
-///   consecutive-run detection is correct; a non-contiguous edge case would
-///   just repeat the header (harmless — no dedupe machinery).
+///   sort), chunked into consecutive `(GroupInfo?, List<TabInfo>)` runs.
+///
+/// Run rendering (260729-58x). The original design put a floating
+/// [_GroupHeader] label above otherwise-flat rows, which gave a group a
+/// visible START but no visible END — a tab inside a group was
+/// indistinguishable from the tab after it. A container has an end, so each
+/// grouped run now renders as ONE [_GroupBlock]; a flat run emits its rows
+/// directly, byte-identical to the pre-260729-58x look.
+///
+/// Spacing contract: 16px between runs (never before the first) — the gap
+/// that puts the next tab unmistakably OUTSIDE the block; 8px between rows
+/// of a flat run (unchanged); 6px between rows nested in a block (see
+/// [_GroupBlock]).
+///
+/// Chrome keeps a group's tabs contiguous in the strip, so consecutive-run
+/// detection is correct; a non-contiguous edge case would just render the
+/// group as two blocks (harmless — no dedupe machinery).
 class _TabsSection extends StatelessWidget {
   final TabsViewState tabs;
   final bool enabled;
@@ -422,56 +460,79 @@ class _TabsSection extends StatelessWidget {
         ),
       );
     }
-    final list = tabs.tabs;
     // Resolve group ids once (proto 1.5): a tab whose groupId misses this
-    // map (group fell past the cap) renders flat, exactly like ungrouped.
+    // map (group fell past the cap) resolves to null and therefore joins the
+    // surrounding FLAT run — no header, no block, no exception.
     final groupById = {for (final g in tabs.groups) g.id: g};
-    final children = <Widget>[];
-    int? prevGroupId;
-    for (var i = 0; i < list.length; i++) {
-      final tab = list[i];
-      final group =
-          tab.groupId != null ? groupById[tab.groupId] : null;
-      final resolvedId = group?.id;
-      if (children.isNotEmpty) children.add(const SizedBox(height: 8));
-      if (group != null && resolvedId != prevGroupId) {
-        children.add(_GroupHeader(group: group));
-        children.add(const SizedBox(height: 8));
+
+    // Chunk the strip into consecutive same-group runs.
+    final runs = <_TabRun>[];
+    for (final tab in tabs.tabs) {
+      final group = tab.groupId != null ? groupById[tab.groupId] : null;
+      if (runs.isNotEmpty && runs.last.group?.id == group?.id) {
+        runs.last.tabs.add(tab);
+      } else {
+        runs.add(_TabRun(group: group, tabs: [tab]));
       }
-      prevGroupId = resolvedId;
-      children.add(
-        Dismissible(
-          key: ValueKey(tab.id),
-          direction: DismissDirection.horizontal,
-          // A kSurface panel with the muted close glyph revealed under the
-          // swiping row.
-          background: Container(
-            decoration: BoxDecoration(
-              color: kSurface,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(
-              Symbols.close_rounded,
-              size: 20,
-              color: kMuted,
-            ),
+    }
+
+    final children = <Widget>[];
+    for (var r = 0; r < runs.length; r++) {
+      // 16px run gap — the signal that the next tab is OUTSIDE the block.
+      if (r > 0) children.add(const SizedBox(height: 16));
+      final run = runs[r];
+      final group = run.group;
+      if (group == null) {
+        // Flat run: rows at radius 16 with 8px gaps — unchanged from before.
+        for (var i = 0; i < run.tabs.length; i++) {
+          if (i > 0) children.add(const SizedBox(height: 8));
+          children.add(_row(run.tabs[i], radius: 16));
+        }
+      } else {
+        // Grouped run: one contained block of nested-radius rows.
+        children.add(
+          _GroupBlock(
+            group: group,
+            rows: [for (final tab in run.tabs) _row(tab, radius: 10)],
           ),
-          confirmDismiss: (_) async => _confirmSwipe(tab.id),
-          child: _TabRow(
-            tab: tab,
-            enabled: enabled,
-            onActivate: onActivate,
-            onClose: onClose,
-          ),
-        ),
-      );
+        );
+      }
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: children,
     );
   }
+
+  /// One swipe-to-close tab row at [radius] — 16 flat, 10 nested inside a
+  /// [_GroupBlock]. The radius is shared with the Dismissible's revealed
+  /// background so the panel under a swiping row matches the row's corners.
+  Widget _row(TabInfo tab, {required double radius}) => Dismissible(
+        key: ValueKey(tab.id),
+        direction: DismissDirection.horizontal,
+        // A kSurface panel with the muted close glyph revealed under the
+        // swiping row.
+        background: Container(
+          decoration: BoxDecoration(
+            color: kSurface,
+            borderRadius: BorderRadius.circular(radius),
+          ),
+          alignment: Alignment.center,
+          child: const Icon(
+            Symbols.close_rounded,
+            size: 20,
+            color: kMuted,
+          ),
+        ),
+        confirmDismiss: (_) async => _confirmSwipe(tab.id),
+        child: _TabRow(
+          tab: tab,
+          enabled: enabled,
+          onActivate: onActivate,
+          onClose: onClose,
+          radius: radius,
+        ),
+      );
 
   /// Swipe-close gate + fire. Returns false when not [enabled] so a swipe
   /// cannot fire unauthed (ChipStatus.connected gating, existing pattern).
@@ -538,11 +599,68 @@ class _InstallHintCard extends StatelessWidget {
       );
 }
 
-/// A view-only tab-group header (proto 1.5, 260716-sme): an 8px dot in the
-/// mapped Chrome group color + the group title at 12/600 tinted the SAME
-/// color; an empty title renders the dot alone. Collapsed groups wrap the
-/// content in Opacity(0.5) and append a small muted unfold-less glyph —
-/// display metadata ONLY.
+/// The containment shell for one consecutive grouped run (260729-58x): a
+/// tinted, bordered box holding the run's [_GroupHeader] and its [rows].
+///
+/// Fill and border are BOTH derived with `Color.withValues(alpha:)` on the
+/// mapped group swatch — 6% fill for a tint that stays readable on kBg
+/// `#0E0F12`, 40% border for the visible edge. Never an [Opacity] wrapper:
+/// Opacity would dim the rows inside as well, and the tab section keeps
+/// EXACTLY ONE Opacity (the collapsed-header dim), which a widget test
+/// looks up unambiguously.
+///
+/// Concentric-radius rule: the block's outer radius 16 minus its 6px padding
+/// leaves 10 for the nested rows, so the corners stay visually parallel
+/// instead of the inner rows looking too round. Rows are separated by 6px
+/// (tighter than the 8px flat spacing) because containment already does the
+/// separating work; the 16px run gap outside the block is what marks the
+/// group's END.
+///
+/// VIEW-ONLY IS STRUCTURAL, same rule as [_GroupHeader]: this widget holds
+/// only a [GroupInfo] and pre-built row widgets, and declares zero callbacks
+/// and zero gesture handlers, so the block can never become a new action
+/// surface (the phone still cannot create/collapse/move groups).
+class _GroupBlock extends StatelessWidget {
+  final GroupInfo group;
+  final List<Widget> rows;
+
+  const _GroupBlock({required this.group, required this.rows});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = groupColor(group.color);
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        border: Border.all(color: color.withValues(alpha: 0.40)),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _GroupHeader(group: group, count: rows.length),
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const SizedBox(height: 6),
+            rows[i],
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// A view-only tab-group header (proto 1.5, 260716-sme; count 260729-58x):
+/// an 8px dot in the mapped Chrome group color, the group title at 12/600
+/// tinted the SAME color, then a muted `· N` tab count. Collapsed groups
+/// wrap the content in Opacity(0.5) and append a small muted unfold-less
+/// glyph — display metadata ONLY.
+///
+/// The count is a SEPARATE [Text], never concatenated into the title: the
+/// title must stay a lone `Text(group.title)` carrying exactly the group
+/// tint so `find.text('Work')` resolves to one widget with a known style
+/// (pinned by test). An untitled group therefore falls back to dot + count
+/// alone, which still reads as a group rather than an anonymous box.
 ///
 /// VIEW-ONLY IS STRUCTURAL: this widget has NO gesture handlers and no
 /// callbacks — the phone cannot create/collapse/move groups (SPEC §7
@@ -552,7 +670,10 @@ class _InstallHintCard extends StatelessWidget {
 class _GroupHeader extends StatelessWidget {
   final GroupInfo group;
 
-  const _GroupHeader({required this.group});
+  /// How many tabs the run holds — rendered as the `· N` suffix.
+  final int count;
+
+  const _GroupHeader({required this.group, required this.count});
 
   @override
   Widget build(BuildContext context) {
@@ -579,23 +700,36 @@ class _GroupHeader extends StatelessWidget {
             ),
           ),
         ],
+        const SizedBox(width: 6),
+        Text(
+          '· $count',
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            color: kMuted,
+          ),
+        ),
         if (group.collapsed) ...[
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           const Icon(Symbols.unfold_less_rounded, size: 14, color: kMuted),
         ],
       ],
     );
     return Padding(
-      padding: const EdgeInsets.only(left: 4),
+      padding: const EdgeInsets.only(left: 6, top: 2, bottom: 6),
       child: group.collapsed ? Opacity(opacity: 0.5, child: content) : content,
     );
   }
 }
 
 /// One tab row: chrome byte-matches the apps screen's `_WindowRow` (kSurface
-/// fill, radius 16, minHeight 56, kHairline border) EXCEPT the active tab,
-/// which carries a kAccent border (the armed-chip visual language — locked
+/// fill, minHeight 56, kHairline border) EXCEPT the active tab, which
+/// carries a kAccent border (the armed-chip visual language — locked
 /// "active tab visually marked").
+///
+/// [radius] is 16 for a flat row and 10 when nested inside a [_GroupBlock]
+/// (260729-58x concentric-radius rule); it drives both the Material shape
+/// and the InkWell splash clip so the ink never bleeds past the corners.
 ///
 /// Tap-DOWN → activate + the 100ms accent press-flash (house press-down
 /// pattern); long-press → close (locked "swipe or long-press = close").
@@ -607,11 +741,15 @@ class _TabRow extends StatefulWidget {
   final void Function(int id) onActivate;
   final void Function(int id) onClose;
 
+  /// Corner radius: 16 flat, 10 nested in a group block.
+  final double radius;
+
   const _TabRow({
     required this.tab,
     required this.enabled,
     required this.onActivate,
     required this.onClose,
+    required this.radius,
   });
 
   @override
@@ -642,10 +780,10 @@ class _TabRowState extends State<_TabRow> {
       color: kSurface,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: borderColor),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(widget.radius),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(widget.radius),
         onTap: widget.enabled ? () {} : null,
         onTapDown: widget.enabled ? (_) => _fire() : null,
         onLongPress:
