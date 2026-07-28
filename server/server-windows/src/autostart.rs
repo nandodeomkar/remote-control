@@ -40,11 +40,33 @@ fn build() -> anyhow::Result<auto_launch::AutoLaunch> {
     // ABSOLUTE exe path (SRV-02, ASVS V4): a relative or bare-name path would
     // resolve against the launcher's CWD at boot and fail silently.
     let exe = std::env::current_exe()?;
+
+    // QUOTED (quick 260729-38z). auto-launch writes the Run value as
+    // `format!("{} {}", app_path, args.join(" "))` — no quoting of its own —
+    // so an unquoted path containing a space leaves the classic ambiguous
+    // command line at boot: `C:\Users\Jane Doe\...\RemoteControl.exe` invites
+    // CreateProcess to try `C:\Users\Jane.exe` first (ASVS V4 / unquoted
+    // service path). The installer defaults to a space-free directory, but
+    // the profile directory is not ours to choose, so quote here instead of
+    // relying on the install path.
+    //
+    // Passing the quotes as part of `app_path` is safe with this crate:
+    // `is_enabled()` only checks that the value NAME exists and `disable()`
+    // removes by name — neither parses the value data. `"` is not a legal
+    // Windows path character, so this can never double-quote.
+    let quoted = quote_path(&exe);
+
     let auto = AutoLaunchBuilder::new()
         .set_app_name(APP_NAME)
-        .set_app_path(exe.to_string_lossy().as_ref())
+        .set_app_path(&quoted)
         .build()?;
     Ok(auto)
+}
+
+/// Wrap an exe path in double quotes for the Run value. Split out from
+/// [`build`] so the quoting is testable without touching the real registry.
+fn quote_path(path: &std::path::Path) -> String {
+    format!("\"{}\"", path.to_string_lossy())
 }
 
 /// Register the server to start with Windows (HKCU `...\Run`, absolute exe).
@@ -78,6 +100,23 @@ pub fn is_enabled() -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A path with a space must land in the Run value fully quoted — the
+    /// whole point of [`quote_path`] (quick 260729-38z). auto-launch appends
+    /// a trailing space for its empty args list, which is harmless once the
+    /// path itself is delimited.
+    #[test]
+    fn quote_path_wraps_paths_containing_spaces() {
+        let quoted = quote_path(std::path::Path::new(
+            r"C:\Users\Jane Doe\AppData\Local\Programs\RemoteControl\RemoteControl.exe",
+        ));
+
+        assert_eq!(
+            quoted,
+            r#""C:\Users\Jane Doe\AppData\Local\Programs\RemoteControl\RemoteControl.exe""#
+        );
+        assert!(quoted.starts_with('"') && quoted.ends_with('"'));
+    }
 
     /// Round-trips the REAL HKCU Run key: enable → is_enabled() true →
     /// disable → is_enabled() false. `#[ignore]` because it mutates on-device

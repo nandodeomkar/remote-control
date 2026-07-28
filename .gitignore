@@ -4,3 +4,6 @@
 app/packages/remote_protocol/build/
 .planning/research/.cache/
 graphify-out/
+# Installer output (installer/build-installer.ps1) -- release artifacts are
+# attached to GitHub Releases, never committed.
+/dist/
