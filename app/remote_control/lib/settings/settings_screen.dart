@@ -18,6 +18,11 @@
 ///      `hapticsEnabledProvider` (default ON).
 ///   5. Accent — a STATIC, non-interactive `#4C8DFF` "Blue" swatch chip
 ///      (D-12: no picker, ever).
+///   6. About — the running build's version, read from the installed package
+///      via `app_version.dart`'s [appVersionProvider] (260729-42w). Display
+///      only. Exists so a sideloaded build can be identified: every APK from
+///      v1.0.0 through v1.3.0-rc1 reported itself as "1.0.0", which made
+///      "which version are you on?" unanswerable.
 ///
 /// Chrome: app bar `#0E0F12` / title "Settings" (16/600); body = scrollable
 /// `#0E0F12` canvas of grouped `#16181D` surfaces separated by `#2A2D34`
@@ -34,6 +39,7 @@ import '../screens/device_list_screen.dart';
 import '../store/device_list_store.dart';
 import '../theme/tokens.dart';
 import '../trackpad/tuning.dart';
+import 'app_version.dart';
 import 'haptics.dart';
 import 'scroll_direction.dart';
 import 'sensitivity.dart';
@@ -72,6 +78,17 @@ const String kAccentLabel = 'Accent';
 
 /// Accent swatch chip text.
 const String kAccentValueLabel = 'Blue';
+
+/// About group heading.
+const String kAboutHeading = 'About';
+
+/// Version row label.
+const String kVersionLabel = 'Version';
+
+/// Version row value when the package lookup fails. A missing version is a
+/// nuisance; a Settings screen that fails to build would also cut off the only
+/// route to Revoke.
+const String kVersionUnavailable = 'Unavailable';
 
 /// Destructive confirm dialog title.
 const String kRevokeConfirmTitle = 'Revoke this PC?';
@@ -135,6 +152,8 @@ class SettingsScreen extends ConsumerWidget {
             _HapticsGroup(),
             SizedBox(height: 24),
             _AccentGroup(),
+            SizedBox(height: 24),
+            _AboutGroup(),
           ],
         ),
       ),
@@ -538,6 +557,45 @@ class _AccentGroup extends StatelessWidget {
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Group 6: About — the running build's version, read from the installed
+/// package. Display only, structurally a plain label/value row (the
+/// [_AccentGroup] shape without the chip).
+class _AboutGroup extends ConsumerWidget {
+  const _AboutGroup();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // loading -> empty rather than a placeholder: the lookup resolves in a
+    // frame or two, and a row that flashes "..." before settling reads worse
+    // than one that simply fills in.
+    final version = ref.watch(appVersionProvider).when(
+          data: (v) => v,
+          loading: () => '',
+          error: (_, _) => kVersionUnavailable,
+        );
+
+    return _GroupSurface(
+      heading: kAboutHeading,
+      children: [
+        ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(kVersionLabel, style: _rowTitle),
+                ),
+                Text(version, style: _rowSubtitle),
               ],
             ),
           ),

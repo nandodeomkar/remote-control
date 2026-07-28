@@ -6,7 +6,7 @@
 // deviceListProvider is stubbed to a static paired-PC list (no BeaconListener
 // bind, no sweep timer — mirrors widget_test.dart's _StubDeviceList).
 //
-// Covers the plan's three acceptance rows: the five groups render in the
+// Covers the plan's three acceptance rows: the six groups render in the
 // UI-SPEC §5 order, the Accent swatch is non-interactive (no InkWell/tap
 // handler), and tapping "Revoke" opens the destructive confirm dialog whose
 // confirm button removes the device + deletes its token.
@@ -18,6 +18,7 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import 'package:remote_control/net/connection_providers.dart';
+import 'package:remote_control/settings/app_version.dart';
 import 'package:remote_control/net/connection_service.dart';
 import 'package:remote_control/screens/connection_copy.dart' show deviceMetaPaired;
 import 'package:remote_control/screens/device_list_screen.dart';
@@ -69,6 +70,10 @@ class _StubPairedList extends DeviceListNotifier {
       ];
 }
 
+/// Pinned so the About row's value is asserted against a known string rather
+/// than whatever pubspec happens to say today.
+const String _kTestVersion = '9.9.9 (99)';
+
 Widget _host(DeviceStore store) => ProviderScope(
       overrides: [
         deviceStoreProvider.overrideWithValue(store),
@@ -76,6 +81,9 @@ Widget _host(DeviceStore store) => ProviderScope(
           (ref) => ConnectionService(store: store),
         ),
         deviceListProvider.overrideWith(_StubPairedList.new),
+        // Keeps the About row off the package_info_plus platform channel,
+        // which has no registrant under flutter_test (260729-42w).
+        appVersionProvider.overrideWith((ref) async => _kTestVersion),
       ],
       child: const MaterialApp(home: SettingsScreen()),
     );
@@ -102,7 +110,16 @@ void main() {
     await store.saveToken('guid-office-pc', 'tok-abc123');
   });
 
-  testWidgets('renders the five groups in the UI-SPEC §5 order', (t) async {
+  testWidgets('renders the six groups in the UI-SPEC §5 order', (t) async {
+    // Six groups no longer fit the default 800x600 test viewport, and the
+    // ListView builds lazily — the About group would simply not exist to find.
+    // The order assertion compares dy across all six at once, so scrolling is
+    // not an option: they must be laid out simultaneously.
+    t.view.physicalSize = const Size(1000, 2400);
+    t.view.devicePixelRatio = 1.0;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+
     await t.pumpWidget(_host(store));
     await t.pump();
 
@@ -112,6 +129,7 @@ void main() {
       kScrollDirectionLabel,
       kHapticsLabel,
       kAccentLabel,
+      kAboutHeading,
     ]) {
       expect(find.text(label), findsOneWidget, reason: 'missing "$label"');
     }
@@ -124,6 +142,7 @@ void main() {
       kScrollDirectionLabel,
       kHapticsLabel,
       kAccentLabel,
+      kAboutHeading,
     ];
     final positions = [
       for (final label in labels) t.getTopLeft(find.text(label)).dy,
