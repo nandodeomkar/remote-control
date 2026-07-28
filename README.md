@@ -8,18 +8,21 @@ You need two devices: the **Windows PC** you want to control and the **Android p
 
 1. **Accept the invite.** This project is private, so first accept the GitHub invitation that was emailed to you (check the email address tied to your GitHub account). Until you accept, the download page will show a "404 not found" error.
 
-2. **Get the files.** Open the [Releases page](../../releases/latest) and you will see two files:
-   - `RemoteControl-Server-v1.0.0.exe` — for the **PC**
-   - `RemoteControl-v1.0.0.apk` — for the **phone**
+2. **Get the files.** Open the [Releases page](../../releases/latest) and you will see two files (the numbers at the end are the version, so they change with each update):
+   - `RemoteControl-Setup-1.3.0.exe` — for the **PC**
+   - `RemoteControl-1.3.0.apk` — for the **phone**
 
    Download the `.exe` on the PC. For the `.apk`, open the Releases page in your **phone's browser** and download it directly on the phone — that skips the hassle of transferring the file between devices.
 
 ### On your PC
 
-1. Download `RemoteControl-Server-v1.0.0.exe` and double-click it.
+1. Download the `RemoteControl-Setup` file and double-click it.
 2. Windows shows a blue **"Windows protected your PC"** warning. This is normal for programs that don't come from the Microsoft Store. Click **More info**, then **Run anyway**.
-3. A firewall popup appears next — click **Allow access**.
-4. Success looks like this: a small icon appears in the tray near the clock (you may need to click the **^** arrow to see it).
+3. The installer asks you two things: whether to put an icon on your desktop, and whether to start Remote Control automatically when you turn on your PC. Both are ticked already — leave them on unless you'd rather not. Then click **Install**. It never asks for an administrator password.
+4. A firewall popup appears the first time it runs — click **Allow access**.
+5. Success looks like this: a small icon appears in the tray near the clock (you may need to click the **^** arrow to see it).
+
+From now on you can start it any time from the **Start menu** (type "Remote Control") or the desktop icon. To remove it later, go to **Settings → Apps**, find Remote Control, and choose Uninstall.
 
 ### On your phone
 
@@ -37,7 +40,7 @@ If the camera scan doesn't work, the pair window also shows a 6-digit PIN you ca
 
 ### Browser tab list (optional)
 
-Want to see and switch your PC browser's open tabs from the phone? Download `RemoteControl-Extension-vX.zip` from the same [Releases page](../../releases/latest), unzip it, and follow the walkthrough in the zip's README ([view it here](extension/README.md)). It's a small free browser extension for Chrome or Edge that only talks to the Remote Control server on your own PC.
+Want to see and switch your PC browser's open tabs from the phone? The installer already put the extension on your PC — nothing extra to download. Open the **Start menu**, type "Remote Control", and pick **Remote Control browser extension**: that opens the folder you point Chrome or Edge at. The walkthrough is in that folder's README ([view it here](extension/README.md)). It's a small free browser extension that only talks to the Remote Control server on your own PC.
 
 ## What you get
 
@@ -57,7 +60,9 @@ Want to see and switch your PC browser's open tabs from the phone? Download `Rem
 
 **The phone can't find the PC.** Confirm BOTH devices are on the same WiFi network — a phone on mobile data won't find it.
 
-**I clicked past the firewall popup (or hit "Cancel").** Close the tray program on the PC and run the `.exe` again to get the popup back — click **Allow access** this time.
+**I closed the program on the PC and can't find it again.** Open the **Start menu**, type "Remote Control", and click it — or use the desktop icon if you kept one. Clicking it twice is harmless: the second click just points you back to the tray icon.
+
+**I clicked past the firewall popup (or hit "Cancel").** Quit the tray program on the PC, start Remote Control again from the Start menu, and the popup comes back — click **Allow access** this time.
 
 **The QR code stopped working.** The code expires after 60 seconds for safety. Close the pair window on the PC and open it again for a fresh code.
 
@@ -70,8 +75,10 @@ This is a protocol-first monorepo: the wire contract in `protocol/` is the sourc
 | Directory | Contents |
 |-----------|----------|
 | `protocol/` | Versioned wire spec (`SPEC.md`), JSON schema, and golden fixtures — the shared cross-language contract |
-| `server/` | Rust cargo workspace: `server-core` (OS-agnostic protocol/auth/dispatch core) + future `server-windows` binary |
+| `server/` | Rust cargo workspace: `server-core` (OS-agnostic protocol/auth/dispatch core) + the `server-windows` binary |
 | `app/` | Flutter client; `app/packages/remote_protocol` is the pure Dart protocol package |
+| `extension/` | Unpacked Chrome/Edge extension for the browser tab list |
+| `installer/` | Inno Setup script + build script for the Windows setup exe |
 
 ### Testing
 

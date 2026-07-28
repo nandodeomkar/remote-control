@@ -4,16 +4,38 @@ How to build the Remote Control release artifacts and hand them to a friend.
 
 ## 1. Building the release artifacts (owner)
 
-### Windows server
+### Windows server installer
 
-From `server/`:
+**One-time prerequisite:** [Inno Setup 6](https://jrsoftware.org/isdl.php)
+(6.3 or newer — the script uses `WizardIsTaskSelected`). A per-user install
+works; no admin rights needed.
 
 ```
-cargo build --release -p server-windows
+winget install --id JRSoftware.InnoSetup -e -s winget
 ```
 
-The binary lands at `server/target/release/server-windows.exe`. It is a single
-self-contained executable — no runtime installs needed on the target machine.
+**Build**, from the repo root:
+
+```
+.\installer\build-installer.ps1
+```
+
+That runs `cargo build --release -p server-windows` and compiles
+`installer/RemoteControl.iss`, producing
+`dist/RemoteControl-Setup-v<version>.exe` (~5 MB). The version comes from
+`server/server-windows/Cargo.toml` — the same value embedded in the exe's
+VERSIONINFO — so bump it there for a release. Pass `-Version` to override for a
+one-off build, or `-SkipBuild` to repackage an existing binary.
+
+The setup exe is what goes on the GitHub Release. It installs per-user into
+`%LOCALAPPDATA%\Programs\RemoteControl` (no UAC prompt), creates a Start Menu
+entry, and offers a desktop shortcut and a start-with-Windows checkbox. The
+browser extension is bundled inside it.
+
+The bare `cargo build --release -p server-windows` still works and still lands
+a self-contained `server/target/release/server-windows.exe` — useful for
+development, but do not hand that out: it has no shortcuts, no uninstaller, and
+its autostart entry points wherever the file happens to sit.
 
 ### Android APK
 
@@ -44,15 +66,19 @@ The APK lands at `build/app/outputs/flutter-apk/app-release.apk`.
 
 ### Browser extension
 
-From the repo root, zip the `extension/` folder (PowerShell):
+The installer ships the extension inside the setup exe (installed to
+`%LOCALAPPDATA%\Programs\RemoteControl\extension`, with a Start Menu shortcut
+that opens that folder), so a separate download is no longer required — and
+this way the extension can never drift out of sync with the server it talks to.
+
+The standalone zip remains useful for anyone running the bare exe:
 
 ```
 Compress-Archive -Path extension -DestinationPath RemoteControl-Extension-v1.0.0.zip
 ```
 
-Attach `RemoteControl-Extension-v1.0.0.zip` to the GitHub release beside the
-exe and the apk. Recipients unzip it and load the `extension` folder unpacked
-in Chrome or Edge — the zip's own `README.md` walks them through it.
+Recipients unzip it and load the `extension` folder unpacked in Chrome or Edge
+— the zip's own `README.md` walks them through it.
 
 > **Signing note:** without `key.properties` the same command still builds,
 > but the APK is DEBUG-signed. That is fine for personal sideloads, NOT for
@@ -71,11 +97,27 @@ stale phone entry on the server can be revoked in the server's Settings.
 
 ### Windows (the PC being controlled)
 
-1. Copy `server-windows.exe` anywhere on the PC and run it.
+1. Run `RemoteControl-Setup-vX.Y.Z.exe`.
 2. SmartScreen will show "Windows protected your PC" (unknown publisher — the
-   exe is unsigned). Click **More info**, then **Run anyway**.
-3. On the Windows Firewall prompt, allow access on **Private** networks.
-4. The tray icon appears when the server is up.
+   setup exe is unsigned, same as the bare exe was). Click **More info**, then
+   **Run anyway**.
+3. The wizard asks for nothing but two checkboxes — a desktop shortcut and
+   start-with-Windows, both on by default. No admin rights, no UAC prompt: it
+   installs into the user's own `%LOCALAPPDATA%\Programs\RemoteControl`.
+4. On the Windows Firewall prompt at first launch, allow access on **Private**
+   networks.
+5. The tray icon appears when the server is up. Afterwards it can be started
+   from the Start Menu (search "Remote Control") or the desktop shortcut.
+
+**Upgrading:** run the newer setup exe over the top. It keeps the install
+location, settings, and paired devices. If the server is running, Setup asks
+for it to be closed first — quit it from the tray menu so it can save its
+config cleanly.
+
+**Uninstalling:** Settings → Apps → *Remote Control* → Uninstall. That removes
+the exe, both shortcuts, and the autostart entry, then asks whether to delete
+`%APPDATA%\RemoteControl` (settings and paired devices). Answering No keeps a
+later reinstall paired.
 
 ### Android (the phone doing the controlling)
 
