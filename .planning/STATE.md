@@ -51,7 +51,7 @@ Next: phase 10 verification (gsd-verifier), then milestone close-out / next phas
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-16 -- Phase 10 execution resumed (wave continue)
+Last activity: 2026-07-29 -- Completed quick task 260729-38z: Windows installer for the tray server
 
 Progress: [██████████] 100% (8 of 8 phases complete; 62 of 62 plans)
 
@@ -343,6 +343,7 @@ Recent decisions affecting current work:
 | 260716-ns1 | App branding: pointer logo, exe icon, Android launcher icons | 2026-07-16 | 1279415 | [260716-ns1-app-branding-pointer-logo-exe-icon-embed](./quick/260716-ns1-app-branding-pointer-logo-exe-icon-embed/) |
 | 260716-oi2 | Browser tab list + switching via Chrome extension (Tab Bridge, protocol 1.4) | 2026-07-16 | 44629e4 | [260716-oi2-browser-tab-list-and-switching-via-chrom](./quick/260716-oi2-browser-tab-list-and-switching-via-chrom/) |
 | 260716-sme | Tab-group visibility — view-only group headers in the phone tab list (protocol 1.5) | 2026-07-16 | a08d992 | [260716-sme-add-tab-group-visibility-to-browser-tabs](./quick/260716-sme-add-tab-group-visibility-to-browser-tabs/) |
+| 260729-38z | Windows installer for the tray server (Inno Setup, shortcuts, autostart migration, single-instance guard) | 2026-07-29 | 9b10180 | [260729-38z-windows-installer-for-tray-server](./quick/260729-38z-windows-installer-for-tray-server/) |
 
 ## Deferred Items
 
