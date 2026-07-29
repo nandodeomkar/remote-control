@@ -199,6 +199,52 @@ class TabsSnapshot {
       Object.hash(connected, Object.hashAll(tabs), Object.hashAll(groups));
 }
 
+/// The last server-pushed bookmark tree (BROW `bm.changed` / `bm.list` reply,
+/// protoVersion 1.6). Value-equal over element equality so the bookmarks
+/// Notifier suppresses no-op rebuilds on identical pushes (mirrors
+/// [TabsSnapshot] discipline — hand-rolled element-wise ==, 06-03
+/// no-package:collection rule).
+///
+/// [connected] `false` renders the SHARED install hint — the exact same card
+/// and copy the Tabs segment shows, not a bookmarks-specific variant.
+class BookmarksSnapshot {
+  /// Whether the Tab Bridge extension is connected on the PC — `false`
+  /// renders the shared install hint.
+  final bool connected;
+
+  /// The flat, breadth-first node list in wire order (no client sort here —
+  /// the folders-first ordering is the store's job). Root `"0"` is never
+  /// shipped; its children carry `parentId: "0"` (D-08).
+  final List<BmNode> nodes;
+
+  /// Snapshot-level budget truncation: nodes were dropped from the tail of
+  /// the whole tree. Distinct from [BmNode.truncated], which means one
+  /// folder's children were dropped.
+  final bool truncated;
+
+  /// Creates a snapshot.
+  const BookmarksSnapshot({
+    required this.connected,
+    required this.nodes,
+    required this.truncated,
+  });
+
+  @override
+  bool operator ==(Object other) {
+    if (other is! BookmarksSnapshot) return false;
+    if (other.connected != connected) return false;
+    if (other.truncated != truncated) return false;
+    if (other.nodes.length != nodes.length) return false;
+    for (var i = 0; i < nodes.length; i++) {
+      if (other.nodes[i] != nodes[i]) return false;
+    }
+    return true;
+  }
+
+  @override
+  int get hashCode => Object.hash(connected, truncated, Object.hashAll(nodes));
+}
+
 /// The last server-pushed clipboard state (D-03 `clip.changed`). Value-equal so
 /// the clipboard Notifier suppresses no-op rebuilds on identical pushes
 /// (mirrors [VolumeSnapshot] discipline). Distinct from the fetch reply below:
@@ -307,6 +353,7 @@ class ConnectionService {
   VolumeSnapshot? _volumeSnapshot;
   AppsSnapshot? _appsSnapshot;
   TabsSnapshot? _tabsSnapshot;
+  BookmarksSnapshot? _bookmarksSnapshot;
   ClipSnapshot? _clipSnapshot;
   String? _clipFetchReply;
   ErrMsg? _lastError;
@@ -410,6 +457,11 @@ class ConnectionService {
   /// `tabs.list` reply), or null before the first push. The tabs store reads
   /// this off a [changes] ping.
   TabsSnapshot? get tabsSnapshot => _tabsSnapshot;
+
+  /// The last server-pushed bookmark tree (BROW `bm.changed` / `bm.list`
+  /// reply, protoVersion 1.6), or null before the first push. The bookmarks
+  /// store reads this off a [changes] ping.
+  BookmarksSnapshot? get bookmarksSnapshot => _bookmarksSnapshot;
 
   /// The last server-pushed clipboard state (D-03 `clip.changed`), or null
   /// before the first push. The clipboard store reads this off a [changes]
@@ -677,6 +729,32 @@ class ConnectionService {
         connected: msg.connected ?? false,
         tabs: msg.tabs ?? const [],
         groups: msg.groups ?? const [],
+      );
+      _notify();
+      return;
+    }
+    if (msg is BmChangedMsg) {
+      // BROW live bookmark-tree push (proto 1.6): park the value-equal
+      // snapshot and ping the bookmarks store. S→C only — never routed to the
+      // driver, and NO payload logging anywhere (SPEC §12 — bookmark titles
+      // are browsing data).
+      _bookmarksSnapshot = BookmarksSnapshot(
+        connected: msg.connected,
+        nodes: msg.nodes,
+        truncated: msg.truncated ?? false,
+      );
+      _notify();
+      return;
+    }
+    if (msg is BmListMsg) {
+      // bm.list reply (the Bookmarks-segment-open prime, D-03): park the same
+      // snapshot. A request carries neither field; a reply always carries
+      // both — default to the never-connected hint shape. NO payload logging
+      // anywhere (SPEC §12 — bookmark titles are browsing data).
+      _bookmarksSnapshot = BookmarksSnapshot(
+        connected: msg.connected ?? false,
+        nodes: msg.nodes ?? const [],
+        truncated: msg.truncated ?? false,
       );
       _notify();
       return;
