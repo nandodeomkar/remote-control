@@ -57,7 +57,11 @@ use crate::executors::{Executors, TabsState, WindowInfo};
 /// 1.5 adds tab-group visibility (BROW-01, quick 260716-sme) — the GroupEl
 /// element, optional `groups` on the tabs payloads, and the optional TabEl
 /// `groupId` — minor bump, 1.0–1.4 clients still accepted (§2).
-pub const SERVER_PROTO_VERSION: &str = "1.5";
+/// 1.6 adds the additive `bm.*` bookmark family (phase 11) — bookmark tree
+/// view, open, star/unstar and remove, fed by the localhost extension leg
+/// (SPEC §15) — plus the optional tri-state `TabInfo.bookmarked` flag;
+/// minor bump, so 1.0–1.5 clients remain accepted (§2).
+pub const SERVER_PROTO_VERSION: &str = "1.6";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
 /// POST-auth liveness deadline: an Authed session receiving NO inbound

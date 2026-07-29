@@ -7,12 +7,12 @@
     "name": "OMKAR-LAPTOP",
     "guid": "9f3c-test-guid",
     "port": 17777,
-    "proto": "1.5"
+    "proto": "1.6"
   },
   "expect": {
     "name": "OMKAR-LAPTOP",
     "guid": "9f3c-test-guid",
     "port": 17777,
-    "proto": "1.5"
+    "proto": "1.6"
   }
 }
