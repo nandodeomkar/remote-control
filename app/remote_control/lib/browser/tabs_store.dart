@@ -33,17 +33,36 @@ class TabsViewState {
   /// groups. View-only display metadata.
   final List<GroupInfo> groups;
 
+  /// D-12 optimistic star overlay, keyed by tab id: the flip the user just
+  /// made, rendered ahead of the PC agreeing. Cleared wholesale by the NEXT
+  /// authoritative snapshot, whether or not that snapshot agrees.
+  final Map<int, bool> optimisticStars;
+
   /// Creates a view snapshot.
   const TabsViewState({
     required this.connected,
     required this.tabs,
     required this.groups,
+    this.optimisticStars = const {},
   });
+
+  /// The star state to RENDER for [tab]: the optimistic flip if one is
+  /// pending, otherwise the authoritative [TabInfo.bookmarked].
+  ///
+  /// `null` is a THIRD state, not a false: it means UNKNOWN (a server or
+  /// extension that never reported one), and the widget layer renders NO star
+  /// slot at all rather than an empty star, which would be a false negative
+  /// (D-11, T-11-01).
+  bool? bookmarkedFor(TabInfo tab) => optimisticStars[tab.id] ?? tab.bookmarked;
 
   @override
   bool operator ==(Object other) {
     if (other is! TabsViewState) return false;
     if (other.connected != connected) return false;
+    if (other.optimisticStars.length != optimisticStars.length) return false;
+    for (final entry in optimisticStars.entries) {
+      if (other.optimisticStars[entry.key] != entry.value) return false;
+    }
     if (other.tabs.length != tabs.length) return false;
     for (var i = 0; i < tabs.length; i++) {
       if (other.tabs[i] != tabs[i]) return false;
@@ -56,8 +75,16 @@ class TabsViewState {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(connected, Object.hashAll(tabs), Object.hashAll(groups));
+  int get hashCode => Object.hash(
+        connected,
+        Object.hashAll(tabs),
+        Object.hashAll(groups),
+        // Order-independent so two equal overlays built in different insertion
+        // orders still hash alike.
+        Object.hashAllUnordered(
+          optimisticStars.entries.map((e) => Object.hash(e.key, e.value)),
+        ),
+      );
 }
 
 /// Re-snapshots [TabsViewState] on every service `changes` ping and drives
@@ -67,9 +94,19 @@ class TabsNotifier extends Notifier<TabsViewState> {
   StreamSubscription<void>? _sub;
   late final ConnectionService _service;
 
+  /// D-12 pending star flips, keyed by tab id. Notifier-owned and mutable;
+  /// only an unmodifiable COPY ever reaches the state.
+  final Map<int, bool> _optimistic = {};
+
+  /// The snapshot object the overlay was last reconciled against — tracked by
+  /// IDENTITY, see [_onChange].
+  TabsSnapshot? _lastSnapshot;
+
   @override
   TabsViewState build() {
     _service = ref.watch(connectionServiceProvider);
+    _optimistic.clear();
+    _lastSnapshot = null;
     _sub?.cancel();
     _sub = _service.changes.listen((_) => _onChange());
     ref.onDispose(() {
@@ -80,6 +117,23 @@ class TabsNotifier extends Notifier<TabsViewState> {
   }
 
   void _onChange() {
+    // Reconcile the D-12 overlay on IDENTITY, not value equality.
+    //
+    // ConnectionService constructs a BRAND-NEW TabsSnapshot on every
+    // `tabs.changed` and every `tabs.list` reply, so an identity change is
+    // exactly "a new authoritative snapshot arrived" — even when the new
+    // snapshot is value-equal to the old one. (Same identity-tracking
+    // precedent as 06-05's clipFetchReply.)
+    //
+    // Value equality would be wrong twice over: an optimistic bit would stay
+    // alive across a snapshot that DISAGREES with it, and `changes` also fires
+    // for volume, apps and clipboard pings — clearing on every ping would
+    // defeat the optimism entirely.
+    final snapshot = _service.tabsSnapshot;
+    if (!identical(snapshot, _lastSnapshot)) {
+      _lastSnapshot = snapshot;
+      _optimistic.clear();
+    }
     state = _view();
   }
 
@@ -89,6 +143,9 @@ class TabsNotifier extends Notifier<TabsViewState> {
       connected: snapshot?.connected ?? false,
       tabs: snapshot?.tabs ?? const [],
       groups: snapshot?.groups ?? const [],
+      // A COPY — passing the mutable field itself would alias the notifier's
+      // map into the state, and a later flip could never compare unequal.
+      optimisticStars: Map<int, bool>.unmodifiable(_optimistic),
     );
   }
 
@@ -103,6 +160,25 @@ class TabsNotifier extends Notifier<TabsViewState> {
 
   /// Close tab [id] (`tabs.close{id}`, fire-and-forget).
   void close(int id) => _service.sendReliable(TabsCloseMsg(id: id));
+
+  /// Bookmark tab [tabId]'s URL (`bm.star`, D-10/D-12). Flips the rendered
+  /// star FIRST so the tap is instant, then sends — the extension resolves
+  /// the URL locally, none of it crosses the wire.
+  void star(int tabId) {
+    _optimistic[tabId] = true;
+    state = _view();
+    _service.sendReliable(BmStarMsg(tabId: tabId));
+  }
+
+  /// Remove every bookmark matching tab [tabId]'s URL (`bm.unstar`, D-11).
+  /// Same flip-then-send order. Opens NO dialog — the destructive confirm gate
+  /// lives in the widget layer and this is only ever called after it resolves
+  /// (T-11-06).
+  void unstar(int tabId) {
+    _optimistic[tabId] = false;
+    state = _view();
+    _service.sendReliable(BmUnstarMsg(tabId: tabId));
+  }
 }
 
 /// The tab-section view state the Browser screen watches.

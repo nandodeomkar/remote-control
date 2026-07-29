@@ -127,6 +127,58 @@ void main() {
       const b = TabsViewState(connected: false, tabs: [], groups: []);
       expect(a, isNot(b));
     });
+
+    test('a differing optimistic star overlay makes them unequal (D-12)', () {
+      const a = TabsViewState(
+        connected: true,
+        tabs: [TabInfo(id: 7, title: 'GitHub', active: true)],
+        groups: [],
+        optimisticStars: {},
+      );
+      const b = TabsViewState(
+        connected: true,
+        tabs: [TabInfo(id: 7, title: 'GitHub', active: true)],
+        groups: [],
+        optimisticStars: {7: true},
+      );
+      expect(a, isNot(b), reason: 'a flip must rebuild the screen');
+      expect(b, isNot(a));
+      expect(
+        b,
+        const TabsViewState(
+          connected: true,
+          tabs: [TabInfo(id: 7, title: 'GitHub', active: true)],
+          groups: [],
+          optimisticStars: {7: true},
+        ),
+      );
+      expect(
+        b.hashCode,
+        const TabsViewState(
+          connected: true,
+          tabs: [TabInfo(id: 7, title: 'GitHub', active: true)],
+          groups: [],
+          optimisticStars: {7: true},
+        ).hashCode,
+      );
+    });
+
+    test('bookmarkedFor preserves the tri-state when no overlay entry exists',
+        () {
+      const state = TabsViewState(
+        connected: true,
+        tabs: [
+          TabInfo(id: 1, title: 'Starred', active: false, bookmarked: true),
+          TabInfo(id: 2, title: 'Plain', active: false, bookmarked: false),
+          TabInfo(id: 3, title: 'Unknown', active: false),
+        ],
+        groups: [],
+      );
+      expect(state.bookmarkedFor(state.tabs[0]), isTrue);
+      expect(state.bookmarkedFor(state.tabs[1]), isFalse);
+      expect(state.bookmarkedFor(state.tabs[2]), isNull,
+          reason: 'UNKNOWN must stay null — the row renders NO star (D-11)');
+    });
   });
 
   group('TabsNotifier — command wiring over the fake service', () {
@@ -254,6 +306,120 @@ void main() {
         container.read(tabsStateProvider),
         const TabsViewState(connected: false, tabs: [], groups: []),
       );
+    });
+  });
+
+  group('TabsNotifier — optimistic star overlay (D-12)', () {
+    late _FakeService service;
+    late ProviderContainer container;
+
+    setUp(() {
+      service = _FakeService();
+      container = ProviderContainer(
+        overrides: [
+          connectionServiceProvider.overrideWith((ref) => service),
+        ],
+      );
+      addTearDown(container.dispose);
+      addTearDown(service.pings.close);
+    });
+
+    /// Parks a BRAND-NEW snapshot object (what ConnectionService does on every
+    /// tabs.changed / tabs.list reply) and pings.
+    Future<void> pushTab({required bool? bookmarked}) async {
+      service.parked = TabsSnapshot(
+        connected: true,
+        tabs: [
+          TabInfo(id: 7, title: 'GitHub', active: true, bookmarked: bookmarked),
+        ],
+        groups: const [],
+      );
+      service.pings.add(null);
+      await Future<void>.delayed(Duration.zero);
+    }
+
+    test('star(7) flips the rendered state instantly and sends BmStarMsg',
+        () async {
+      container.read(tabsStateProvider);
+      await pushTab(bookmarked: false);
+
+      container.read(tabsStateProvider.notifier).star(7);
+
+      final state = container.read(tabsStateProvider);
+      expect(state.bookmarkedFor(state.tabs.single), isTrue,
+          reason: 'no snapshot needed — the flip renders immediately');
+      expect(service.reliable, hasLength(1));
+      expect((service.reliable.single as BmStarMsg).tabId, 7);
+    });
+
+    test('unstar(7) flips it off instantly and sends BmUnstarMsg', () async {
+      container.read(tabsStateProvider);
+      await pushTab(bookmarked: true);
+
+      container.read(tabsStateProvider.notifier).unstar(7);
+
+      final state = container.read(tabsStateProvider);
+      expect(state.bookmarkedFor(state.tabs.single), isFalse);
+      expect(service.reliable, hasLength(1));
+      expect((service.reliable.single as BmUnstarMsg).tabId, 7);
+    });
+
+    test('a new snapshot is authoritative even when it DISAGREES', () async {
+      container.read(tabsStateProvider);
+      await pushTab(bookmarked: false);
+      container.read(tabsStateProvider.notifier).star(7);
+
+      // The PC pushes again and still says false (the star did not land, or
+      // this snapshot predates it). The pushed value wins.
+      await pushTab(bookmarked: false);
+
+      final state = container.read(tabsStateProvider);
+      expect(state.bookmarkedFor(state.tabs.single), isFalse);
+      expect(state.optimisticStars, isEmpty);
+    });
+
+    test('an unrelated changes ping does NOT clear the overlay', () async {
+      container.read(tabsStateProvider);
+      await pushTab(bookmarked: false);
+      container.read(tabsStateProvider.notifier).star(7);
+
+      // A volume / apps / clipboard ping: the SAME parked snapshot object.
+      service.pings.add(null);
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(tabsStateProvider);
+      expect(state.bookmarkedFor(state.tabs.single), isTrue,
+          reason: 'only a NEW snapshot identity reconciles (D-12)');
+      expect(service.reliable, hasLength(1));
+    });
+
+    test('an UNKNOWN tab keeps null until the user flips it', () async {
+      container.read(tabsStateProvider);
+      await pushTab(bookmarked: null);
+
+      var state = container.read(tabsStateProvider);
+      expect(state.bookmarkedFor(state.tabs.single), isNull);
+
+      container.read(tabsStateProvider.notifier).star(7);
+      state = container.read(tabsStateProvider);
+      expect(state.bookmarkedFor(state.tabs.single), isTrue);
+    });
+
+    test('the overlay never aliases the notifier map (state stays immutable)',
+        () async {
+      container.read(tabsStateProvider);
+      await pushTab(bookmarked: false);
+
+      container.read(tabsStateProvider.notifier).star(7);
+      final before = container.read(tabsStateProvider);
+
+      container.read(tabsStateProvider.notifier).unstar(7);
+      final after = container.read(tabsStateProvider);
+
+      expect(before.optimisticStars[7], isTrue,
+          reason: 'the earlier state value must not have mutated under us');
+      expect(after.optimisticStars[7], isFalse);
+      expect(before, isNot(after));
     });
   });
 }
