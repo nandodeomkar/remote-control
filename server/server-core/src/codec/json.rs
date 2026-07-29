@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::error::CodecError;
-use crate::executors::{GroupInfo, TabInfo, WindowInfo};
+use crate::executors::{BmNode, GroupInfo, TabInfo, WindowInfo};
 
 /// The wire envelope `{t, seq?, p?}` (SPEC §1) — step 1 of the two-step
 /// parse (RESEARCH Pattern 3). Private: callers only see [`Decoded`].
@@ -260,6 +260,85 @@ pub struct TabsClosePayload {
     pub id: i64,
 }
 
+/// `bm.list` payload (protoVersion 1.6): request is `{}` (ALL fields
+/// absent); the reply carries `connected` and `nodes` — the
+/// [`TabsListPayload`] dual request/reply precedent.
+///
+/// Every field is optional precisely so the bare `{}` request decodes; the
+/// S→C push [`BmChangedPayload`] is the strict sibling where `connected`
+/// and `nodes` are required.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BmListPayload {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub connected: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nodes: Option<Vec<BmNode>>,
+    /// Snapshot-level truncation: nodes were dropped from the TAIL of the
+    /// breadth-first order to fit the extension's frame budget. Distinct
+    /// from [`BmNode::truncated`], which means one folder's children were
+    /// dropped.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+}
+
+/// `bm.changed` payload (S→C push, protoVersion 1.6): `connected` and
+/// `nodes` REQUIRED — a missing field is a hard decode error (unlike the
+/// dual-request/reply `bm.list` above). `truncated` is the additive
+/// optional; absent stays absent on canonical re-encode.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BmChangedPayload {
+    pub connected: bool,
+    pub nodes: Vec<BmNode>,
+    /// Snapshot-level truncation — see [`BmListPayload::truncated`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+}
+
+/// `bm.open` payload (C→S, protoVersion 1.6): open that bookmark in a NEW
+/// tab. Fire-and-forget — no err reply; stale ids self-heal via the next
+/// `bm.changed`.
+///
+/// **`nodeId` vs `tabId` (T-11-10).** Chrome bookmark ids are STRINGS and
+/// Chrome tab ids are INTEGERS. Reusing one key name `id` for both kinds
+/// would decode fine under this value-lenient codec and then fail SILENTLY
+/// inside the extension (`bookmarks.get(7)` finds nothing, `tabs.get("12")`
+/// throws) — so the two id kinds are named apart on the wire and the Rust
+/// types (`String` here, `i64` on [`BmStarPayload`]/[`BmUnstarPayload`]) are
+/// the enforcement: a swap is a hard decode error, not a silent no-op.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BmOpenPayload {
+    #[serde(rename = "nodeId")]
+    pub node_id: String,
+}
+
+/// `bm.star` payload (C→S, protoVersion 1.6, D-10): bookmark that tab's URL
+/// into the bookmarks-bar root. Integer `tabId` — see the `nodeId`/`tabId`
+/// note on [`BmOpenPayload`]. Fire-and-forget.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BmStarPayload {
+    #[serde(rename = "tabId")]
+    pub tab_id: i64,
+}
+
+/// `bm.unstar` payload (C→S, protoVersion 1.6, D-11): remove EVERY bookmark
+/// whose URL exactly matches that tab's URL. Deliberately NOT a toggle, so
+/// an in-flight snapshot cannot invert the wrong state. Fire-and-forget.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BmUnstarPayload {
+    #[serde(rename = "tabId")]
+    pub tab_id: i64,
+}
+
+/// `bm.remove` payload (C→S, protoVersion 1.6, D-13/D-14): remove ONE
+/// bookmark or ONE EMPTY folder. String `nodeId` — the [`BmOpenPayload`]
+/// shape. `removeTree` is never used anywhere in the stack, so a subtree
+/// wipe from the phone is structurally impossible. Fire-and-forget.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BmRemovePayload {
+    #[serde(rename = "nodeId")]
+    pub node_id: String,
+}
+
 /// `browser` payload (C→S): key-macro actions (SPEC §7).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BrowserPayload {
@@ -338,6 +417,12 @@ pub enum Msg {
     TabsChanged(TabsChangedPayload),
     TabsActivate(TabsActivatePayload),
     TabsClose(TabsClosePayload),
+    BmList(BmListPayload),
+    BmChanged(BmChangedPayload),
+    BmOpen(BmOpenPayload),
+    BmStar(BmStarPayload),
+    BmUnstar(BmUnstarPayload),
+    BmRemove(BmRemovePayload),
     Browser(BrowserPayload),
     Present(PresentPayload),
     Ping(PingPayload),
@@ -393,6 +478,12 @@ pub fn decode_text(s: &str) -> Result<Decoded, CodecError> {
         "tabs.changed" => Msg::TabsChanged(payload(p)?),
         "tabs.activate" => Msg::TabsActivate(payload(p)?),
         "tabs.close" => Msg::TabsClose(payload(p)?),
+        "bm.list" => Msg::BmList(payload(p)?),
+        "bm.changed" => Msg::BmChanged(payload(p)?),
+        "bm.open" => Msg::BmOpen(payload(p)?),
+        "bm.star" => Msg::BmStar(payload(p)?),
+        "bm.unstar" => Msg::BmUnstar(payload(p)?),
+        "bm.remove" => Msg::BmRemove(payload(p)?),
         "browser" => Msg::Browser(payload(p)?),
         "present" => Msg::Present(payload(p)?),
         "ping" => Msg::Ping(payload(p)?),
@@ -464,6 +555,12 @@ pub fn encode_msg(msg: &Msg, seq: Option<u64>) -> String {
         Msg::TabsChanged(pl) => ("tabs.changed", val(pl)),
         Msg::TabsActivate(pl) => ("tabs.activate", val(pl)),
         Msg::TabsClose(pl) => ("tabs.close", val(pl)),
+        Msg::BmList(pl) => ("bm.list", val(pl)),
+        Msg::BmChanged(pl) => ("bm.changed", val(pl)),
+        Msg::BmOpen(pl) => ("bm.open", val(pl)),
+        Msg::BmStar(pl) => ("bm.star", val(pl)),
+        Msg::BmUnstar(pl) => ("bm.unstar", val(pl)),
+        Msg::BmRemove(pl) => ("bm.remove", val(pl)),
         Msg::Browser(pl) => ("browser", val(pl)),
         Msg::Present(pl) => ("present", val(pl)),
         Msg::Ping(pl) => ("ping", val(pl)),

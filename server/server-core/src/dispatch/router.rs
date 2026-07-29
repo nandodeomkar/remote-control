@@ -11,7 +11,8 @@ use tokio::time::Instant;
 use crate::auth::AuthManager;
 use crate::codec::binary::MouseFrame;
 use crate::codec::json::{
-    AppsListPayload, ClipSetPayload, Decoded, ErrPayload, Msg, PongPayload, TabsListPayload,
+    AppsListPayload, BmListPayload, ClipSetPayload, Decoded, ErrPayload, Msg, PongPayload,
+    TabsListPayload,
 };
 use crate::dispatch::AuthState;
 use crate::dispatch::held::HeldInput;
@@ -70,8 +71,8 @@ pub fn route(
 
     // GATE 2 — pause (SPEC §11, threat T-01-21): executor-bound families
     // are silently dropped while paused. `ping`/`pong` (and the read-only
-    // queries `apps.list`/`clip.get`/`tabs.list`, which SPEC §11 exempts)
-    // keep working — pause never breaks liveness probing.
+    // queries `apps.list`/`clip.get`/`tabs.list`/`bm.list`, which SPEC §11
+    // exempts) keep working — pause never breaks liveness probing.
     if paused && is_executor_bound(&decoded.msg) {
         return Vec::new();
     }
@@ -255,6 +256,44 @@ pub fn route(
             Vec::new()
         }
 
+        // ── bookmarks (protoVersion 1.6, phase 11) ─────────────────────
+        // bm.list is a READ (SPEC §11 pause exemption, like apps.list):
+        // the reply carries the relay's current state — including the
+        // never-connected {connected:false, nodes:[]} install-hint shape.
+        Msg::BmList(_) => {
+            let state = exec.bookmarks.list();
+            vec![Msg::BmList(BmListPayload {
+                connected: Some(state.connected),
+                nodes: Some(state.nodes),
+                // The 1.6 server ALWAYS emits truncated (the same posture as
+                // the 1.5 groups array) — older clients drop the unknown key
+                // per D-05.
+                truncated: Some(state.truncated),
+            })]
+        }
+        // Fire-and-forget (SPEC §7): NO err reply exists for any of the four
+        // — stale node/tab ids self-heal via the next bm.changed push, and
+        // adding an err code would break the family's posture (and hand a
+        // caller an existence oracle over bookmark ids). All four are
+        // executor-bound, so the pause gate drops them (D-13/D-14
+        // destructive actions included).
+        Msg::BmOpen(p) => {
+            exec.bookmarks.open(&p.node_id);
+            Vec::new()
+        }
+        Msg::BmStar(p) => {
+            exec.bookmarks.star(p.tab_id);
+            Vec::new()
+        }
+        Msg::BmUnstar(p) => {
+            exec.bookmarks.unstar(p.tab_id);
+            Vec::new()
+        }
+        Msg::BmRemove(p) => {
+            exec.bookmarks.remove(&p.node_id);
+            Vec::new()
+        }
+
         // ── key-macro families (Phase 1 minimal tables; Phase 5 refines)
         Msg::Browser(p) => {
             if let Some((code, mods)) = browser_macro(&p.action) {
@@ -294,14 +333,16 @@ pub fn route(
         | Msg::VolChanged(_)
         | Msg::InputBlocked(_)
         | Msg::TabsChanged(_)
+        | Msg::BmChanged(_)
         | Msg::Pong(_)
         | Msg::Err(_) => Vec::new(),
     }
 }
 
 /// SPEC §11's pause drop list: every executor-bound family. `ping`/`pong`
-/// and the read-only queries (`apps.list`, `clip.get`, `tabs.list`) are
-/// exempt.
+/// and the read-only queries (`apps.list`, `clip.get`, `tabs.list`,
+/// `bm.list`) are exempt — a paused PC still answers reads, so the phone
+/// renders an honest list instead of an empty lie (D-03).
 fn is_executor_bound(msg: &Msg) -> bool {
     matches!(
         msg,
@@ -320,6 +361,7 @@ fn is_executor_bound(msg: &Msg) -> bool {
             | Msg::Present(_)
             | Msg::TabsActivate(_)
             | Msg::TabsClose(_)
+            | Msg::BmOpen(_) | Msg::BmStar(_) | Msg::BmUnstar(_) | Msg::BmRemove(_)
     )
 }
 
