@@ -184,6 +184,19 @@ fn codec_fixtures_tabs() {
 }
 
 #[test]
+fn codec_fixtures_bookmarks() {
+    // protocol 1.6 (phase 11): the bm.* family — bm.changed round-trips
+    // three BmEls (folder + plain link + truncated folder, unknown `future`
+    // field dropped per D-05), the dual bm.list request/reply shape in both
+    // directions, the four command payloads with nodeId as a STRING and
+    // tabId as a NUMBER, and the two missing-required-field negatives.
+    // Hard-registered: neither harness globs directories (the 07-02
+    // input.blocked lesson), so without this function the nine golden files
+    // would be silently untested — zero coverage AND zero failures.
+    run_json_family("bookmarks");
+}
+
+#[test]
 fn auth_proof_fixture() {
     let path = Path::new(FIXTURES_ROOT).join("handshake/05-auth-proof.json");
     let fixture = load(&path);
