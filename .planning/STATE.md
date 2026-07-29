@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Phase 10 complete — awaiting phase verification
-stopped_at: Completed 10-06-PLAN.md (on-device UAT gate APPROVED; commits ce935a9, 9ba8358)
-last_updated: "2026-07-17T04:14:52.347Z"
-last_activity: 2026-07-17 -- Phase 10 complete (all 6 plans; UAT approved on v1.3.0-rc1)
+stopped_at: Phase 11 context gathered
+last_updated: "2026-07-29T10:16:42.582Z"
+last_activity: "2026-07-29 -- Completed quick task 260729-58x: tab-group visual hierarchy (_GroupBlock containment)"
 progress:
-  total_phases: 10
+  total_phases: 11
   completed_phases: 10
   total_plans: 77
   completed_plans: 77
-  percent: 100
+  percent: 91
 ---
 
 # Project State
@@ -154,6 +154,7 @@ Progress: [██████████] 100% (8 of 8 phases complete; 62 of 6
 - Phase 8 added: Floating trackpad bubble — replace quick-bar with draggable bubble + floating trackpad window (spec: docs/superpowers/specs/2026-07-15-trackpad-bubble-design.md)
 - Phase 10 added: Keyboard rethink + Shortcuts tile — full-screen swipeable keyboard pads (Type w/ system IME + slim extras row, Arrows, Numpad, Fn) with persistent modifier chips + bottom tabs replacing the bottom-docked panel/switcher; new Shortcuts hub tile of one-tap Windows shortcut buttons (show desktop, snip/screenshots, task manager, explorer, settings, snap, refresh, tabs, find, zoom, edit ops) via existing key tap+mods path; keymap.rs CLIENT_KEY_CODES + Dart mirror extended (letters, PrintScreen, etc). Excluded by user: Alt+Tab (Apps remote exists), Win+L lock, Ctrl+Alt+Del (uninjectable)
 - Phase 9 added: UI refinement to design prototype — visual pass across all screens to match the Claude Design handoff (spec: docs/superpowers/specs/2026-07-16-ui-refinement-prototype/Prototype.dc.html). User-decided: dot-grid trackpad texture only — NO fake cursor dot, NO tap ripple. Palette untouched (7 D-12 tokens already byte-identical to prototype).
+- Phase 11 added: Browser bookmarks — view the PC browser's bookmarks on the Browser tile, open one in a new tab, and star/unstar the current tab. Extends the existing Tab Bridge extension leg (SPEC §15) with a `bookmarks` permission and a new `bm.*` phone-facing family (proto minor bump 1.6 — 1.0–1.5 clients stay accepted). Entry-scan notes for planning, NOT locked decisions: (a) the §7 "no `url` ever crosses the phone-facing wire" invariant is preserved by keeping URL resolution extension-side — the phone sends `bm.open {id}` and the extension does `bookmarks.get(id)` → `tabs.create({url})`; (b) a full flattened `bm.state` push snapshot mirrors `tabs.state`, avoiding request-correlation machinery on the push-only ext leg, but needs node/title caps against the 56 KB frame budget; (c) the bookmarks-bar parent for new bookmarks must be resolved via `getTree()`, not the hardcoded id `"1"`; (d) a per-TabEl `bookmarked` flag would drive the star state; (e) tab rows already spend tap-down (activate), long-press and swipe (close), so a star needs a trailing button, not another row gesture. Open scope questions for discuss-phase: whether `bm.remove` (destructive, no undo) is in v1 at all, and Tabs/Bookmarks segmented control vs a separate screen.
 
 ### Decisions
 
@@ -358,6 +359,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-17T03:43:07.899Z
-Stopped at: Completed 10-02-PLAN.md (Shortcuts tile + 25-button catalog; commits 1202f1c, bd0725a, b8e3107)
-Resume file: .planning/phases/10-keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke/10-03-PLAN.md
+Last session: 2026-07-29T10:16:42.568Z
+Stopped at: Phase 11 context gathered
+Resume file: .planning/phases/11-browser-bookmarks-view-open-star-current-tab/11-CONTEXT.md
