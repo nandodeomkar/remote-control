@@ -50,6 +50,19 @@ let reconnectTimer = null;
 let backoffIdx = 0;
 let snapshotTimer = null;
 
+// A bookmark import fires hundreds of onCreated events. Chrome's own guidance:
+// expensive observers should ignore updates between onImportBegan and
+// onImportEnded — otherwise a full getTree() runs on every settling gap of a
+// multi-second import over a tree that is huge and still growing.
+let bmImporting = false;
+
+// Every bookmark URL in the tree, rebuilt on each snapshot walk — the D-11
+// "starred anywhere" truth. Tri-state contract: null means the bookmark tree
+// could not be read, and in that case buildAndSend must OMIT the `bookmarked`
+// key from every tab element rather than emitting false — the star must never
+// misreport. This Set never leaves the extension (no url crosses the wire).
+let bmUrlSet = null;
+
 // Favicon base64 cache keyed by page url. Lost on SW restart — fine, it
 // refills from Chrome's own favicon cache.
 const faviconCache = new Map();
@@ -88,8 +101,8 @@ function connect() {
     });
     clearInterval(pingTimer);
     pingTimer = setInterval(() => send({ t: "ext.ping", p: {} }), PING_INTERVAL_MS);
-    // Full snapshot on every (re)connect — the SW is stateless by design.
-    buildAndSend();
+    // Full snapshots on every (re)connect — the SW is stateless by design.
+    buildAndSendAll();
   };
 
   socket.onmessage = (ev) => {
@@ -217,9 +230,78 @@ if (chrome.tabGroups) {
   chrome.tabGroups.onMoved.addListener(onTabEvent);
 }
 
+function onBookmarkEvent() {
+  if (bmImporting) return; // coalesced away until onImportEnded
+  connect(); // reconnect-if-closed guard: a bookmark event also wakes the SW
+  scheduleSnapshot();
+}
+
+// Bookmark events feed the same debounced snapshot. Guarded like tabGroups
+// above: chrome.bookmarks may be absent (permission withheld, non-Chromium
+// fork) and the worker must still load and keep reporting tabs. Registered
+// synchronously at top level — MV3 dispatches events to listeners that exist
+// on initial script execution only.
+if (chrome.bookmarks) {
+  chrome.bookmarks.onCreated.addListener(onBookmarkEvent);
+  chrome.bookmarks.onRemoved.addListener(onBookmarkEvent);
+  chrome.bookmarks.onChanged.addListener(onBookmarkEvent);
+  chrome.bookmarks.onMoved.addListener(onBookmarkEvent);
+  chrome.bookmarks.onChildrenReordered.addListener(onBookmarkEvent);
+  // Chrome: "Fired when a bookmark import session is begun. Expensive
+  // observers should ignore onCreated updates until onImportEnded is fired."
+  chrome.bookmarks.onImportBegan.addListener(() => {
+    bmImporting = true;
+  });
+  chrome.bookmarks.onImportEnded.addListener(() => {
+    bmImporting = false;
+    scheduleSnapshot(); // exactly one snapshot for the whole import
+  });
+}
+
 function scheduleSnapshot() {
   clearTimeout(snapshotTimer);
-  snapshotTimer = setTimeout(buildAndSend, DEBOUNCE_MS);
+  snapshotTimer = setTimeout(buildAndSendAll, DEBOUNCE_MS);
+}
+
+// ---------------------------------------------------------------------------
+// The single debounce target: ONE settling gap => ONE getTree() walk => TWO
+// frames. The bookmark snapshot runs FIRST so the tab snapshot that follows
+// reads a freshly rebuilt bmUrlSet (D-11 star truth).
+// ---------------------------------------------------------------------------
+
+async function buildAndSendAll() {
+  let snap = null;
+  try {
+    snap = await buildBmSnapshot();
+  } catch {
+    snap = null; // treat any unexpected throw as unreadable, never as empty
+  }
+  if (snap === null) {
+    // Unreadable tree: the star state is UNKNOWN, and NO bm.state frame is
+    // sent. An empty snapshot would tell the phone "you have no bookmarks",
+    // which is a lie; with no frame the server's BookmarksState stays
+    // connected:false and the phone shows the honest install hint.
+    bmUrlSet = null;
+  } else {
+    bmUrlSet = snap.urls;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      try {
+        ws.send(snap.frame);
+        // Counts and lifecycle only — never a bookmark title, never a url.
+        console.log(
+          "[tab-bridge] bm snapshot sent:",
+          snap.count,
+          "nodes,",
+          bytesOf(snap.frame),
+          "bytes"
+        );
+      } catch {
+        /* onclose handles it; next connect pushes a fresh snapshot */
+      }
+    }
+    // Socket not open: skip — the connect handler pushes a snapshot on open.
+  }
+  await buildAndSend();
 }
 
 // ---------------------------------------------------------------------------
