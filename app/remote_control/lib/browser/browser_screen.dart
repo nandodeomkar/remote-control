@@ -4,6 +4,22 @@
 /// above a 2-column macro grid that drives the focused PC browser via the
 /// reliable path.
 ///
+/// Segmented layout (phase 11, D-01/D-02): a hand-rolled
+/// [BrowserSegmentBar] pins `Tabs | Bookmarks` above ONE swapped scroll
+/// region, and the macro grid moved OUT of that scroll into a pinned footer
+/// with a 1px [kHairline] top edge. D-02 is read as pixel-pinned — the grid
+/// must occupy the SAME rect in both segments — and under the previous single
+/// `SingleChildScrollView` it would have shifted vertically whenever the list
+/// region's height changed. The segment control replaced the old
+/// `Tabs` section header; there is no new hub tile, no new route, no new
+/// screen.
+///
+/// Lazy prime (D-03): screen open still primes `tabs.list` ONLY. `bm.list` is
+/// sent the first time the Bookmarks segment is DISPLAYED in a mount — by tap
+/// or restored from prefs — guarded by a single `_bmPrimed` flag, so a second
+/// switch sends nothing and a phone that never opens the segment never asks
+/// the PC for bookmark titles at all.
+///
 /// Tab section (260716-oi2): renders from the value-equal [TabsViewState] —
 /// the install hint when the extension is not connected (regardless of
 /// phone-auth state — locked fallback), "No tabs open." when connected and
@@ -63,6 +79,9 @@ import '../net/connection_service.dart' show ChipStatus, ConnectionService;
 import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
+import 'bookmarks_section.dart';
+import 'bookmarks_store.dart';
+import 'browser_segment.dart';
 import 'install_hint_card.dart';
 import 'tabs_store.dart';
 
@@ -86,6 +105,115 @@ const Map<String, Color> kGroupColors = {
 /// Map a Chrome named group color to its swatch; unknown names render
 /// neutrally as [kMuted].
 Color groupColor(String name) => kGroupColors[name] ?? kMuted;
+
+/// The left segment's label (11-UI-SPEC §Copywriting Contract).
+const String kSegmentTabsLabel = 'Tabs';
+
+/// The right segment's label.
+const String kSegmentBookmarksLabel = 'Bookmarks';
+
+/// The `Tabs | Bookmarks` selector above the swapped list region (D-01) — a
+/// clone of the settings screen's scroll-direction segment: two [Expanded]
+/// children with an 8px gap, `Material(kBg)` + [InkWell], radius 8,
+/// `minHeight 40`, an accent border + accent label when selected and
+/// hairline/muted otherwise.
+///
+/// # Always interactive — there is deliberately no `enabled` parameter
+///
+/// The segment is NAVIGATION, not a send: it must work offline and unauthed so
+/// the user can still read the other list while the socket is down. The rows
+/// and the macro grid carry the gating. Do not add a gated variant.
+///
+/// # Selection only — no haptics, no animation
+///
+/// The bar reports the tap and nothing else; the screen owner runs
+/// `hapticTick()` and swaps the region on [onSelect]. The swap is instant
+/// (0 ms) by contract — D-02 wants a list swap, not a navigation — so there is
+/// no cross-fade, no slide and no paged transition anywhere on this screen.
+///
+/// Hand-rolled on purpose: the app owns three segment/tab affordances of its
+/// own and `lib/` contains no Material segment widget at all.
+class BrowserSegmentBar extends StatelessWidget {
+  /// The selected segment — accent border + accent label.
+  final BrowserSegment current;
+
+  /// Fired with the tapped segment (including a re-tap of [current] — the
+  /// screen owner decides what a same-segment select means).
+  final void Function(BrowserSegment segment) onSelect;
+
+  /// Creates the segment bar.
+  const BrowserSegmentBar({
+    super.key,
+    required this.current,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: _SegmentButton(
+            label: kSegmentTabsLabel,
+            selected: current == BrowserSegment.tabs,
+            onTap: () => onSelect(BrowserSegment.tabs),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _SegmentButton(
+            label: kSegmentBookmarksLabel,
+            selected: current == BrowserSegment.bookmarks,
+            onTap: () => onSelect(BrowserSegment.bookmarks),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One segment: accent border + accent label when selected, hairline/muted
+/// otherwise (the settings-screen `_SegmentButton` contract, verbatim).
+class _SegmentButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SegmentButton({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? kAccent : kMuted;
+    return Material(
+      color: kBg,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 40),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            border: Border.all(color: selected ? kAccent : kHairline),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: color,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 /// One browser macro: UI label + icon + the router-vocabulary action string.
 class BrowserActionSpec {
@@ -266,6 +394,12 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
   /// Cached once — app-lifetime singleton (house pattern).
   late final ConnectionService _service;
 
+  /// D-03: whether this MOUNT has already asked for the bookmark tree. Set the
+  /// first time the Bookmarks segment is displayed — by tap or restored from
+  /// prefs — so a second switch sends nothing and the list is kept live by
+  /// `bm.changed` pushes from then on.
+  bool _bmPrimed = false;
+
   @override
   void initState() {
     super.initState();
@@ -301,6 +435,57 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
     hapticTick();
   }
 
+  /// Segment tap: the haptic + the persisted selection. The bar itself owns
+  /// no effect (see [BrowserSegmentBar]).
+  void _onSelectSegment(BrowserSegment segment) {
+    hapticTick();
+    ref.read(browserSegmentProvider.notifier).set(segment);
+  }
+
+  /// D-03 lazy prime, called from `build` with the segment about to render:
+  /// the FIRST time Bookmarks is actually displayed in this mount, ask for the
+  /// tree once. The send rides a post-frame callback so it can never fire
+  /// during a build, and the flag flips before the frame so two builds in the
+  /// same frame cannot double-send.
+  void _maybePrimeBookmarks(BrowserSegment segment) {
+    if (segment != BrowserSegment.bookmarks || _bmPrimed) return;
+    _bmPrimed = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) ref.read(bookmarksStateProvider.notifier).primeList();
+    });
+  }
+
+  /// Bookmark row tap-down: open it in a new PC tab (`bm.open`,
+  /// fire-and-forget) + haptic tick. Deliberately touches NEITHER the segment
+  /// NOR the folder position, so several bookmarks can be opened in a row
+  /// (D-04).
+  void _onOpenBookmark(String nodeId) {
+    ref.read(bookmarksStateProvider.notifier).open(nodeId);
+    hapticTick();
+  }
+
+  /// Folder row tap-down: drill in. Local navigation (D-06) — nothing crosses
+  /// the wire, so this stays a pure state move plus the tick.
+  void _onEnterFolder(String folderId) {
+    ref.read(bookmarksStateProvider.notifier).enterFolder(folderId);
+    hapticTick();
+  }
+
+  /// Pop one folder level — the folder bar's back button AND the Android
+  /// system back button both land here.
+  void _onBookmarksBack() {
+    ref.read(bookmarksStateProvider.notifier).goBack();
+    hapticTick();
+  }
+
+  /// Delete one bookmark or one empty folder (`bm.remove`) + haptic tick. Only
+  /// ever reached AFTER the section's confirm dialog resolved true (D-13) —
+  /// the screen adds no second entry point.
+  void _onDeleteBookmark(String nodeId) {
+    ref.read(bookmarksStateProvider.notifier).remove(nodeId);
+    hapticTick();
+  }
+
   @override
   Widget build(BuildContext context) {
     // Transition-only snapshot — never pinged by the hot path.
@@ -308,6 +493,15 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
     final authed = status.chip == ChipStatus.connected;
     // Value-equal tab view (260716-oi2) — rebuilds only on real tab changes.
     final tabs = ref.watch(tabsStateProvider);
+    // Value-equal bookmarks view — also read on the Tabs segment because the
+    // system-back interception below needs the current folder depth.
+    final bookmarks = ref.watch(bookmarksStateProvider);
+    final segment = ref.watch(browserSegmentProvider);
+    _maybePrimeBookmarks(segment);
+    // Android system back walks the folder stack first, then leaves the
+    // screen: blocked only while the Bookmarks segment is showing a subfolder.
+    final inFolder =
+        segment == BrowserSegment.bookmarks && bookmarks.depth > 0;
 
     return Scaffold(
       backgroundColor: kBg,
@@ -328,67 +522,74 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
           ),
         ],
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // D-02: the non-blocking drop strip under the app bar.
-            ReconnectingBannerSlot(
-              visible: status.chip == ChipStatus.reconnecting,
-              onRetry: _service.retryNow,
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                // md edge padding, xl top padding (UI-SPEC grid contract).
-                padding: const EdgeInsets.fromLTRB(16, 32, 16, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Tab section (260716-oi2): the new primary content —
-                    // macros stay reachable by scroll below.
-                    const _SectionHeader('Tabs'),
-                    const SizedBox(height: 8),
-                    _TabsSection(
-                      tabs: tabs,
-                      enabled: authed,
-                      onActivate: _onActivateTab,
-                      onClose: _onCloseTab,
-                    ),
-                    const SizedBox(height: 24),
-                    // The EXISTING macro grid, byte-untouched (the 7-action
-                    // vocabulary is pinned by test and locked by CONTEXT).
-                    BrowserMacroGrid(
-                      onAction: _onAction,
-                      enabled: authed,
-                    ),
-                  ],
+      body: PopScope(
+        canPop: !inFolder,
+        onPopInvokedWithResult: (didPop, result) {
+          if (!didPop) _onBookmarksBack();
+        },
+        child: SafeArea(
+          child: Column(
+            children: [
+              // D-02 (phase 8): the non-blocking drop strip under the app bar.
+              ReconnectingBannerSlot(
+                visible: status.chip == ChipStatus.reconnecting,
+                onRetry: _service.retryNow,
+              ),
+              // Fixed header: md edge padding, xl top padding (UI-SPEC grid
+              // contract). The segment control IS the section header now.
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 32, 16, 0),
+                child: BrowserSegmentBar(
+                  current: segment,
+                  onSelect: _onSelectSegment,
                 ),
               ),
-            ),
-          ],
+              // The ONLY swapped region (D-01). Everything above and below it
+              // is identical in both segments, which is what makes the switch
+              // read as a list swap instead of a navigation.
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                  child: segment == BrowserSegment.tabs
+                      ? _TabsSection(
+                          tabs: tabs,
+                          enabled: authed,
+                          onActivate: _onActivateTab,
+                          onClose: _onCloseTab,
+                        )
+                      : BookmarksSection(
+                          bookmarks: bookmarks,
+                          enabled: authed,
+                          onOpen: _onOpenBookmark,
+                          onEnterFolder: _onEnterFolder,
+                          onBack: _onBookmarksBack,
+                          onDelete: _onDeleteBookmark,
+                        ),
+                ),
+              ),
+              // The EXISTING macro grid, byte-untouched (the 7-action
+              // vocabulary is pinned by test and locked by CONTEXT) — it only
+              // MOVED in the tree, out of the scroll region into a pinned
+              // footer, so D-02's identical rect holds by construction. Its
+              // 1px hairline top edge is the new boundary signal now that
+              // content scrolls above it.
+              Container(
+                decoration: const BoxDecoration(
+                  color: kBg,
+                  border: Border(top: BorderSide(color: kHairline)),
+                ),
+                padding: const EdgeInsets.all(16),
+                child: BrowserMacroGrid(
+                  onAction: _onAction,
+                  enabled: authed,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
-}
-
-/// A 16/600 section header (the apps-screen `_SectionHeader` clone —
-/// UI-SPEC typography role: Title).
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  const _SectionHeader(this.label);
-
-  @override
-  Widget build(BuildContext context) => Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: kText,
-          ),
-        ),
-      );
 }
 
 /// One consecutive run of tabs sharing the same resolved group (260729-58x).

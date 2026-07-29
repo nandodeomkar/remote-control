@@ -21,6 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_protocol/remote_protocol.dart';
 
 import 'package:remote_control/browser/browser_screen.dart';
+import 'package:remote_control/browser/browser_segment.dart';
 import 'package:remote_control/net/connection_providers.dart';
 import 'package:remote_control/net/connection_service.dart';
 import 'package:remote_control/store/device_store.dart';
@@ -100,21 +101,50 @@ class _FakeService extends ConnectionService {
   void sendReliable(RemoteMessage msg) => reliable.add(msg);
 }
 
+/// Recording segment store (the `keyboard_screen_test` seam): `load` returns
+/// [initial] and every `save` is recorded. Extends the real store over a fake
+/// [PrefsKv] so no `SharedPreferencesAsync` platform instance is ever needed —
+/// the screen watches `browserSegmentStoreProvider` on EVERY mount now, so the
+/// override belongs in the shared harness, not in individual tests.
+class _FakeSegmentStore extends BrowserSegmentStore {
+  _FakeSegmentStore({this.initial = BrowserSegment.tabs})
+      : super(prefs: _FakePrefsKv());
+
+  /// What `load()` resolves to (the "restored from prefs" seam).
+  final BrowserSegment initial;
+
+  /// Every persisted selection, in order.
+  final List<BrowserSegment> saved = [];
+
+  @override
+  Future<BrowserSegment> load() async => initial;
+
+  @override
+  Future<void> save(BrowserSegment segment) async => saved.add(segment);
+}
+
 /// Pumps the full BrowserScreen over [service] on a tall surface (the tab
 /// rows + the whole macro grid must be on-screen for taps) and runs the
 /// post-frame primeList.
-Future<void> _pumpScreen(WidgetTester t, _FakeService service) async {
+Future<void> _pumpScreen(
+  WidgetTester t,
+  _FakeService service, {
+  _FakeSegmentStore? store,
+}) async {
   await t.binding.setSurfaceSize(const Size(800, 1600));
   addTearDown(() => t.binding.setSurfaceSize(null));
   await t.pumpWidget(
     ProviderScope(
       overrides: [
         connectionServiceProvider.overrideWith((ref) => service),
+        browserSegmentStoreProvider.overrideWithValue(
+          store ?? _FakeSegmentStore(),
+        ),
       ],
       child: const MaterialApp(home: BrowserScreen()),
     ),
   );
-  await t.pump(); // post-frame primeList
+  await t.pump(); // post-frame primeList + the async segment load
 }
 
 /// Unmounts the screen so the header chip's periodic ticker is cancelled
