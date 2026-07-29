@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-07-29T16:37:19.012Z"
+stopped_at: Completed 11-05-PLAN.md
+last_updated: "2026-07-29T16:49:43.028Z"
 last_activity: 2026-07-29 -- Phase 11 execution started
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 89
-  completed_plans: 79
-  percent: 89
+  completed_plans: 80
+  percent: 90
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 3 of 12
+Plan: 4 of 12
 Next: wave 2 (11-02, 11-05, 11-07) — Rust relay tier, extension leg, Dart codec mirror.
   Phase 10 VERIFIED 2026-07-17 (10-VERIFICATION.md, passed, 12/12 must-haves).
   Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
@@ -149,6 +149,7 @@ Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 
 | Phase 10 P05 | ~17min | 2 tasks | 2 files |
 | Phase 11 P01 | 22min | 3 tasks | 17 files |
 | Phase 11 P02 | 23min | 3 tasks | 5 files |
+| Phase 11 P05 | 7min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -325,6 +326,10 @@ Recent decisions affecting current work:
 - [Phase 11-02]: Executors.bookmarks landed in the same commit as BookmarksRelay (not the plan's task 1): adding the field alone breaks server-windows' struct literal, so field + sole production implementor ship together and no intermediate commit is red
 - [Phase 11-02]: ExtCmd drops Copy (String-carrying bm variants); the four bm frames are built from a LOCAL serde_json::json! envelope, not the phone-facing codec — run_ext already parses this leg with a local tolerant ExtFrame, so egress stays local and run_ext takes no dependency on the bm codec landing in 11-03
 - [Phase 11-02]: reset_relay_watches is the ONE session-death cleanup point called at all three sites (Pitfall 2), mutation-verified: deleting the bm_tx reset fails ext_disconnect_resets_both_watches and only that test. bm.state takes the STRICT posture (parse failure keeps the last good tree) unlike the lenient groups array; nodeId/tabId asserted by TYPE (is_string/is_i64) because a swap decodes fine and fails silently at the extension
+- [Phase ?]: [Phase 11-05]: Every frame budget in extension/background.js now measures UTF-8 BYTES via bytesOf (TextEncoder) — frame.length appears zero times. The shipped tabs icon-strip loop carried the same latent bug since 260716-oi2 and was fixed in place with its body, bound and exit condition byte-identical; a 900-node CJK+emoji tree the old measurement would have shipped at ~170 KB (session kill) now lands at 57172 bytes
+- [Phase 11]: [Phase 11-05]: buildBmSnapshot walks BFS from tree[0].children (root 0 never emitted) because a DFS truncation can spend the whole budget inside the first root's first deep subtree, leaving Other/Mobile bookmarks unreachable — a direct D-08 violation. Truncation flags are applied INSIDE the serialize closure the drop loop re-runs, so the bytes measured are the bytes sent (the flags themselves cost ~18 B/node)
+- [Phase 11]: [Phase 11-05]: capBmTitle trims a trailing lone high surrogate after the 48-char slice (Rule 2) — JSON.stringify of an emoji split by the cap emits a bare lone-surrogate escape, serde_json rejects it as a hard decode error, and 11-02 made bm.state ingest STRICT, so one such title would silently cost the phone its whole bookmark tree. The shipped 32-char group-title cap has the same hazard on the leniently-parsed groups array: logged in deferred-items.md, not fixed
+- [Phase 11]: [Phase 11-05]: An unreadable bookmark tree sends NO bm.state frame (bmUrlSet=null), never an empty one — an empty snapshot tells the phone 'you have no bookmarks', while no frame leaves BookmarksState connected:false and the phone on the honest install hint. buildAndSendAll is the single debounce target and on-open push: one settling gap, one getTree walk, two frames, bookmarks first so the tab snapshot reads a fresh URL set
 
 ### Pending Todos
 
@@ -368,6 +373,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T16:36:44.545Z
-Stopped at: Completed 11-01-PLAN.md
+Last session: 2026-07-29T16:49:43.011Z
+Stopped at: Completed 11-05-PLAN.md
 Resume file: None

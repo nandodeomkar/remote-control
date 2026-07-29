@@ -377,7 +377,7 @@ Plans:
 **Goal:** The phone can browse the PC browser's bookmark tree by folder, open a bookmark in a new tab, star/unstar any tab, and delete a bookmark or an empty folder — delivered as a second segment on the existing Browser screen (protoVersion 1.6), with URL resolution staying extension-side so no `url` field ever crosses the phone-facing wire.
 **Requirements**: none mapped — the acceptance surface is decisions D-01..D-14 in `11-CONTEXT.md`
 **Depends on:** Phase 10
-**Plans:** 2/12 plans executed
+**Plans:** 3/12 plans executed
 
 Plans:
 
@@ -385,7 +385,7 @@ Plans:
 - [x] 11-02-PLAN.md — Rust bookmark relay: BmNode/BookmarksState/Bookmarks trait, ext.rs bm.state + both-watch reset, main.rs wiring
 - [ ] 11-03-PLAN.md — Rust phone-facing bm.* codec, router classification, Rust fixture harness registration
 - [ ] 11-04-PLAN.md — ServerDeps.bookmarks + authed-gated bm.changed push arm + pre-auth-silence integration test
-- [ ] 11-05-PLAN.md — extension: bookmarks permission, caps, listeners, BFS buildBmSnapshot with a byte-measured budget loop
+- [x] 11-05-PLAN.md — extension: bookmarks permission, caps, listeners, BFS buildBmSnapshot with a byte-measured budget loop
 - [ ] 11-06-PLAN.md — extension: tri-state TabEl.bookmarked, the four bm.* command handlers, removeTree source guard
 - [ ] 11-07-PLAN.md — Dart codec mirror (BmNode, six Bm*Msg, TabInfo.bookmarked) + Dart fixture harness registration
 - [ ] 11-08-PLAN.md — client state: BookmarksSnapshot parking, BookmarksNotifier local folder nav, optimistic star overlay
