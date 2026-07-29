@@ -114,6 +114,14 @@ function connect() {
     }
     if (!msg || typeof msg.t !== "string") return;
     const p = msg.p || {};
+    // Every bm.* arm below touches chrome.bookmarks. When the permission is
+    // withheld (or the browser is a non-Chromium fork) the namespace is
+    // undefined and a bare chrome.bookmarks.get(...) would throw a SYNCHRONOUS
+    // TypeError straight out of onmessage, past the terminal .catch. Same
+    // optional-API guard shape as the listener registration further down. No
+    // reply is owed: the family is fire-and-forget and the phone already knows
+    // the tree is unreadable (no bm.state frame was ever sent).
+    if (msg.t.startsWith("bm.") && !chrome.bookmarks) return;
     switch (msg.t) {
       case "tabs.activate":
         // Stale ids self-heal on the next snapshot; swallow rejections.
@@ -125,6 +133,85 @@ function connect() {
         break;
       case "tabs.close":
         chrome.tabs.remove(p.id).catch(() => {});
+        break;
+      // ---- bm.* commands (protoVersion 1.6) -------------------------------
+      // All four are fire-and-forget with a terminal .catch(() => {}) — the
+      // family has no err reply (SPEC §7) and every failure self-heals on the
+      // next full snapshot, which the chrome.bookmarks.on* listeners schedule
+      // on their own. NEVER call scheduleSnapshot() from an arm, and NEVER log
+      // a url, a title or a node id.
+      case "bm.open":
+        // p.nodeId is an OPAQUE UNTRUSTED string that originated on the phone,
+        // an authed but remote LAN peer. The phone should only ever send a leaf
+        // id (folder rows drill down, they do not open), but this is the tier
+        // that must not trust its input: a folder node has no url, and
+        // tabs.create({url: undefined}) silently opens the new-tab page — a
+        // confusing no-op rather than a visible failure (T-11-10, Pitfall 9).
+        // Unknown ids and foreign-profile ids reject and fail closed.
+        chrome.bookmarks
+          .get(p.nodeId)
+          .then((nodes) => {
+            const node = nodes && nodes[0];
+            if (!node) return;
+            if (!node.url) return; // folder — never open, never new-tab-page
+            return chrome.tabs.create({ url: node.url });
+          })
+          .catch(() => {});
+        break;
+      case "bm.star":
+        // Files the CURRENT tab into the bookmarks-bar root resolved by
+        // folderType (D-10) — never a hardcoded id, never a localized title.
+        chrome.tabs
+          .get(p.tabId)
+          .then(async (tab) => {
+            if (!tab || !tab.url) return;
+            const parentId = await bookmarksBarId();
+            // No resolvable root: create NOTHING. An unparented create would
+            // either reject or land the bookmark somewhere the owner cannot
+            // predict; doing nothing is the honest failure.
+            if (parentId === null) return;
+            return chrome.bookmarks.create({
+              parentId,
+              title: tab.title || tab.url,
+              url: tab.url,
+            });
+          })
+          .catch(() => {});
+        break;
+      case "bm.unstar":
+        // D-11: remove EVERY bookmark whose url exactly matches the tab's url.
+        // search({url}) matches VERBATIM (no normalization on Chrome's side
+        // either), and folders have no url — so a folder can never appear in
+        // these results. D-11's "delete every match" therefore cannot interact
+        // with D-14's no-subtree-wipe rule at all.
+        chrome.tabs
+          .get(p.tabId)
+          .then((tab) => {
+            if (!tab || !tab.url) return;
+            return chrome.bookmarks.search({ url: tab.url });
+          })
+          .then((found) => {
+            for (const node of found || []) {
+              if (node.unmodifiable) continue; // managed / root — skip (T-11-05)
+              // Per-node catch is REQUIRED, not defensive noise: a managed node
+              // rejects with a modify-managed error and a concurrently-deleted
+              // node rejects with a no-node error. Neither may abort the
+              // remaining removals — a partial unstar leaves the star lit with
+              // some copies already gone.
+              chrome.bookmarks.remove(node.id).catch(() => {});
+            }
+          })
+          .catch(() => {});
+        break;
+      case "bm.remove":
+        // ONE bookmark or ONE EMPTY folder. removeTree is deliberately never
+        // called anywhere in this extension (D-14) — that ban is what makes a
+        // phone-driven subtree wipe STRUCTURALLY impossible, and Chrome offers
+        // no undo path the phone can reach. Three independent backstops sit
+        // behind the phone-side count == 0 affordance gate: Chrome rejects a
+        // non-empty folder (folder-not-empty), rejects the roots
+        // (modify-special) and rejects managed nodes (modify-managed).
+        chrome.bookmarks.remove(p.nodeId).catch(() => {});
         break;
       case "ext.pong":
         break; // keepalive echo — no-op
@@ -542,6 +629,31 @@ async function buildBmSnapshot() {
   }
 
   return { frame, urls, count: nodes.length };
+}
+
+// ---------------------------------------------------------------------------
+// Bookmark command support
+// ---------------------------------------------------------------------------
+
+// Resolve the id of the bookmarks-bar root — the parent every new bookmark is
+// filed under (D-10). Two prohibitions, both load-bearing:
+//
+//   * NEVER the hardcoded id "1". D-10 forbids it outright, and Chrome does not
+//     guarantee the root numbering is stable across profiles; on a profile
+//     where it is not, every star silently lands in the wrong folder.
+//   * NEVER a title match on "Bookmarks bar". Root titles are LOCALIZED, so the
+//     match returns undefined on a German or Japanese Chrome and the bookmark
+//     ends up in "Other bookmarks" with no error anywhere.
+//
+// folderType is the stable documented enum (bookmarks-bar | other | mobile |
+// managed) and is the only correct key. Falls back to the first root, then to
+// null; a null return means the caller must create NOTHING.
+async function bookmarksBarId() {
+  const tree = await chrome.bookmarks.getTree();
+  const roots = (tree[0] && tree[0].children) || [];
+  const bar = roots.find((r) => r.folderType === "bookmarks-bar");
+  if (bar) return bar.id;
+  return roots.length ? roots[0].id : null;
 }
 
 // ---------------------------------------------------------------------------
