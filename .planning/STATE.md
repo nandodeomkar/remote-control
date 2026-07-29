@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 11-03-PLAN.md
-last_updated: "2026-07-29T17:28:56.687Z"
+stopped_at: Completed 11-06-PLAN.md
+last_updated: "2026-07-29T17:39:07.727Z"
 last_activity: 2026-07-29 -- Phase 11 execution started
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 89
-  completed_plans: 82
+  completed_plans: 83
   percent: 91
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 6 of 12
+Plan: 7 of 12
 Next: wave 2 (11-02, 11-05, 11-07) — Rust relay tier, extension leg, Dart codec mirror.
   Phase 10 VERIFIED 2026-07-17 (10-VERIFICATION.md, passed, 12/12 must-haves).
   Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
@@ -152,6 +152,7 @@ Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 
 | Phase 11 P05 | 7min | 3 tasks | 2 files |
 | Phase 11 P07 | 5min | 3 tasks | 2 files |
 | Phase 11 P03 | 7min | 3 tasks | 3 files |
+| Phase 11 P06 | 6min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -336,6 +337,8 @@ Recent decisions affecting current work:
 - [Phase 11-07]: group('bookmarks fixtures') hard-registered in the Dart harness and PROVEN real by a corrupt-to-RED-then-revert experiment (Pitfall 7) — a fixture family neither harness globs yields zero coverage and zero failures silently (the 07-02 input.blocked lesson). _bmList shipped with its consumers in task 2 because a caller-less private Dart helper is an unused_element warning that fails the analyze gate
 - [Phase 11-03]: bm.list read arm ALWAYS emits truncated (Some(state.truncated)) mirroring the 1.5 always-emit-groups posture — older clients drop the unknown key per D-05, and a 1.6 client never disambiguates absent-because-old from absent-because-false
 - [Phase 11-03]: Fixture-family registration proven, not assumed: corrupting 03-bm-open.json's expect turned codec_fixtures_bookmarks RED, then reverted (fixtures byte-clean). The pause gate was mutation-verified the same way — deleting the is_executor_bound bm entry failed exactly paused_drops_every_executor_bound_family_silently
+- [Phase ?]: [Phase 11-06]: TabEl.bookmarked is a strict tri-state — one guarded assignment (bmUrlSet !== null && tab.url) emitting explicit true/false, key absent from EVERY tab when the tree was unreadable; raw exact URL equality with ZERO normalization because widening 'matches' widens bm.unstar's delete-every-match blast radius, not for fidelity
+- [Phase ?]: [Phase 11-06]: bookmarksBarId() resolves via folderType === 'bookmarks-bar' (D-10), roots[0] then null fallback, and bm.star creates NOTHING on null rather than an unparented bookmark. server-core/tests/extension_guard.rs (comment-stripped, mutation-proven RED) makes removeTree, a hardcoded parentId '1', a url on a snapshot element, and a missing bookmarks permission each fail cargo test --workspace — CI-visible with zero new tooling since the repo has no JS runner
 
 ### Pending Todos
 
@@ -379,6 +382,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T17:28:45.849Z
-Stopped at: Completed 11-03-PLAN.md
+Last session: 2026-07-29T17:39:07.708Z
+Stopped at: Completed 11-06-PLAN.md
 Resume file: None
