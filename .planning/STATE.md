@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 11-08-PLAN.md
-last_updated: "2026-07-29T18:09:30.713Z"
+stopped_at: Completed 11-09-PLAN.md
+last_updated: "2026-07-29T18:21:48.879Z"
 last_activity: 2026-07-29 -- Phase 11 execution resumed (wave continue)
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 89
-  completed_plans: 85
+  completed_plans: 86
   percent: 91
 ---
 
@@ -26,9 +26,20 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 9 of 12
-Next: wave 4 continues with 11-09 — the first bookmarks widget layer (install hint,
-  confirm, bookmarks section). 11-04 is DONE: ServerDeps.bookmarks is threaded from
+Plan: 10 of 12
+Next: wave 4 continues with 11-10 — wiring the segmented control and mounting
+  BookmarksSection on the Browser screen. 11-09 is DONE: InstallHintCard is now a
+  shared public widget both segments render (no fork), confirmDestructive + ten
+  named copy consts serve all three destructive confirms, and BookmarksSection
+  ships the full region — folder bar (live while gated), folder/link rows on the
+  _TabRow chrome, honest truncation copy, and the D-14 affordance gate
+  (onLongPress null on a non-empty folder, a locked node and every root) behind
+  the D-13 confirm. 18 new widget tests; flutter suite 585 green, analyze clean.
+  Carry-forward for 11-10: PopScope(canPop: depth == 0) + Android back routing
+  belong to the SCREEN (the folder bar only supplies the on-screen control), and
+  primeList() fires from the segment onSelect guarded by _bmPrimed (D-03), never
+  from initState.
+  11-04 is DONE: ServerDeps.bookmarks is threaded from
   run_ext through the accept loop into every session, the bm.changed push arm is
   authed-gated (guard-removal mutation proven RED) with no after-auth snapshot, and
   bm_changed_frame always emits truncated and never logs. Server-side bookmarks relay
@@ -161,6 +172,7 @@ Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 
 | Phase 11 P06 | 6min | 3 tasks | 2 files |
 | Phase 11 P08 | 18min | 3 tasks | 5 files |
 | Phase 11 P04 | 14min | 2 tasks | 5 files |
+| Phase 11 P09 | 8min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -352,6 +364,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 11-04]: ServerDeps.bookmarks push arm is authed-gated (bookmarks_alive && ctx.auth_state == AuthState::Authed) and is the ONLY bookmarks push site — mutation-proven by deleting the guard, watching the pre-auth silence assertion go RED, then restoring session.rs byte-identical
 - [Phase ?]: [Phase 11-04]: the no-after-auth-snapshot assertion (T-11-12/D-03) needs a connection authed BEFORE the watch ever advances — on the pre-auth-silence connection the pending watch delivery is byte-indistinguishable from a snapshot, so the test opens authed_client() first and asserts silence there
 - [Phase ?]: [Phase 11-04]: Harness.bm_tx stays a struct field despite a one-commit dead-code warning — a local _bm_tx in start_server() would drop at function exit, flip bookmarks_alive false and silently disable the branch under test
+- [Phase 11-09]: Trailing bookmark lines (folder truncation + long-press hint) render only when connected — a delete hint under the install-hint card would advertise an affordance no visible row has
+- [Phase 11-09]: D-14 is enforced as an AFFORDANCE gate, not a refusal: onLongPress is null (no visual tell, nothing to discover) unless BookmarksViewState.isDeletable — 11-08's shared predicate, deliberately not re-derived in the row
+- [Phase 11-09]: confirmDestructive returns result == true so a barrier dismissal collapses into the cancel branch; kError appears in exactly one place in the phase (the confirm button fill)
 
 ### Pending Todos
 
@@ -395,6 +410,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T18:09:01.754Z
-Stopped at: Completed 11-08-PLAN.md
+Last session: 2026-07-29T18:21:48.858Z
+Stopped at: Completed 11-09-PLAN.md
 Resume file: None
