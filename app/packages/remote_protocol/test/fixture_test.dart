@@ -196,8 +196,26 @@ void main() {
   // per D-05) and an iconless one (icon key omitted on re-encode); 02 is the
   // never-connected tabs.list reply; 03/05 round-trip tabs.activate/close;
   // 04 proves a missing required `id` is a hard decode error — the same
-  // shared golden fixtures the Rust harness exercises.
+  // shared golden fixtures the Rust harness exercises. 09-tabs-changed-
+  // bookmarked (protocol 1.6) additionally proves the TRI-STATE `bookmarked`
+  // flag round-trips in all three states — true, false, and absent staying
+  // absent (null = UNKNOWN, D-11). It needs no new registration because this
+  // family already enumerates every file in its directory.
   group('tabs fixtures', () {
     runJsonFamily('tabs');
+  });
+
+  // protocol 1.6 (phase 11): the additive bm.* family. 01 round-trips a
+  // bm.changed carrying a folder node with `count` and `truncated`, a locked
+  // root, and a plain link that re-encodes with NO optional keys — dropping
+  // the unknown `future` field per the SPEC section 1 rule; 02 is the
+  // never-connected bm.list reply and 09 the bare request; 03-06 round-trip
+  // the four commands with `nodeId` as a String and `tabId` as an int; 07
+  // and 08 prove a missing required field is a hard decode error. Hard-
+  // registered because neither harness globs directories (the 07-02
+  // input.blocked lesson): an unregistered family yields zero coverage AND
+  // zero failures, silently.
+  group('bookmarks fixtures', () {
+    runJsonFamily('bookmarks');
   });
 }
