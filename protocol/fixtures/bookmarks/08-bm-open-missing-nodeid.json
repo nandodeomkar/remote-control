@@ -1,0 +1,11 @@
+{
+  "name": "bm-open-missing-nodeid",
+  "description": "NEGATIVE (D-05, protocol 1.6): bm.open without the required `nodeId` field must be a hard decode error in both codecs — missing required fields are never silently coerced. The tabs/04-tabs-activate-missing-id.json clone for the bookmark family.",
+  "wire": {
+    "t": "bm.open",
+    "p": {}
+  },
+  "expect": {
+    "error": true
+  }
+}

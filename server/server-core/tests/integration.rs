@@ -1223,8 +1223,18 @@ fn sample_tabs() -> TabsState {
                 active: true,
                 icon: Some("bbbb".into()),
                 group_id: Some(1),
+                // Tri-state UNKNOWN (protoVersion 1.6): the key stays off the
+                // wire, so every existing push assertion is unchanged.
+                bookmarked: None,
             },
-            TabInfo { id: 9, title: "Docs".into(), active: false, icon: None, group_id: None },
+            TabInfo {
+                id: 9,
+                title: "Docs".into(),
+                active: false,
+                icon: None,
+                group_id: None,
+                bookmarked: None,
+            },
         ],
         groups: vec![GroupInfo {
             id: 1,

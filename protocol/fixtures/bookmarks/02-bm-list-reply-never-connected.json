@@ -1,0 +1,18 @@
+{
+  "name": "bm-list-reply-never-connected",
+  "description": "S→C bm.list reply (protocol 1.6): the never-connected shape {connected:false, nodes:[]} — the install-hint state the phone renders in the Bookmarks segment when the extension has never dialed in. The bookmarks clone of tabs/02-tabs-list-reply.json; the hint is shared across both segments.",
+  "wire": {
+    "t": "bm.list",
+    "p": {
+      "connected": false,
+      "nodes": []
+    }
+  },
+  "expect": {
+    "t": "bm.list",
+    "p": {
+      "connected": false,
+      "nodes": []
+    }
+  }
+}

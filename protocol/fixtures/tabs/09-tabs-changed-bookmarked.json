@@ -1,0 +1,54 @@
+{
+  "name": "tabs-changed-bookmarked",
+  "description": "S→C tabs.changed push (protocol 1.6, phase 11): the TRI-STATE `bookmarked` flag round-trips. `true` = this tab's URL is bookmarked somewhere in the tree; `false` = it is not; ABSENT means UNKNOWN — the extension could not read the bookmark tree (getTree() failed or the bookmarks permission is missing), NOT 'not bookmarked'. That is exactly why `false` is emitted EXPLICITLY rather than skipped, deliberately unlike the skip-when-absent `icon`/`groupId` precedent: an empty star for an unreadable tree would be the misreport D-11 forbids. A tab with the key absent renders no star button at all.",
+  "wire": {
+    "t": "tabs.changed",
+    "p": {
+      "connected": true,
+      "tabs": [
+        {
+          "id": 7,
+          "title": "GitHub",
+          "active": true,
+          "bookmarked": true
+        },
+        {
+          "id": 9,
+          "title": "Docs",
+          "active": false,
+          "bookmarked": false
+        },
+        {
+          "id": 11,
+          "title": "Unread",
+          "active": false
+        }
+      ]
+    }
+  },
+  "expect": {
+    "t": "tabs.changed",
+    "p": {
+      "connected": true,
+      "tabs": [
+        {
+          "id": 7,
+          "title": "GitHub",
+          "active": true,
+          "bookmarked": true
+        },
+        {
+          "id": 9,
+          "title": "Docs",
+          "active": false,
+          "bookmarked": false
+        },
+        {
+          "id": 11,
+          "title": "Unread",
+          "active": false
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "bm-star",
+  "description": "C→S bm.star (protocol 1.6, D-10): bookmark that tab's URL into the bookmarks-bar root. `tabId` is an INTEGER (a chrome.tabs id), unlike bm.open/bm.remove's string `nodeId`. Fire-and-forget — no err reply; the next bm.changed reconciles the optimistic star (D-12). No url crosses the wire: the extension resolves the tab's URL locally.",
+  "wire": {
+    "t": "bm.star",
+    "p": {
+      "tabId": 7
+    }
+  },
+  "expect": {
+    "t": "bm.star",
+    "p": {
+      "tabId": 7
+    }
+  }
+}

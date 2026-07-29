@@ -1,0 +1,65 @@
+{
+  "name": "bm-changed",
+  "description": "S→C bm.changed push (protocol 1.6, phase 11): folder + link + locked + truncated BmEl round trip. The first element is a locked bookmarks-bar folder carrying an unknown `future` field that must be IGNORED on decode (D-05, dropped on canonical re-encode); the second is a plain link proving every optional key (folder/count/locked/truncated) stays ABSENT on re-encode; the third is a truncated folder. The snapshot-level `truncated` flag is preserved. There is no `url` and no `icon` field anywhere — the locked no-url invariant (SPEC §7) plus D-07.",
+  "wire": {
+    "t": "bm.changed",
+    "p": {
+      "connected": true,
+      "truncated": true,
+      "nodes": [
+        {
+          "id": "1",
+          "parentId": "0",
+          "title": "Bookmarks bar",
+          "folder": true,
+          "count": 2,
+          "locked": true,
+          "future": "ignored"
+        },
+        {
+          "id": "12",
+          "parentId": "1",
+          "title": "Rust docs"
+        },
+        {
+          "id": "13",
+          "parentId": "1",
+          "title": "Deep folder",
+          "folder": true,
+          "count": 9,
+          "truncated": true
+        }
+      ]
+    }
+  },
+  "expect": {
+    "t": "bm.changed",
+    "p": {
+      "connected": true,
+      "truncated": true,
+      "nodes": [
+        {
+          "id": "1",
+          "parentId": "0",
+          "title": "Bookmarks bar",
+          "folder": true,
+          "count": 2,
+          "locked": true
+        },
+        {
+          "id": "12",
+          "parentId": "1",
+          "title": "Rust docs"
+        },
+        {
+          "id": "13",
+          "parentId": "1",
+          "title": "Deep folder",
+          "folder": true,
+          "count": 9,
+          "truncated": true
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "bm-remove",
+  "description": "C→S bm.remove (protocol 1.6, D-13/D-14): remove ONE bookmark or ONE EMPTY folder. String `nodeId`, the bm.open shape. `removeTree` is never called anywhere in the phase, so a subtree wipe from the phone is structurally impossible; Chrome's own kFolderNotEmptyError is the third line of defence. Fire-and-forget — no err reply.",
+  "wire": {
+    "t": "bm.remove",
+    "p": {
+      "nodeId": "1234"
+    }
+  },
+  "expect": {
+    "t": "bm.remove",
+    "p": {
+      "nodeId": "1234"
+    }
+  }
+}

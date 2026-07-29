@@ -1,0 +1,16 @@
+{
+  "name": "bm-open",
+  "description": "C→S bm.open (protocol 1.6): open that bookmark in a NEW tab. `nodeId` is a STRING because Chrome bookmark ids are strings, deliberately unlike the integer `tabId` of bm.star/bm.unstar. Reusing `id` for both would decode fine (the codec is value-lenient) and then fail SILENTLY at the extension — which is exactly why the two id fields are named apart.",
+  "wire": {
+    "t": "bm.open",
+    "p": {
+      "nodeId": "1234"
+    }
+  },
+  "expect": {
+    "t": "bm.open",
+    "p": {
+      "nodeId": "1234"
+    }
+  }
+}

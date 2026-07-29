@@ -1,0 +1,12 @@
+{
+  "name": "bm-list-request",
+  "description": "C→S bm.list request (protocol 1.6): the request form carries NEITHER field — `connected` and `nodes` are both optional in the dual request/reply payload, present only on the reply. `encode_msg` always emits `p`, as `{}` for an empty payload (the Phase-01 canonical-form rule), so the canonical re-encode keeps the empty object. This is the exact frame D-03's lazy prime sends on the first switch to the Bookmarks segment.",
+  "wire": {
+    "t": "bm.list",
+    "p": {}
+  },
+  "expect": {
+    "t": "bm.list",
+    "p": {}
+  }
+}

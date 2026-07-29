@@ -1,0 +1,16 @@
+{
+  "name": "bm-unstar",
+  "description": "C→S bm.unstar (protocol 1.6, D-11): remove EVERY bookmark whose URL exactly matches that tab's URL. Same integer `tabId` shape as bm.star, and explicitly NOT a toggle — an idempotent star/unstar pair cannot invert the wrong state when a snapshot lands between tap and delivery (D-12). Confirm-gated phone-side; fire-and-forget on the wire.",
+  "wire": {
+    "t": "bm.unstar",
+    "p": {
+      "tabId": 7
+    }
+  },
+  "expect": {
+    "t": "bm.unstar",
+    "p": {
+      "tabId": 7
+    }
+  }
+}

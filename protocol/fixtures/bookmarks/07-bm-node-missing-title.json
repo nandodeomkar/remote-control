@@ -1,0 +1,19 @@
+{
+  "name": "bm-node-missing-title",
+  "description": "NEGATIVE (D-05, protocol 1.6): a BmEl missing the required `title` field must be a hard decode error in both codecs — BmEl's three fields (id, parentId, title) are all required and are never silently coerced. The tabs/08-tabs-group-missing-color.json rule applied to BmEl.",
+  "wire": {
+    "t": "bm.changed",
+    "p": {
+      "connected": true,
+      "nodes": [
+        {
+          "id": "12",
+          "parentId": "1"
+        }
+      ]
+    }
+  },
+  "expect": {
+    "error": true
+  }
+}

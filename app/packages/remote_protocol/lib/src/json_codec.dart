@@ -128,6 +128,7 @@ List<TabInfo> _tabList(Object? v, String key) {
       active: _req<bool>(e, 'active'),
       icon: _opt<String>(e, 'icon'),
       groupId: _opt<int>(e, 'groupId'),
+      bookmarked: _opt<bool>(e, 'bookmarked'),
     );
   }).toList();
 }
@@ -175,6 +176,14 @@ class TabInfo {
   /// Absent on the wire = ungrouped — never emitted as null or `-1`.
   final int? groupId;
 
+  /// Whether this tab's URL is bookmarked anywhere in the tree
+  /// (protoVersion 1.6, D-11). TRI-STATE: `true` bookmarked, `false` not
+  /// bookmarked, and **null means UNKNOWN — NOT `false`** (the extension
+  /// could not read the bookmark tree). Unlike [icon] and [groupId], whose
+  /// absence reads "there is none", absence here reads "we do not know", so
+  /// a null must render NO star at all rather than an empty one.
+  final bool? bookmarked;
+
   /// Creates a tab entry.
   const TabInfo({
     required this.id,
@@ -182,16 +191,19 @@ class TabInfo {
     required this.active,
     this.icon,
     this.groupId,
+    this.bookmarked,
   });
 
-  /// Canonical JSON form: `{id, title, active}` plus `icon`/`groupId` only
-  /// when non-null (mirrors the Rust `skip_serializing_if = "Option::is_none"`).
+  /// Canonical JSON form: `{id, title, active}` plus `icon`/`groupId`/
+  /// `bookmarked` only when non-null (mirrors the Rust
+  /// `skip_serializing_if = "Option::is_none"`).
   Map<String, Object?> toJson() => {
         'id': id,
         'title': title,
         'active': active,
         if (icon != null) 'icon': icon,
         if (groupId != null) 'groupId': groupId,
+        if (bookmarked != null) 'bookmarked': bookmarked,
       };
 
   @override
@@ -201,10 +213,12 @@ class TabInfo {
       other.title == title &&
       other.active == active &&
       other.icon == icon &&
-      other.groupId == groupId;
+      other.groupId == groupId &&
+      other.bookmarked == bookmarked;
 
   @override
-  int get hashCode => Object.hash(id, title, active, icon, groupId);
+  int get hashCode =>
+      Object.hash(id, title, active, icon, groupId, bookmarked);
 }
 
 /// A tab-group entry in the optional `groups` array on `tabs.list` replies

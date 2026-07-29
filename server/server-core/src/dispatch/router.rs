@@ -456,6 +456,10 @@ mod tests {
                         active: true,
                         icon: None,
                         group_id: Some(1),
+                        // Tri-state UNKNOWN (protoVersion 1.6): these tabs
+                        // predate the bookmark relay, so the key stays off
+                        // the wire and every existing assertion is unchanged.
+                        bookmarked: None,
                     },
                     TabInfo {
                         id: 9,
@@ -463,6 +467,7 @@ mod tests {
                         active: false,
                         icon: None,
                         group_id: None,
+                        bookmarked: None,
                     },
                 ],
                 groups: vec![GroupInfo {

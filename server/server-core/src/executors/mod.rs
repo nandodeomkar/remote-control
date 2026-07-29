@@ -76,6 +76,19 @@ pub struct TabInfo {
     /// the key for TAB_GROUP_ID_NONE).
     #[serde(rename = "groupId", default, skip_serializing_if = "Option::is_none")]
     pub group_id: Option<i64>,
+    /// Whether this tab's URL is bookmarked anywhere in the tree
+    /// (protoVersion 1.6, phase 11, D-11). **TRI-STATE — `None` means
+    /// UNKNOWN, NOT `false`**: the extension could not read the bookmark
+    /// tree (`getTree()` failed, or the `bookmarks` permission is missing).
+    /// This is the one place the skip-when-absent shape shared with
+    /// `icon`/`group_id`/`WindowInfo::path` carries a DIFFERENT meaning —
+    /// those read "there is none", this one reads "we do not know". The
+    /// extension therefore emits an explicit `Some(true)`/`Some(false)` on
+    /// EVERY tab when the URL set was built and `None` on EVERY tab when it
+    /// was not, and the phone renders no star at all for `None` (rendering
+    /// an empty star for an unreadable tree is the misreport D-11 forbids).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bookmarked: Option<bool>,
 }
 
 /// One entry of the optional `groups` array on the `tabs.list` reply /
