@@ -407,6 +407,107 @@ async function buildAndSend() {
 }
 
 // ---------------------------------------------------------------------------
+// Bookmark snapshot builder (protoVersion 1.6) — always a FULL getTree() walk,
+// never a diff, the same stateless posture as the tab snapshot above.
+//
+// Returns { frame, urls, count }, or null when the tree is UNREADABLE. null is
+// not "no bookmarks": the caller sends no bm.state frame at all, so the server
+// keeps BookmarksState connected:false and the phone shows the honest install
+// hint instead of being told the collection is empty.
+// ---------------------------------------------------------------------------
+
+// Cap a bookmark title at MAX_BM_TITLE, never leaving a lone surrogate behind.
+// slice() cuts on UTF-16 code units, so an emoji straddling the cap is split in
+// half; JSON.stringify then emits a bare "\ud83d", which serde_json rejects as
+// a hard decode error — and bm.state ingest is STRICT, so ONE such title would
+// silently cost the phone the entire bookmark tree.
+function capBmTitle(s) {
+  const t = (s || "").slice(0, MAX_BM_TITLE);
+  const last = t.charCodeAt(t.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? t.slice(0, -1) : t;
+}
+
+async function buildBmSnapshot() {
+  if (!chrome.bookmarks) return null; // permission withheld / API absent
+  let tree;
+  try {
+    tree = await chrome.bookmarks.getTree();
+  } catch (e) {
+    console.log("[tab-bridge] bookmarks.getTree failed:", e && e.message);
+    return null;
+  }
+
+  // Breadth-first (level order), seeded from the CHILDREN of root "0" — the
+  // root is never emitted as a node; its children carry parentId "0" and the
+  // phone treats "0" as the virtual top level (D-08).
+  //
+  // The walk order is load-bearing. A pre-order (DFS) walk can spend the whole
+  // budget inside the first root's first deep subtree, leaving "Other
+  // bookmarks" and "Mobile bookmarks" absent entirely — a direct D-08
+  // violation. BFS guarantees every root, and the top level of every root,
+  // lands before any depth-2 node, so degradation prunes the deepest leaves.
+  const queue = ((tree[0] && tree[0].children) || []).slice();
+  const nodes = [];
+  const urls = new Set();
+  const dropped = new Set(); // parentIds whose children did not all fit
+
+  while (queue.length) {
+    const n = queue.shift();
+    const parentId = n.parentId !== undefined ? n.parentId : "0";
+    if (nodes.length >= MAX_BM_NODES) {
+      dropped.add(parentId);
+      continue;
+    }
+    // Exactly these keys and no others. NEVER a url key and NEVER an icon key
+    // — the url is collected into a module-local Set that never leaves the
+    // extension, and D-07 drops icons to keep the whole tree in one frame.
+    const el = {
+      id: n.id,
+      parentId,
+      title: capBmTitle(n.title),
+    };
+    if (n.children !== undefined) {
+      el.folder = true;
+      el.count = n.children.length;
+    } else if (n.url) {
+      urls.add(n.url); // exact-URL star truth (D-11)
+    }
+    if (n.unmodifiable) el.locked = true;
+    nodes.push(el);
+    if (n.children !== undefined) {
+      for (const child of n.children) queue.push(child);
+    }
+  }
+
+  // Truncation flags are applied BEFORE measuring, so the bytes counted are the
+  // bytes actually sent — `truncated` costs ~18 B per flagged node plus the
+  // payload key, enough to push a borderline frame back over on its own.
+  // Known edge: when a dropped node's own parent was dropped too, the
+  // per-folder flag lands nowhere and the snapshot-level flag is what remains
+  // honest.
+  const serialize = () => {
+    if (dropped.size === 0) {
+      return JSON.stringify({ t: "bm.state", p: { nodes } });
+    }
+    for (const el of nodes) {
+      if (dropped.has(el.id)) el.truncated = true;
+    }
+    return JSON.stringify({ t: "bm.state", p: { nodes, truncated: true } });
+  };
+
+  // 56 KB serialized budget: same control shape as the icon-strip loop above,
+  // but popping whole nodes off the END of the breadth-first order and
+  // measuring UTF-8 BYTES, never UTF-16 code units.
+  let frame = serialize();
+  while (nodes.length && bytesOf(frame) > MAX_FRAME_BYTES) {
+    dropped.add(nodes.pop().parentId);
+    frame = serialize();
+  }
+
+  return { frame, urls, count: nodes.length };
+}
+
+// ---------------------------------------------------------------------------
 // Favicons via the `favicon` permission's _favicon/ endpoint (Chrome's own
 // cache — same-origin fetch, no CORS, no <all_urls>). Returns base64 PNG
 // without a data: prefix, or null on any failure (row shows fallback glyph).
