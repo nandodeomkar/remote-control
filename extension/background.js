@@ -349,6 +349,38 @@ async function buildAndSend() {
     if (tab.groupId !== undefined && tab.groupId !== GROUP_ID_NONE) {
       el.groupId = tab.groupId;
     }
+    // TRI-STATE `bookmarked` (D-11). This key DIVERGES from `icon` and `groupId`
+    // above: for those, an absent key means "there is none". For `bookmarked`,
+    // an absent key means UNKNOWN — the bookmark tree could not be read. So the
+    // explicit `false` below is deliberate and must NOT be "optimized" into a
+    // skip-when-falsy: emitting no key for an unbookmarked tab would be
+    // indistinguishable from an unreadable tree, and emitting `false` when the
+    // tree was unreadable would render an empty star on a page that IS
+    // bookmarked — exactly the misreport D-11 forbids. All-or-nothing across
+    // the snapshot: bmUrlSet === null omits the key from EVERY tab.
+    // Cost of the explicit false: ~20 B/tab, ~1 KB at 50 tabs — under 2% of the
+    // 56 KB budget. Affordable.
+    //
+    // RAW EXACT string equality against tab.url. No normalization of any kind:
+    // no fragment stripping, no query stripping, no scheme unification, no
+    // trailing-slash fixing. The reason is BLAST RADIUS, not fidelity — D-11
+    // makes unstar delete EVERY bookmark whose URL matches, so any widening of
+    // "matches" here would let an unstar on a base URL destroy a deliberately
+    // kept fragment-specific bookmark. Chrome canonicalizes bookmark URLs and
+    // tab.url through the same GURL path, so exact equality is right for the
+    // common case; the residual mismatch shows an empty star on a page whose
+    // base URL is bookmarked — honest, not a lie.
+    //
+    // No per-tab chrome.bookmarks.search({url}) call: the URL set is a free
+    // by-product of the getTree() walk buildBmSnapshot already did, and 50 extra
+    // async IPC round-trips inside a 200 ms debounce would double worst-case
+    // snapshot latency for identical semantics (search({url}) matches verbatim).
+    //
+    // A tab with no url (e.g. discarded) gets no key — unknown is the honest
+    // answer for that one tab.
+    if (bmUrlSet !== null && tab.url) {
+      el.bookmarked = bmUrlSet.has(tab.url);
+    }
     const icon = tab.url ? await favicon(tab.url) : null;
     if (icon !== null && icon.length <= MAX_ICON_B64) {
       el.icon = icon;
@@ -392,12 +424,17 @@ async function buildAndSend() {
   if (ws && ws.readyState === WebSocket.OPEN) {
     try {
       ws.send(frame);
+      // Counts and lifecycle only — never a tab title, never a url. The last
+      // count is how many tabs carried a `bookmarked` flag (0 = the tree was
+      // unreadable on this pass, or no tab had a url).
       console.log(
         "[tab-bridge] snapshot sent:",
         els.length,
         "tabs,",
         groups.length,
-        "groups"
+        "groups,",
+        els.filter((e) => e.bookmarked !== undefined).length,
+        "star-known"
       );
     } catch {
       /* onclose handles it; next connect pushes a fresh snapshot */
