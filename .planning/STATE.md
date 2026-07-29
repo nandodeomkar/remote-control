@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 11-07-PLAN.md
-last_updated: "2026-07-29T16:57:48.900Z"
+stopped_at: Completed 11-03-PLAN.md
+last_updated: "2026-07-29T17:28:56.687Z"
 last_activity: 2026-07-29 -- Phase 11 execution started
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 89
-  completed_plans: 81
+  completed_plans: 82
   percent: 91
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 5 of 12
+Plan: 6 of 12
 Next: wave 2 (11-02, 11-05, 11-07) — Rust relay tier, extension leg, Dart codec mirror.
   Phase 10 VERIFIED 2026-07-17 (10-VERIFICATION.md, passed, 12/12 must-haves).
   Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
@@ -151,6 +151,7 @@ Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 
 | Phase 11 P02 | 23min | 3 tasks | 5 files |
 | Phase 11 P05 | 7min | 3 tasks | 2 files |
 | Phase 11 P07 | 5min | 3 tasks | 2 files |
+| Phase 11 P03 | 7min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -333,6 +334,8 @@ Recent decisions affecting current work:
 - [Phase 11]: [Phase 11-05]: An unreadable bookmark tree sends NO bm.state frame (bmUrlSet=null), never an empty one — an empty snapshot tells the phone 'you have no bookmarks', while no frame leaves BookmarksState connected:false and the phone on the honest install hint. buildAndSendAll is the single debounce target and on-open push: one settling gap, one getTree walk, two frames, bookmarks first so the tab snapshot reads a fresh URL set
 - [Phase 11-07]: Dart codec mirrors the bm.* family: BmNode/_bmList with String nodeId vs integer tabId enforced by _req<String>/_req<int>, so a type swap is a FormatException in BOTH languages instead of a silent extension-side failure (T-11-10). Six Bm*Msg classes + six decodeText arms; no package:collection, no url and no icon on BmNode
 - [Phase 11-07]: group('bookmarks fixtures') hard-registered in the Dart harness and PROVEN real by a corrupt-to-RED-then-revert experiment (Pitfall 7) — a fixture family neither harness globs yields zero coverage and zero failures silently (the 07-02 input.blocked lesson). _bmList shipped with its consumers in task 2 because a caller-less private Dart helper is an unused_element warning that fails the analyze gate
+- [Phase 11-03]: bm.list read arm ALWAYS emits truncated (Some(state.truncated)) mirroring the 1.5 always-emit-groups posture — older clients drop the unknown key per D-05, and a 1.6 client never disambiguates absent-because-old from absent-because-false
+- [Phase 11-03]: Fixture-family registration proven, not assumed: corrupting 03-bm-open.json's expect turned codec_fixtures_bookmarks RED, then reverted (fixtures byte-clean). The pause gate was mutation-verified the same way — deleting the is_executor_bound bm entry failed exactly paused_drops_every_executor_bound_family_silently
 
 ### Pending Todos
 
@@ -376,6 +379,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T16:57:32.970Z
-Stopped at: Completed 11-07-PLAN.md
+Last session: 2026-07-29T17:28:45.849Z
+Stopped at: Completed 11-03-PLAN.md
 Resume file: None
