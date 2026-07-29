@@ -875,21 +875,21 @@ TabInfo(
 | A5 | Bookmark titles are frequently non-ASCII for this owner. | Pitfall 1 | If wholly ASCII, the `TextEncoder` fix is harmless belt; the pitfall is real regardless because it also protects the shipped tabs path. |
 | A6 | Flutter resolves the nested star tap to the inner `InkWell` without firing the parent's `onTapDown`. | Client Integration | **Explicitly pinned by a test rather than trusted** — see Validation Architecture row for D-09. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does the owner's Chrome disable the extension on the permission change?**
+1. **Does the owner's Chrome disable the extension on the permission change?** — **RESOLVED: deferred by design to UAT-1 (11-12 task 2).** Both outcomes are acceptable; the README prose is written from the observed result, never before it.
    - What we know: packed extensions are disabled pending re-approval; unpacked ones are documented to receive no permission warnings at all.
    - What's unclear: whether current-stable Chrome still honours the MV2-era unpacked exemption in the same way.
    - **Recommendation:** treat it as unknown in the plan. UAT-1 (below) resolves it in 60 seconds on the owner's machine, and the README/UAT copy is written from the observed result. Do **not** ship README prose asserting either behaviour before that step runs.
 
-2. **Should the truncation flag be per-folder, snapshot-level, or both?**
+2. **Should the truncation flag be per-folder, snapshot-level, or both?** — **RESOLVED: both** (implemented by 11-05 task 3).
    - What we know: per-folder is more truthful; snapshot-level is cheaper and enables a header count.
    - **Recommendation:** both. `truncated` on affected folders (skip-when-absent, so free in the normal case) drives the inline row; `truncated` on the payload drives the optional header line. Total marginal cost in an untruncated snapshot: **0 bytes.**
 
-3. **Does the star belong on `TabsNotifier` or `BookmarksNotifier`?**
+3. **Does the star belong on `TabsNotifier` or `BookmarksNotifier`?** — **RESOLVED: `TabsNotifier`** (implemented by 11-08 task 3).
    - **Recommendation:** `TabsNotifier`. The star renders on a tab row, reads `TabEl.bookmarked`, and its optimistic overlay is keyed by tab id. `BookmarksNotifier` stays purely about the tree. One owner per surface.
 
-4. **Should the existing tabs budget loop be fixed in this phase?**
+4. **Should the existing tabs budget loop be fixed in this phase?** — **RESOLVED: yes** (implemented by 11-05 task 1; on-device coverage named there as UAT-3 + UAT-11).
    - What we know: it is a live latent bug (Pitfall 1) in code this phase is already editing.
    - **Recommendation:** yes — a two-line change in the same function, in the same file, with the same reasoning. Note it explicitly in the plan so it is not mistaken for scope creep.
 
