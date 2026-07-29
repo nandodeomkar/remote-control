@@ -26,9 +26,10 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 9 of 12
-Next: wave 3 continues (11-08 done) — 11-09+ own the widget layer: segment bar,
-  bookmarks section, star slot, confirm dialogs.
+Plan: 8 of 12
+Next: wave 4 (11-04, 11-09) — Rust transport/session wiring for the bm.* relay leg,
+  and the first bookmarks widget layer (install hint, confirm, bookmarks section).
+  Waves 1-3 complete: 11-01, 11-02, 11-03, 11-05, 11-06, 11-07, 11-08.
   Phase 10 VERIFIED 2026-07-17 (10-VERIFICATION.md, passed, 12/12 must-haves).
   Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
   with persistent modifier chips + tab bar, keyboard.pad persistence, sacred FSM
