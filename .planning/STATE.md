@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 11-09-PLAN.md
-last_updated: "2026-07-29T18:21:48.879Z"
-last_activity: 2026-07-29 -- Phase 11 execution resumed (wave continue)
+status: Executing Phase 11
+stopped_at: Completed 11-10-PLAN.md
+last_updated: "2026-07-29T18:43:07.354Z"
+last_activity: 2026-07-29 -- Phase 11 execution started
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 89
-  completed_plans: 86
+  completed_plans: 87
   percent: 91
 ---
 
@@ -26,19 +26,33 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 10 of 12
-Next: wave 4 continues with 11-10 — wiring the segmented control and mounting
-  BookmarksSection on the Browser screen. 11-09 is DONE: InstallHintCard is now a
+Plan: 11 of 12
+Next: wave 5 continues with 11-11 — the D-09/D-11/D-12 star slot on tab rows.
+  11-10 is DONE: the Browser screen is now a fixed BrowserSegmentBar header
+  (hand-rolled, no enabled parameter — navigation is never gated), ONE swapped
+  Expanded scroll region, and a PINNED macro-grid footer with a 1px kHairline
+  top edge, so D-02's identical rect holds by construction (tester.getRect
+  equality proven across a segment switch AND a 21-row folder drill-in).
+  browser_segment.dart persists the choice under a NEW browser.segment prefs key
+  (corrupt/unknown/throwing reads degrade to tabs); the D-03 prime fires from
+  build off the segment ABOUT TO RENDER, guarded by _bmPrimed — so a segment
+  restored from prefs primes on the same path as a tap, and screen open still
+  records zero BmListMsg. PopScope walks the folder stack before leaving the
+  route. _SectionHeader deleted; kBrowserActions + the whole tab section
+  byte-untouched. 9 new screen tests; flutter suite 594 green, analyze clean.
+  Carry-forward for 11-11: _TabRow is untouched, so the star insert lands
+  against the shipped chrome (the 12px→4px right-padding drop is 11-11's edit);
+  use state.bookmarkedFor(tab), NOT tab.bookmarked; import the unstar copy from
+  bookmark_confirm.dart; and any new screen-level test must pump through
+  _pumpScreen, which owns the browserSegmentStoreProvider override (a raw
+  ProviderScope throws on the shared_preferences platform).
+  11-09 is DONE: InstallHintCard is now a
   shared public widget both segments render (no fork), confirmDestructive + ten
   named copy consts serve all three destructive confirms, and BookmarksSection
   ships the full region — folder bar (live while gated), folder/link rows on the
   _TabRow chrome, honest truncation copy, and the D-14 affordance gate
   (onLongPress null on a non-empty folder, a locked node and every root) behind
-  the D-13 confirm. 18 new widget tests; flutter suite 585 green, analyze clean.
-  Carry-forward for 11-10: PopScope(canPop: depth == 0) + Android back routing
-  belong to the SCREEN (the folder bar only supplies the on-screen control), and
-  primeList() fires from the segment onSelect guarded by _bmPrimed (D-03), never
-  from initState.
+  the D-13 confirm.
   11-04 is DONE: ServerDeps.bookmarks is threaded from
   run_ext through the accept loop into every session, the bm.changed push arm is
   authed-gated (guard-removal mutation proven RED) with no after-auth snapshot, and
@@ -69,7 +83,7 @@ Next: wave 4 continues with 11-10 — wiring the segmented control and mounting
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-29 -- Phase 11 execution resumed (wave continue)
+Last activity: 2026-07-29 -- Phase 11 execution started
 
 Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 89 plans)
 
@@ -173,6 +187,7 @@ Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 
 | Phase 11 P08 | 18min | 3 tasks | 5 files |
 | Phase 11 P04 | 14min | 2 tasks | 5 files |
 | Phase 11 P09 | 8min | 3 tasks | 5 files |
+| Phase 11 P10 | 12min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -367,6 +382,9 @@ Recent decisions affecting current work:
 - [Phase 11-09]: Trailing bookmark lines (folder truncation + long-press hint) render only when connected — a delete hint under the install-hint card would advertise an affordance no visible row has
 - [Phase 11-09]: D-14 is enforced as an AFFORDANCE gate, not a refusal: onLongPress is null (no visual tell, nothing to discover) unless BookmarksViewState.isDeletable — 11-08's shared predicate, deliberately not re-derived in the row
 - [Phase 11-09]: confirmDestructive returns result == true so a barrier dismissal collapses into the cancel branch; kError appears in exactly one place in the phase (the confirm button fill)
+- [Phase ?]: [Phase 11-10]: D-02 pixel-pinning is achieved by LAYOUT — the macro grid moved out of the swapped scroll region into a Column footer, so identical rects hold by construction and tester.getRect equality only witnesses it
+- [Phase ?]: [Phase 11-10]: the D-03 bm.list prime fires from build off the segment about to render (guarded by _bmPrimed), not from onSelect — a segment restored from prefs is displayed with no tap, and an onSelect-only prime would never fire for that user
+- [Phase ?]: [Phase 11-10]: bookmarksStateProvider is watched on BOTH segments so PopScope.canPop sees the folder depth in the frame the back gesture arrives; system back and the folder-bar button share one callback (haptic included)
 
 ### Pending Todos
 
@@ -410,6 +428,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T18:21:48.858Z
+Last session: 2026-07-29T18:42:40.817Z
 Stopped at: Completed 11-09-PLAN.md
 Resume file: None
