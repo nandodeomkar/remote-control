@@ -155,6 +155,33 @@ List<GroupInfo> _groupList(Object? v, String key) {
   }).toList();
 }
 
+/// Parse a `nodes` array of `{id, parentId, title, folder?, count?, locked?,
+/// truncated?}` entries (protoVersion 1.6, phase 11).
+///
+/// `id`, `parentId` and `title` are ALL REQUIRED per element (a missing
+/// field is a hard decode error — fixture 07, the GroupEl rule applied to
+/// BmEl); the four flags are optional (D-05 tolerant). Unknown extra fields
+/// are ignored; a present value with the wrong type is a decode error.
+List<BmNode> _bmList(Object? v, String key) {
+  if (v is! List) {
+    throw FormatException('field $key must be an array');
+  }
+  return v.map((e) {
+    if (e is! Map<String, dynamic>) {
+      throw FormatException('entries of $key must be objects');
+    }
+    return BmNode(
+      id: _req<String>(e, 'id'),
+      parentId: _req<String>(e, 'parentId'),
+      title: _req<String>(e, 'title'),
+      folder: _opt<bool>(e, 'folder'),
+      count: _opt<int>(e, 'count'),
+      locked: _opt<bool>(e, 'locked'),
+      truncated: _opt<bool>(e, 'truncated'),
+    );
+  }).toList();
+}
+
 /// A tab entry in `tabs.list` replies and `tabs.changed` pushes
 /// (protoVersion 1.4, BROW-01). No url field ever crosses the phone-facing
 /// wire — titles are enough (SPEC section 7 privacy rule).
@@ -1025,6 +1052,189 @@ final class TabsCloseMsg extends RemoteMessage {
   Map<String, Object?> toPayload() => {'id': id};
 }
 
+/// `bm.list` (C→S request / S→C reply, protoVersion 1.6): request payload is
+/// `{}` (the all-null const form the phone sends on first Bookmarks-segment
+/// display, D-03); the reply carries `connected` + `nodes`. With the
+/// extension never connected the reply is `{connected:false, nodes:[]}` —
+/// the phone's install-hint state, shared with the Tabs segment.
+///
+/// A READ, not executor-bound: answered even while the server is paused
+/// (SPEC section 11).
+final class BmListMsg extends RemoteMessage {
+  /// Present in replies, absent in requests.
+  final bool? connected;
+
+  /// Present in replies, absent in requests.
+  final List<BmNode>? nodes;
+
+  /// Snapshot-level flag: nodes were dropped by the extension's byte budget.
+  /// Absent stays absent on canonical re-encode.
+  final bool? truncated;
+
+  /// Creates a bm.list message (const request form: all fields null).
+  const BmListMsg({this.connected, this.nodes, this.truncated});
+
+  /// Decodes the `bm.list` payload.
+  factory BmListMsg.fromPayload(Map<String, dynamic> p) {
+    final raw = p['nodes'];
+    return BmListMsg(
+      connected: _opt<bool>(p, 'connected'),
+      nodes: raw == null ? null : _bmList(raw, 'nodes'),
+      truncated: _opt<bool>(p, 'truncated'),
+    );
+  }
+
+  @override
+  String get t => 'bm.list';
+
+  @override
+  Map<String, Object?> toPayload() => {
+        if (connected != null) 'connected': connected,
+        if (nodes != null) 'nodes': nodes!.map((e) => e.toJson()).toList(),
+        if (truncated != null) 'truncated': truncated,
+      };
+}
+
+/// `bm.changed` (S→C push, protoVersion 1.6): on any bookmark change AND on
+/// extension connect/disconnect. `connected` and `nodes` are required — a
+/// missing field is a hard decode error. `truncated` is optional and
+/// snapshot-level (a per-node `truncated` lives on [BmNode]).
+final class BmChangedMsg extends RemoteMessage {
+  /// Whether the browser extension is connected to the server.
+  final bool connected;
+
+  /// Current full bookmark snapshot, flat breadth-first (root `"0"` is never
+  /// shipped — D-08).
+  final List<BmNode> nodes;
+
+  /// Snapshot-level budget-truncation flag; absent stays absent on
+  /// canonical re-encode.
+  final bool? truncated;
+
+  /// Creates a bm.changed message.
+  const BmChangedMsg({
+    required this.connected,
+    required this.nodes,
+    this.truncated,
+  });
+
+  /// Decodes the `bm.changed` payload.
+  factory BmChangedMsg.fromPayload(Map<String, dynamic> p) {
+    if (!p.containsKey('nodes')) {
+      throw const FormatException('missing required field: nodes');
+    }
+    return BmChangedMsg(
+      connected: _req<bool>(p, 'connected'),
+      nodes: _bmList(p['nodes'], 'nodes'),
+      truncated: _opt<bool>(p, 'truncated'),
+    );
+  }
+
+  @override
+  String get t => 'bm.changed';
+
+  @override
+  Map<String, Object?> toPayload() => {
+        'connected': connected,
+        'nodes': nodes.map((e) => e.toJson()).toList(),
+        if (truncated != null) 'truncated': truncated,
+      };
+}
+
+/// `bm.open` (C→S, protoVersion 1.6): open that bookmark in a NEW tab.
+/// Fire-and-forget — no err reply; stale ids self-heal via the next
+/// `bm.changed`.
+///
+/// [nodeId] is a **String** because Chrome bookmark ids are strings,
+/// deliberately unlike the integer `tabId` on [BmStarMsg]/[BmUnstarMsg].
+/// Reusing one key name for both would decode fine — the codec is
+/// value-lenient — and then fail SILENTLY inside the extension, which is
+/// precisely why the two id fields are named apart.
+final class BmOpenMsg extends RemoteMessage {
+  /// Chrome bookmark node id (a String).
+  final String nodeId;
+
+  /// Creates a bm.open message.
+  const BmOpenMsg({required this.nodeId});
+
+  /// Decodes the `bm.open` payload.
+  factory BmOpenMsg.fromPayload(Map<String, dynamic> p) =>
+      BmOpenMsg(nodeId: _req<String>(p, 'nodeId'));
+
+  @override
+  String get t => 'bm.open';
+
+  @override
+  Map<String, Object?> toPayload() => {'nodeId': nodeId};
+}
+
+/// `bm.star` (C→S, protoVersion 1.6, D-10): bookmark that tab's URL into the
+/// bookmarks-bar root. `tabId` is an INTEGER (a chrome.tabs id), unlike
+/// [BmOpenMsg]/[BmRemoveMsg]'s String `nodeId`. Fire-and-forget; no url
+/// crosses the wire — the extension resolves the tab's URL locally.
+final class BmStarMsg extends RemoteMessage {
+  /// Browser-assigned tab id (an integer).
+  final int tabId;
+
+  /// Creates a bm.star message.
+  const BmStarMsg({required this.tabId});
+
+  /// Decodes the `bm.star` payload.
+  factory BmStarMsg.fromPayload(Map<String, dynamic> p) =>
+      BmStarMsg(tabId: _req<int>(p, 'tabId'));
+
+  @override
+  String get t => 'bm.star';
+
+  @override
+  Map<String, Object?> toPayload() => {'tabId': tabId};
+}
+
+/// `bm.unstar` (C→S, protoVersion 1.6, D-11): remove EVERY bookmark whose
+/// URL exactly matches that tab's URL. Same integer `tabId` shape as
+/// [BmStarMsg] and explicitly NOT a toggle — an idempotent star/unstar pair
+/// cannot invert the wrong state when a snapshot lands between tap and
+/// delivery (D-12).
+final class BmUnstarMsg extends RemoteMessage {
+  /// Browser-assigned tab id (an integer).
+  final int tabId;
+
+  /// Creates a bm.unstar message.
+  const BmUnstarMsg({required this.tabId});
+
+  /// Decodes the `bm.unstar` payload.
+  factory BmUnstarMsg.fromPayload(Map<String, dynamic> p) =>
+      BmUnstarMsg(tabId: _req<int>(p, 'tabId'));
+
+  @override
+  String get t => 'bm.unstar';
+
+  @override
+  Map<String, Object?> toPayload() => {'tabId': tabId};
+}
+
+/// `bm.remove` (C→S, protoVersion 1.6, D-13/D-14): remove ONE bookmark or
+/// ONE EMPTY folder — the String `nodeId` shape of [BmOpenMsg].
+/// `removeTree` is never called anywhere in the phase, so a subtree wipe
+/// from the phone is structurally impossible. Fire-and-forget.
+final class BmRemoveMsg extends RemoteMessage {
+  /// Chrome bookmark node id (a String).
+  final String nodeId;
+
+  /// Creates a bm.remove message.
+  const BmRemoveMsg({required this.nodeId});
+
+  /// Decodes the `bm.remove` payload.
+  factory BmRemoveMsg.fromPayload(Map<String, dynamic> p) =>
+      BmRemoveMsg(nodeId: _req<String>(p, 'nodeId'));
+
+  @override
+  String get t => 'bm.remove';
+
+  @override
+  Map<String, Object?> toPayload() => {'nodeId': nodeId};
+}
+
 /// `browser` (C→S): key-macro actions.
 final class BrowserMsg extends RemoteMessage {
   /// Browser action string.
@@ -1221,6 +1431,12 @@ final class UnknownMsg extends RemoteMessage {
     'tabs.changed' => TabsChangedMsg.fromPayload(p),
     'tabs.activate' => TabsActivateMsg.fromPayload(p),
     'tabs.close' => TabsCloseMsg.fromPayload(p),
+    'bm.list' => BmListMsg.fromPayload(p),
+    'bm.changed' => BmChangedMsg.fromPayload(p),
+    'bm.open' => BmOpenMsg.fromPayload(p),
+    'bm.star' => BmStarMsg.fromPayload(p),
+    'bm.unstar' => BmUnstarMsg.fromPayload(p),
+    'bm.remove' => BmRemoveMsg.fromPayload(p),
     'browser' => BrowserMsg.fromPayload(p),
     'present' => PresentMsg.fromPayload(p),
     'ping' => PingMsg.fromPayload(p),
