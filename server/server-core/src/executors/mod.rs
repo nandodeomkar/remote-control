@@ -129,6 +129,72 @@ pub struct TabsState {
     pub groups: Vec<GroupInfo>,
 }
 
+/// One entry of the `bm.list` reply / `bm.changed` push node array — the
+/// wire BmEl element (protoVersion 1.6, phase 11). The tree is shipped as
+/// ONE FLAT breadth-first list, not a recursive structure (D-06), so the
+/// codec never recurses.
+///
+/// `id`, `parent_id` and `title` are ALL wire-required — a missing field is
+/// a HARD decode error, following [`GroupInfo`] rather than [`TabInfo`]'s
+/// optional tail. The optional fields use the `WindowInfo::icon`
+/// skip-when-absent convention: never emitted as null.
+///
+/// `id`/`parent_id` are Chrome bookmark ids and are **STRINGS**, deliberately
+/// unlike [`TabInfo::id`]'s integer. That is exactly why the commands name
+/// their fields `nodeId` (bookmark node, string) and `tabId` (tab, integer)
+/// instead of both reusing `id`: the codec is value-lenient, so a swapped id
+/// would decode fine and fail silently at the extension.
+///
+/// Root `"0"` is **NEVER shipped as a node**; its children carry
+/// `parent_id: "0"` and the phone treats `"0"` as the virtual top level
+/// (D-08). `folder: Some(true)` marks a folder (absent = a link) and `count`
+/// is that folder's direct-child count, which gates the D-14 delete
+/// affordance (`count == 0` ⇒ delete may be offered). `locked: Some(true)`
+/// mirrors Chrome's `BookmarkTreeNode.unmodifiable` (managed/admin
+/// bookmarks) so the phone hides a delete Chrome would reject.
+/// `truncated: Some(true)` marks a folder whose children were dropped by the
+/// extension's size-budget loop (SPEC §15).
+///
+/// There is deliberately **NO url field and NO icon field**: the no-url rule
+/// is the same locked invariant [`TabInfo`] carries (URL resolution stays
+/// extension-side — the phone sends `bm.open {nodeId}` and the extension
+/// resolves it), and D-07 drops the icon so the whole tree fits one frame.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BmNode {
+    pub id: String,
+    #[serde(rename = "parentId")]
+    pub parent_id: String,
+    pub title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub count: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub locked: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub truncated: Option<bool>,
+}
+
+/// The full bookmark-relay state carried by the `bm.list` reply and the
+/// `bm.changed` push (protoVersion 1.6, phase 11) — the [`TabsState`] clone
+/// for bookmarks. Core-owned plain data, ZERO OS deps.
+///
+/// `Default` is the never-connected shape
+/// `{connected: false, nodes: [], truncated: false}` — exactly what the
+/// phone's install-hint state keys on, and exactly what the watch resets to
+/// when the extension session ends for ANY reason.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct BookmarksState {
+    /// Whether a browser extension is currently connected to the ext
+    /// listener (SPEC §15).
+    pub connected: bool,
+    /// The current full bookmark snapshot, flat breadth-first (max 500 —
+    /// server belt).
+    pub nodes: Vec<BmNode>,
+    /// Whether the extension dropped nodes to fit its frame budget.
+    pub truncated: bool,
+}
+
 /// Mouse + keyboard injection.
 ///
 /// Explicit `*_down`/`*_up` pairs exist (not just tap/click) because the
@@ -196,6 +262,29 @@ pub trait Tabs: Send + Sync {
     fn list(&self) -> TabsState;
     fn activate(&self, id: i64);
     fn close(&self, id: i64);
+}
+
+/// Browser bookmark relay (protoVersion 1.6, phase 11) — the [`Tabs`] shape
+/// applied to bookmarks.
+///
+/// All FOUR commands return NOTHING: the SPEC §7 `bm.*` family is
+/// fire-and-forget with no err reply (the same posture as `tabs.activate`),
+/// so there is no failure to surface. A stale `node_id`/`tab_id`, a
+/// permission-denied Chrome call, an unmodifiable managed bookmark — every
+/// failure self-heals on the next full `bm.changed` snapshot. `list` is a
+/// plain read of the latest relay state.
+///
+/// `remove` targets ONE bookmark or ONE **EMPTY** folder only (D-14). There
+/// is deliberately no recursive/subtree method on this trait: the server
+/// tier cannot express a subtree wipe, so the ext leg's escalated
+/// destructive residual (SPEC §15) stays bounded by construction rather than
+/// by convention.
+pub trait Bookmarks: Send + Sync {
+    fn list(&self) -> BookmarksState;
+    fn open(&self, node_id: &str);
+    fn star(&self, tab_id: i64);
+    fn unstar(&self, tab_id: i64);
+    fn remove(&self, node_id: &str);
 }
 
 /// The full executor bundle injected into dispatch and transport.

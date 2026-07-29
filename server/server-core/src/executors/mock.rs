@@ -10,8 +10,8 @@ use std::time::Duration;
 use tokio::sync::Notify;
 
 use super::{
-    Apps, Button, Clipboard, Executors, KeyCode, Media, Modifier, MouseKeys, Power, Tabs,
-    TabsState, WindowInfo,
+    Apps, BookmarksState, Bookmarks, Button, Clipboard, Executors, KeyCode, Media, Modifier,
+    MouseKeys, Power, Tabs, TabsState, WindowInfo,
 };
 
 /// One recorded executor invocation, in call order.
@@ -38,6 +38,10 @@ pub enum Call {
     ClipSet(String),
     TabsActivate(i64),
     TabsClose(i64),
+    BmOpen(String),
+    BmStar(i64),
+    BmUnstar(i64),
+    BmRemove(String),
 }
 
 /// Shared, cloneable view of everything the mocks have recorded.
@@ -244,6 +248,27 @@ impl Tabs for MockExecutors {
     }
     fn close(&self, id: i64) {
         self.log.record(Call::TabsClose(id));
+    }
+}
+
+impl Bookmarks for MockExecutors {
+    /// Returns the never-connected default state so `bm.list` routing is
+    /// assertable through the reply payload — the `Tabs::list` convention.
+    /// Read-only: not recorded as a `Call`.
+    fn list(&self) -> BookmarksState {
+        BookmarksState::default()
+    }
+    fn open(&self, node_id: &str) {
+        self.log.record(Call::BmOpen(node_id.to_string()));
+    }
+    fn star(&self, tab_id: i64) {
+        self.log.record(Call::BmStar(tab_id));
+    }
+    fn unstar(&self, tab_id: i64) {
+        self.log.record(Call::BmUnstar(tab_id));
+    }
+    fn remove(&self, node_id: &str) {
+        self.log.record(Call::BmRemove(node_id.to_string()));
     }
 }
 
