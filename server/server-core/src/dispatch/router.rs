@@ -453,15 +453,16 @@ mod tests {
 
     use super::*;
     use crate::codec::json::{
-        AppsClosePayload, AppsFocusPayload, AppsLaunchPayload, AppsListPayload, BrowserPayload,
-        ClickPayload, ClipGetPayload, ClipSetPayload, ConfirmPayload, DragPayload, ErrPayload,
-        KeyPayload, MediaPayload, PingPayload, PongPayload, PowerPayload, PresentPayload,
-        TabsActivatePayload, TabsClosePayload, TabsListPayload, TextPayload,
+        AppsClosePayload, AppsFocusPayload, AppsLaunchPayload, AppsListPayload, BmChangedPayload,
+        BmListPayload, BmOpenPayload, BmRemovePayload, BmStarPayload, BmUnstarPayload,
+        BrowserPayload, ClickPayload, ClipGetPayload, ClipSetPayload, ConfirmPayload, DragPayload,
+        ErrPayload, KeyPayload, MediaPayload, PingPayload, PongPayload, PowerPayload,
+        PresentPayload, TabsActivatePayload, TabsClosePayload, TabsListPayload, TextPayload,
     };
     use crate::executors::mock::{Call, MockExecutors};
     use crate::executors::{
-        Apps, Button, Executors, GroupInfo, KeyCode, Modifier, TabInfo, Tabs, TabsState,
-        WindowInfo,
+        Apps, BmNode, Bookmarks, BookmarksState, Button, Executors, GroupInfo, KeyCode, Modifier,
+        TabInfo, Tabs, TabsState, WindowInfo,
     };
     use std::sync::Arc;
 
@@ -527,6 +528,50 @@ mod tests {
         }
         fn activate(&self, _id: i64) {}
         fn close(&self, _id: i64) {}
+    }
+
+    /// Bookmarks executor with a POPULATED fixed state (the recording mock's
+    /// `list` returns the never-connected default) — drives the bm.list
+    /// reply assertions, including the paused read-exemption test. The four
+    /// command methods are no-ops: this double exists to prove the READ
+    /// path, the recording mock proves the command path.
+    struct PopulatedBookmarks;
+    impl PopulatedBookmarks {
+        fn state() -> BookmarksState {
+            BookmarksState {
+                connected: true,
+                nodes: vec![
+                    BmNode {
+                        id: "1".into(),
+                        parent_id: "0".into(),
+                        title: "Bookmarks bar".into(),
+                        folder: Some(true),
+                        count: Some(2),
+                        locked: Some(true),
+                        truncated: None,
+                    },
+                    BmNode {
+                        id: "12".into(),
+                        parent_id: "1".into(),
+                        title: "Rust docs".into(),
+                        folder: None,
+                        count: None,
+                        locked: None,
+                        truncated: None,
+                    },
+                ],
+                truncated: true,
+            }
+        }
+    }
+    impl Bookmarks for PopulatedBookmarks {
+        fn list(&self) -> BookmarksState {
+            Self::state()
+        }
+        fn open(&self, _node_id: &str) {}
+        fn star(&self, _tab_id: i64) {}
+        fn unstar(&self, _tab_id: i64) {}
+        fn remove(&self, _node_id: &str) {}
     }
 
     fn d(msg: Msg) -> Decoded {
@@ -628,6 +673,12 @@ mod tests {
             Msg::Present(PresentPayload { action: "next".into() }),
             Msg::TabsActivate(TabsActivatePayload { id: 7 }),
             Msg::TabsClose(TabsClosePayload { id: 9 }),
+            // protoVersion 1.6: pause means the phone cannot CHANGE the PC,
+            // and that includes the D-13/D-14 destructive bookmark commands.
+            Msg::BmOpen(BmOpenPayload { node_id: "1234".into() }),
+            Msg::BmStar(BmStarPayload { tab_id: 7 }),
+            Msg::BmUnstar(BmUnstarPayload { tab_id: 7 }),
+            Msg::BmRemove(BmRemovePayload { node_id: "1234".into() }),
         ] {
             let reply = route(d(msg), &mut ctx, &exec, &auth, true);
             assert!(reply.is_empty(), "paused executor-bound traffic must produce NO reply");
@@ -719,6 +770,131 @@ mod tests {
                 groups: Some(Vec::new()),
             })],
             "mock default state must reply the never-connected hint shape"
+        );
+    }
+
+    /// SPEC §11 read exemption (protoVersion 1.6, D-03): bm.list still
+    /// answers while paused — the same exemption as apps.list/clip.get/
+    /// tabs.list — so the phone renders an HONEST bookmark list instead of
+    /// an empty lie whenever the PC happens to be paused.
+    #[tokio::test]
+    async fn paused_bm_list_still_answers_with_state() {
+        let (base, log) = MockExecutors::recording();
+        let exec = Executors { bookmarks: Arc::new(PopulatedBookmarks), ..base };
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+
+        let reply = route(
+            d(Msg::BmList(BmListPayload { connected: None, nodes: None, truncated: None })),
+            &mut ctx, &exec, &auth, true,
+        );
+        match &reply[..] {
+            [Msg::BmList(BmListPayload {
+                connected: Some(true),
+                nodes: Some(nodes),
+                truncated: Some(true),
+            })] => {
+                assert_eq!(nodes.len(), 2, "reply must carry the executor's nodes");
+                assert_eq!(nodes[0].id, "1");
+                assert_eq!(nodes[0].folder, Some(true), "folder flag must survive the reply");
+                assert_eq!(nodes[0].count, Some(2), "count must survive the reply");
+                assert_eq!(nodes[0].locked, Some(true), "locked must survive the reply");
+                assert_eq!(nodes[1].id, "12");
+                assert_eq!(nodes[1].folder, None, "a plain link stays folder-less");
+            }
+            other => panic!("expected a bm.list reply with state, got: {other:?}"),
+        }
+        assert!(log.calls().is_empty(), "bm.list is a read — no recorded call");
+    }
+
+    /// The recording mock's bm.list reply carries its (default) state — the
+    /// never-connected {connected:false, nodes:[]} install-hint shape the
+    /// phone keys its "install the extension" copy on.
+    #[tokio::test]
+    async fn bm_list_replies_mock_default_state() {
+        let (exec, _log) = MockExecutors::recording();
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+        let reply = route(
+            d(Msg::BmList(BmListPayload { connected: None, nodes: None, truncated: None })),
+            &mut ctx, &exec, &auth, false,
+        );
+        assert_eq!(
+            reply,
+            vec![Msg::BmList(BmListPayload {
+                connected: Some(false),
+                nodes: Some(Vec::new()),
+                truncated: Some(false),
+            })],
+            "mock default state must reply the never-connected hint shape"
+        );
+    }
+
+    /// Direction rule (SPEC §7): bm.changed is S→C-ONLY. A client that sends
+    /// it is ignored SILENTLY — specifically NOT err{unknownType}, because
+    /// the type IS known, only the direction is wrong. An err here would
+    /// also hand a caller a type-existence oracle.
+    #[tokio::test]
+    async fn client_sent_bm_changed_ignored_without_err() {
+        let (exec, log) = MockExecutors::recording();
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+
+        let reply = route(
+            d(Msg::BmChanged(BmChangedPayload {
+                connected: true,
+                nodes: vec![],
+                truncated: None,
+            })),
+            &mut ctx, &exec, &auth, false,
+        );
+        assert!(
+            reply.is_empty(),
+            "bm.changed is S→C-only: a client sending it gets NO reply, and in \
+             particular no err{{code:\"unknownType\"}} — the type is known, the \
+             direction is not (got: {reply:?})"
+        );
+        assert!(
+            !reply.iter().any(|m| matches!(m, Msg::Err(_))),
+            "no err of any code may be emitted for a wrong-direction bm.changed"
+        );
+        assert!(log.calls().is_empty(), "bm.changed must reach NO executor");
+    }
+
+    /// Routing (protoVersion 1.6): unpaused bm.open/star/unstar/remove each
+    /// reach the recording mock EXACTLY once with their id passed through
+    /// unchanged, and produce NO reply (fire-and-forget).
+    ///
+    /// This is the second line of defence against a nodeId/tabId swap (the
+    /// first is the ext_relay.rs frame test from 11-02): the string node ids
+    /// and the integer tab ids are asserted by value on distinct Call
+    /// variants, so a crossed wiring cannot pass.
+    #[tokio::test]
+    async fn bm_commands_route_when_unpaused() {
+        let (exec, log) = MockExecutors::recording();
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+
+        for msg in [
+            Msg::BmOpen(BmOpenPayload { node_id: "1234".into() }),
+            Msg::BmStar(BmStarPayload { tab_id: 7 }),
+            Msg::BmUnstar(BmUnstarPayload { tab_id: 9 }),
+            Msg::BmRemove(BmRemovePayload { node_id: "5678".into() }),
+        ] {
+            assert!(
+                route(d(msg), &mut ctx, &exec, &auth, false).is_empty(),
+                "every bm command is fire-and-forget: no reply, ever"
+            );
+        }
+        assert_eq!(
+            log.calls(),
+            vec![
+                Call::BmOpen("1234".into()),
+                Call::BmStar(7),
+                Call::BmUnstar(9),
+                Call::BmRemove("5678".into()),
+            ],
+            "each command must record exactly one call with its id unswapped"
         );
     }
 
