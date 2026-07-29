@@ -63,6 +63,7 @@ import '../net/connection_service.dart' show ChipStatus, ConnectionService;
 import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
+import 'install_hint_card.dart';
 import 'tabs_store.dart';
 
 /// Chrome's named group colors mapped to their dark-theme swatches —
@@ -446,7 +447,7 @@ class _TabsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (!tabs.connected) return const _InstallHintCard();
+    if (!tabs.connected) return const InstallHintCard();
     if (tabs.tabs.isEmpty) {
       return const Align(
         alignment: Alignment.centerLeft,
@@ -547,56 +548,6 @@ class _TabsSection extends StatelessWidget {
     onClose(id);
     return false;
   }
-}
-
-/// The extension-missing hint card: kSurface fill, kHairline border, radius
-/// 16, padding 16, with a muted leading extension glyph. Plain [Text] only —
-/// url_launcher is NOT a dependency and none is added.
-class _InstallHintCard extends StatelessWidget {
-  const _InstallHintCard();
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: kSurface,
-          border: Border.all(color: kHairline),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Icon(Symbols.extension_rounded, size: 24, color: kMuted),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Install the browser extension',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: kText,
-                    ),
-                  ),
-                  SizedBox(height: 4),
-                  Text(
-                    'See tabs here by loading the free Tab Bridge extension '
-                    'on your PC — the extension/README.md file in the '
-                    'Remote Control download walks through it.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                      color: kMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      );
 }
 
 /// The containment shell for one consecutive grouped run (260729-58x): a
