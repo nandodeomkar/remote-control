@@ -2,11 +2,15 @@
 //
 // Talks ONLY to the Remote Control server on this machine over
 // ws://127.0.0.1:<PORT>. Sends full tab snapshots (title + favicon + tab
-// groups, never full URLs beyond what the local favicon cache needs) and
-// executes tabs.activate / tabs.close commands from the server.
+// groups, never full URLs beyond what the local favicon cache needs) and full
+// bookmark snapshots (bm.state — id + parentId + title only, never a url and
+// never an icon), and executes tabs.activate / tabs.close plus the bm.open /
+// bm.star / bm.unstar / bm.remove commands from the server.
 //
-// Privacy discipline: NEVER log tab titles, group titles, or urls to the
-// console — they are browsing data. Lifecycle events and counts only.
+// Privacy discipline: NEVER log tab titles, group titles, bookmark titles,
+// bookmark urls, or tab urls to the console — they are all browsing data, and
+// a bookmark collection is a more durable profile of the owner than a live tab
+// list is. Lifecycle events and counts only.
 
 // Must match the server's RC_EXT_PORT (default 17779). If you change the
 // server port, edit this const and press the reload arrow for the extension
@@ -19,6 +23,18 @@ const MAX_ICON_B64 = 4096; // chars; icons above this are dropped
 const MAX_FRAME_BYTES = 57344; // 56 KB — under the server's 64 KB WS cap
 const MAX_GROUPS = 16; // tab groups per snapshot (SPEC §15, protoVersion 1.5)
 const MAX_GROUP_TITLE = 32; // chars; group titles truncated above this
+const MAX_BM_NODES = 500; // bookmark nodes per snapshot (SPEC §15, protoVersion 1.6)
+const MAX_BM_TITLE = 48; // chars; bookmark titles truncated above this
+
+// UTF-8 byte length. String.prototype.length counts UTF-16 CODE UNITS, so a
+// CJK char reads as 1 but costs 3 bytes on the wire and an emoji reads as 2 but
+// costs 4 — a code-unit count under-measures a frame by up to 3x. The server's
+// max_message_size kills the ext session on an oversize frame, so every budget
+// check below must measure bytes. TextEncoder is a platform built-in and is
+// available in MV3 service workers.
+function bytesOf(s) {
+  return new TextEncoder().encode(s).length;
+}
 
 // chrome.tabGroups may be absent (older browsers / non-Chromium forks) — the
 // worker must still load and report ungrouped tabs.
@@ -282,8 +298,9 @@ async function buildAndSend() {
   }
 
   // 56 KB serialized budget: strip icons from the END of the list until under.
+  // Measured in UTF-8 BYTES via bytesOf, never in UTF-16 code units.
   let frame = JSON.stringify({ t: "tabs.state", p: { tabs: els, groups } });
-  for (let i = els.length - 1; i >= 0 && frame.length > MAX_FRAME_BYTES; i--) {
+  for (let i = els.length - 1; i >= 0 && bytesOf(frame) > MAX_FRAME_BYTES; i--) {
     if (els[i].icon !== undefined) {
       delete els[i].icon;
       frame = JSON.stringify({ t: "tabs.state", p: { tabs: els, groups } });

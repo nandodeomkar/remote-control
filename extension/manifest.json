@@ -3,6 +3,6 @@
   "name": "Remote Control — Tab Bridge",
   "version": "1.1.0",
   "description": "Feeds your open tabs to the Remote Control server on this PC (localhost only — no data leaves the machine).",
-  "permissions": ["tabs", "tabGroups", "favicon", "alarms"],
+  "permissions": ["tabs", "tabGroups", "favicon", "alarms", "bookmarks"],
   "background": { "service_worker": "background.js" }
 }
