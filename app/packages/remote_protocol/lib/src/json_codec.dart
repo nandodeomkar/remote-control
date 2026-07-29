@@ -271,6 +271,86 @@ class GroupInfo {
   int get hashCode => Object.hash(id, title, color, collapsed);
 }
 
+/// A bookmark node in `bm.list` replies and `bm.changed` pushes
+/// (protoVersion 1.6, phase 11) — the flat BmEl element (SPEC section 7).
+///
+/// [id] and [parentId] are Chrome bookmark ids and are **STRINGS**, unlike
+/// the integer [TabInfo.id] — which is why the commands name their fields
+/// `nodeId` (bookmark node) and `tabId` (tab) instead of both reusing `id`:
+/// the codec is value-lenient, so a swapped id would decode fine and fail
+/// SILENTLY at the extension.
+///
+/// The tree is flat and breadth-first: root `"0"` is NEVER shipped as a
+/// node, its children carry `parentId: "0"`, and the phone treats `"0"` as
+/// the virtual top level (D-08).
+///
+/// There is **no `url` field and no `icon` field** — URL resolution stays
+/// extension-side (the locked no-url invariant TabEl also carries), and the
+/// icon is dropped (D-07) to keep the whole tree inside one frame.
+final class BmNode {
+  /// Chrome bookmark id (a STRING, not an integer).
+  final String id;
+
+  /// Parent bookmark id; `"0"` for a virtual-top-level node (D-08).
+  final String parentId;
+
+  /// Node title (capped at 48 chars extension-side; may be empty).
+  final String title;
+
+  /// Whether this node is a folder (absent = a link).
+  final bool? folder;
+
+  /// Direct-child count of a folder — gates the D-14 delete affordance
+  /// (`count == 0` ⇒ delete may be offered). Absent on links.
+  final int? count;
+
+  /// Mirrors Chrome's `BookmarkTreeNode.unmodifiable` (managed/admin
+  /// bookmarks) so the phone hides a delete Chrome would reject.
+  final bool? locked;
+
+  /// `true` marks a folder whose children were dropped by the extension's
+  /// byte-budget loop (SPEC section 15).
+  final bool? truncated;
+
+  /// Creates a bookmark node.
+  const BmNode({
+    required this.id,
+    required this.parentId,
+    required this.title,
+    this.folder,
+    this.count,
+    this.locked,
+    this.truncated,
+  });
+
+  /// Canonical JSON form: `{id, parentId, title}` plus each flag only when
+  /// non-null (mirrors the Rust `skip_serializing_if = "Option::is_none"`).
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'parentId': parentId,
+        'title': title,
+        if (folder != null) 'folder': folder,
+        if (count != null) 'count': count,
+        if (locked != null) 'locked': locked,
+        if (truncated != null) 'truncated': truncated,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      other is BmNode &&
+      other.id == id &&
+      other.parentId == parentId &&
+      other.title == title &&
+      other.folder == folder &&
+      other.count == count &&
+      other.locked == locked &&
+      other.truncated == truncated;
+
+  @override
+  int get hashCode =>
+      Object.hash(id, parentId, title, folder, count, locked, truncated);
+}
+
 /// Every message type in the protoVersion 1.0 registry (SPEC section 7),
 /// plus [UnknownMsg] for unregistered `t` values (D-07).
 sealed class RemoteMessage {
