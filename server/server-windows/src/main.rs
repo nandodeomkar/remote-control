@@ -156,8 +156,9 @@ async fn main() -> anyhow::Result<()> {
     //     channel the same ext task produces into — one socket, two
     //     snapshots (D-06 pushes the whole tree in one flattened frame). It
     //     shares `ext_cmd_tx` with TabsRelay: one command stream to the one
-    //     extension. `bm_rx` MOVES into the relay for now; 11-04 clones it
-    //     once ServerDeps gains its own receiver for the bm.changed push.
+    //     extension. `bm_rx` is CLONED into the relay (snapshot reads for
+    //     `bm.list`) and moved into ServerDeps below, which drives the
+    //     authed-gated `bm.changed` push — exactly how `tabs_rx` is split.
     let (bm_tx, bm_rx) = tokio::sync::watch::channel(BookmarksState::default());
     let (ext_cmd_tx, ext_cmd_rx) = tokio::sync::mpsc::channel::<ExtCmd>(16);
     //     The shell's settings window holds its own clone (07-08): its
@@ -182,7 +183,7 @@ async fn main() -> anyhow::Result<()> {
         apps: Arc::new(WinApps::new(apps_cmd_tx, apps_rx.clone())),
         clipboard: Arc::new(WinClipboard::new(clip_cmd_tx, clip_rx.clone())),
         tabs: Arc::new(TabsRelay::new(tabs_rx.clone(), ext_cmd_tx.clone())),
-        bookmarks: Arc::new(BookmarksRelay::new(bm_rx, ext_cmd_tx)),
+        bookmarks: Arc::new(BookmarksRelay::new(bm_rx.clone(), ext_cmd_tx)),
     };
 
     // 5. Auth (SRV-03 / D-01): seed the store from config.toml's paired
@@ -301,6 +302,7 @@ async fn main() -> anyhow::Result<()> {
         revoke: revoke_rx,
         blocked: blocked_rx,
         tabs: tabs_rx,
+        bookmarks: bm_rx,
     };
 
     // 7. Bind the LAN interface (tests bind 127.0.0.1:0; the real binary

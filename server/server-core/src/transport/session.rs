@@ -31,14 +31,15 @@ use crate::auth::AuthManager;
 use crate::auth::pin::PinOutcome;
 use super::{ClipState, VolumeState};
 use crate::codec::json::{
-    AppsChangedPayload, AuthFailPayload, AuthOkPayload, ChallengePayload, ClipChangedPayload,
-    ErrPayload, InputBlockedPayload, Msg, PairOkPayload, TabsChangedPayload, VolChangedPayload,
+    AppsChangedPayload, AuthFailPayload, AuthOkPayload, BmChangedPayload, ChallengePayload,
+    ClipChangedPayload, ErrPayload, InputBlockedPayload, Msg, PairOkPayload, TabsChangedPayload,
+    VolChangedPayload,
 };
 use crate::codec::{binary, json};
 use crate::dispatch::AuthState;
 use crate::dispatch::held::HeldInput;
 use crate::dispatch::router::{self, SessionCtx};
-use crate::executors::{Executors, TabsState, WindowInfo};
+use crate::executors::{BookmarksState, Executors, TabsState, WindowInfo};
 
 /// The server's protocol version (SPEC §2). Only the MAJOR component is
 /// compared against the client's `hello.protoVersion`. `pub` (re-exported
@@ -105,6 +106,7 @@ pub(super) async fn run_session(
     mut revoke: watch::Receiver<u64>,
     mut blocked: watch::Receiver<u64>,
     mut tabs: watch::Receiver<TabsState>,
+    mut bookmarks: watch::Receiver<BookmarksState>,
 ) {
     let (mut sink, mut stream) = ws.split();
 
@@ -151,6 +153,10 @@ pub(super) async fn run_session(
     // Same discipline for the tabs watch (BROW-01): producer dropped (e.g.
     // the ext listener failed to bind) → disable the branch, never busy-loop.
     let mut tabs_alive = true;
+    // Same discipline for the bookmarks watch (protoVersion 1.6): producer
+    // dropped (e.g. the ext listener failed to bind) → disable the branch,
+    // never busy-loop.
+    let mut bookmarks_alive = true;
     // The phone's `hello.device` name, captured when Hello is processed so
     // the pin (pairing) path can record it via `complete_pairing_named`
     // (D-04/A7). `None` until Hello arrives.
@@ -347,6 +353,34 @@ pub(super) async fn run_session(
                         }
                     }
                     Err(_) => tabs_alive = false,
+                }
+            }
+            // Phase-11 bm.changed live push, authed-gated: byte-discipline
+            // clone of the tabs.changed branch (threat T-11-01 / T-06-01 —
+            // bookmark titles are browsing data and must never cross to an
+            // unauthed socket; the `== AuthState::Authed` guard is THE
+            // privacy backstop, removing it leaks the owner's bookmark
+            // titles). watch is latest-value-only (no backlog flood). Like
+            // tabs there is NO after-auth snapshot: the phone pulls the
+            // current state via `bm.list` on first Bookmarks-segment display
+            // (D-03 lazy prime), so this branch is the ONLY bookmarks push
+            // site.
+            changed = bookmarks.changed(), if bookmarks_alive && ctx.auth_state == AuthState::Authed => {
+                match changed {
+                    Ok(()) => {
+                        // BookmarksState owns a Vec (not Copy): clone the
+                        // borrowed snapshot. borrow_and_update clears the
+                        // changed flag.
+                        let state = bookmarks.borrow_and_update().clone();
+                        // WR-08: non-blocking try_send (see the vol branch) —
+                        // drop on a full queue, the latest-value re-delivers.
+                        match tx.try_send(bm_changed_frame(state)) {
+                            Ok(()) => {}
+                            Err(mpsc::error::TrySendError::Full(_)) => {}
+                            Err(mpsc::error::TrySendError::Closed(_)) => break 'read,
+                        }
+                    }
+                    Err(_) => bookmarks_alive = false,
                 }
             }
             incoming = stream.next() => {
@@ -689,6 +723,27 @@ fn tabs_changed_frame(state: TabsState) -> Message {
             // The 1.5 server ALWAYS emits groups in its pushes (empty when
             // none); 1.4 clients ignore the unknown key per D-05.
             groups: Some(state.groups),
+        }),
+        None,
+    ))
+}
+
+/// Encode one `bm.changed` push frame (S→C, protoVersion 1.6, phase 11)
+/// from the core-owned bookmark-relay state. The sole bookmarks-push
+/// encoder — no after-auth snapshot analog (the phone pulls via `bm.list`
+/// on first Bookmarks-segment display, D-03). Privacy backstop (T-11-01 /
+/// T-11-02): this frame only ever leaves through the authed-gated select!
+/// branch above, and bookmark node titles never touch a log sink (T-01-31,
+/// SPEC §12 redaction-mandatory list).
+fn bm_changed_frame(state: BookmarksState) -> Message {
+    Message::text(json::encode_msg(
+        &Msg::BmChanged(BmChangedPayload {
+            connected: state.connected,
+            nodes: state.nodes,
+            // The 1.6 server ALWAYS emits `truncated` in its pushes (the
+            // "1.5 server always emits groups" posture); older clients drop
+            // the unknown key per SPEC §1.
+            truncated: Some(state.truncated),
         }),
         None,
     ))

@@ -24,7 +24,7 @@ pub use session::SERVER_PROTO_VERSION;
 use std::sync::{Arc, Mutex};
 
 use crate::auth::AuthManager;
-use crate::executors::{Executors, TabsState, WindowInfo};
+use crate::executors::{BookmarksState, Executors, TabsState, WindowInfo};
 
 /// Server-side volume state pushed to authed sessions as `vol.changed`
 /// (MED-02, D-03). Core-owned plain data — ZERO OS deps, so server-core
@@ -108,6 +108,14 @@ pub struct ServerDeps {
     /// Browser screen. Producer is [`ext::run_ext`] on the loopback
     /// extension listener.
     pub tabs: tokio::sync::watch::Receiver<TabsState>,
+    /// Latest bookmark-relay state (protoVersion 1.6, phase 11): authed
+    /// sessions receive a `bm.changed` push on every change — INCLUDING the
+    /// extension connect/disconnect flips, which is what flips both browser
+    /// segments to the install hint together. Apps-style: there is NO
+    /// after-auth snapshot; the phone pulls the current state via `bm.list`
+    /// on first Bookmarks-segment display (D-03 lazy prime). Producer is
+    /// [`ext::run_ext`] on the loopback extension listener.
+    pub bookmarks: tokio::sync::watch::Receiver<BookmarksState>,
 }
 
 /// Run the accept loop on an already-bound listener until the task is

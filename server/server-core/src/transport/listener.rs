@@ -31,6 +31,7 @@ pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
         revoke,
         blocked,
         tabs,
+        bookmarks,
     } = deps;
 
     loop {
@@ -64,6 +65,7 @@ pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
         let revoke = revoke.clone();
         let blocked = blocked.clone();
         let tabs = tabs.clone();
+        let bookmarks = bookmarks.clone();
         tokio::spawn(async move {
             let ws =
                 match tokio_tungstenite::accept_async_with_config(stream, Some(config)).await {
@@ -85,6 +87,7 @@ pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
                 revoke,
                 blocked,
                 tabs,
+                bookmarks,
             )
             .await;
         });
