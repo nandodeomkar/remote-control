@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 10 complete — awaiting phase verification
-stopped_at: Phase 11 UI-SPEC approved
-last_updated: "2026-07-29T10:57:49.903Z"
-last_activity: "2026-07-29 -- Completed quick task 260729-58x: tab-group visual hierarchy (_GroupBlock containment)"
+status: Ready to execute
+stopped_at: Completed 11-01-PLAN.md
+last_updated: "2026-07-29T16:08:53.781Z"
+last_activity: 2026-07-29 -- Phase 11 execution started
 progress:
   total_phases: 11
   completed_phases: 10
-  total_plans: 77
-  completed_plans: 77
-  percent: 91
+  total_plans: 89
+  completed_plans: 78
+  percent: 88
 ---
 
 # Project State
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 10 — keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke
+**Current focus:** Phase 11 — browser-bookmarks-view-open-star-current-tab
 
 ## Current Position
 
-Phase: 10 (keyboard-rethink-and-shortcuts-tile-full-screen-swipeable-ke) — COMPLETE
-Plan: 6 of 6 complete (10-06 UAT gate APPROVED 2026-07-17)
+Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
+Plan: 2 of 12
 Next: phase 10 verification (gsd-verifier), then milestone close-out / next phase.
   Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
   with persistent modifier chips + tab bar, keyboard.pad persistence, sacred FSM
@@ -51,7 +51,7 @@ Next: phase 10 verification (gsd-verifier), then milestone close-out / next phas
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-29 -- Completed quick task 260729-58x: tab-group visual hierarchy (_GroupBlock containment)
+Last activity: 2026-07-29 -- Phase 11 execution started
 
 Progress: [██████████] 100% (8 of 8 phases complete; 62 of 62 plans)
 
@@ -146,6 +146,7 @@ Progress: [██████████] 100% (8 of 8 phases complete; 62 of 6
 | Phase 10 P02 | 14min | 3 tasks | 5 files |
 | Phase 10 P04 | ~14min | 2 tasks | 4 files |
 | Phase 10 P05 | ~17min | 2 tasks | 2 files |
+| Phase 11 P01 | 22min | 3 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -316,6 +317,9 @@ Recent decisions affecting current work:
 - [Phase 10]: KeyCap's 48px HEIGHT floor stays hard-coded; only width is parameterized — UI-SPEC relaxes width only ('Height stays >=48dp'). The height floor is what actually keeps a cap tappable, so it must not be call-site relaxable.
 - [Phase 10]: kKeyboardHint moved (not copied) to key_pads.dart — A duplicate const would break the house one-named-const rule and, blocking, would leave 10-05 unable to import both key_pads.dart and keyboard_screen.dart (kKeyboardTitle) without an ambiguous-name collision.
 - [Phase 10]: KeyboardTabBar reports selection only — no haptic, no page animation, no enabled param — The screen owner (10-05) runs hapticTick() + the 200ms PageView animate on onSelect, so swipe-settle can reuse the selection path without double-firing a haptic (UI-SPEC: no extra haptic on settle). Tabs are navigation and must work offline, so no gated variant exists.
+- [Phase ?]: [Phase 11-01]: protoVersion 1.6 locked in SPEC.md — six bm.* rows, flat BmEl {id,parentId,title,folder?,count?,locked?,truncated?} with NO url and NO icon, root 0 virtual (D-08), nodeId (string) vs tabId (integer) named apart because Chrome bookmark ids are strings and a value-lenient codec would let a swap fail silently at the extension
+- [Phase 11-01]: TabEl.bookmarked is TRI-STATE — reuses the icon/groupId serde+Dart shape but absence means UNKNOWN not false (the extension could not read the tree), so the phone renders NO star rather than an empty one (D-11 forbids misreporting). Shipped in BOTH codecs in 11-01 (Rule 3) because tabs/09-tabs-changed-bookmarked.json goes live immediately in the already-registered tabs harness — 11-02 task 1 step 5 and 11-07 task 1 step 3 are now no-ops
+- [Phase 11-01]: SPEC section 15 accepted-residual ESCALATED — the ext leg now carries bookmark create+delete, the first ext-leg capability with a persistent non-self-healing effect (a closed tab is recoverable from history, a deleted bookmark is not and the phone has no undo); still accepted because the blast radius is bounded by never calling removeTree (D-14). Caps fixed at 500 nodes / 48-char titles / 56 KB measured in UTF-8 BYTES not UTF-16 code units
 
 ### Pending Todos
 
@@ -359,6 +363,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T10:57:49.872Z
-Stopped at: Phase 11 UI-SPEC approved
-Resume file: .planning/phases/11-browser-bookmarks-view-open-star-current-tab/11-UI-SPEC.md
+Last session: 2026-07-29T16:08:53.764Z
+Stopped at: Completed 11-01-PLAN.md
+Resume file: None
