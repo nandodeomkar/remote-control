@@ -30,10 +30,10 @@ use std::sync::{Arc, Mutex};
 use anyhow::Context;
 use server_core::auth::pin::PIN_TTL_SECS;
 use server_core::auth::AuthManager;
-use server_core::executors::{Executors, TabsState, WindowInfo};
+use server_core::executors::{BookmarksState, Executors, TabsState, WindowInfo};
 use server_core::transport::{ClipState, ServerDeps, VolumeState};
 use server_core::transport::beacon::{self, BeaconIdentity};
-use server_core::transport::ext::{self, ExtCmd, TabsRelay};
+use server_core::transport::ext::{self, BookmarksRelay, ExtCmd, TabsRelay};
 
 use apps_thread::AppsCmd;
 use audio_thread::AudioCmd;
@@ -152,6 +152,13 @@ async fn main() -> anyhow::Result<()> {
     //     snapshot receiver with the command sender, exactly how WinApps
     //     pairs its command sender with the apps snapshot receiver.
     let (tabs_tx, tabs_rx) = tokio::sync::watch::channel(TabsState::default());
+    //     The bookmark watch (protoVersion 1.6, phase 11) is the SECOND
+    //     channel the same ext task produces into — one socket, two
+    //     snapshots (D-06 pushes the whole tree in one flattened frame). It
+    //     shares `ext_cmd_tx` with TabsRelay: one command stream to the one
+    //     extension. `bm_rx` MOVES into the relay for now; 11-04 clones it
+    //     once ServerDeps gains its own receiver for the bm.changed push.
+    let (bm_tx, bm_rx) = tokio::sync::watch::channel(BookmarksState::default());
     let (ext_cmd_tx, ext_cmd_rx) = tokio::sync::mpsc::channel::<ExtCmd>(16);
     //     The shell's settings window holds its own clone (07-08): its
     //     clipboard-sync checkbox flips the gate LIVE — clone BEFORE the
@@ -174,7 +181,8 @@ async fn main() -> anyhow::Result<()> {
         power: Arc::new(WinPower),
         apps: Arc::new(WinApps::new(apps_cmd_tx, apps_rx.clone())),
         clipboard: Arc::new(WinClipboard::new(clip_cmd_tx, clip_rx.clone())),
-        tabs: Arc::new(TabsRelay::new(tabs_rx.clone(), ext_cmd_tx)),
+        tabs: Arc::new(TabsRelay::new(tabs_rx.clone(), ext_cmd_tx.clone())),
+        bookmarks: Arc::new(BookmarksRelay::new(bm_rx, ext_cmd_tx)),
     };
 
     // 5. Auth (SRV-03 / D-01): seed the store from config.toml's paired
@@ -377,9 +385,10 @@ async fn main() -> anyhow::Result<()> {
     // 7d. Extension listener (BROW-01, SPEC §15): 127.0.0.1 ONLY — the
     //     loopback bind is the auth boundary for the Tab Bridge extension
     //     leg. RC_EXT_PORT env override mirrors RC_BEACON_PORT above. A bind
-    //     FAILURE degrades to no-tab-support (the phone renders the install
-    //     hint via the watch default) — the feature is optional; never kill
-    //     the server for it (contrast with the mandatory main listener).
+    //     FAILURE degrades to no-tab-support AND no-bookmark-support (the
+    //     phone renders the install hint via BOTH watch defaults) — the
+    //     feature is optional; never kill the server for it (contrast with
+    //     the mandatory main listener).
     let ext_port: u16 = match std::env::var("RC_EXT_PORT") {
         Ok(v) => v
             .parse()
@@ -389,7 +398,7 @@ async fn main() -> anyhow::Result<()> {
     match tokio::net::TcpListener::bind(("127.0.0.1", ext_port)).await {
         Ok(ext_listener) => {
             tracing::info!(port = ext_port, "extension listener on 127.0.0.1");
-            tokio::spawn(ext::run_ext(ext_listener, tabs_tx, ext_cmd_rx));
+            tokio::spawn(ext::run_ext(ext_listener, tabs_tx, bm_tx, ext_cmd_rx));
         }
         Err(e) => {
             tracing::warn!(

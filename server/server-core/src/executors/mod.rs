@@ -296,4 +296,5 @@ pub struct Executors {
     pub apps: Arc<dyn Apps>,
     pub clipboard: Arc<dyn Clipboard>,
     pub tabs: Arc<dyn Tabs>,
+    pub bookmarks: Arc<dyn Bookmarks>,
 }

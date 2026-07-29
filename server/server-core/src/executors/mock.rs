@@ -120,7 +120,8 @@ impl MockExecutors {
             power: Arc::clone(&mock) as Arc<dyn Power>,
             apps: Arc::clone(&mock) as Arc<dyn Apps>,
             clipboard: Arc::clone(&mock) as Arc<dyn Clipboard>,
-            tabs: mock as Arc<dyn Tabs>,
+            tabs: Arc::clone(&mock) as Arc<dyn Tabs>,
+            bookmarks: mock as Arc<dyn Bookmarks>,
         };
         (executors, log)
     }

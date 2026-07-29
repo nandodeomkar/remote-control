@@ -19,7 +19,7 @@ use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
-use server_core::executors::TabsState;
+use server_core::executors::{BookmarksState, TabsState};
 use server_core::transport::ext::{ExtCmd, run_ext};
 
 const RECV_TIMEOUT: Duration = Duration::from_secs(2);
@@ -43,8 +43,11 @@ async fn spawn_relay() -> Relay {
         .expect("bind ephemeral port on 127.0.0.1");
     let addr = listener.local_addr().expect("read bound address");
     let (tabs_tx, tabs_rx) = watch::channel(TabsState::default());
+    // protoVersion 1.6: `run_ext` owns a SECOND watch. Held only to keep the
+    // sender alive here; the bookmark tests promote it to a Relay field.
+    let (bm_tx, _bm_rx) = watch::channel(BookmarksState::default());
     let (cmd_tx, cmd_rx) = mpsc::channel::<ExtCmd>(16);
-    let relay = tokio::spawn(run_ext(listener, tabs_tx, cmd_rx));
+    let relay = tokio::spawn(run_ext(listener, tabs_tx, bm_tx, cmd_rx));
     Relay { addr, tabs_rx, cmd_tx, _relay: relay }
 }
 
