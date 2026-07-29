@@ -27,7 +27,7 @@ use server_core::auth::challenge::auth_proof;
 use server_core::auth::token::hash_token;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
 use server_core::executors::{
-    BookmarksState, Button, GroupInfo, KeyCode, TabInfo, TabsState, WindowInfo,
+    BmNode, BookmarksState, Button, GroupInfo, KeyCode, TabInfo, TabsState, WindowInfo,
 };
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
 use server_core::transport::{ClipState, SERVER_PROTO_VERSION, ServerDeps, VolumeState};
@@ -1336,4 +1336,163 @@ async fn tabs_changed_after_auth_then_disconnect_hint() {
     assert!(!connected, "disconnect reset must carry connected:false");
     assert!(tabs.is_empty(), "disconnect reset must carry an empty tab list");
     assert!(groups.is_empty(), "disconnect reset must carry an empty groups list");
+}
+
+// ──────────────── bm.changed push gating (phase 11) ─────────────────────
+
+/// Receive the next frame, requiring a `bm.changed` push; returns
+/// `(connected, nodes-json-array, truncated)` for field-level assertions.
+/// The 1.6 server ALWAYS emits `truncated` in its pushes.
+async fn recv_bm_changed(ws: &mut WsClient) -> (bool, Vec<Value>, bool) {
+    let v = recv_json(ws).await;
+    assert_eq!(v["t"], "bm.changed", "expected a bm.changed push, got: {v}");
+    (
+        v["p"]["connected"]
+            .as_bool()
+            .expect("bm.changed must carry p.connected"),
+        v["p"]["nodes"]
+            .as_array()
+            .expect("bm.changed must carry p.nodes")
+            .clone(),
+        v["p"]["truncated"]
+            .as_bool()
+            .expect("1.6 bm.changed must always carry p.truncated"),
+    )
+}
+
+/// One-link snapshot. Every title here is a short ASCII literal invented by
+/// this test — no real bookmark title can ever reach a failure message.
+fn sample_bm_one() -> BookmarksState {
+    BookmarksState {
+        connected: true,
+        nodes: vec![BmNode {
+            id: "11".into(),
+            parent_id: "1".into(),
+            title: "Aa".into(),
+            folder: None,
+            count: None,
+            locked: None,
+            truncated: None,
+        }],
+        truncated: false,
+    }
+}
+
+/// Two-node snapshot: one folder (with a direct-child count) plus one link
+/// under it — distinct from [`sample_bm_one`] so a watch advance is real.
+fn sample_bm_two() -> BookmarksState {
+    BookmarksState {
+        connected: true,
+        nodes: vec![
+            BmNode {
+                id: "12".into(),
+                parent_id: "1".into(),
+                title: "Bb".into(),
+                folder: Some(true),
+                count: Some(1),
+                locked: None,
+                truncated: None,
+            },
+            BmNode {
+                id: "13".into(),
+                parent_id: "12".into(),
+                title: "Cc".into(),
+                folder: None,
+                count: None,
+                locked: None,
+                truncated: None,
+            },
+        ],
+        truncated: false,
+    }
+}
+
+/// T-11-01 (T-06-01 clone) — the security test for this plan: bookmark
+/// state changes while the session is still pre-auth must push NOTHING to
+/// the unauthenticated peer. If the `== AuthState::Authed` guard is deleted
+/// from the session's bookmarks select! arm, the two `assert_no_frame`
+/// calls below fail (verified by temporarily removing the guard).
+///
+/// Three things are proven on two connections:
+/// 1. T-11-12 — no after-auth snapshot (D-03): the FIRST connection auths
+///    before the watch has ever advanced and receives no bookmark data at
+///    all. This is the only place the absence of a snapshot is observable;
+///    on the second connection a pending pre-auth change is indistinguish-
+///    able from a snapshot, which is why the assertion lives here.
+/// 2. Pre-auth silence across TWO distinct state changes, plus the
+///    positive control (the pending change is delivered once the branch
+///    enables) proving the silence was the auth gate, not a dead channel.
+/// 3. Exactly one push per post-auth change, field-for-field.
+#[tokio::test]
+async fn bm_changed_authed_gate_silence_then_single_push() {
+    let h = start_server().await;
+
+    // ── 1. No after-auth snapshot (T-11-12 / D-03) ──────────────────────
+    // Authed BEFORE the watch ever advances: a phone that never opens the
+    // Bookmarks segment receives no bookmark data at all (apps/clip
+    // posture). It pulls via `bm.list` on first segment display instead.
+    let mut primed = authed_client(&h).await; // drains the D-03 vol snapshot
+    assert_no_frame(&mut primed, "unexpected bm.changed snapshot at the auth transition").await;
+
+    // ── 2. Pre-auth silence (T-11-01) ───────────────────────────────────
+    let pin = h.auth.lock().unwrap().begin_pairing();
+    let mut ws = connect(h.addr).await;
+    let _nonce = hello_challenge(&mut ws).await; // state: AwaitingAuth
+
+    h.bm_tx.send(sample_bm_one()).expect("bookmarks watch alive");
+    assert_no_frame(&mut ws, "bm.changed leaked to an unauthed session").await;
+    h.bm_tx.send(sample_bm_two()).expect("bookmarks watch alive");
+    assert_no_frame(
+        &mut ws,
+        "bm.changed leaked to an unauthed session on a second change",
+    )
+    .await;
+
+    // ── 3. Positive control: pair on the SAME connection ────────────────
+    // pairOk → the D-03 vol.changed snapshot → the pending pre-auth change
+    // fires through the now-enabled branch (mirrors tabs_no_push_preauth).
+    send_json(&mut ws, json!({"t": "pin", "seq": 2, "p": {"pin": pin}})).await;
+    let pair_ok = recv_json(&mut ws).await;
+    assert_eq!(
+        pair_ok["t"], "pairOk",
+        "expected pairOk after correct pin, got: {pair_ok}"
+    );
+    let _snapshot = recv_vol_changed(&mut ws).await; // D-03 vol snapshot
+    let (connected, nodes, truncated) = recv_bm_changed(&mut ws).await;
+    assert!(connected, "the pending pre-auth change must carry connected:true");
+    assert_eq!(
+        nodes.len(),
+        2,
+        "watch is latest-value-only: the pending delivery is the SECOND state"
+    );
+    assert!(!truncated);
+    assert_no_frame(&mut ws, "duplicate bm.changed after the pending pre-auth change").await;
+
+    // ── 4. Exactly one push per post-auth change ────────────────────────
+    h.bm_tx.send(sample_bm_one()).expect("bookmarks watch alive");
+    let (connected, nodes, truncated) = recv_bm_changed(&mut ws).await;
+    assert!(connected, "post-auth push must carry connected:true");
+    assert_eq!(nodes.len(), 1, "post-auth push must carry exactly what was pushed");
+    assert_eq!(nodes[0]["id"], "11", "nodeId is a STRING on the wire");
+    assert_eq!(nodes[0]["parentId"], "1");
+    assert_eq!(nodes[0]["title"], "Aa");
+    assert!(
+        nodes[0].get("folder").is_none(),
+        "a link must omit the folder key (never false, never null)"
+    );
+    assert!(
+        nodes[0].get("url").is_none(),
+        "SPEC §7: no url ever crosses the phone-facing wire"
+    );
+    assert!(!truncated, "1.6 always emits truncated, false when nothing was dropped");
+    assert_no_frame(&mut ws, "duplicate bm.changed after a single post-auth change").await;
+
+    // ── 5. Disconnect flip: both segments show the install hint together ─
+    h.bm_tx
+        .send(BookmarksState::default())
+        .expect("bookmarks watch alive");
+    let (connected, nodes, truncated) = recv_bm_changed(&mut ws).await;
+    assert!(!connected, "the ext disconnect reset must carry connected:false");
+    assert!(nodes.is_empty(), "the disconnect reset must carry an empty node list");
+    assert!(!truncated);
 }
