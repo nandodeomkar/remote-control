@@ -87,6 +87,7 @@ class _FakeService extends ConnectionService {
   final List<RemoteMessage> reliable = [];
   ChipStatus chip;
   TabsSnapshot? parked;
+  BookmarksSnapshot? parkedBm;
 
   @override
   ChipStatus get chipStatus => chip;
@@ -96,6 +97,9 @@ class _FakeService extends ConnectionService {
 
   @override
   TabsSnapshot? get tabsSnapshot => parked;
+
+  @override
+  BookmarksSnapshot? get bookmarksSnapshot => parkedBm;
 
   @override
   void sendReliable(RemoteMessage msg) => reliable.add(msg);
@@ -188,6 +192,67 @@ const TabsSnapshot _twoGroups = TabsSnapshot(
     GroupInfo(id: 2, title: 'Play', color: 'green', collapsed: false),
   ],
 );
+
+/// Three Chrome roots (D-08). `Bookmarks bar` holds one subfolder plus twenty
+/// links, so the Bookmarks segment's scroll region is FAR taller than the
+/// two-tab list — which is exactly the height difference that would have moved
+/// the macro grid under the old single-`SingleChildScrollView` layout, and is
+/// therefore what makes the D-02 rect-equality assertion meaningful.
+final BookmarksSnapshot _bmTree = BookmarksSnapshot(
+  connected: true,
+  truncated: false,
+  nodes: [
+    // Roots arrive locked (managed by Chrome) — no delete affordance.
+    const BmNode(
+      id: '1',
+      parentId: '0',
+      title: 'Bookmarks bar',
+      folder: true,
+      count: 21,
+      locked: true,
+    ),
+    const BmNode(
+      id: '2',
+      parentId: '0',
+      title: 'Other bookmarks',
+      folder: true,
+      count: 0,
+      locked: true,
+    ),
+    const BmNode(
+      id: '3',
+      parentId: '0',
+      title: 'Mobile bookmarks',
+      folder: true,
+      count: 0,
+      locked: true,
+    ),
+    const BmNode(
+      id: '10',
+      parentId: '1',
+      title: 'Work',
+      folder: true,
+      count: 2,
+    ),
+    for (var i = 0; i < 20; i++)
+      BmNode(id: 'b$i', parentId: '1', title: 'Link $i'),
+    const BmNode(id: '20', parentId: '10', title: 'Jira'),
+    const BmNode(id: '21', parentId: '10', title: 'Wiki'),
+  ],
+);
+
+/// The screen's back-interception state, read straight off its `PopScope`:
+/// `canPop == false` is the frame in which Android back pops a folder level
+/// instead of the route.
+Finder _popScope({required bool canPop}) =>
+    find.byWidgetPredicate((w) => w is PopScope && w.canPop == canPop);
+
+/// Taps a segment button and settles the rebuild.
+Future<void> _selectSegment(WidgetTester t, String label) async {
+  await t.tap(find.text(label));
+  await t.pump();
+  await t.pump();
+}
 
 /// The row-chrome border color: the nearest Material ancestor's shape side.
 Color _rowBorder(WidgetTester t, String title) {
@@ -701,6 +766,310 @@ void main() {
         (block.decoration! as BoxDecoration).color,
         kGroupColors['red']!.withValues(alpha: 0.06),
       );
+
+      await _unmount(t);
+    });
+  });
+
+  // -- Phase 11 (11-10): the Tabs | Bookmarks segment ------------------------
+  //
+  // D-01 swaps ONLY the list region, D-02 is read as pixel-pinned (the macro
+  // grid must occupy the same rect in both segments), D-03 primes bm.list
+  // exactly once per mount however Bookmarks is reached, and D-04 keeps both
+  // the segment and the folder position across consecutive opens.
+
+  group('segmented browser screen (11-10)', () {
+    testWidgets(
+        'D-02: the macro grid occupies an IDENTICAL rect in both segments, '
+        'even with a bookmarks list far taller than the tab list', (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmTree;
+      await _pumpScreen(t, service);
+
+      // One key cap (the nearest Container ancestor of its label — the
+      // existing `keyBox` idiom) and the whole grid, measured in both
+      // segments.
+      Rect capRect(String label) => t.getRect(
+            find
+                .ancestor(
+                  of: find.text(label),
+                  matching: find.byType(Container),
+                )
+                .first,
+          );
+
+      final capOnTabs = capRect('Refresh');
+      final gridOnTabs = t.getRect(find.byType(BrowserMacroGrid));
+
+      await _selectSegment(t, kSegmentBookmarksLabel);
+      expect(find.text('Bookmarks bar'), findsOneWidget);
+
+      expect(
+        capRect('Refresh'),
+        capOnTabs,
+        reason: 'D-02 is pixel-pinned: the grid lives OUTSIDE the swapped '
+            'scroll region, so a taller list cannot move it',
+      );
+      expect(t.getRect(find.byType(BrowserMacroGrid)), gridOnTabs);
+
+      // Drill into the 21-child folder — the tallest list this fixture can
+      // render, and the case the old single-scroll-view layout would have
+      // pushed the grid far down the screen.
+      await t.tap(find.text('Bookmarks bar'));
+      await t.pump(const Duration(milliseconds: 150));
+      expect(find.text('Link 0'), findsOneWidget);
+
+      expect(
+        capRect('Refresh'),
+        capOnTabs,
+        reason: 'the grid must not move when the folder list overflows either',
+      );
+      expect(t.getRect(find.byType(BrowserMacroGrid)), gridOnTabs);
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'D-01: the segment swaps ONLY the list; the 7 macro buttons render in '
+        'both', (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmTree;
+      await _pumpScreen(t, service);
+
+      const macroLabels = [
+        'Back',
+        'Forward',
+        'New tab',
+        'Close tab',
+        'Refresh',
+        'Zoom out',
+        'Zoom in',
+      ];
+
+      // Tabs: tab rows, no bookmark rows.
+      expect(find.text('GitHub'), findsOneWidget);
+      expect(find.text('Docs'), findsOneWidget);
+      expect(find.text('Bookmarks bar'), findsNothing);
+      for (final label in macroLabels) {
+        expect(find.text(label), findsOneWidget);
+      }
+
+      await _selectSegment(t, kSegmentBookmarksLabel);
+
+      // Bookmarks: bookmark rows, no tab rows — same grid.
+      expect(find.text('Bookmarks bar'), findsOneWidget);
+      expect(find.text('Other bookmarks'), findsOneWidget);
+      expect(find.text('GitHub'), findsNothing);
+      expect(find.text('Docs'), findsNothing);
+      for (final label in macroLabels) {
+        expect(find.text(label), findsOneWidget);
+      }
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'D-03: screen open primes tabs.list ONLY; the first Bookmarks display '
+        'primes bm.list exactly once, and a second switch primes nothing',
+        (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmTree;
+      await _pumpScreen(t, service);
+
+      expect(service.reliable.whereType<TabsListMsg>(), hasLength(1));
+      expect(
+        service.reliable.whereType<BmListMsg>(),
+        isEmpty,
+        reason: 'a phone that never opens the segment never asks the PC for '
+            'bookmark titles at all (T-11-12)',
+      );
+
+      await _selectSegment(t, kSegmentBookmarksLabel);
+      expect(service.reliable.whereType<BmListMsg>(), hasLength(1));
+
+      await _selectSegment(t, kSegmentTabsLabel);
+      await _selectSegment(t, kSegmentBookmarksLabel);
+      expect(
+        service.reliable.whereType<BmListMsg>(),
+        hasLength(1),
+        reason: 'the tree is kept live by bm.changed pushes after the first '
+            'prime — a second switch must send nothing',
+      );
+      // The tab prime is likewise once per mount, not once per switch.
+      expect(service.reliable.whereType<TabsListMsg>(), hasLength(1));
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'D-03: a segment RESTORED from prefs primes bm.list once too — the '
+        'prime follows display, not the tap', (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmTree;
+      final store = _FakeSegmentStore(initial: BrowserSegment.bookmarks);
+      await _pumpScreen(t, service, store: store);
+      await t.pump();
+
+      expect(find.text('Bookmarks bar'), findsOneWidget,
+          reason: 'the persisted segment must be the one displayed');
+      expect(service.reliable.whereType<BmListMsg>(), hasLength(1));
+      expect(service.reliable.whereType<TabsListMsg>(), hasLength(1),
+          reason: 'tabs.list still primes on open regardless of segment');
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'D-04: opening bookmarks in a row changes neither the segment nor the '
+        'folder position', (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmTree;
+      await _pumpScreen(t, service);
+      await _selectSegment(t, kSegmentBookmarksLabel);
+
+      // Drill two levels in: roots → Bookmarks bar → Work.
+      await t.tap(find.text('Bookmarks bar'));
+      await t.pump(const Duration(milliseconds: 150));
+      await t.tap(find.text('Work'));
+      await t.pump(const Duration(milliseconds: 150));
+      expect(find.text('Jira'), findsOneWidget);
+      expect(find.text('Wiki'), findsOneWidget);
+
+      for (final title in ['Jira', 'Wiki', 'Jira']) {
+        await t.tap(find.text(title));
+        await t.pump(const Duration(milliseconds: 150));
+        // Still inside Work, still on the Bookmarks segment, every time.
+        expect(find.text('Work'), findsOneWidget,
+            reason: 'the folder bar must still name the current folder');
+        expect(find.text('Jira'), findsOneWidget);
+        expect(find.text('GitHub'), findsNothing,
+            reason: 'opening a bookmark must never switch back to Tabs');
+      }
+
+      expect(
+        service.reliable.whereType<BmOpenMsg>().map((m) => m.nodeId).toList(),
+        ['20', '21', '20'],
+      );
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'the segment is never gated: switching works unauthed while the macro '
+        'grid and the rows stay inert', (t) async {
+      final service = _FakeService(chip: ChipStatus.disconnected)
+        ..parked = _twoTabs
+        ..parkedBm = _bmTree;
+      await _pumpScreen(t, service);
+
+      // Gated tab row + gated macro button record nothing.
+      await t.tap(find.text('GitHub'), warnIfMissed: false);
+      await t.pump();
+      await t.tap(find.text('Back'), warnIfMissed: false);
+      await t.pump();
+      expect(service.reliable.whereType<TabsActivateMsg>(), isEmpty);
+      expect(service.reliable.whereType<BrowserMsg>(), isEmpty);
+
+      // ...but the segment still switches — navigation, not a send.
+      await _selectSegment(t, kSegmentBookmarksLabel);
+      expect(find.text('Bookmarks bar'), findsOneWidget);
+      expect(find.text('GitHub'), findsNothing);
+
+      // Gated bookmark rows are inert as well.
+      await t.tap(find.text('Bookmarks bar'), warnIfMissed: false);
+      await t.pump(const Duration(milliseconds: 150));
+      expect(service.reliable.whereType<BmOpenMsg>(), isEmpty);
+      expect(find.text('Link 0'), findsNothing,
+          reason: 'a gated row fires neither a send nor a local drill-in');
+
+      await _selectSegment(t, kSegmentTabsLabel);
+      expect(find.text('GitHub'), findsOneWidget);
+
+      await _unmount(t);
+    });
+
+    testWidgets('selecting Bookmarks persists the choice exactly once',
+        (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmTree;
+      final store = _FakeSegmentStore();
+      await _pumpScreen(t, service, store: store);
+
+      expect(store.saved, isEmpty, reason: 'a mount persists nothing');
+
+      await _selectSegment(t, kSegmentBookmarksLabel);
+      expect(store.saved, [BrowserSegment.bookmarks]);
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'the segment bar renders both labels, accent on the selected one',
+        (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmTree;
+      await _pumpScreen(t, service);
+
+      Color labelColor(String label) =>
+          t.widget<Text>(find.text(label)).style!.color!;
+
+      expect(find.byType(BrowserSegmentBar), findsOneWidget);
+      expect(labelColor(kSegmentTabsLabel), kAccent);
+      expect(labelColor(kSegmentBookmarksLabel), kMuted);
+
+      await _selectSegment(t, kSegmentBookmarksLabel);
+
+      expect(labelColor(kSegmentTabsLabel), kMuted);
+      expect(labelColor(kSegmentBookmarksLabel), kAccent);
+      // The removed section header must not come back.
+      expect(find.text('Tabs'), findsOneWidget);
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'Android system back pops one folder level, then leaves the screen',
+        (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmTree;
+      await _pumpScreen(t, service);
+      await _selectSegment(t, kSegmentBookmarksLabel);
+
+      await t.tap(find.text('Bookmarks bar'));
+      await t.pump(const Duration(milliseconds: 150));
+      await t.tap(find.text('Work'));
+      await t.pump(const Duration(milliseconds: 150));
+      expect(find.text('Jira'), findsOneWidget);
+
+      expect(_popScope(canPop: false), findsOneWidget,
+          reason: 'inside a folder the screen intercepts system back');
+
+      // depth 2 → back walks up one level, the route stays.
+      await t.binding.handlePopRoute();
+      await t.pumpAndSettle();
+      expect(find.text('Link 0'), findsOneWidget);
+      expect(find.text('Jira'), findsNothing);
+
+      // depth 1 → back walks to the roots level.
+      await t.binding.handlePopRoute();
+      await t.pumpAndSettle();
+      expect(find.text('Bookmarks bar'), findsOneWidget);
+      expect(find.text('Link 0'), findsNothing);
+
+      // depth 0 → nothing is intercepted any more; back leaves the screen.
+      expect(_popScope(canPop: true), findsOneWidget);
+
+      // ...and the Tabs segment never intercepts at all.
+      await _selectSegment(t, kSegmentTabsLabel);
+      expect(_popScope(canPop: true), findsOneWidget);
 
       await _unmount(t);
     });
