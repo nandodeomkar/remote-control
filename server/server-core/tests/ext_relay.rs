@@ -8,6 +8,13 @@
 //! regression). Plus the protoVersion-1.5 group scenarios (quick
 //! 260716-sme): groups → watch, 16-group belt, malformed-groups
 //! tolerant-degrade.
+//!
+//! protoVersion 1.6 (phase 11) adds the bookmark leg: bm.state → watch, the
+//! BOTH-watch reset, the four command frames with correctly TYPED keys, the
+//! 500-node belt, and the strict malformed-nodes posture. The ext leg has no
+//! codec harness (SPEC §15), so these socket tests plus the §15 prose ARE
+//! the contract for this tier — every one of them goes through a real
+//! socket, never a direct call into the frame handler.
 
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -19,8 +26,8 @@ use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
-use server_core::executors::{BookmarksState, TabsState};
-use server_core::transport::ext::{ExtCmd, run_ext};
+use server_core::executors::{Bookmarks, BookmarksState, TabsState};
+use server_core::transport::ext::{BookmarksRelay, ExtCmd, run_ext};
 
 const RECV_TIMEOUT: Duration = Duration::from_secs(2);
 
@@ -32,6 +39,8 @@ type WsClient = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 struct Relay {
     addr: SocketAddr,
     tabs_rx: watch::Receiver<TabsState>,
+    /// protoVersion 1.6: the SECOND watch `run_ext` produces into.
+    bm_rx: watch::Receiver<BookmarksState>,
     cmd_tx: mpsc::Sender<ExtCmd>,
     _relay: tokio::task::JoinHandle<()>,
 }
@@ -43,12 +52,12 @@ async fn spawn_relay() -> Relay {
         .expect("bind ephemeral port on 127.0.0.1");
     let addr = listener.local_addr().expect("read bound address");
     let (tabs_tx, tabs_rx) = watch::channel(TabsState::default());
-    // protoVersion 1.6: `run_ext` owns a SECOND watch. Held only to keep the
-    // sender alive here; the bookmark tests promote it to a Relay field.
-    let (bm_tx, _bm_rx) = watch::channel(BookmarksState::default());
+    // protoVersion 1.6: `run_ext` owns a SECOND watch, surfaced alongside
+    // the tabs receiver so every test can observe both.
+    let (bm_tx, bm_rx) = watch::channel(BookmarksState::default());
     let (cmd_tx, cmd_rx) = mpsc::channel::<ExtCmd>(16);
     let relay = tokio::spawn(run_ext(listener, tabs_tx, bm_tx, cmd_rx));
-    Relay { addr, tabs_rx, cmd_tx, _relay: relay }
+    Relay { addr, tabs_rx, bm_rx, cmd_tx, _relay: relay }
 }
 
 /// Connect a fake extension to the relay.
@@ -93,12 +102,51 @@ async fn wait_watch(
         .clone()
 }
 
+/// Wait (bounded) for the BOOKMARKS watch to satisfy `pred`.
+async fn wait_bm_watch(
+    rx: &mut watch::Receiver<BookmarksState>,
+    pred: impl FnMut(&BookmarksState) -> bool,
+    why: &str,
+) -> BookmarksState {
+    tokio::time::timeout(RECV_TIMEOUT, rx.wait_for(pred))
+        .await
+        .unwrap_or_else(|_| panic!("timed out: {why}"))
+        .expect("bookmarks watch sender dropped")
+        .clone()
+}
+
 /// The canonical fake-extension snapshot frame.
 fn tabs_state_frame() -> Value {
     json!({"t": "tabs.state", "p": {"tabs": [
         {"id": 7, "title": "GitHub", "active": true, "icon": "bbbb"},
         {"id": 9, "title": "Docs", "active": false}
     ]}})
+}
+
+/// A `bm.state` snapshot frame carrying `nodes`, plus the optional
+/// snapshot-level `truncated` flag when `truncated` is `Some` (the
+/// `tabs_state_frame` sibling for the bookmark leg).
+fn bm_state_frame(nodes: Vec<Value>, truncated: Option<bool>) -> Value {
+    let mut p = json!({"nodes": nodes});
+    if let Some(flag) = truncated {
+        p["truncated"] = json!(flag);
+    }
+    json!({"t": "bm.state", "p": p})
+}
+
+/// The canonical two-node tree: the bookmarks-bar folder plus one link
+/// inside it. Root `"0"` is never shipped — the bar carries `parentId: "0"`.
+fn bm_nodes() -> Vec<Value> {
+    vec![
+        json!({"id": "1", "parentId": "0", "title": "Bookmarks bar", "folder": true, "count": 2}),
+        json!({"id": "12", "parentId": "1", "title": "Rust docs"}),
+    ]
+}
+
+/// Build a `BookmarksRelay` on a relay's channels — the executor the router
+/// would hold.
+fn bm_relay(r: &Relay) -> BookmarksRelay {
+    BookmarksRelay::new(r.bm_rx.clone(), r.cmd_tx.clone())
 }
 
 /// Scenario 1: a `tabs.state` frame from the extension lands in the watch
@@ -362,4 +410,192 @@ async fn ext_ping_gets_pong() {
     send_json(&mut ext, json!({"t": "ext.ping", "p": {}})).await;
     let frame = recv_json(&mut ext).await;
     assert_eq!(frame["t"], "ext.pong", "expected ext.pong, got: {frame}");
+}
+
+/// protoVersion 1.6 scenario 1: a `bm.state` frame lands in the BOOKMARKS
+/// watch as `{connected:true, nodes}` with every field intact — the
+/// `tabs_state_populates_watch` clone for the bookmark leg.
+#[tokio::test]
+async fn bm_state_populates_bookmarks_watch() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(&mut ext, json!({"t": "ext.hello", "p": {"extVersion": "1.0.0"}})).await;
+    send_json(&mut ext, bm_state_frame(bm_nodes(), Some(true))).await;
+
+    let state = wait_bm_watch(
+        &mut r.bm_rx,
+        |s| s.connected,
+        "bookmarks watch never showed connected:true",
+    )
+    .await;
+    assert_eq!(state.nodes.len(), 2, "watch must carry both nodes");
+    assert_eq!(state.nodes[0].id, "1", "bookmark ids are STRINGS, not integers");
+    assert_eq!(state.nodes[0].parent_id, "0", "the bar hangs off the virtual root");
+    assert_eq!(state.nodes[0].title, "Bookmarks bar");
+    assert_eq!(state.nodes[0].folder, Some(true));
+    assert_eq!(state.nodes[0].count, Some(2));
+    assert_eq!(state.nodes[1].id, "12");
+    assert_eq!(state.nodes[1].parent_id, "1");
+    assert_eq!(state.nodes[1].title, "Rust docs");
+    assert_eq!(state.nodes[1].folder, None, "a link omits folder entirely");
+    assert!(state.truncated, "the snapshot-level truncated flag must survive");
+}
+
+/// protoVersion 1.6 scenario 2 (the Pitfall-2 test): the extension
+/// disconnecting resets BOTH watches in the same instant. Both are populated
+/// first so the reset is a real transition — this test is capable of failing
+/// if only the tabs watch is reset, which is exactly the bug that would
+/// leave the phone rendering a stale, tappable bookmark tree next to a
+/// correct "install the extension" hint.
+#[tokio::test]
+async fn ext_disconnect_resets_both_watches() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(&mut ext, tabs_state_frame()).await;
+    send_json(&mut ext, bm_state_frame(bm_nodes(), None)).await;
+    wait_watch(&mut r.tabs_rx, |s| s.connected, "tabs watch never showed connected").await;
+    wait_bm_watch(&mut r.bm_rx, |s| s.connected, "bm watch never showed connected").await;
+
+    // Abrupt drop: no close frame, no goodbye.
+    drop(ext);
+
+    let tabs = wait_watch(
+        &mut r.tabs_rx,
+        |s| !s.connected,
+        "tabs watch never reset after the ext disconnect",
+    )
+    .await;
+    assert_eq!(tabs, TabsState::default(), "tabs reset must be the full default");
+
+    let bm = wait_bm_watch(
+        &mut r.bm_rx,
+        |s| !s.connected,
+        "BOOKMARKS watch never reset after the ext disconnect",
+    )
+    .await;
+    assert_eq!(
+        bm,
+        BookmarksState::default(),
+        "bookmarks reset must be the full default — nodes cleared, not just connected:false"
+    );
+}
+
+/// protoVersion 1.6 scenario 3: `Bookmarks::open` reaches the extension as a
+/// `bm.open` frame whose `nodeId` is a JSON **STRING**. The type assertion
+/// is the point: `nodeId` (string) vs `tabId` (integer) is the swap gate —
+/// a swapped value decodes fine on both sides and fails silently at the
+/// extension.
+#[tokio::test]
+async fn ext_cmd_forwards_bm_open_frame() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    // Prove the session is registered before commanding (the watch
+    // round-trip is the observable handshake).
+    send_json(&mut ext, tabs_state_frame()).await;
+    wait_watch(&mut r.tabs_rx, |s| s.connected, "session never registered").await;
+
+    bm_relay(&r).open("1234");
+    let frame = recv_json(&mut ext).await;
+    assert_eq!(frame["t"], "bm.open", "expected bm.open, got: {frame}");
+    assert!(
+        frame["p"]["nodeId"].is_string(),
+        "nodeId MUST be a JSON string, got: {}",
+        frame["p"]["nodeId"]
+    );
+    assert_eq!(frame["p"]["nodeId"], "1234");
+}
+
+/// protoVersion 1.6 scenario 4: the remaining three commands. `bm.star` and
+/// `bm.unstar` carry `tabId` as a JSON **NUMBER**; `bm.remove` carries
+/// `nodeId` as a JSON **STRING**. All four key names are now pinned.
+#[tokio::test]
+async fn ext_cmd_forwards_bm_star_frame() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(&mut ext, tabs_state_frame()).await;
+    wait_watch(&mut r.tabs_rx, |s| s.connected, "session never registered").await;
+
+    let relay = bm_relay(&r);
+
+    relay.star(7);
+    let frame = recv_json(&mut ext).await;
+    assert_eq!(frame["t"], "bm.star", "expected bm.star, got: {frame}");
+    assert!(
+        frame["p"]["tabId"].is_i64(),
+        "tabId MUST be a JSON integer, got: {}",
+        frame["p"]["tabId"]
+    );
+    assert_eq!(frame["p"]["tabId"], 7);
+
+    relay.unstar(9);
+    let frame = recv_json(&mut ext).await;
+    assert_eq!(frame["t"], "bm.unstar", "expected bm.unstar, got: {frame}");
+    assert!(frame["p"]["tabId"].is_i64(), "unstar tabId MUST be a JSON integer");
+    assert_eq!(frame["p"]["tabId"], 9);
+
+    relay.remove("42");
+    let frame = recv_json(&mut ext).await;
+    assert_eq!(frame["t"], "bm.remove", "expected bm.remove, got: {frame}");
+    assert!(frame["p"]["nodeId"].is_string(), "remove nodeId MUST be a JSON string");
+    assert_eq!(frame["p"]["nodeId"], "42");
+}
+
+/// protoVersion 1.6 belt (T-11-07): 600 nodes in one snapshot are truncated
+/// to 500 server-side, regardless of the extension's own cap — the
+/// `groups_belt_truncates_at_sixteen` pattern at bookmark scale.
+#[tokio::test]
+async fn bm_nodes_belt_truncates_at_five_hundred() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    let nodes: Vec<Value> = (0..600)
+        .map(|i| json!({"id": i.to_string(), "parentId": "0", "title": format!("n{i}")}))
+        .collect();
+    send_json(&mut ext, bm_state_frame(nodes, None)).await;
+
+    let state = wait_bm_watch(
+        &mut r.bm_rx,
+        |s| s.connected,
+        "bookmarks watch never showed connected:true",
+    )
+    .await;
+    assert_eq!(state.nodes.len(), 500, "server must belt bookmark nodes at 500");
+    assert_eq!(state.nodes[0].id, "0");
+    assert_eq!(state.nodes[499].id, "499", "truncation must keep the FIRST 500");
+}
+
+/// protoVersion 1.6 STRICT posture: a malformed `nodes` value ignores the
+/// WHOLE frame — the watch keeps the previous good snapshot. This is the
+/// deliberate CONTRAST with `malformed_groups_degrade_to_empty`: groups are
+/// decoration and degrade to empty, but nodes ARE the payload, so degrading
+/// them would render "you have no bookmarks" as if it were an answer.
+#[tokio::test]
+async fn malformed_bm_nodes_ignore_frame() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(&mut ext, bm_state_frame(bm_nodes(), None)).await;
+    wait_bm_watch(&mut r.bm_rx, |s| s.connected, "good snapshot never landed").await;
+
+    // A node missing the wire-required `title` — a hard decode error.
+    send_json(
+        &mut ext,
+        bm_state_frame(vec![json!({"id": "99", "parentId": "0"})], None),
+    )
+    .await;
+
+    // Frames are processed in order on one socket, so a marker frame that
+    // moves the OTHER watch proves the bad bm.state was already handled.
+    send_json(&mut ext, tabs_state_frame()).await;
+    wait_watch(&mut r.tabs_rx, |s| s.connected, "marker frame never landed").await;
+
+    let state = r.bm_rx.borrow().clone();
+    assert_eq!(state.nodes.len(), 2, "the previous good snapshot must survive");
+    assert_eq!(state.nodes[0].id, "1");
+    assert_eq!(state.nodes[1].id, "12");
+    assert!(state.connected, "the frame was ignored, not treated as a disconnect");
 }
