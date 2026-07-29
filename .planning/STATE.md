@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 11
+status: Ready to execute
 stopped_at: Completed 11-08-PLAN.md
-last_updated: "2026-07-29T17:54:58.037Z"
-last_activity: 2026-07-29 -- Phase 11 execution started
+last_updated: "2026-07-29T18:09:30.713Z"
+last_activity: 2026-07-29 -- Phase 11 execution resumed (wave continue)
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 89
-  completed_plans: 84
+  completed_plans: 85
   percent: 91
 ---
 
@@ -26,9 +26,13 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 8 of 12
-Next: wave 4 (11-04, 11-09) — Rust transport/session wiring for the bm.* relay leg,
-  and the first bookmarks widget layer (install hint, confirm, bookmarks section).
+Plan: 9 of 12
+Next: wave 4 continues with 11-09 — the first bookmarks widget layer (install hint,
+  confirm, bookmarks section). 11-04 is DONE: ServerDeps.bookmarks is threaded from
+  run_ext through the accept loop into every session, the bm.changed push arm is
+  authed-gated (guard-removal mutation proven RED) with no after-auth snapshot, and
+  bm_changed_frame always emits truncated and never logs. Server-side bookmarks relay
+  is complete; cargo 202 green, build warning-free.
   Waves 1-3 complete: 11-01, 11-02, 11-03, 11-05, 11-06, 11-07, 11-08.
   Phase 10 VERIFIED 2026-07-17 (10-VERIFICATION.md, passed, 12/12 must-haves).
   Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
@@ -54,7 +58,7 @@ Next: wave 4 (11-04, 11-09) — Rust transport/session wiring for the bm.* relay
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-29 -- Phase 11 execution started
+Last activity: 2026-07-29 -- Phase 11 execution resumed (wave continue)
 
 Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 89 plans)
 
@@ -156,6 +160,7 @@ Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 
 | Phase 11 P03 | 7min | 3 tasks | 3 files |
 | Phase 11 P06 | 6min | 3 tasks | 2 files |
 | Phase 11 P08 | 18min | 3 tasks | 5 files |
+| Phase 11 P04 | 14min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -344,6 +349,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 11-06]: bookmarksBarId() resolves via folderType === 'bookmarks-bar' (D-10), roots[0] then null fallback, and bm.star creates NOTHING on null rather than an unparented bookmark. server-core/tests/extension_guard.rs (comment-stripped, mutation-proven RED) makes removeTree, a hardcoded parentId '1', a url on a snapshot element, and a missing bookmarks permission each fail cargo test --workspace — CI-visible with zero new tooling since the repo has no JS runner
 - [Phase 11]: 11-08: the D-12 optimistic star overlay reconciles on snapshot IDENTITY, not value equality — ConnectionService parks a brand-new TabsSnapshot per push, so identical() is the exact definition of 'new authoritative data'; value equality would keep a flip alive across a disagreeing snapshot, and clearing on every changes ping would defeat the optimism (volume/apps/clipboard ping too)
 - [Phase 11]: 11-08: bookmark folder navigation lives on the notifier, never on the wire — D-06 gives drill-down no wire representation; keeping _currentFolderId and _backStack on BookmarksNotifier is what makes a pushed snapshot unable to move the user (D-04), and a vanished folder self-heals to the virtual root '0' silently
+- [Phase ?]: [Phase 11-04]: ServerDeps.bookmarks push arm is authed-gated (bookmarks_alive && ctx.auth_state == AuthState::Authed) and is the ONLY bookmarks push site — mutation-proven by deleting the guard, watching the pre-auth silence assertion go RED, then restoring session.rs byte-identical
+- [Phase ?]: [Phase 11-04]: the no-after-auth-snapshot assertion (T-11-12/D-03) needs a connection authed BEFORE the watch ever advances — on the pre-auth-silence connection the pending watch delivery is byte-indistinguishable from a snapshot, so the test opens authed_client() first and asserts silence there
+- [Phase ?]: [Phase 11-04]: Harness.bm_tx stays a struct field despite a one-commit dead-code warning — a local _bm_tx in start_server() would drop at function exit, flip bookmarks_alive false and silently disable the branch under test
 
 ### Pending Todos
 
@@ -387,6 +395,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T17:54:58.018Z
+Last session: 2026-07-29T18:09:01.754Z
 Stopped at: Completed 11-08-PLAN.md
 Resume file: None
