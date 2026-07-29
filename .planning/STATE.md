@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
 stopped_at: Completed 11-01-PLAN.md
-last_updated: "2026-07-29T16:08:53.781Z"
+last_updated: "2026-07-29T16:37:19.012Z"
 last_activity: 2026-07-29 -- Phase 11 execution started
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 89
-  completed_plans: 78
-  percent: 88
+  completed_plans: 79
+  percent: 89
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 2 of 12
+Plan: 3 of 12
 Next: wave 2 (11-02, 11-05, 11-07) — Rust relay tier, extension leg, Dart codec mirror.
   Phase 10 VERIFIED 2026-07-17 (10-VERIFICATION.md, passed, 12/12 must-haves).
   Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
@@ -148,6 +148,7 @@ Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 
 | Phase 10 P04 | ~14min | 2 tasks | 4 files |
 | Phase 10 P05 | ~17min | 2 tasks | 2 files |
 | Phase 11 P01 | 22min | 3 tasks | 17 files |
+| Phase 11 P02 | 23min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -321,6 +322,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 11-01]: protoVersion 1.6 locked in SPEC.md — six bm.* rows, flat BmEl {id,parentId,title,folder?,count?,locked?,truncated?} with NO url and NO icon, root 0 virtual (D-08), nodeId (string) vs tabId (integer) named apart because Chrome bookmark ids are strings and a value-lenient codec would let a swap fail silently at the extension
 - [Phase 11-01]: TabEl.bookmarked is TRI-STATE — reuses the icon/groupId serde+Dart shape but absence means UNKNOWN not false (the extension could not read the tree), so the phone renders NO star rather than an empty one (D-11 forbids misreporting). Shipped in BOTH codecs in 11-01 (Rule 3) because tabs/09-tabs-changed-bookmarked.json goes live immediately in the already-registered tabs harness — 11-02 task 1 step 5 and 11-07 task 1 step 3 are now no-ops
 - [Phase 11-01]: SPEC section 15 accepted-residual ESCALATED — the ext leg now carries bookmark create+delete, the first ext-leg capability with a persistent non-self-healing effect (a closed tab is recoverable from history, a deleted bookmark is not and the phone has no undo); still accepted because the blast radius is bounded by never calling removeTree (D-14). Caps fixed at 500 nodes / 48-char titles / 56 KB measured in UTF-8 BYTES not UTF-16 code units
+- [Phase 11-02]: Executors.bookmarks landed in the same commit as BookmarksRelay (not the plan's task 1): adding the field alone breaks server-windows' struct literal, so field + sole production implementor ship together and no intermediate commit is red
+- [Phase 11-02]: ExtCmd drops Copy (String-carrying bm variants); the four bm frames are built from a LOCAL serde_json::json! envelope, not the phone-facing codec — run_ext already parses this leg with a local tolerant ExtFrame, so egress stays local and run_ext takes no dependency on the bm codec landing in 11-03
+- [Phase 11-02]: reset_relay_watches is the ONE session-death cleanup point called at all three sites (Pitfall 2), mutation-verified: deleting the bm_tx reset fails ext_disconnect_resets_both_watches and only that test. bm.state takes the STRICT posture (parse failure keeps the last good tree) unlike the lenient groups array; nodeId/tabId asserted by TYPE (is_string/is_i64) because a swap decodes fine and fails silently at the extension
 
 ### Pending Todos
 
@@ -364,6 +368,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T16:08:53.764Z
+Last session: 2026-07-29T16:36:44.545Z
 Stopped at: Completed 11-01-PLAN.md
 Resume file: None
