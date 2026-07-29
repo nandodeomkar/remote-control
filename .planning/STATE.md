@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 11-06-PLAN.md
-last_updated: "2026-07-29T17:39:07.727Z"
+status: Executing Phase 11
+stopped_at: Completed 11-08-PLAN.md
+last_updated: "2026-07-29T17:54:58.037Z"
 last_activity: 2026-07-29 -- Phase 11 execution started
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 89
-  completed_plans: 83
+  completed_plans: 84
   percent: 91
 ---
 
@@ -26,8 +26,9 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 7 of 12
-Next: wave 2 (11-02, 11-05, 11-07) — Rust relay tier, extension leg, Dart codec mirror.
+Plan: 9 of 12
+Next: wave 3 continues (11-08 done) — 11-09+ own the widget layer: segment bar,
+  bookmarks section, star slot, confirm dialogs.
   Phase 10 VERIFIED 2026-07-17 (10-VERIFICATION.md, passed, 12/12 must-haves).
   Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
   with persistent modifier chips + tab bar, keyboard.pad persistence, sacred FSM
@@ -153,6 +154,7 @@ Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 
 | Phase 11 P07 | 5min | 3 tasks | 2 files |
 | Phase 11 P03 | 7min | 3 tasks | 3 files |
 | Phase 11 P06 | 6min | 3 tasks | 2 files |
+| Phase 11 P08 | 18min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -339,6 +341,8 @@ Recent decisions affecting current work:
 - [Phase 11-03]: Fixture-family registration proven, not assumed: corrupting 03-bm-open.json's expect turned codec_fixtures_bookmarks RED, then reverted (fixtures byte-clean). The pause gate was mutation-verified the same way — deleting the is_executor_bound bm entry failed exactly paused_drops_every_executor_bound_family_silently
 - [Phase ?]: [Phase 11-06]: TabEl.bookmarked is a strict tri-state — one guarded assignment (bmUrlSet !== null && tab.url) emitting explicit true/false, key absent from EVERY tab when the tree was unreadable; raw exact URL equality with ZERO normalization because widening 'matches' widens bm.unstar's delete-every-match blast radius, not for fidelity
 - [Phase ?]: [Phase 11-06]: bookmarksBarId() resolves via folderType === 'bookmarks-bar' (D-10), roots[0] then null fallback, and bm.star creates NOTHING on null rather than an unparented bookmark. server-core/tests/extension_guard.rs (comment-stripped, mutation-proven RED) makes removeTree, a hardcoded parentId '1', a url on a snapshot element, and a missing bookmarks permission each fail cargo test --workspace — CI-visible with zero new tooling since the repo has no JS runner
+- [Phase 11]: 11-08: the D-12 optimistic star overlay reconciles on snapshot IDENTITY, not value equality — ConnectionService parks a brand-new TabsSnapshot per push, so identical() is the exact definition of 'new authoritative data'; value equality would keep a flip alive across a disagreeing snapshot, and clearing on every changes ping would defeat the optimism (volume/apps/clipboard ping too)
+- [Phase 11]: 11-08: bookmark folder navigation lives on the notifier, never on the wire — D-06 gives drill-down no wire representation; keeping _currentFolderId and _backStack on BookmarksNotifier is what makes a pushed snapshot unable to move the user (D-04), and a vanished folder self-heals to the virtual root '0' silently
 
 ### Pending Todos
 
@@ -382,6 +386,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T17:39:07.708Z
-Stopped at: Completed 11-06-PLAN.md
+Last session: 2026-07-29T17:54:58.018Z
+Stopped at: Completed 11-08-PLAN.md
 Resume file: None
