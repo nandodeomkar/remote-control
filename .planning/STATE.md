@@ -27,7 +27,8 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
 Plan: 2 of 12
-Next: phase 10 verification (gsd-verifier), then milestone close-out / next phase.
+Next: wave 2 (11-02, 11-05, 11-07) — Rust relay tier, extension leg, Dart codec mirror.
+  Phase 10 VERIFIED 2026-07-17 (10-VERIFICATION.md, passed, 12/12 must-haves).
   Phase 10 shipped: four full-screen swipeable keyboard pads (Type/Arrows/Numpad/Fn)
   with persistent modifier chips + tab bar, keyboard.pad persistence, sacred FSM
   lifted to screen owner (donor keyboard_panel.dart byte-untouched), Shortcuts hub
@@ -53,7 +54,7 @@ Next: phase 10 verification (gsd-verifier), then milestone close-out / next phas
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
 Last activity: 2026-07-29 -- Phase 11 execution started
 
-Progress: [██████████] 100% (8 of 8 phases complete; 62 of 62 plans)
+Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 89 plans)
 
 ## Performance Metrics
 
