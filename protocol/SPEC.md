@@ -1,6 +1,6 @@
 # Remote Control Wire Protocol — SPEC
 
-**protoVersion:** `"1.5"`
+**protoVersion:** `"1.6"`
 **Status:** Locked contract. Both codecs (Rust `server-core`, Dart `remote_protocol`) are written against this document and proven byte-identical by the golden fixtures in `protocol/fixtures/`. No codec may adjust a fixture to match its own output.
 
 Transport: a single WebSocket connection per session carrying two frame kinds — JSON text frames (everything) and 9-byte binary frames (mouse hot path only). Discovery is UDP broadcast (out of scope for this document; see design spec §4).
@@ -29,7 +29,7 @@ Every JSON text frame is an object of the shape:
 
 ## 2. Versioning (D-06)
 
-- `protoVersion` is a `"major.minor"` string. Current version: `"1.5"`.
+- `protoVersion` is a `"major.minor"` string. Current version: `"1.6"`.
 - `hello` carries `protoVersion`. The server parses only the **major** component.
 - **Major mismatch:** the server replies `err` with `code:"versionMismatch"` and payload fields `serverVersion` and `clientVersion` (both `"major.minor"` strings), then closes the connection.
 - **Minor mismatch:** accepted. Peers simply do not use features the other side does not know; unknown fields and unknown types are handled by the strictness rules (§1, §10).
@@ -38,6 +38,7 @@ Every JSON text frame is an object of the shape:
 - **1.3 addition (SRV-05, D-07):** the S→C `input.blocked {reason}` push — a transient UIPI-elevated-foreground-window notice. Minor bump.
 - **1.4 addition (BROW-01):** the `tabs.*` family (`tabs.list`, `tabs.changed`, `tabs.activate`, `tabs.close`, §7) — live browser tab list fed by the localhost extension leg (§15). Minor bump — 1.0–1.3 clients stay accepted.
 - **1.5 addition (BROW-01):** tab-group visibility — the GroupEl element, optional `groups` on the `tabs.list` reply / `tabs.changed` / `tabs.state` payloads, and the optional TabEl `groupId`. View-only (no group commands). Minor bump — 1.0–1.4 clients stay accepted.
+- **1.6 addition (phase 11):** the `bm.*` bookmark family (`bm.list`, `bm.changed`, `bm.open`, `bm.star`, `bm.unstar`, `bm.remove`, §7), the BmEl element, and the optional tri-state TabEl `bookmarked` flag. Minor bump — 1.0–1.5 clients stay accepted.
 
 ## 3. Handshake FSM
 
@@ -122,6 +123,12 @@ Direction: C→S (client to server), S→C (server to client), C↔S (both).
 | `tabs.changed` | S→C | `connected` (bool), `tabs` (array of TabEl) | `groups` (array of GroupEl, protoVersion 1.5 — absent from 1.4 servers) | Server push (protoVersion 1.4): on any tab change AND on extension connect/disconnect |
 | `tabs.activate` | C→S | `id` (integer) | — | Switch the PC browser to that tab (window focused too). Fire-and-forget — no err reply; stale ids self-heal via the next `tabs.changed`. Executor-bound (§11) |
 | `tabs.close` | C→S | `id` (integer) | — | Close that tab. Fire-and-forget — same semantics as `tabs.activate`. Executor-bound (§11) |
+| `bm.list` | C→S request / S→C reply | request: — (`p` is `{}`); reply: `connected` (bool), `nodes` (array of BmEl) | reply: `truncated` (bool) | Pulled on first Bookmarks-segment display, not on screen open (protoVersion 1.6, D-03). With the extension never connected the reply is `{connected:false, nodes:[]}`. A READ, not executor-bound — answered while paused (§11) |
+| `bm.changed` | S→C | `connected` (bool), `nodes` (array of BmEl) | `truncated` (bool) | Server push (protoVersion 1.6): on any bookmark change AND on extension connect/disconnect |
+| `bm.open` | C→S | `nodeId` (string) | — | Open that bookmark in a NEW tab. Fire-and-forget — no err reply; stale ids self-heal via the next `bm.changed`. Executor-bound (§11) |
+| `bm.star` | C→S | `tabId` (integer) | — | Bookmark that tab's URL into the bookmarks-bar root (D-10). Fire-and-forget — same semantics as `bm.open`. Executor-bound (§11) |
+| `bm.unstar` | C→S | `tabId` (integer) | — | Remove EVERY bookmark whose URL exactly matches that tab's URL (D-11). Fire-and-forget. Executor-bound (§11) |
+| `bm.remove` | C→S | `nodeId` (string) | — | Remove one bookmark or one EMPTY folder (D-14 — `removeTree` is never used). Fire-and-forget. Executor-bound (§11) |
 | `clip.set` | C↔S | `text` (string) | — | Both directions |
 | `clip.get` | C→S | — (`p` is `{}`) | — | Server replies with `clip.set` |
 | `clip.changed` | S→C | `text` (string) | — | Server push (auto-sync) |
@@ -133,7 +140,11 @@ Direction: C→S (client to server), S→C (server to client), C↔S (both).
 
 **TabEl element (protoVersion 1.4):** `{id: integer, title: string, active: bool, icon?: string, groupId?: integer}` — `icon` is a base64 PNG WITHOUT a `data:` prefix (the exact WindowInfo icon convention: skipped entirely when absent, never emitted as null). `groupId` (protoVersion 1.5) references a GroupEl `id`; absent = ungrouped — skipped entirely when absent, never emitted as null (and never emitted as `-1`). Exactly one element carries `active:true`. **No `url` field ever crosses the phone-facing wire** — titles are enough (privacy).
 
+`bookmarked` (protoVersion 1.6) is an optional bool that is **TRI-STATE**, deliberately unlike `icon` and `groupId`: `true` = this tab's URL is bookmarked somewhere in the tree, `false` = it is not, and **ABSENCE means UNKNOWN** — the extension could not read the bookmark tree (`getTree()` failed, or the `bookmarks` permission is missing) — NOT "not bookmarked". The extension therefore emits an explicit `true` or `false` on EVERY tab whenever the URL set was built, and omits the key on EVERY tab when it was not. A client must not render an "unstarred" affordance for an absent flag; absence means "do not offer the star at all" (D-11 forbids misreporting star state).
+
 **GroupEl element (protoVersion 1.5):** `{id: integer, title: string, color: string, collapsed: bool}` — ALL four fields are required within an element (a missing field is a hard decode error, exactly like TabEl's `id`/`title`/`active`). `color` is Chrome's named group color passed through verbatim — vocabulary `grey|blue|red|yellow|green|pink|purple|cyan|orange`; the value is NOT validated on the wire (unknown names render as a neutral fallback client-side, the enum-string leniency rule). `title` may be empty (Chrome allows unnamed groups) and is capped at 32 chars extension-side. `collapsed` is display metadata only — no wire message toggles it (view-only: there are no group create/collapse/move commands).
+
+**BmEl element (protoVersion 1.6):** `{id: string, parentId: string, title: string, folder?: bool, count?: integer, locked?: bool, truncated?: bool}` — `id`, `parentId` and `title` are ALL required within an element (a missing field is a hard decode error, exactly the GroupEl rule). `id`/`parentId` are Chrome bookmark ids and are **STRINGS**, deliberately unlike TabEl's integer `id` — which is precisely why the commands name their fields `nodeId` (bookmark node, string) and `tabId` (tab, integer) instead of both reusing `id`: the codec is value-lenient, so a swapped id would decode fine and fail silently at the extension. Root `"0"` is **NEVER shipped as a node**; its children carry `parentId: "0"` and the phone treats `"0"` as the virtual top level (D-08). `folder: true` marks a folder (absent = a link) and `count` is that folder's direct-child count, which gates the D-14 delete affordance (`count == 0` ⇒ delete may be offered). `locked: true` mirrors Chrome's `BookmarkTreeNode.unmodifiable` (managed/admin bookmarks) so the phone hides a delete Chrome would reject. `truncated: true` marks a folder whose children were dropped by the budget loop (§15). There is **no `url` field and no `icon` field** on a BmEl — the no-url rule is the same locked invariant TabEl carries (URL resolution stays extension-side), and D-07 drops the icon to keep the whole tree inside one frame.
 
 **`err` codes:**
 
@@ -187,7 +198,7 @@ The full byte layout is documented in `protocol/schema/mouse-binary.md`.
 
 ## 11. Pause semantics and session cleanup
 
-- While server-side **pause** is active, all executor-bound messages are **silently dropped**: binary frames, `click`, `drag`, `key`, `text`, `media`, `power`, `confirm`, `apps.launch`, `apps.focus`, `apps.close`, `clip.set`, `browser`, `present`, `tabs.activate`, `tabs.close`. The handshake family (`hello`, `pin`, `auth`) and `ping`/`pong` continue to work — pause never breaks connectivity or liveness probing. `tabs.list` is a read and stays answered while paused (the same exemption as `apps.list`/`clip.get`).
+- While server-side **pause** is active, all executor-bound messages are **silently dropped**: binary frames, `click`, `drag`, `key`, `text`, `media`, `power`, `confirm`, `apps.launch`, `apps.focus`, `apps.close`, `clip.set`, `browser`, `present`, `tabs.activate`, `tabs.close`, `bm.open`, `bm.star`, `bm.unstar`, `bm.remove`. The handshake family (`hello`, `pin`, `auth`) and `ping`/`pong` continue to work — pause never breaks connectivity or liveness probing. `tabs.list` and `bm.list` are reads and stay answered while paused (the same exemption as `apps.list`/`clip.get`).
 - **Activating pause immediately releases any held input** (buttons held via `drag start`, keys held via `key down`).
 - **Session end for ANY reason** — clean close, socket error, auth revoke, server shutdown — **releases all held keys and buttons** (CONN-07). No phantom held input may survive a mid-drag disconnect.
 
@@ -215,7 +226,7 @@ The browser tab list (protoVersion 1.4, §7 `tabs.*`) is fed by a SECOND WebSock
 
 - **Envelope:** the same `{t, seq?, p}` JSON envelope as the main protocol (§1). Same strictness rules.
 - **Auth boundary:** the loopback bind IS the authentication — a LAN device cannot complete a TCP handshake to a loopback-bound socket; the kernel enforces it. There is no PIN/token handshake on this leg, and no role handshake ever exists on the LAN-exposed main listener. Belt-and-braces: the accept loop drops any stream whose peer address is not loopback.
-- **Accepted residual (consistent with the v1 LAN threat model, §12):** any LOCAL process can connect and feed fake tab state or receive activate/close tab ids. A malicious local process already owns the machine.
+- **Accepted residual (consistent with the v1 LAN threat model, §12):** any LOCAL process can connect and feed fake tab state or receive activate/close tab ids. **As of protoVersion 1.6 this leg also carries bookmark CREATE and DELETE** (`bm.star` / `bm.unstar` / `bm.remove`), so a malicious local process can **destroy bookmarks**. This is the first ext-leg capability with a persistent, non-self-healing effect: a closed tab is recoverable from history, a deleted bookmark is not, and the phone offers no undo. The residual is still accepted on the same reasoning — a local process able to open a loopback socket already owns the machine — and the blast radius is bounded by the rule that **`removeTree` is never called** (D-14): only a single bookmark or a single EMPTY folder can be removed per command, so a subtree wipe is structurally impossible.
 - **Single-extension policy:** newest connection wins — a second accepted connection replaces the current extension session (the old stream is dropped).
 
 Message table (extension ↔ server):
@@ -228,7 +239,14 @@ Message table (extension ↔ server):
 | `ext.pong` | srv→ext | `{}` | Keepalive reply |
 | `tabs.activate` | srv→ext | `id` (integer) | Same payload as the phone-facing message |
 | `tabs.close` | srv→ext | `id` (integer) | Same payload as the phone-facing message |
+| `bm.state` | ext→srv | `nodes` (array of BmEl, §7); `truncated` (bool — optional) | ALWAYS a full snapshot, never a diff (protoVersion 1.6) |
+| `bm.open` | srv→ext | `nodeId` (string) | Same payload as the phone-facing message |
+| `bm.star` | srv→ext | `tabId` (integer) | Same payload as the phone-facing message |
+| `bm.unstar` | srv→ext | `tabId` (integer) | Same payload as the phone-facing message |
+| `bm.remove` | srv→ext | `nodeId` (string) | Same payload as the phone-facing message |
 
 **Limits:** the 64 KB `max_message_size`/`max_frame_size` caps (§13) apply per-listener — an oversize frame kills the extension session. Extension-side caps enforced BEFORE send: max **50 tabs**, max **4096 base64 chars** per icon (icon dropped above), max **16 groups** with group titles capped at **32 chars** (protoVersion 1.5), and if the serialized `tabs.state` frame exceeds **56 KB** icons are stripped from the end of the list until it fits. The server additionally truncates at 50 tabs — and at 16 groups — as a belt.
 
-**Fixtures:** mandatory only for the phone-facing `tabs.*` family (`protocol/fixtures/tabs/`). The extension leg has exactly one Rust implementation and one JS implementation, with no codec harness — this section's prose plus the server's integration tests are its contract.
+For `bm.state` (protoVersion 1.6): max **500 bookmark nodes**, bookmark titles capped at **48 chars**, and if the serialized `bm.state` frame exceeds **56 KB** nodes are dropped from the END of the breadth-first order until it fits. That size is measured in **UTF-8 BYTES, not UTF-16 code units** — a 48-char CJK title is 144 bytes, so a code-unit count would under-measure by up to 3× and let an oversize frame kill the extension session. The server additionally truncates at 500 nodes as a belt.
+
+**Fixtures:** mandatory only for the phone-facing `tabs.*` and `bm.*` families (`protocol/fixtures/tabs/` and `protocol/fixtures/bookmarks/`). The extension leg has exactly one Rust implementation and one JS implementation, with no codec harness — this section's prose plus the server's integration tests are its contract.
