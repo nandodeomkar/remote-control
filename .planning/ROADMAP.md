@@ -371,3 +371,25 @@ Plans:
 **Wave 5** *(after 10-02 + 10-05)*
 
 - [x] 10-06-PLAN.md — On-device UAT gate: fresh release APK + full regression + per-surface walkthrough
+
+### Phase 11: Browser bookmarks — view, open, star current tab
+
+**Goal:** The phone can browse the PC browser's bookmark tree by folder, open a bookmark in a new tab, star/unstar any tab, and delete a bookmark or an empty folder — delivered as a second segment on the existing Browser screen (protoVersion 1.6), with URL resolution staying extension-side so no `url` field ever crosses the phone-facing wire.
+**Requirements**: none mapped — the acceptance surface is decisions D-01..D-14 in `11-CONTEXT.md`
+**Depends on:** Phase 10
+**Plans:** 12 plans (7 waves)
+
+Plans:
+
+- [ ] 11-01-PLAN.md — protoVersion 1.6 wire contract: SPEC §2/§7/§11/§15, version bump, bookmarks fixture family
+- [ ] 11-02-PLAN.md — Rust bookmark relay: BmNode/BookmarksState/Bookmarks trait, ext.rs bm.state + both-watch reset, main.rs wiring
+- [ ] 11-03-PLAN.md — Rust phone-facing bm.* codec, router classification, Rust fixture harness registration
+- [ ] 11-04-PLAN.md — ServerDeps.bookmarks + authed-gated bm.changed push arm + pre-auth-silence integration test
+- [ ] 11-05-PLAN.md — extension: bookmarks permission, caps, listeners, BFS buildBmSnapshot with a byte-measured budget loop
+- [ ] 11-06-PLAN.md — extension: tri-state TabEl.bookmarked, the four bm.* command handlers, removeTree source guard
+- [ ] 11-07-PLAN.md — Dart codec mirror (BmNode, six Bm*Msg, TabInfo.bookmarked) + Dart fixture harness registration
+- [ ] 11-08-PLAN.md — client state: BookmarksSnapshot parking, BookmarksNotifier local folder nav, optimistic star overlay
+- [ ] 11-09-PLAN.md — BookmarksSection widget, shared InstallHintCard, confirmDestructive + copy, isolated widget tests
+- [ ] 11-10-PLAN.md — Browser screen restructure: Tabs|Bookmarks segment, pinned macro grid, lazy bm.list prime, persistence
+- [ ] 11-11-PLAN.md — trailing star slot on tab rows: tri-state render, arena isolation, unstar confirm gate
+- [ ] 11-12-PLAN.md — phase gate, on-device UAT (11 steps), extension README written from the observed UAT-1 outcome
