@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 11
-stopped_at: Completed 11-10-PLAN.md
-last_updated: "2026-07-29T18:43:07.354Z"
-last_activity: 2026-07-29 -- Phase 11 execution started
+stopped_at: Completed 11-11-PLAN.md
+last_updated: "2026-07-30T02:30:00.000Z"
+last_activity: 2026-07-30 -- Phase 11 wave 6 executed (11-11 star slot)
 progress:
   total_phases: 11
   completed_phases: 10
   total_plans: 89
-  completed_plans: 87
+  completed_plans: 88
   percent: 91
 ---
 
@@ -26,8 +26,28 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
-Plan: 11 of 12
-Next: wave 5 continues with 11-11 — the D-09/D-11/D-12 star slot on tab rows.
+Plan: 12 of 12
+Next: wave 7 is 11-12 — the phase's docs + UAT plan (SPEC/README prose and the
+  on-device checks), the last plan of phase 11.
+  11-11 is DONE: every tab row whose bookmark state is KNOWN now carries a 48x48
+  trailing star — Symbols.star_rounded with the FILL axis as the whole state
+  signal (fill 1 + kAccent live, fill 0 + kMuted, never the destructive red),
+  right padding dropping 12→4 only when a slot renders. bookmarked == null
+  (UNKNOWN) renders NO slot and NO semantics node, so the row and its a11y tree
+  stay byte-identical to pre-phase. _onStarTab is asymmetric by design: adding
+  sends bm.star + haptic on the tap instant; removing opens confirmDestructive
+  FIRST and only flips + sends on the Remove press (cancel/barrier send nothing).
+  RESEARCH Pitfall 8 / A6 is now settled by OBSERVATION — a star tap records
+  exactly one BmStarMsg and zero TabsActivateMsg. Carry-forward for 11-12: an
+  icon-only button whose onTap can be null needs Semantics(container: true,
+  enabled: ...) or the disabled state has NO a11y node at all (found by test,
+  fixed in b513149 — the shipped bookmarks back button is unaffected only
+  because its onTap is never null). Also logged as deferred item 2: a
+  press-and-HOLD >100ms on the star additionally fires the row's onTapDown
+  (Flutter calls handleTapDown on deadline expiry, not only on winning the
+  arena) — benign tab switch, out of scope because the row's tap-down activate
+  is locked. 7 new tests; flutter suite 601 green, analyze clean, cargo 202
+  green, dart protocol 13 green.
   11-10 is DONE: the Browser screen is now a fixed BrowserSegmentBar header
   (hand-rolled, no enabled parameter — navigation is never gated), ONE swapped
   Expanded scroll region, and a PINNED macro-grid footer with a 1px kHairline
@@ -83,7 +103,7 @@ Next: wave 5 continues with 11-11 — the D-09/D-11/D-12 star slot on tab rows.
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-29 -- Phase 11 execution started
+Last activity: 2026-07-30 -- Phase 11 execution resumed (wave continue)
 
 Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 89 plans)
 
@@ -188,6 +208,7 @@ Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 
 | Phase 11 P04 | 14min | 2 tasks | 5 files |
 | Phase 11 P09 | 8min | 3 tasks | 5 files |
 | Phase 11 P10 | 12min | 3 tasks | 3 files |
+| Phase 11 P11 | 35min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -385,6 +406,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 11-10]: D-02 pixel-pinning is achieved by LAYOUT — the macro grid moved out of the swapped scroll region into a Column footer, so identical rects hold by construction and tester.getRect equality only witnesses it
 - [Phase ?]: [Phase 11-10]: the D-03 bm.list prime fires from build off the segment about to render (guarded by _bmPrimed), not from onSelect — a segment restored from prefs is displayed with no tap, and an onSelect-only prime would never fire for that user
 - [Phase ?]: [Phase 11-10]: bookmarksStateProvider is watched on BOTH segments so PopScope.canPop sees the folder depth in the frame the back gesture arrives; system back and the folder-bar button share one callback (haptic included)
+- [Phase ?]: [Phase 11-11]: the tab-row star is tri-state — UNKNOWN (bookmarked == null) renders NO slot and NO semantics node, so an unreadable bookmark state can never be misreported as not-bookmarked
+- [Phase ?]: [Phase 11-11]: an icon-only button whose onTap can be null needs Semantics(container: true, enabled: ...) — otherwise the disabled state has no a11y node at all and a screen reader hears nothing instead of a disabled button
+- [Phase ?]: [Phase 11-11]: nested-recognizer isolation is asserted by observation (zero TabsActivateMsg on a star tap), never inferred from TapGestureRecognizer deadlines — and the deadline caveat that survives is press-and-hold, logged as deferred item 2
 
 ### Pending Todos
 
@@ -428,6 +452,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-29T18:42:40.817Z
+Last session: 2026-07-30T02:25:52.565Z
 Stopped at: Completed 11-09-PLAN.md
 Resume file: None
