@@ -1087,7 +1087,18 @@ class _TabRowState extends State<_TabRow> {
                     width: 48,
                     height: 48,
                     child: Semantics(
+                      // `container` + `enabled` are what make the GATED star
+                      // read as "disabled button", not as nothing at all
+                      // (T-11-09). Without `container: true` the annotation
+                      // has no node of its own, and when `onTap` is null the
+                      // InkWell creates none either — so the label silently
+                      // disappeared from the semantics tree exactly in the
+                      // state that most needs explaining. `enabled` also lets
+                      // a screen reader say "disabled" instead of announcing a
+                      // button that does nothing. Proven by the gated test.
+                      container: true,
                       button: true,
+                      enabled: widget.enabled,
                       label: bookmarked ? kUnstarSemantic : kStarSemantic,
                       child: InkWell(
                         customBorder: const CircleBorder(),
