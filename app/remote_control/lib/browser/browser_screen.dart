@@ -112,6 +112,19 @@ const String kSegmentTabsLabel = 'Tabs';
 /// The right segment's label.
 const String kSegmentBookmarksLabel = 'Bookmarks';
 
+/// The tab-row star's semantic label while the tab is NOT bookmarked
+/// (11-UI-SPEC §Accessibility Labels, D-09/D-11).
+///
+/// The star is icon-only and encodes its state in the FILL axis alone, which a
+/// screen reader cannot infer — so the label, not the glyph, is the only
+/// channel that carries the bookmarked/not-bookmarked distinction to a
+/// non-visual user. It therefore FLIPS with the state (see [kUnstarSemantic]).
+const String kStarSemantic = 'Bookmark this tab';
+
+/// The tab-row star's semantic label while the tab IS bookmarked — the flipped
+/// half of [kStarSemantic].
+const String kUnstarSemantic = 'Remove bookmark';
+
 /// The `Tabs | Bookmarks` selector above the swapped list region (D-01) — a
 /// clone of the settings screen's scroll-direction segment: two [Expanded]
 /// children with an 8px gap, `Material(kBg)` + [InkWell], radius 8,
@@ -556,6 +569,13 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
                           enabled: authed,
                           onActivate: _onActivateTab,
                           onClose: _onCloseTab,
+                          bookmarkedFor: tabs.bookmarkedFor,
+                          // Rendering-only for now: the star/unstar handler
+                          // (instant add, confirm-gated remove) lands in the
+                          // next commit, and a no-op is the honest stub —
+                          // better than an unconfirmed destructive path
+                          // existing even briefly.
+                          onStar: (_, _) {},
                         )
                       : BookmarksSection(
                           bookmarks: bookmarks,
@@ -639,11 +659,23 @@ class _TabsSection extends StatelessWidget {
   final void Function(int id) onActivate;
   final void Function(int id) onClose;
 
+  /// The tri-state bookmark resolver ([TabsViewState.bookmarkedFor]): true
+  /// bookmarked, false not, and `null` UNKNOWN — which renders NO star slot at
+  /// all (D-11 truthfulness).
+  final bool? Function(TabInfo tab) bookmarkedFor;
+
+  /// Star tap: `(tabId, currentlyBookmarked)`. The row reports the state it
+  /// RENDERED, so the screen never has to re-resolve it and the add/remove
+  /// split can never disagree with the glyph the user tapped.
+  final void Function(int tabId, bool bookmarked) onStar;
+
   const _TabsSection({
     required this.tabs,
     required this.enabled,
     required this.onActivate,
     required this.onClose,
+    required this.bookmarkedFor,
+    required this.onStar,
   });
 
   @override
@@ -732,6 +764,10 @@ class _TabsSection extends StatelessWidget {
           enabled: enabled,
           onActivate: onActivate,
           onClose: onClose,
+          // Resolved HERE (not inside the row) so the row stays a dumb
+          // renderer of the tri-state value, exactly like `enabled`.
+          bookmarked: bookmarkedFor(tab),
+          onStar: onStar,
           radius: radius,
         ),
       );
@@ -887,11 +923,41 @@ class _GroupHeader extends StatelessWidget {
 /// pattern); long-press → close (locked "swipe or long-press = close").
 /// NOTE: on the Apps screen a row long-press means PIN — per-screen
 /// semantics differ, accepted (a tab has no path to pin).
+///
+/// # The trailing star slot (phase 11, D-09/D-11/D-12)
+///
+/// The row's gesture budget was already spent — tap-down activates, long-press
+/// closes and a horizontal drag closes — so bookmarking had to become a
+/// trailing BUTTON rather than a fourth gesture (D-09). Its `InkWell` is a
+/// nested recognizer inside the row's: a star tap must fire [onStar] and
+/// produce ZERO `tabs.activate`, which is pinned by a widget test rather than
+/// by reasoning about `TapGestureRecognizer` deadlines (RESEARCH Pitfall 8 /
+/// assumption A6).
+///
+/// [bookmarked] is TRI-STATE and the rendering is the D-11 truthfulness rule:
+///
+/// - `true` → 48x48 slot, the rounded star glyph at `fill: 1`, [kAccent]
+///   (or [kMuted] when gated)
+/// - `false` → the same slot at `fill: 0`, [kMuted]
+/// - `null` (UNKNOWN) → NO slot at all, so both the layout and the
+///   accessibility tree stay byte-identical to the pre-phase row. An empty
+///   star on a tab whose bookmark state could not be read would be a
+///   misreport, and a misreport is worse than no star.
+///
+/// The fill change is deliberately unanimated (0 ms) so the D-12 optimistic
+/// flip reads as immediate.
 class _TabRow extends StatefulWidget {
   final TabInfo tab;
   final bool enabled;
   final void Function(int id) onActivate;
   final void Function(int id) onClose;
+
+  /// Tri-state bookmark state to RENDER — `null` means unknown and renders no
+  /// star slot at all (see the class doc).
+  final bool? bookmarked;
+
+  /// Star tap: `(tabId, currentlyBookmarked)`.
+  final void Function(int tabId, bool bookmarked) onStar;
 
   /// Corner radius: 16 flat, 10 nested in a group block.
   final double radius;
@@ -901,6 +967,8 @@ class _TabRow extends StatefulWidget {
     required this.enabled,
     required this.onActivate,
     required this.onClose,
+    required this.bookmarked,
+    required this.onStar,
     required this.radius,
   });
 
@@ -928,6 +996,14 @@ class _TabRowState extends State<_TabRow> {
         : _pressed
             ? kAccent
             : kText;
+    // Tri-state: null renders no slot (D-11), so every use below is inside the
+    // `bookmarked != null` guard and the local is non-null there.
+    final bookmarked = widget.bookmarked;
+    // Accent ONLY for a live, filled star. Everything else rendered — the
+    // gated filled star and the outline star in any state — is kMuted.
+    // The destructive red never appears on a star (11-UI-SPEC §Palette).
+    final starColor =
+        (bookmarked == true && widget.enabled) ? kAccent : kMuted;
     return Material(
       color: kSurface,
       shape: RoundedRectangleBorder(
@@ -943,7 +1019,14 @@ class _TabRowState extends State<_TabRow> {
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 56),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            // Right padding drops 12 -> 4 whenever a star slot renders: the
+            // 48x48 star box supplies the remaining optical inset (11-UI-SPEC
+            // §Spacing exceptions). A row with no slot keeps 12 and is
+            // byte-identical to the pre-phase row.
+            padding: EdgeInsets.only(
+              left: 12,
+              right: bookmarked == null ? 12 : 4,
+            ),
             child: Row(
               children: [
                 _TabIcon(iconB64: widget.tab.icon, size: 24),
@@ -960,6 +1043,37 @@ class _TabRowState extends State<_TabRow> {
                     ),
                   ),
                 ),
+                // The D-09 star slot — the last child, and present ONLY when
+                // the bookmark state is actually known. Gated keeps the
+                // geometry AND the Semantics node (Flutter marks the node
+                // disabled via the null callback), so the layout never shifts
+                // and the control reads as disabled rather than absent.
+                if (bookmarked != null) ...[
+                  const SizedBox(width: 4),
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: Semantics(
+                      button: true,
+                      label: bookmarked ? kUnstarSemantic : kStarSemantic,
+                      child: InkWell(
+                        customBorder: const CircleBorder(),
+                        onTap: widget.enabled
+                            ? () => widget.onStar(widget.tab.id, bookmarked)
+                            : null,
+                        child: Icon(
+                          Symbols.star_rounded,
+                          // The FILL axis is the whole state signal, and this
+                          // per-Icon override intentionally beats the app-wide
+                          // FILL 0 pin from buildAppTheme.
+                          fill: bookmarked ? 1 : 0,
+                          size: 20,
+                          color: starColor,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
