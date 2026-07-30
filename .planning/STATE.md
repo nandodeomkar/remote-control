@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 11
-stopped_at: Completed 11-11-PLAN.md
-last_updated: "2026-07-30T02:30:00.000Z"
-last_activity: 2026-07-30 -- Phase 11 wave 6 executed (11-11 star slot)
+stopped_at: 11-12 task 1 complete (gate + artifacts); paused at task 2 on-device UAT checkpoint
+last_updated: "2026-07-30T03:55:00.000Z"
+last_activity: 2026-07-30 -- 11-12 wave 7 started; phase gate green, fresh release artifacts built and installed, awaiting owner UAT
 progress:
   total_phases: 11
   completed_phases: 10
@@ -103,7 +103,14 @@ Next: wave 7 is 11-12 — the phase's docs + UAT plan (SPEC/README prose and the
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-30 -- Completed quick task 260730-bm0: shipped v1.4.0-rc1 prerelease (phase 11 bookmarks test build)
+Last activity: 2026-07-30 -- 11-12 task 1 done (cargo 202 / dart 13 / flutter 601 green,
+  analyze clean, fresh server exe v1.4.0 + release APK 1.4.0+7 installed on the
+  Xiaomi). PAUSED at the task-2 on-device UAT checkpoint: 11-UAT.md exists as an
+  empty eleven-row sheet, no observation recorded yet, and task 3 (extension
+  README) is deliberately NOT started because its wording is derived from the
+  UAT-1 observation. Owner action required first: no Tab Bridge extension is
+  currently loaded in ANY Chromium profile on this PC, so the owner must Load
+  unpacked before UAT-1 can measure the permission-update path.
 
 Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 89 plans)
 
