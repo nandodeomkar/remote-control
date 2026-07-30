@@ -103,7 +103,7 @@ Next: wave 7 is 11-12 — the phase's docs + UAT plan (SPEC/README prose and the
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-30 -- Phase 11 execution resumed (wave continue)
+Last activity: 2026-07-30 -- Completed quick task 260730-bm0: shipped v1.4.0-rc1 prerelease (phase 11 bookmarks test build)
 
 Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 89 plans)
 
@@ -441,6 +441,7 @@ Recent decisions affecting current work:
 | 260729-42w | App version identity (1.3.0+4) + Settings About row | 2026-07-29 | cf7005c | [260729-42w-app-version-identity-and-about-row](./quick/260729-42w-app-version-identity-and-about-row/) |
 | 260729-4rg | No console window on launch + rolling file logging | 2026-07-29 | 564a744 | [260729-4rg-hide-console-window-and-add-file-logging](./quick/260729-4rg-hide-console-window-and-add-file-logging/) |
 | 260729-58x | Tab-group visual hierarchy — grouped runs contained in a tinted `_GroupBlock` | 2026-07-29 | 088c53b | [260729-58x-fix-tab-group-visual-hierarchy-on-the-br](./quick/260729-58x-fix-tab-group-visual-hierarchy-on-the-br/) |
+| 260730-bm0 | Ship v1.4.0-rc1 prerelease with phase 11 bookmarks artifacts (server 1.4.0, app 1.4.0+7, extension 1.2.0) | 2026-07-30 | 2fca0cb | [260730-bm0-ship-v1-4-0-rc1-prerelease-with-phase-11](./quick/260730-bm0-ship-v1-4-0-rc1-prerelease-with-phase-11/) |
 
 ## Deferred Items
 
