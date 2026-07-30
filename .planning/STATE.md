@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 11
-stopped_at: 11-12 task 1 complete (gate + artifacts); paused at task 2 on-device UAT checkpoint
-last_updated: "2026-07-30T03:55:00.000Z"
-last_activity: 2026-07-30 -- 11-12 wave 7 started; phase gate green, fresh release artifacts built and installed, awaiting owner UAT
+stopped_at: 11-12 task 2 (on-device UAT) COMPLETE -- 10 PASS / 1 FAIL; phase blocked on Failure B (UAT-8)
+last_updated: "2026-07-30T17:45:00.000Z"
+last_activity: 2026-07-30 -- 11-12 task 2 on-device UAT run end to end; A1 answered (silent grant on Comet 150); UAT-8 FAILED: long-press delete unreachable on bookmark folders
 progress:
   total_phases: 11
   completed_phases: 10
@@ -103,14 +103,42 @@ Next: wave 7 is 11-12 — the phase's docs + UAT plan (SPEC/README prose and the
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-30 -- 11-12 task 1 done (cargo 202 / dart 13 / flutter 601 green,
-  analyze clean, fresh server exe v1.4.0 + release APK 1.4.0+7 installed on the
-  Xiaomi). PAUSED at the task-2 on-device UAT checkpoint: 11-UAT.md exists as an
-  empty eleven-row sheet, no observation recorded yet, and task 3 (extension
-  README) is deliberately NOT started because its wording is derived from the
-  UAT-1 observation. Owner action required first: no Tab Bridge extension is
-  currently loaded in ANY Chromium profile on this PC, so the owner must Load
-  unpacked before UAT-1 can measure the permission-update path.
+Last activity: 2026-07-30 -- 11-12 task 2 (on-device UAT) RUN AND RECORDED. All eleven
+  rows carry an observation: 10 PASS, 1 FAIL. Full detail in 11-UAT.md.
+  **PHASE IS NOT CLEAR TO CLOSE** -- UAT-8 is a real functional gap (Failure B):
+  `_BmRow` (bookmarks_section.dart:315-319) puts onTapDown activate and onLongPress
+  on the SAME InkWell, and Flutter fires handleTapDown at the ~100ms press deadline
+  while long-press waits ~500ms. On a FOLDER the tap-down navigation swaps the list
+  before long-press can resolve, so D-14's empty-folder delete is unreachable by any
+  gesture (proven with count==0, where onLongPress IS wired). On a LINK the delete
+  does work but the bookmark is force-opened first. Tab rows and the link case are
+  unaffected because their tap-down action does not destroy the row -- so the defect
+  is scoped to rows whose tap-down replaces the row. Same root cause as deferred
+  item 2 but a materially worse consequence; must NOT be folded into it. Widget
+  tests missed it because they invoke onLongPress directly and never model the
+  arena race -- a fix should add a real timed-press test.
+  A1 IS ANSWERED and task 3 (extension README) is now unblocked: on **Comet
+  150.0.7871.115** a permission-widening reload of an UNPACKED extension is granted
+  **silently** -- no prompt, no disable, granted_permissions gained `bookmarks`
+  with disable_reasons []. Two caveats task 3 must honour: this is Comet, not
+  Chrome, and it is the unpacked/reload-arrow path only, NOT Web Store update
+  behaviour. Method note: the sheet's own four-step procedure was INSUFFICIENT --
+  a downgrade+reload clears active_permissions but NOT granted_permissions, so the
+  pre-state needs a full Remove + Load-unpacked or the measurement is a false pass.
+  Other findings: A3 measured 500 nodes / 37,845 B / getTree 4.57ms, and
+  **truncation is LIVE on the owner's real collection** (538 API-visible nodes vs
+  the 500-node cap, ~38 dropped every snapshot) -- MAX_BM_NODES, not
+  MAX_FRAME_BYTES, is the binding constraint (bytes would not bite until ~758
+  nodes). D-10 got a genuine field win: this profile numbers its roots
+  bookmark_bar=1, other=371, synced=372, and the folderType lookup still filed the
+  star correctly where a hardcoded id would have been at risk. Comet's getTree()
+  never returns the synced root at all, which is why Mobile bookmarks is absent
+  from the phone (correct, not a D-08 violation). New deferred item 3: truncation
+  copy is accurate but unintuitive. Anomaly A: one unreproduced partial unstar --
+  watch item; bm.unstar's silent per-node .catch() would hide a real intermittent
+  failure. Profile left dirty by the run (owner to delete in the bookmark manager):
+  `Search by name` id 587 in Bookmarks bar, empty `UAT8 test folder` id 588 in
+  Other bookmarks.
 
 Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 89 plans)
 
