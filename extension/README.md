@@ -1,13 +1,16 @@
 # Remote Control — Tab Bridge
 
-Browser extension that shows your PC browser's open tabs on the phone's
-Browser screen — tap a tab on the phone to switch to it, swipe or long-press
-to close it.
+Browser extension that shows your PC browser's open tabs AND its bookmark tree
+on the phone's Browser screen. Tap a tab on the phone to switch to it, swipe or
+long-press to close it; browse your bookmark folders, open a bookmark on the
+PC, and star or unstar the tab you are on. The extension feeds both lists to
+the Remote Control server on this PC and executes the tab and bookmark commands
+the phone sends back.
 
 **Privacy:** the extension talks ONLY to the Remote Control server running on
 the same PC (`ws://127.0.0.1:17779` — localhost). No data ever leaves the
-machine. It sends tab titles and favicons to your own server; full URLs never
-leave the machine.
+machine. It sends tab titles, favicons, and bookmark titles and ids to your own
+server; full URLs — of tabs and of bookmarks alike — never leave the machine.
 
 ## Install on Chrome
 
@@ -24,6 +27,42 @@ leave the machine.
 Identical steps via `edge://extensions` — the **Developer mode** toggle is at
 the **bottom-left** of that page. Chrome MV3 extensions load in Edge
 unmodified.
+
+## Permissions
+
+| Permission | Why it is needed |
+|------------|------------------|
+| `tabs` | Read the open tabs and switch or close them from the phone. This is what produces the "Read your browsing history" wording at load time. |
+| `tabGroups` | Show which group a tab belongs to, and its colour. |
+| `favicon` | Draw each tab's site icon on the phone. |
+| `alarms` | Wake the service worker so it reconnects after the server restarts. |
+| `bookmarks` | Show the bookmark tree on the phone, file a starred tab into the bookmarks bar, and remove a bookmark when you unstar. Only bookmark titles and ids are sent to your own server — never a bookmark URL. |
+
+## Updating the extension
+
+The extension is loaded **unpacked**, so an update is a file copy plus one
+click:
+
+1. Unzip the new release and copy its `extension` folder contents over the
+   folder you originally loaded from. Use the **same path** — an unpacked
+   extension's id is derived from its absolute folder path, so loading a second
+   copy from a new location registers a second, duplicate Tab Bridge.
+2. Press the **reload arrow** on the Tab Bridge card on `chrome://extensions`.
+
+That is the whole procedure even when the update adds a permission. Going from
+v1.1.0 (no bookmark access) to v1.2.0 (which adds `bookmarks`) in place, the
+extension stays enabled across the reload — no re-approval prompt, no warning
+banner, no greyed-out card — and the phone's Browser screen kept showing the
+tab list the whole time. No prompt appears because the extension is loaded
+unpacked rather than installed from a web store.
+
+(Measured on real hardware on 2026-07-30, not taken from documentation: the
+browser was **Comet 150.0.7871.115** — Perplexity's Chromium fork, *not*
+Chrome — with the Tab Bridge loaded unpacked. The card went straight from
+`1.1.0` to `1.2.0` and the browser's own permission record silently gained
+`bookmarks`. This is evidence about the unpacked / reload-arrow path only,
+which is how the Tab Bridge is distributed; web-store updates are documented
+to handle a permission increase differently, and that path was not measured.)
 
 ## Troubleshooting
 
@@ -63,3 +102,21 @@ worker" to open its console. Confirm:
 If any check fails, apply the RESEARCH fallback for that assumption
 (e.g. A2 fallback: add `host_permissions: ["ws://127.0.0.1/*"]` to
 `manifest.json`) and note it here.
+
+## Bookmark snapshot check (developer)
+
+Confirms the bookmark tree fits the wire budget on this profile. Read-only —
+it builds a frame and measures it, and sends nothing. Open the extension's
+service worker console and paste:
+
+```javascript
+buildBmSnapshot().then(s => console.log('nodes:', s.count, 'bytes:', bytesOf(s.frame)));
+```
+
+Expected: `nodes:` at or under **500** (`MAX_BM_NODES`) and `bytes:` under
+**57344** (`MAX_FRAME_BYTES` — the 56 KB per-frame cap). Counts and sizes
+only: like the shipped `[tab-bridge] bm snapshot sent:` log line, this prints
+nothing that identifies any individual bookmark.
+
+A collection bigger than the cap reports exactly 500 and the phone says so on
+screen — that is honest truncation, not an error.
