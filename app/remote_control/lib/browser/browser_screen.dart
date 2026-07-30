@@ -79,6 +79,7 @@ import '../net/connection_service.dart' show ChipStatus, ConnectionService;
 import '../settings/haptics.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
+import 'bookmark_confirm.dart';
 import 'bookmarks_section.dart';
 import 'bookmarks_store.dart';
 import 'browser_segment.dart';
@@ -448,6 +449,43 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
     hapticTick();
   }
 
+  /// Star tap on the tab row [tabId], carrying the state the row RENDERED.
+  ///
+  /// The two directions are deliberately asymmetric (D-11/D-12):
+  ///
+  /// - ADDING is instant. The glyph flips on the tap instant via the
+  ///   optimistic overlay and the haptic fires at that same instant, which is
+  ///   also the send instant. No dialog — adding a bookmark is not
+  ///   destructive and nothing is lost if the PC disagrees.
+  /// - REMOVING opens the confirm FIRST and changes nothing visually until it
+  ///   resolves true. WHY: `bm.unstar` deletes EVERY bookmark on the PC that
+  ///   points at that page — possibly a curated entry, filed in a folder the
+  ///   phone never showed — and it cannot be undone, so no single tap on a
+  ///   48x48 target beside a row that also activates on touch may destroy one
+  ///   (T-11-06). Cancel and a barrier dismissal both send nothing and leave
+  ///   the star filled.
+  ///
+  /// No toast either way: the `bm.*` family is fire-and-forget with no `err`
+  /// reply, so a success message would imply a confirmation the wire does not
+  /// carry.
+  Future<void> _onStarTab(int tabId, bool bookmarked) async {
+    if (!bookmarked) {
+      ref.read(tabsStateProvider.notifier).star(tabId);
+      hapticTick();
+      return;
+    }
+    final confirmed = await confirmDestructive(
+      context,
+      title: kBmUnstarTitle,
+      body: kBmUnstarBody,
+      confirmLabel: kBmUnstarConfirm,
+    );
+    // The dialog is an async gap — the screen may be gone by now.
+    if (!confirmed || !mounted) return;
+    ref.read(tabsStateProvider.notifier).unstar(tabId);
+    hapticTick();
+  }
+
   /// Segment tap: the haptic + the persisted selection. The bar itself owns
   /// no effect (see [BrowserSegmentBar]).
   void _onSelectSegment(BrowserSegment segment) {
@@ -570,12 +608,7 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
                           onActivate: _onActivateTab,
                           onClose: _onCloseTab,
                           bookmarkedFor: tabs.bookmarkedFor,
-                          // Rendering-only for now: the star/unstar handler
-                          // (instant add, confirm-gated remove) lands in the
-                          // next commit, and a no-op is the honest stub —
-                          // better than an unconfirmed destructive path
-                          // existing even briefly.
-                          onStar: (_, _) {},
+                          onStar: _onStarTab,
                         )
                       : BookmarksSection(
                           bookmarks: bookmarks,
