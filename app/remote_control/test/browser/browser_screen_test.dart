@@ -20,6 +20,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_protocol/remote_protocol.dart';
 
+import 'package:remote_control/browser/bookmark_confirm.dart';
 import 'package:remote_control/browser/browser_screen.dart';
 import 'package:remote_control/browser/browser_segment.dart';
 import 'package:remote_control/net/connection_providers.dart';
@@ -193,6 +194,19 @@ const TabsSnapshot _twoGroups = TabsSnapshot(
   ],
 );
 
+/// The D-11 tri-state star fixture: one bookmarked tab, one explicitly not
+/// bookmarked, and one whose state was never reported — `bookmarked: null`
+/// means UNKNOWN, which is a THIRD state and not a `false`.
+const TabsSnapshot _triStateTabs = TabsSnapshot(
+  connected: true,
+  tabs: [
+    TabInfo(id: 7, title: 'Starred', active: true, bookmarked: true),
+    TabInfo(id: 8, title: 'Plain', active: false, bookmarked: false),
+    TabInfo(id: 9, title: 'Unknown', active: false),
+  ],
+  groups: [],
+);
+
 /// Three Chrome roots (D-08). `Bookmarks bar` holds one subfolder plus twenty
 /// links, so the Bookmarks segment's scroll region is FAR taller than the
 /// two-tab list — which is exactly the height difference that would have moved
@@ -275,6 +289,30 @@ BoxDecoration _blockDecoration(WidgetTester t, String headerTitle) {
   );
   return container.decoration! as BoxDecoration;
 }
+
+/// One tab row, addressed by its title: the NEAREST [Material] ancestor of
+/// the title text is the row itself (the same idiom [_rowBorder] relies on).
+/// Scoping through this is what keeps a per-row star lookup from picking up a
+/// sibling row's star.
+Finder _rowOf(String title) =>
+    find.ancestor(of: find.text(title), matching: find.byType(Material)).first;
+
+/// The star [Icon] inside [title]'s row — `findsNothing` when the row renders
+/// no slot at all (the D-11 UNKNOWN case).
+Finder _star(String title) => find.descendant(
+      of: _rowOf(title),
+      matching: find.byIcon(Symbols.star_rounded),
+    );
+
+/// A [Semantics] widget inside [title]'s row carrying exactly [label] — the
+/// widget-level form, so the label can be pinned to a SPECIFIC row without
+/// enabling the semantics tree.
+Finder _rowSemantics(String title, String label) => find.descendant(
+      of: _rowOf(title),
+      matching: find.byWidgetPredicate(
+        (w) => w is Semantics && w.properties.label == label,
+      ),
+    );
 
 /// A tab row's corner radius: the nearest Material ancestor's shape radius
 /// (16 flat, 10 nested inside a group block — the concentric-radius rule).
@@ -1072,6 +1110,254 @@ void main() {
       expect(_popScope(canPop: true), findsOneWidget);
 
       await _unmount(t);
+    });
+  });
+
+  // -- Phase 11 (11-11): the trailing star slot on a tab row -----------------
+  //
+  // D-09 exists because the row's gesture budget was already spent, so the
+  // star had to be a nested BUTTON — and RESEARCH Pitfall 8 / assumption A6
+  // says that arena isolation must be pinned by OBSERVATION rather than by
+  // reasoning about `TapGestureRecognizer` deadlines. D-11 is the truthfulness
+  // rule (UNKNOWN renders nothing; removing is confirm-gated) and D-12 is the
+  // optimistic flip.
+
+  group('tab row star (11-11)', () {
+    testWidgets(
+        'D-11 tri-state: filled+accent when bookmarked, outline+muted when '
+        'not, and NO slot at all when unknown', (t) async {
+      // Disposed inside the body: the framework verifies semantics handles
+      // BEFORE tearDowns run (the bookmarks_section_test discipline).
+      final handle = t.ensureSemantics();
+      final service = _FakeService()..parked = _triStateTabs;
+      await _pumpScreen(t, service);
+
+      final starred = t.widget<Icon>(_star('Starred'));
+      expect(starred.fill, 1, reason: 'the FILL axis IS the state signal');
+      expect(starred.color, kAccent);
+
+      final plain = t.widget<Icon>(_star('Plain'));
+      expect(plain.fill, 0);
+      expect(plain.color, kMuted);
+
+      // The UNKNOWN row renders neither a glyph nor an accessibility node —
+      // an empty star on a tab whose bookmark state could not be read would
+      // be a false negative (T-11-01).
+      expect(_star('Unknown'), findsNothing);
+      expect(_rowSemantics('Unknown', kStarSemantic), findsNothing);
+      expect(_rowSemantics('Unknown', kUnstarSemantic), findsNothing);
+      expect(find.byIcon(Symbols.star_rounded), findsNWidgets(2),
+          reason: 'exactly two of the three rows may carry a star');
+
+      // Never the destructive red, in any rendered state.
+      for (final title in ['Starred', 'Plain']) {
+        expect(t.widget<Icon>(_star(title)).color, isNot(kError));
+      }
+
+      await _unmount(t);
+      handle.dispose();
+    });
+
+    testWidgets(
+        'A6/Pitfall 8: a star tap sends exactly one bm.star and ZERO '
+        'tabs.activate', (t) async {
+      final service = _FakeService()..parked = _triStateTabs;
+      await _pumpScreen(t, service);
+
+      await t.tap(_star('Plain'));
+      await t.pump(const Duration(milliseconds: 150)); // flush any flash
+
+      final stars = service.reliable.whereType<BmStarMsg>().toList();
+      expect(stars, hasLength(1));
+      expect(stars.single.tabId, 8);
+      expect(
+        service.reliable.whereType<TabsActivateMsg>(),
+        isEmpty,
+        reason: 'the nested star recognizer must win the arena — this is an '
+            'observation, not an inference about tap deadlines',
+      );
+      expect(service.reliable.whereType<TabsCloseMsg>(), isEmpty);
+      expect(service.reliable.whereType<BmUnstarMsg>(), isEmpty);
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'gated: the star keeps its geometry and its label, renders kMuted '
+        '(never kError), and sends nothing', (t) async {
+      final handle = t.ensureSemantics();
+
+      // Reference geometry from the CONNECTED state, same fixture and same
+      // surface size — so an equal rect afterwards means the layout truly did
+      // not shift between the two states.
+      final live = _FakeService()..parked = _triStateTabs;
+      await _pumpScreen(t, live);
+      final liveStarRect = t.getRect(_star('Starred'));
+      final liveRowRect = t.getRect(_rowOf('Starred'));
+      await _unmount(t);
+
+      final service = _FakeService(chip: ChipStatus.disconnected)
+        ..parked = _triStateTabs;
+      await _pumpScreen(t, service);
+
+      expect(t.getRect(_star('Starred')), liveStarRect,
+          reason: 'the gated slot occupies the same box');
+      expect(t.getRect(_rowOf('Starred')), liveRowRect,
+          reason: 'and the row around it does not move either');
+
+      final gatedStar = t.widget<Icon>(_star('Starred'));
+      expect(gatedStar.color, kMuted, reason: 'gated is muted, never red');
+      expect(gatedStar.color, isNot(kError));
+      expect(gatedStar.fill, 1,
+          reason: 'a gated star still tells the truth about the state');
+      expect(t.widget<Icon>(_star('Plain')).color, kMuted);
+
+      // The label is KEPT — Flutter marks the node disabled via the null
+      // callback, so the control reads as disabled rather than absent.
+      expect(_rowSemantics('Starred', kUnstarSemantic), findsOneWidget);
+      expect(_rowSemantics('Plain', kStarSemantic), findsOneWidget);
+      expect(find.bySemanticsLabel(kUnstarSemantic), findsOneWidget);
+
+      await t.tap(_star('Starred'), warnIfMissed: false);
+      await t.pump();
+      await t.tap(_star('Plain'), warnIfMissed: false);
+      await t.pump();
+
+      expect(service.reliable.whereType<BmStarMsg>(), isEmpty);
+      expect(service.reliable.whereType<BmUnstarMsg>(), isEmpty);
+      expect(find.text(kBmUnstarTitle), findsNothing,
+          reason: 'a gated star cannot even open the confirm');
+      expect(service.reliable.whereType<TabsActivateMsg>(), isEmpty);
+
+      await _unmount(t);
+      handle.dispose();
+    });
+
+    testWidgets(
+        'T-11-06: unstar is confirm-gated — the tap alone sends nothing, '
+        'Cancel keeps the star filled, Remove sends exactly one bm.unstar',
+        (t) async {
+      final service = _FakeService()..parked = _triStateTabs;
+      await _pumpScreen(t, service);
+
+      await t.tap(_star('Starred'));
+      await t.pumpAndSettle();
+
+      expect(find.text(kBmUnstarTitle), findsOneWidget);
+      expect(find.text(kBmUnstarBody), findsOneWidget,
+          reason: 'the body must state the blast radius plainly');
+      expect(service.reliable.whereType<BmUnstarMsg>(), isEmpty,
+          reason: 'the dialog opens and NOTHING has been sent yet');
+
+      await t.tap(find.text(kBmConfirmCancel));
+      await t.pumpAndSettle();
+
+      expect(service.reliable.whereType<BmUnstarMsg>(), isEmpty);
+      final afterCancel = t.widget<Icon>(_star('Starred'));
+      expect(afterCancel.fill, 1, reason: 'cancel changes nothing');
+      expect(afterCancel.color, kAccent);
+
+      // Second attempt, confirmed this time.
+      await t.tap(_star('Starred'));
+      await t.pumpAndSettle();
+      await t.tap(find.text(kBmUnstarConfirm));
+      await t.pumpAndSettle();
+
+      final unstars = service.reliable.whereType<BmUnstarMsg>().toList();
+      expect(unstars, hasLength(1));
+      expect(unstars.single.tabId, 7);
+      expect(service.reliable.whereType<TabsActivateMsg>(), isEmpty,
+          reason: 'neither the star tap nor the dialog may activate the tab');
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'D-12: the optimistic flip is visible in the next frame with no new '
+        'snapshot, and the semantic label flips with it', (t) async {
+      final handle = t.ensureSemantics();
+      final service = _FakeService()..parked = _triStateTabs;
+      await _pumpScreen(t, service);
+
+      expect(t.widget<Icon>(_star('Plain')).fill, 0);
+      expect(_rowSemantics('Plain', kStarSemantic), findsOneWidget);
+
+      await t.tap(_star('Plain'));
+      await t.pump(); // ONE frame — no authoritative snapshot delivered
+
+      final flipped = t.widget<Icon>(_star('Plain'));
+      expect(flipped.fill, 1, reason: 'the flip must read as immediate (0 ms)');
+      expect(flipped.color, kAccent);
+      expect(
+        _rowSemantics('Plain', kUnstarSemantic),
+        findsOneWidget,
+        reason: 'the label is the only channel a screen reader has for the '
+            'state, so it must flip too',
+      );
+      expect(_rowSemantics('Plain', kStarSemantic), findsNothing);
+      expect(find.bySemanticsLabel(kUnstarSemantic), findsNWidgets(2));
+      expect(find.bySemanticsLabel(kStarSemantic), findsNothing);
+      expect(service.parked, same(_triStateTabs),
+          reason: 'the flip came from the overlay, not from the PC');
+
+      // The row untouched by the tap is unaffected.
+      expect(t.widget<Icon>(_star('Starred')).fill, 1);
+      expect(_star('Unknown'), findsNothing);
+
+      await t.pump(const Duration(milliseconds: 150));
+      await _unmount(t);
+      handle.dispose();
+    });
+
+    testWidgets(
+        'the star labels are pinned to the right rows and announce WHICH '
+        'state the star is in', (t) async {
+      final handle = t.ensureSemantics();
+      final service = _FakeService()..parked = _triStateTabs;
+      await _pumpScreen(t, service);
+
+      expect(_rowSemantics('Starred', kUnstarSemantic), findsOneWidget);
+      expect(_rowSemantics('Starred', kStarSemantic), findsNothing);
+      expect(_rowSemantics('Plain', kStarSemantic), findsOneWidget);
+      expect(_rowSemantics('Plain', kUnstarSemantic), findsNothing);
+
+      expect(find.bySemanticsLabel(kStarSemantic), findsOneWidget);
+      expect(find.bySemanticsLabel(kUnstarSemantic), findsOneWidget);
+
+      await _unmount(t);
+      handle.dispose();
+    });
+
+    testWidgets(
+        'regression: an UNKNOWN-state row carries no star and its tap-down / '
+        'long-press / swipe behave exactly as before the phase', (t) async {
+      final handle = t.ensureSemantics();
+      // Every tab in _twoTabs omits `bookmarked` — i.e. null throughout.
+      final service = _FakeService()..parked = _twoTabs;
+      await _pumpScreen(t, service);
+
+      expect(find.byIcon(Symbols.star_rounded), findsNothing);
+      expect(find.bySemanticsLabel(kStarSemantic), findsNothing);
+      expect(find.bySemanticsLabel(kUnstarSemantic), findsNothing);
+
+      await t.tap(find.text('Docs'));
+      await t.pump(const Duration(milliseconds: 150));
+      await t.longPress(find.text('GitHub'));
+      await t.pump(const Duration(milliseconds: 150));
+      await t.drag(find.text('Docs'), const Offset(500, 0));
+      await t.pumpAndSettle();
+
+      expect(service.reliable.whereType<TabsActivateMsg>().map((m) => m.id),
+          contains(9));
+      final closed =
+          service.reliable.whereType<TabsCloseMsg>().map((m) => m.id).toList();
+      expect(closed, contains(7), reason: 'long-press still closes');
+      expect(closed, contains(9), reason: 'swipe still closes');
+      expect(service.reliable.whereType<BmStarMsg>(), isEmpty);
+      expect(service.reliable.whereType<BmUnstarMsg>(), isEmpty);
+
+      await _unmount(t);
+      handle.dispose();
     });
   });
 }
