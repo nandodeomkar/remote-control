@@ -4,7 +4,13 @@ Recording sheet for the eleven-step on-device UAT (plan `11-12`, task 2). Every 
 non-empty **Observed** column before the phase can close — **an unrecorded outcome is a FAIL even
 when nothing visibly broke**. Do not mark a row PASS without an observation written beside it.
 
-## Verdict — 10 PASS / 1 FAIL. Phase 11 is NOT clear to close.
+## Verdict — 11 PASS / 0 FAIL.
+
+UAT-8 originally FAILED (Failure B). Plan 11-13 fixed it and the re-run on 2026-07-31 passed all six
+checks — see "Re-run (plan 11-13)" at the end of this file. Everything below the verdict table is the
+original 2026-07-30 run, preserved verbatim including the original failure.
+
+## Original run verdict — 10 PASS / 1 FAIL (2026-07-30)
 
 Run completed on real hardware 2026-07-30. All eleven rows carry an observation.
 
@@ -17,12 +23,12 @@ Run completed on real hardware 2026-07-30. All eleven rows carry an observation.
 | UAT-5 | PASS | Star filed into Bookmarks bar on a profile with **non-standard root ids** (`other=371`) — a real D-10 win. |
 | UAT-6 | PASS | Both copies of a duplicated URL removed, behind the confirm. An earlier uncontrolled attempt anomaly did not reproduce (Anomaly A). |
 | UAT-7 | PASS | Star fills instantly, no flicker when the push lands. |
-| **UAT-8** | **FAIL** | **Long-press delete is unreachable on folders; on links it forces an unwanted open. See Failure B.** |
+| UAT-8 | **PASS (re-run)** | Originally FAILED. Fixed by plan 11-13 and re-verified on device 2026-07-31 — checks B1–B6 all pass, deletions confirmed against the profile. See "Re-run (plan 11-13)" below. |
 | UAT-9 | PASS | Both segments flip to the install hint; extension leg dropped while the phone leg stayed up. |
 | UAT-10 | PASS | Paused input blocks the open but not the list — actuation gated, observation intact. |
 | UAT-11 | PASS | Full regression clean; macro grid rect held across segment switches. |
 
-**Blocking item:** Failure B (UAT-8). D-14's empty-folder delete cannot be invoked by any gesture, and reaching a link's delete forces the link to open. Needs its own plan; not fixable from inside 11-12.
+**Blocking item at the time (NOW RESOLVED — see the re-run):** Failure B (UAT-8). D-14's empty-folder delete could not be invoked by any gesture, and reaching a link's delete forced the link to open. Fixed by plan 11-13.
 
 **Non-blocking items raised:** deferred item 3 (truncation copy is accurate but unintuitive — now permanent on-screen state for this profile), and Anomaly A (unreproduced partial unstar; watch item, with a note that `bm.unstar`'s silent `.catch(() => {})` would hide a genuine intermittent failure).
 
@@ -202,4 +208,74 @@ onLongPress: deletable ? _confirmDelete : null,
 
 ### Other failures
 
-_(UAT-1 through UAT-7 all PASS; UAT-8 FAIL as above. Record any further failure verbatim; do not patch source from inside plan 11-12)_
+_(UAT-1 through UAT-7 all PASS; UAT-8 FAILED as above and was fixed by plan 11-13 — see the re-run below. Record any further failure verbatim; do not patch source from inside plan 11-12)_
+
+---
+
+# Re-run (plan 11-13) — UAT-8 only. 2026-07-31. **PASS.**
+
+Plan 11-13 task 4. Re-verifies ONLY the row that failed; UAT-1…UAT-7 and UAT-9…UAT-11 are not re-run.
+
+## Environment
+
+| Field | Value |
+|-------|-------|
+| Date | 2026-07-31, ~08:50–09:10 IST |
+| Browser | **Comet 150.0.7871.115** (Official Build) (64-bit), Perplexity build 230 |
+| Extension | Tab Bridge v1.2.0, id `ekmedhfioelkaaegoanhpeageahjaeng`, `granted_permissions` includes `bookmarks`, `disable_reasons: []`, reconnected on `127.0.0.1:17779` |
+| Server exe | **The repo exe** `server\target\release\server-windows.exe` (md5 `cb95d14f…`), PID 26940 — NOT the stale installed `RemoteControl.exe` |
+| APK | **1.4.0+7, built 2026-07-31 08:47**, md5 `3f58e7506610b8e83e31da4f4ccf90a4`. Version string is IDENTICAL to the 2026-07-30 run's APK, so the build time and md5 are what distinguish them. |
+| Phone | Xiaomi 25080RABDI (`5dqwzpdqemsc6xpb`), installed 2026-07-31 08:53:27, link `192.168.29.18` → `:17777` |
+| Code under test | `a5cd678` (fix) + `adb8413` (tests) + `7723602` (spec), on `master` |
+
+**Fixture setup, verified by the orchestrator before B1 ran.** Created in `Other bookmarks` (id `371`):
+folder `UAT8 test folder` (id `586`) holding one child `UAT8 child` (id `587`), plus a standalone
+`UAT8 plain bookmark` (id `588`). **The creation snippet ran twice**, producing a duplicate set
+(`583`/`584`/`585`) with byte-identical titles; that would have made the phone show two rows reading
+`UAT8 test folder` and rendered B2's "the folder disappears" check unreadable. The duplicates were
+deleted and the fixture re-verified as exactly two children before B1 — the same
+verify-the-pre-state discipline that resolved the UAT-6 ambiguity in the original run.
+
+## Results
+
+| # | Check | Observed | PASS / FAIL |
+|---|-------|----------|-------------|
+| **B1** | Non-empty folder — the D-14 gate, and the one behaviour that legitimately CHANGED | Held `UAT8 test folder` (count 1) a full second and released. **No confirm dialog at any point**, and the folder **drilled in on release**. Both parts as specified: part (ii) is the documented, intended consequence of moving the action to `onTap` — a non-deletable row registers no `LongPressGestureRecognizer`, so the tap recognizer is unopposed and fires on pointer-up however long the hold. The D-14 gate withheld the DELETE, never the navigation. | PASS |
+| **B2** | **Empty folder — the originally-blocking case** | Deleted `UAT8 child` from the phone (long-press → Delete), bringing the folder to count 0. Long-pressed `UAT8 test folder`: **`Delete this folder?` appeared and the folder was NOT entered.** Pressed Delete; the folder disappeared from the list. **This is the exact gesture that was unreachable before the fix.** | PASS |
+| **B3** | Link — the force-open case | Long-pressed `UAT8 plain bookmark`: **`Delete this bookmark?` appeared with NO new tab opened.** Cancel left the bookmark intact and still opened nothing. Repeat + Delete removed the bookmark, **still with no new tab**. | PASS |
+| **B4** | Normal path + haptic timing | Quick-tap drills into a folder and pops back out; quick-tap on a bookmark opens a PC tab while the phone stays on the Bookmarks segment in the same folder (D-04). Haptic judged NOT laggy — the release-instant tick did not read as delayed against a tab row tapped back to back, so the `hapticTick()`-into-`_flash()` remedy is NOT needed. **Press-flash observation recorded separately below.** | PASS |
+| **B5** | Hint copy | The muted line reads `Long-press a bookmark or empty folder to delete it.` | PASS |
+| **B6** | Tab-row regression (the scope fence) | Tab activate, long-press close and swipe close all behave exactly as before — consistent with `browser_screen.dart` having a zero-line diff. | PASS |
+
+**Deletions verified against the browser, not just the phone.** After B2 and B3 the profile's
+`Bookmarks` file showed `Other bookmarks` at **0 children** and **zero `UAT8` remnants anywhere in
+the tree** (file written 15 s earlier). So the folder and the bookmark really were removed in Comet,
+not merely dropped from the phone's rendering — the same cross-check that exposed the UAT-6
+ambiguity.
+
+## Press-flash observation from B4 (not a defect, not caused by 11-13)
+
+Owner reported: *"no flash on links. No flash on drill out. One very fast flash on drilling just one
+level into the bookmarks bar."* All three are explained and none is a regression:
+
+1. **No flash on drill-out — by design.** The folder-bar back control is a separate `InkWell` in
+   `_folderBar()` with `onTap: onBack` and **zero `_pressed` references**; it has never had a press
+   flash, before or after this plan.
+2. **No perceptible flash on link rows — unchanged by this plan.** The flash fires from `onTapDown`
+   both before and after. On a quick tap the tap recognizer wins the arena at pointer-UP, so
+   `onTapDown` and `onTap` fire in the same frame either way; pre-fix `_fire()` performed the action
+   and then `setState(_pressed = true)` from that same callback. The trigger point is byte-identical,
+   so link rows flash exactly as they always did — 100 ms (~6 frames) with nothing else changing
+   on the phone to draw the eye. Logged as **deferred item 4**.
+3. **The folder flash is newly visible — this is the fix ADDING feedback.** Holding a folder past
+   100 ms now fires `onTapDown` at the deadline while the row stays put, so the flash is seen before
+   release. Pre-fix the drill-in fired at that same instant and destroyed the row, so the folder
+   flash was effectively invisible. An improvement, not a defect.
+
+## Verdict
+
+**UAT-8 PASS.** D-14's empty-folder delete is reachable by a real gesture on real hardware (B2), and
+reaching a link's delete no longer force-opens it (B3). Phase 11's blocking item is closed.
+
+Profile left clean by this re-run: every `UAT8` fixture was consumed by B2/B3. The 2026-07-30 run's
+leftovers were cleaned by the owner beforehand.

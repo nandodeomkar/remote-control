@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 11
-stopped_at: 11-13 tasks 1-3 COMPLETE (code + tests + spec); PAUSED at task 4 on-device UAT-8 re-run checkpoint
-last_updated: "2026-07-30T19:40:00.000Z"
-last_activity: 2026-07-30 -- 11-12 CLOSED (task 3 README); 11-13 Failure B fix landed, 608 flutter green, awaiting owner UAT-8 re-run
+stopped_at: 11-13 COMPLETE (4/4, UAT-8 re-run PASSED on device); all 13 plans done; phase 11 ready for verification
+last_updated: "2026-07-31T03:45:00.000Z"
+last_activity: 2026-07-31 -- 11-13 task 4 UAT-8 re-run PASSED (B1-B6); Failure B closed; phase 11 blocking item resolved
 progress:
   total_phases: 11
   completed_phases: 10
@@ -103,7 +103,27 @@ Next: wave 7 is 11-12 — the phase's docs + UAT plan (SPEC/README prose and the
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-30 (evening) -- 11-12 CLOSED and 11-13 tasks 1-3 LANDED.
+Last activity: 2026-07-31 -- 11-13 COMPLETE (4/4). **UAT-8 RE-RUN PASSED ON DEVICE**
+  (B1-B6), so Failure B is closed and phase 11's blocking item is resolved. All 13
+  plans now have SUMMARY files. B2 proved the originally-unreachable gesture: a
+  long-press on an EMPTY folder surfaced `Delete this folder?` WITHOUT navigating
+  into it, and Delete removed it. B3 proved a link's delete no longer force-opens
+  the bookmark. Both deletions were cross-checked against the profile's Bookmarks
+  file (0 UAT8 remnants anywhere), not just the phone's rendering. B1 behaved as
+  the amended checklist predicted: no dialog, drill-in ON RELEASE, which is
+  correct. B4 haptic judged NOT laggy, so the pre-authorised
+  hapticTick()-into-_flash() remedy is NOT needed. B6 confirmed the tab-row scope
+  fence held. Fixture note: the setup snippet ran TWICE and produced duplicate
+  same-titled rows; caught by verifying the profile before B1, which would
+  otherwise have made B2 unreadable. NEW deferred item 4: the 100ms press flash is
+  imperceptible on LINK rows -- verified NOT caused by 11-13 (the flash fires from
+  onTapDown before and after, and on a quick tap both callbacks land in the same
+  frame either way), pre-existing and surfaced only because B4 asked the owner to
+  look closely at press feedback. The FOLDER flash became newly visible, an
+  improvement. NEXT: phase 11 has no incomplete plans -- run phase verification
+  (gsd-verifier -> 11-VERIFICATION.md) before closing the phase. Deferred items 2
+  and 3 remain OUT of scope by owner decision.
+  PREVIOUS -- 11-12 CLOSED and 11-13 tasks 1-3 LANDED.
   11-12 task 3 wrote extension/README.md from the observed A1 outcome (`333c820`),
   SUMMARY `715280c`. Plan 11-13 then fixed Failure B:
   `a5cd678` splits `_BmRowState._fire()` into `_flash()` (onTapDown, visual only)
