@@ -33,6 +33,9 @@ impl MouseKeys for EnigoMouseKeys {
     fn scroll(&self, dx: f32, dy: f32) {
         let _ = self.tx.send(Cmd::Scroll(dx, dy));
     }
+    fn zoom(&self, dx: f32, dy: f32) {
+        let _ = self.tx.send(Cmd::Zoom(dx, dy));
+    }
     fn click(&self, button: Button) {
         let _ = self.tx.send(Cmd::Click(button));
     }

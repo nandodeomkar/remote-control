@@ -79,14 +79,26 @@ void main() {
         }
 
         final frame = decodeMouseFrame(bytes);
-        final expectedOp = expected['op'] == 'move' ? opMove : opScroll;
+        // Three-way, NO silent fallback: the old two-way ternary decoded any
+        // non-'move' fixture as a scroll, so a zoom fixture would have passed
+        // while proving nothing (quick 260731-euq).
+        final opName = expected['op'] as String;
+        final expectedOp = switch (opName) {
+          'move' => opMove,
+          'scroll' => opScroll,
+          'zoom' => opZoom,
+          _ => fail('$name: unknown fixture op "$opName"'),
+        };
         expect(frame.op, expectedOp, reason: '$name: op mismatch');
         expect(frame.dx, f32(expected['dx'] as num), reason: '$name: dx mismatch');
         expect(frame.dy, f32(expected['dy'] as num), reason: '$name: dy mismatch');
 
-        final reencoded = frame.op == opMove
-            ? encodeMove(frame.dx, frame.dy)
-            : encodeScroll(frame.dx, frame.dy);
+        final reencoded = switch (frame.op) {
+          opMove => encodeMove(frame.dx, frame.dy),
+          opScroll => encodeScroll(frame.dx, frame.dy),
+          opZoom => encodeZoom(frame.dx, frame.dy),
+          _ => fail('$name: unknown decoded op 0x${frame.op.toRadixString(16)}'),
+        };
         expect(
           hexEncode(reencoded),
           wireHex,

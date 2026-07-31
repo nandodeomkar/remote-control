@@ -19,6 +19,7 @@ use super::{
 pub enum Call {
     MoveRel(f32, f32),
     Scroll(f32, f32),
+    Zoom(f32, f32),
     Click(Button),
     ButtonDown(Button),
     ButtonUp(Button),
@@ -133,6 +134,9 @@ impl MouseKeys for MockExecutors {
     }
     fn scroll(&self, dx: f32, dy: f32) {
         self.log.record(Call::Scroll(dx, dy));
+    }
+    fn zoom(&self, dx: f32, dy: f32) {
+        self.log.record(Call::Zoom(dx, dy));
     }
     fn click(&self, button: Button) {
         self.log.record(Call::Click(button));

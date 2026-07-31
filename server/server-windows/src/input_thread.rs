@@ -47,6 +47,10 @@ pub enum Cmd {
     Move(f32, f32),
     /// Scroll in fractional wheel units (dx = horizontal, dy = vertical).
     Scroll(f32, f32),
+    /// Zoom in fractional wheel units with Ctrl held (pinch-to-zoom, SPEC §9
+    /// opcode `0x03`). Only `dy` carries the delta; `dx` is reserved and
+    /// ignored.
+    Zoom(f32, f32),
     /// Single click of a mouse button (PAD-02).
     Click(Button),
     /// Press-and-hold a mouse button (drag start, PAD-04).
@@ -387,6 +391,10 @@ pub fn run_input_thread(rx: std::sync::mpsc::Receiver<Cmd>, blocked_tx: tokio::s
     };
     let mut move_acc = SubPixelAccumulator::new();
     let mut scroll_acc = SubPixelAccumulator::new();
+    // Zoom carries its OWN accumulator: sharing scroll_acc would let a pinch
+    // consume the fractional remainder of an in-progress scroll (and vice
+    // versa), so a pinch after a slow scroll would jump.
+    let mut zoom_acc = SubPixelAccumulator::new();
     let mut uipi_last_check = std::time::Instant::now() - UIPI_CHECK_INTERVAL;
     let mut uipi_was_blocked = false;
     while let Ok(cmd) = rx.recv() {
@@ -416,6 +424,24 @@ pub fn run_input_thread(rx: std::sync::mpsc::Receiver<Cmd>, blocked_tx: tokio::s
                 }
                 if sx != 0 {
                     let _ = enigo.scroll(sx, Axis::Horizontal);
+                }
+            }
+            Cmd::Zoom(_, dy) => {
+                // dx is reserved on 0x03 (SPEC §9) — only the vertical axis
+                // carries the zoom delta, so the accumulator is stepped with
+                // a zero x and only sy is consumed.
+                let (_, sy) = zoom_acc.step(0.0, dy);
+                if sy != 0 {
+                    // Ctrl is pressed and released INSIDE this arm: the input
+                    // thread is single-threaded, so no other Cmd can
+                    // interleave between the press and the release, and a
+                    // session that dies mid-pinch can never leave Ctrl stuck
+                    // down. That is precisely why the client needs no Ctrl
+                    // state machine and why CONN-07 release_all owes this
+                    // path nothing.
+                    let _ = enigo.key(Key::Control, Direction::Press);
+                    let _ = enigo.scroll(sy, Axis::Vertical);
+                    let _ = enigo.key(Key::Control, Direction::Release);
                 }
             }
             // Every arm below follows the non-fatal-drop rule (T-04-01):
@@ -521,6 +547,30 @@ mod tests {
             emitted.iter().sum::<i32>(),
             2,
             "5 frames of 0.4px must sum to 2 integer pixels (no lost fraction)"
+        );
+    }
+
+    /// The zoom arm's accumulator is a THIRD instance, independent of the
+    /// scroll one: interleaving sub-integer steps must not let either
+    /// consume the other's carried remainder (a pinch after a slow scroll
+    /// would otherwise jump).
+    #[test]
+    fn zoom_accumulator_is_independent_of_scroll() {
+        let mut zoom_acc = SubPixelAccumulator::new();
+        let mut scroll_acc = SubPixelAccumulator::new();
+
+        // Interleave the same sub-integer delta on both.
+        let zoom: Vec<i32> = (0..3).map(|_| zoom_acc.step(0.0, 0.4).1).collect();
+        let scroll: Vec<i32> = (0..3).map(|_| scroll_acc.step(0.0, 0.4).1).collect();
+        assert_eq!(zoom, vec![0, 0, 1], "zoom accumulates on its own remainder");
+        assert_eq!(scroll, zoom, "an independent accumulator emits the same sequence");
+
+        // Driving one further must leave the other's carried fraction alone.
+        let _ = zoom_acc.step(0.0, 5.0);
+        assert_eq!(
+            scroll_acc.step(0.0, 0.4).1,
+            0,
+            "scroll's remainder survived a large zoom step untouched"
         );
     }
 

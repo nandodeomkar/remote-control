@@ -62,7 +62,7 @@ use crate::executors::{BookmarksState, Executors, TabsState, WindowInfo};
 /// view, open, star/unstar and remove, fed by the localhost extension leg
 /// (SPEC §15) — plus the optional tri-state `TabInfo.bookmarked` flag;
 /// minor bump, so 1.0–1.5 clients remain accepted (§2).
-pub const SERVER_PROTO_VERSION: &str = "1.6";
+pub const SERVER_PROTO_VERSION: &str = "1.7";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
 /// POST-auth liveness deadline: an Authed session receiving NO inbound

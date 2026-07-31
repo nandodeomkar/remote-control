@@ -11,6 +11,12 @@ use crate::error::CodecError;
 pub const OP_MOVE: u8 = 0x01;
 /// Opcode for a relative scroll frame.
 pub const OP_SCROLL: u8 = 0x02;
+/// Opcode for a pinch-to-zoom frame (protoVersion 1.7).
+///
+/// `dy` is the zoom delta in wheel units (positive zooms in); `dx` is
+/// RESERVED — carried through the codec unchanged so round-trips stay
+/// byte-exact, but ignored by the executor.
+pub const OP_ZOOM: u8 = 0x03;
 
 /// A decoded 9-byte binary mouse frame.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -19,14 +25,17 @@ pub enum MouseFrame {
     Move { dx: f32, dy: f32 },
     /// Relative scroll delta (opcode 0x02).
     Scroll { dx: f32, dy: f32 },
+    /// Pinch-to-zoom delta (opcode 0x03): `dy` carries the zoom in wheel
+    /// units, `dx` is reserved (see [`OP_ZOOM`]).
+    Zoom { dx: f32, dy: f32 },
 }
 
 /// Strictly decode a binary frame (SPEC §9).
 ///
 /// Errors: [`CodecError::BadLength`] if `buf.len() != 9`,
 /// [`CodecError::UnknownOpcode`] for any opcode other than
-/// [`OP_MOVE`]/[`OP_SCROLL`], [`CodecError::NonFinite`] if `dx` or `dy` is
-/// NaN or ±Inf.
+/// [`OP_MOVE`]/[`OP_SCROLL`]/[`OP_ZOOM`], [`CodecError::NonFinite`] if `dx`
+/// or `dy` is NaN or ±Inf.
 pub fn decode(buf: &[u8]) -> Result<MouseFrame, CodecError> {
     // 1. Length check FIRST — everything below indexes into buf[0..9].
     if buf.len() != 9 {
@@ -48,6 +57,7 @@ pub fn decode(buf: &[u8]) -> Result<MouseFrame, CodecError> {
     match buf[0] {
         OP_MOVE => Ok(MouseFrame::Move { dx, dy }),
         OP_SCROLL => Ok(MouseFrame::Scroll { dx, dy }),
+        OP_ZOOM => Ok(MouseFrame::Zoom { dx, dy }),
         op => Err(CodecError::UnknownOpcode(op)),
     }
 }
@@ -60,6 +70,7 @@ pub fn encode(frame: &MouseFrame) -> [u8; 9] {
     let (op, dx, dy) = match *frame {
         MouseFrame::Move { dx, dy } => (OP_MOVE, dx, dy),
         MouseFrame::Scroll { dx, dy } => (OP_SCROLL, dx, dy),
+        MouseFrame::Zoom { dx, dy } => (OP_ZOOM, dx, dy),
     };
     let mut out = [0u8; 9];
     out[0] = op;
@@ -91,6 +102,28 @@ mod tests {
     fn decode_scroll_exact() {
         let b = frame_bytes(OP_SCROLL, 0.0, -1.5);
         assert_eq!(decode(&b).unwrap(), MouseFrame::Scroll { dx: 0.0, dy: -1.5 });
+    }
+
+    #[test]
+    fn decode_zoom_exact() {
+        // protoVersion 1.7: dx is reserved and MUST survive decode unchanged
+        // (the executor ignores it, the codec does not).
+        let b = frame_bytes(OP_ZOOM, 0.0, 1.5);
+        assert_eq!(decode(&b).unwrap(), MouseFrame::Zoom { dx: 0.0, dy: 1.5 });
+    }
+
+    #[test]
+    fn round_trip_zoom() {
+        let b = frame_bytes(OP_ZOOM, 0.0, -0.5);
+        let frame = decode(&b).unwrap();
+        assert_eq!(encode(&frame), b);
+    }
+
+    #[test]
+    fn rejects_unknown_opcode_still() {
+        // The known set grew by exactly one: 0x03 is now valid, 0x04 is not.
+        let b = frame_bytes(0x04, 1.0, 0.0);
+        assert_eq!(decode(&b), Err(CodecError::UnknownOpcode(0x04)));
     }
 
     #[test]

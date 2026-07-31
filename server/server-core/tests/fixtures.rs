@@ -71,6 +71,7 @@ fn codec_fixtures_mouse_binary() {
         let (op, dx, dy) = match frame {
             binary::MouseFrame::Move { dx, dy } => ("move", dx, dy),
             binary::MouseFrame::Scroll { dx, dy } => ("scroll", dx, dy),
+            binary::MouseFrame::Zoom { dx, dy } => ("zoom", dx, dy),
         };
         assert_eq!(op, expect["op"].as_str().unwrap(), "{name}: op mismatch");
         // Fixture floats are f32-exact by construction: EXACT equality,

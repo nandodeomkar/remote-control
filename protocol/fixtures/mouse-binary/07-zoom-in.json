@@ -1,0 +1,10 @@
+{
+  "name": "zoom-in",
+  "description": "Zoom frame, positive delta (protoVersion 1.7): opcode 0x03, dx 0.0 (reserved, executor-ignored), dy 1.5 = zoom IN (f32-exact; LE bytes via .NET BitConverter).",
+  "wire": "03000000000000c03f",
+  "expect": {
+    "op": "zoom",
+    "dx": 0.0,
+    "dy": 1.5
+  }
+}

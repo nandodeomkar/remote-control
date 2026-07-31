@@ -1,6 +1,6 @@
 # Remote Control Wire Protocol — SPEC
 
-**protoVersion:** `"1.6"`
+**protoVersion:** `"1.7"`
 **Status:** Locked contract. Both codecs (Rust `server-core`, Dart `remote_protocol`) are written against this document and proven byte-identical by the golden fixtures in `protocol/fixtures/`. No codec may adjust a fixture to match its own output.
 
 Transport: a single WebSocket connection per session carrying two frame kinds — JSON text frames (everything) and 9-byte binary frames (mouse hot path only). Discovery is UDP broadcast (out of scope for this document; see design spec §4).
@@ -29,7 +29,7 @@ Every JSON text frame is an object of the shape:
 
 ## 2. Versioning (D-06)
 
-- `protoVersion` is a `"major.minor"` string. Current version: `"1.6"`.
+- `protoVersion` is a `"major.minor"` string. Current version: `"1.7"`.
 - `hello` carries `protoVersion`. The server parses only the **major** component.
 - **Major mismatch:** the server replies `err` with `code:"versionMismatch"` and payload fields `serverVersion` and `clientVersion` (both `"major.minor"` strings), then closes the connection.
 - **Minor mismatch:** accepted. Peers simply do not use features the other side does not know; unknown fields and unknown types are handled by the strictness rules (§1, §10).
@@ -39,6 +39,7 @@ Every JSON text frame is an object of the shape:
 - **1.4 addition (BROW-01):** the `tabs.*` family (`tabs.list`, `tabs.changed`, `tabs.activate`, `tabs.close`, §7) — live browser tab list fed by the localhost extension leg (§15). Minor bump — 1.0–1.3 clients stay accepted.
 - **1.5 addition (BROW-01):** tab-group visibility — the GroupEl element, optional `groups` on the `tabs.list` reply / `tabs.changed` / `tabs.state` payloads, and the optional TabEl `groupId`. View-only (no group commands). Minor bump — 1.0–1.4 clients stay accepted.
 - **1.6 addition (phase 11):** the `bm.*` bookmark family (`bm.list`, `bm.changed`, `bm.open`, `bm.star`, `bm.unstar`, `bm.remove`, §7), the BmEl element, and the optional tri-state TabEl `bookmarked` flag. Minor bump — 1.0–1.5 clients stay accepted.
+- **1.7 addition (quick 260731-euq):** the `0x03` **zoom** binary opcode (§9) — pinch-to-zoom, executed server-side as a Ctrl-held wheel tick. Minor bump, and the degradation is graceful in the useful direction: a 1.0–1.6 server does not know the opcode, so its strict decoder rejects the frame and **drops it under §9 rule 4** — the session stays alive and only the zoom is lost. No JSON message type was added.
 
 ## 3. Handshake FSM
 
@@ -179,13 +180,16 @@ Binary WebSocket frames are **exactly 9 bytes**:
 |--------|---------|
 | `0x01` | move (relative cursor delta) |
 | `0x02` | scroll (relative scroll delta) |
+| `0x03` | zoom (pinch-to-zoom delta, protoVersion 1.7) |
 
 `dx`/`dy` are IEEE-754 binary32 (f32), **little-endian**. Frames are sent at input rate (~60–120 Hz), fire-and-forget; the server never acknowledges them.
+
+**`0x03` payload semantics (protoVersion 1.7).** Zoom is the first opcode that does not use both axes. `dy` is the zoom delta in wheel units — **positive zooms IN, negative zooms OUT** — and `dx` is **reserved**: the codec carries it through unchanged (so `encode(decode(wire))` still round-trips byte-for-byte for any value) but the executor ignores it. Clients SHOULD send `dx = 0.0`. The executor applies the delta as a Ctrl-held wheel tick; Ctrl is pressed and released around that single tick and is never held across the gesture.
 
 **Strict decode rules:**
 
 - Length ≠ 9 bytes → decode error.
-- Unknown opcode → decode error.
+- Unknown opcode — anything other than `0x01`, `0x02`, `0x03` — → decode error.
 - Non-finite f32 (`NaN`, `+Inf`, `-Inf`) in `dx` or `dy` → decode error.
 - Errored frames are **dropped and counted** (diagnostics), never routed to an executor, and never terminate the session.
 
@@ -198,7 +202,7 @@ The full byte layout is documented in `protocol/schema/mouse-binary.md`.
 
 ## 11. Pause semantics and session cleanup
 
-- While server-side **pause** is active, all executor-bound messages are **silently dropped**: binary frames, `click`, `drag`, `key`, `text`, `media`, `power`, `confirm`, `apps.launch`, `apps.focus`, `apps.close`, `clip.set`, `browser`, `present`, `tabs.activate`, `tabs.close`, `bm.open`, `bm.star`, `bm.unstar`, `bm.remove`. The handshake family (`hello`, `pin`, `auth`) and `ping`/`pong` continue to work — pause never breaks connectivity or liveness probing. `tabs.list` and `bm.list` are reads and stay answered while paused (the same exemption as `apps.list`/`clip.get`).
+- While server-side **pause** is active, all executor-bound messages are **silently dropped**: binary frames (move, scroll, zoom), `click`, `drag`, `key`, `text`, `media`, `power`, `confirm`, `apps.launch`, `apps.focus`, `apps.close`, `clip.set`, `browser`, `present`, `tabs.activate`, `tabs.close`, `bm.open`, `bm.star`, `bm.unstar`, `bm.remove`. The handshake family (`hello`, `pin`, `auth`) and `ping`/`pong` continue to work — pause never breaks connectivity or liveness probing. `tabs.list` and `bm.list` are reads and stay answered while paused (the same exemption as `apps.list`/`clip.get`).
 - **Activating pause immediately releases any held input** (buttons held via `drag start`, keys held via `key down`).
 - **Session end for ANY reason** — clean close, socket error, auth revoke, server shutdown — **releases all held keys and buttons** (CONN-07). No phantom held input may survive a mid-drag disconnect.
 

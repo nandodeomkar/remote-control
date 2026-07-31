@@ -1,0 +1,10 @@
+{
+  "name": "zoom-out",
+  "description": "Zoom frame, negative delta (protoVersion 1.7): opcode 0x03, dx 0.0 (reserved, executor-ignored), dy -0.5 = zoom OUT (f32-exact; LE bytes via .NET BitConverter).",
+  "wire": "0300000000000000bf",
+  "expect": {
+    "op": "zoom",
+    "dx": 0.0,
+    "dy": -0.5
+  }
+}

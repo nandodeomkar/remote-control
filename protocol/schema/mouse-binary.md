@@ -1,4 +1,4 @@
-# Binary Mouse Frame Layout (protoVersion 1.0)
+# Binary Mouse Frame Layout (protoVersion 1.7)
 
 Binary WebSocket frames carry the mouse hot path only. Every frame is **exactly 9 bytes**:
 
@@ -10,7 +10,7 @@ Binary WebSocket frames carry the mouse hot path only. Every frame is **exactly 
 
 | Offset | Size (bytes) | Field | Type | Semantics |
 |--------|--------------|-------|------|-----------|
-| 0 | 1 | `opcode` | unsigned 8-bit | `0x01` = move, `0x02` = scroll |
+| 0 | 1 | `opcode` | unsigned 8-bit | `0x01` = move, `0x02` = scroll, `0x03` = zoom |
 | 1 | 4 | `dx` | IEEE-754 binary32, **little-endian** | Relative X delta |
 | 5 | 4 | `dy` | IEEE-754 binary32, **little-endian** | Relative Y delta |
 
@@ -22,13 +22,14 @@ Total: 9 bytes. No padding, no trailing data.
 |--------|---------|-------------------|
 | `0x01` | move | Relative cursor delta in pixels (client sensitivity pre-applied) |
 | `0x02` | scroll | Relative scroll delta (positive dy = scroll down convention decided by executor) |
+| `0x03` | zoom (protoVersion 1.7) | `dy` = zoom delta in wheel units, **positive = zoom in**. `dx` is **reserved**: carried through the codec unchanged so round-trips stay byte-exact, but ignored by the executor. Clients SHOULD send `dx = 0.0` |
 
 All other opcode values are invalid and MUST be rejected at decode.
 
 ## Strict decode rules (SPEC §9)
 
 1. Frame length ≠ 9 bytes → decode error.
-2. Unknown opcode (anything other than `0x01`/`0x02`) → decode error.
+2. Unknown opcode (anything other than `0x01`/`0x02`/`0x03`) → decode error.
 3. Non-finite f32 (`NaN`, `+Inf`, `-Inf`) in `dx` or `dy` → decode error.
 4. Errored frames are dropped and counted; never routed to an executor, never fatal to the session.
 

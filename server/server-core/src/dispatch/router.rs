@@ -442,6 +442,7 @@ pub fn route_binary(frame: MouseFrame, ctx: &SessionCtx, exec: &Executors, pause
     match frame {
         MouseFrame::Move { dx, dy } => exec.mouse_keys.move_rel(dx, dy),
         MouseFrame::Scroll { dx, dy } => exec.mouse_keys.scroll(dx, dy),
+        MouseFrame::Zoom { dx, dy } => exec.mouse_keys.zoom(dx, dy),
     }
 }
 
@@ -1342,9 +1343,24 @@ mod tests {
         let ctx = ctx(AuthState::Authed);
         route_binary(MouseFrame::Move { dx: 1.5, dy: -2.0 }, &ctx, &exec, false);
         route_binary(MouseFrame::Scroll { dx: 0.0, dy: 3.0 }, &ctx, &exec, false);
+        route_binary(MouseFrame::Zoom { dx: 0.0, dy: 2.0 }, &ctx, &exec, false);
         assert_eq!(
             log.calls(),
-            vec![Call::MoveRel(1.5, -2.0), Call::Scroll(0.0, 3.0)]
+            vec![
+                Call::MoveRel(1.5, -2.0),
+                Call::Scroll(0.0, 3.0),
+                Call::Zoom(0.0, 2.0)
+            ]
         );
+    }
+
+    #[tokio::test]
+    async fn paused_zoom_frames_dropped() {
+        // Zoom is executor-bound like every other binary frame (SPEC §11) —
+        // the pause gate in route_binary covers it with no extra check.
+        let (exec, log) = MockExecutors::recording();
+        let ctx = ctx(AuthState::Authed);
+        route_binary(MouseFrame::Zoom { dx: 0.0, dy: 2.0 }, &ctx, &exec, true);
+        assert!(log.calls().is_empty());
     }
 }

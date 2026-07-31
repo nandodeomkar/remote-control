@@ -203,6 +203,13 @@ pub struct BookmarksState {
 pub trait MouseKeys: Send + Sync {
     fn move_rel(&self, dx: f32, dy: f32);
     fn scroll(&self, dx: f32, dy: f32);
+    /// Zoom by `dy` wheel units with Ctrl held (pinch-to-zoom, SPEC §9
+    /// opcode `0x03`). `dx` is reserved — implementations ignore it.
+    ///
+    /// Implementations MUST press and release Ctrl around the tick rather
+    /// than holding it across the gesture, so a session that dies mid-pinch
+    /// can never leave the modifier stuck down.
+    fn zoom(&self, dx: f32, dy: f32);
     fn click(&self, button: Button);
     fn button_down(&self, button: Button);
     fn button_up(&self, button: Button);
