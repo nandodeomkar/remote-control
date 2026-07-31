@@ -213,7 +213,7 @@ void main() {
     });
   });
 
-  group('tap-down routing', () {
+  group('tap routing', () {
     testWidgets('tapping a folder fires onEnterFolder once, onOpen never',
         (t) async {
       final rec = _Rec();
@@ -244,6 +244,115 @@ void main() {
 
       expect(rec.opened, ['11']);
       expect(rec.entered, isEmpty);
+    });
+  });
+
+  // Failure B (11-UAT.md). `tester.longPress` already pumps a REAL timed press
+  // — `longPressAt` does startGesture -> pump(kLongPressTimeout + kPressTimeout)
+  // = 600ms -> up — so the pre-existing suite DID cross the 100ms tap-down
+  // deadline. What it never did was assert that the navigation/open callback
+  // stayed SILENT. That single missing assertion is why every test here was
+  // green while D-14's delete was unreachable on real hardware.
+  group('gesture arena — a long press must never fire the tap action', () {
+    testWidgets(
+        'long-pressing an EMPTY folder opens the folder confirm and never enters the folder',
+        (t) async {
+      final rec = _Rec();
+      await _pump(
+        t,
+        _state(_tree, currentFolderId: '1', backStack: const ['0']),
+        rec,
+      );
+
+      await t.longPress(find.text('Empty'));
+      await t.pumpAndSettle();
+
+      expect(
+        rec.entered,
+        isEmpty,
+        reason: 'Failure B: the action used to hang off onTapDown, which fires '
+            'at kPressTimeout (100ms) on a long press too — 400ms before '
+            'LongPressGestureRecognizer resolves at kLongPressTimeout (500ms). '
+            'On a folder that drill-in replaced the list, destroying the row '
+            'before the long press could land, so D-14 was unreachable.',
+      );
+      expect(find.text(kBmDeleteFolderTitle), findsOneWidget);
+      expect(rec.opened, isEmpty);
+    });
+
+    testWidgets(
+        'long-pressing a LINK opens the bookmark confirm and never opens the bookmark',
+        (t) async {
+      final rec = _Rec();
+      await _pump(
+        t,
+        _state(_tree, currentFolderId: '1', backStack: const ['0']),
+        rec,
+      );
+
+      await t.longPress(find.text('Docs'));
+      await t.pumpAndSettle();
+
+      expect(
+        rec.opened,
+        isEmpty,
+        reason: 'deleting a bookmark must not force-open it first',
+      );
+      expect(find.text(kBmDeleteBookmarkTitle), findsOneWidget);
+      expect(rec.entered, isEmpty);
+    });
+
+    testWidgets('a quick tap fires the action and opens NO confirm dialog',
+        (t) async {
+      final rec = _Rec();
+      await _pump(
+        t,
+        _state(_tree, currentFolderId: '1', backStack: const ['0']),
+        rec,
+      );
+
+      await t.tap(find.text('Empty'));
+      await _settleFlash(t);
+
+      expect(rec.entered, ['10']);
+      expect(find.text(kBmDeleteFolderTitle), findsNothing);
+
+      await t.tap(find.text('Docs'));
+      await _settleFlash(t);
+
+      expect(rec.opened, ['11']);
+      expect(find.text(kBmDeleteBookmarkTitle), findsNothing);
+    });
+
+    // The executable twin of UAT check B1. The existing
+    // 'a non-empty folder offers no long-press: no dialog, no delete' test also
+    // long-presses 'Sub', but asserts only the dialog and rec.deleted —
+    // rec.entered is ['21'] BOTH before and after this fix (fired at the 100ms
+    // deadline before, on release after), so it survives a real change in WHEN
+    // the navigation happens and pins nothing. Pin the semantics here instead.
+    testWidgets(
+        'holding a NON-deletable folder opens no confirm and drills in on release',
+        (t) async {
+      final rec = _Rec();
+      await _pump(
+        t,
+        _state(_tree, currentFolderId: '20', backStack: const ['0']),
+        rec,
+      );
+
+      await t.longPress(find.text('Sub'));
+      await t.pumpAndSettle();
+
+      expect(find.text(kBmDeleteFolderTitle), findsNothing);
+      expect(
+        rec.entered,
+        ['21'],
+        reason: 'a row with onLongPress: null registers no '
+            'LongPressGestureRecognizer at all, so the tap recognizer is '
+            'unopposed, has no upper time bound, and fires on release however '
+            'long the hold was. The D-14 gate withholds the DELETE, never the '
+            'navigation — documented semantics, not a leak.',
+      );
     });
   });
 

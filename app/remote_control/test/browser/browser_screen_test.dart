@@ -21,6 +21,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_protocol/remote_protocol.dart';
 
 import 'package:remote_control/browser/bookmark_confirm.dart';
+import 'package:remote_control/browser/bookmarks_section.dart';
 import 'package:remote_control/browser/browser_screen.dart';
 import 'package:remote_control/browser/browser_segment.dart';
 import 'package:remote_control/net/connection_providers.dart';
@@ -252,6 +253,28 @@ final BookmarksSnapshot _bmTree = BookmarksSnapshot(
       BmNode(id: 'b$i', parentId: '1', title: 'Link $i'),
     const BmNode(id: '20', parentId: '10', title: 'Jira'),
     const BmNode(id: '21', parentId: '10', title: 'Wiki'),
+  ],
+);
+
+/// A tree that actually contains something DELETABLE, which `_bmTree` does
+/// not: every folder there is either locked (a root) or non-empty, so D-14's
+/// empty-folder case has no representative. Failure B lives exactly there.
+final BookmarksSnapshot _bmDeletable = BookmarksSnapshot(
+  connected: true,
+  truncated: false,
+  nodes: const [
+    BmNode(
+      id: '1',
+      parentId: '0',
+      title: 'Bookmarks bar',
+      folder: true,
+      count: 2,
+      locked: true,
+    ),
+    // Empty + unlocked -> deletable. The D-14 case.
+    BmNode(id: '40', parentId: '1', title: 'Scratch', folder: true, count: 0),
+    // A link -> deletable. The D-13 case.
+    BmNode(id: '41', parentId: '1', title: 'Recipe'),
   ],
 );
 
@@ -1358,6 +1381,130 @@ void main() {
 
       await _unmount(t);
       handle.dispose();
+    });
+  });
+
+  // Failure B (11-UAT.md), at the layer that can actually reproduce it.
+  //
+  // The section-layer tests cannot: there `onEnterFolder` is a recorder, so a
+  // drill-in swaps NOTHING and the pressed row survives the press regardless
+  // of wiring. Only the real `BookmarksNotifier` replaces the list on
+  // enterFolder — and that replacement is precisely what destroyed the row
+  // before the long press could resolve on device. This group drives the real
+  // store through `_pumpScreen`.
+  group('Failure B — long-press reachability against the real store', () {
+    testWidgets(
+        'long-pressing an EMPTY folder row opens the delete confirm and does NOT drill into it',
+        (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmDeletable;
+      await _pumpScreen(t, service);
+      await _selectSegment(t, kSegmentBookmarksLabel);
+
+      await t.tap(find.text('Bookmarks bar'));
+      await t.pump();
+      await t.pump();
+
+      await t.longPress(find.text('Scratch'));
+      await t.pumpAndSettle();
+
+      expect(find.text(kBmDeleteFolderTitle), findsOneWidget);
+      expect(
+        find.text('Recipe'),
+        findsOneWidget,
+        reason: 'the sibling row is still mounted, so the list did NOT swap',
+      );
+      expect(
+        find.text(kBmEmptyFolder),
+        findsNothing,
+        reason: 'that is what an actual drill-in into Scratch would render',
+      );
+
+      await t.tap(find.text(kBmDeleteFolderConfirm));
+      await t.pumpAndSettle();
+
+      final removed = service.reliable.whereType<BmRemoveMsg>().toList();
+      expect(removed, hasLength(1));
+      expect(removed.single.nodeId, '40');
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'long-pressing a LINK row opens the delete confirm and sends NO bm.open',
+        (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmDeletable;
+      await _pumpScreen(t, service);
+      await _selectSegment(t, kSegmentBookmarksLabel);
+
+      await t.tap(find.text('Bookmarks bar'));
+      await t.pump();
+      await t.pump();
+
+      await t.longPress(find.text('Recipe'));
+      await t.pumpAndSettle();
+
+      expect(find.text(kBmDeleteBookmarkTitle), findsOneWidget);
+      expect(
+        service.reliable.whereType<BmOpenMsg>(),
+        isEmpty,
+        reason: 'reaching a delete must not force-open the bookmark first',
+      );
+
+      await t.tap(find.text(kBmConfirmCancel));
+      await t.pumpAndSettle();
+
+      expect(service.reliable.whereType<BmOpenMsg>(), isEmpty);
+      expect(
+        service.reliable.whereType<BmRemoveMsg>(),
+        isEmpty,
+        reason: 'Cancel opens nothing and destroys nothing',
+      );
+
+      await _unmount(t);
+    });
+
+    testWidgets(
+        'a quick tap on a bookmark row still sends bm.open exactly once and a folder tap still drills in',
+        (t) async {
+      final service = _FakeService()
+        ..parked = _twoTabs
+        ..parkedBm = _bmDeletable;
+      await _pumpScreen(t, service);
+      await _selectSegment(t, kSegmentBookmarksLabel);
+
+      await t.tap(find.text('Bookmarks bar'));
+      await t.pump();
+      await t.pump();
+
+      await t.tap(find.text('Recipe'));
+      await t.pump();
+      await t.pump();
+
+      expect(service.reliable.whereType<BmOpenMsg>(), hasLength(1));
+
+      await t.tap(find.text('Scratch'));
+      await t.pump();
+      await t.pump();
+
+      expect(
+        find.text(kBmEmptyFolder),
+        findsOneWidget,
+        reason: 'the drill-in happened',
+      );
+      expect(
+        service.reliable.whereType<BmOpenMsg>(),
+        hasLength(1),
+        reason: 'entering a folder sends nothing — local navigation (D-06)',
+      );
+
+      // Drain the 100ms press-flash relax so no fake timer outlives the test
+      // (the long-press siblings get this free from pumpAndSettle).
+      await t.pump(const Duration(milliseconds: 150));
+      await _unmount(t);
     });
   });
 }
