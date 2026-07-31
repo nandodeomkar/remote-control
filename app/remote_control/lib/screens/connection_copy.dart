@@ -129,6 +129,12 @@ String deviceMetaLastSeen(String ip, int port) => 'last seen at $ip:$port';
 
 // -- authFail reason mapping (CONN-02) ------------------------------------------
 
+/// The `noPairing` case — a PIN submitted while the PC has NO active pairing
+/// window (`PinOutcome::NoPairing`), NOT a revoked token. [kRevokedExplanation]
+/// remains the `badMac` case.
+const String kNoPinWindowCopy =
+    "Your PC isn't showing a PIN — start pairing on the PC";
+
 /// Maps an `authFail` reason (or `versionMismatch`) to its exact UI-SPEC
 /// copy. Whitelist semantics: an unknown [reason] renders a generic retry
 /// line — the raw enum value never reaches the user (T-03-24).
@@ -147,9 +153,10 @@ String pairingErrorCopy(
     case 'lockedOut':
       return 'Too many attempts — try again in ${retryAfterSecs ?? 0}s';
     case 'noPairing':
+      return kNoPinWindowCopy;
     case 'badMac':
-      // The D-05 string, single definition in reconnect_fsm.dart — imported,
-      // never re-declared.
+      // The D-05 revoked-token string — badMac only. Single definition in
+      // reconnect_fsm.dart, imported here, never re-declared.
       return kRevokedExplanation;
     case 'versionMismatch':
       return 'This phone and the PC server need matching versions — update '

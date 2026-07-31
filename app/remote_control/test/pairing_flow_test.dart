@@ -77,13 +77,31 @@ void main() {
       );
     });
 
-    test('noPairing and badMac both map to the D-05 revoked explanation '
+    test('badMac maps to the D-05 revoked explanation '
         '(single definition from reconnect_fsm.dart)', () {
-      expect(pairingErrorCopy('noPairing'), kRevokedExplanation);
       expect(pairingErrorCopy('badMac'), kRevokedExplanation);
       expect(
         kRevokedExplanation,
         'This PC no longer recognizes this phone — pair again',
+      );
+    });
+
+    test('noPairing gets its own no-PIN-window copy, distinct from badMac '
+        '(260731-d45)', () {
+      expect(pairingErrorCopy('noPairing'), isNot(pairingErrorCopy('badMac')));
+      expect(pairingErrorCopy('noPairing'), kNoPinWindowCopy);
+      expect(pairingErrorCopy('noPairing'), isNot(kRevokedExplanation));
+      expect(
+        kNoPinWindowCopy,
+        "Your PC isn't showing a PIN — start pairing on the PC",
+      );
+      expect(
+        kNoPinWindowCopy.length,
+        lessThanOrEqualTo(kRevokedExplanation.length + 4),
+        reason: 'the pairing sheet reserves ONE line for the error '
+            '(SizedBox(height: 24) + maxLines: 1 + ellipsis), so copy much '
+            'longer than the shipped D-05 line gets ellipsized on a '
+            'phone-width sheet',
       );
     });
 
@@ -187,7 +205,9 @@ void main() {
           expect(text, isNot(contains(reason)),
               reason: 'raw enum "$reason" must never render (T-03-24)');
         }
-        expect(find.text(kRevokedExplanation), findsOneWidget);
+        final expected =
+            reason == 'badMac' ? kRevokedExplanation : kNoPinWindowCopy;
+        expect(find.text(expected), findsOneWidget);
       }
     });
 
