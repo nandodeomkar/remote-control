@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 11
-stopped_at: 11-12 task 2 (on-device UAT) COMPLETE -- 10 PASS / 1 FAIL; phase blocked on Failure B (UAT-8)
-last_updated: "2026-07-30T17:45:00.000Z"
-last_activity: 2026-07-30 -- 11-12 task 2 on-device UAT run end to end; A1 answered (silent grant on Comet 150); UAT-8 FAILED: long-press delete unreachable on bookmark folders
+stopped_at: 11-13 tasks 1-3 COMPLETE (code + tests + spec); PAUSED at task 4 on-device UAT-8 re-run checkpoint
+last_updated: "2026-07-30T19:40:00.000Z"
+last_activity: 2026-07-30 -- 11-12 CLOSED (task 3 README); 11-13 Failure B fix landed, 608 flutter green, awaiting owner UAT-8 re-run
 progress:
   total_phases: 11
   completed_phases: 10
@@ -103,7 +103,35 @@ Next: wave 7 is 11-12 — the phase's docs + UAT plan (SPEC/README prose and the
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-30 -- 11-12 task 2 (on-device UAT) RUN AND RECORDED. All eleven
+Last activity: 2026-07-30 (evening) -- 11-12 CLOSED and 11-13 tasks 1-3 LANDED.
+  11-12 task 3 wrote extension/README.md from the observed A1 outcome (`333c820`),
+  SUMMARY `715280c`. Plan 11-13 then fixed Failure B:
+  `a5cd678` splits `_BmRowState._fire()` into `_flash()` (onTapDown, visual only)
+  and `_activate()` (onTap, the side effect), so a long press now resolves with
+  nothing having run; kBmDeleteHint gains the folder case. `adb8413` adds 7
+  regression tests at TWO layers -- the section layer was structurally incapable
+  of reproducing the defect because `onEnterFolder` is a recorder there, so a
+  drill-in swaps nothing and the row survives; only the real BookmarksNotifier at
+  the screen layer replaces the list. RED-PROOF OBSERVED: with the wiring reverted
+  to pre-fix, EXACTLY 4 of the 7 new tests fail (both long-press-empty-folder and
+  both long-press-link, at both layers); the other 3 pass either way by design and
+  pin semantics, not the defect. Source restored byte-identical after. `7723602`
+  amends 11-UI-SPEC.md, which was the ROOT CAUSE -- it specified tap-down drill-in
+  AND long-press delete on the same folder row, and 11-09 implemented that
+  faithfully. Now carries the rule "a row whose tap action REPLACES or REMOVES the
+  row must fire on onTap, never on onTapDown", plus the plan-checker's corollary:
+  a NON-deletable row has no LongPressGestureRecognizer at all, so its tap
+  recognizer is unopposed and fires on release however long the hold -- holding a
+  non-empty folder DOES drill in, and that is correct (the D-14 gate withholds the
+  DELETE, never the navigation). Do NOT "fix" it with a dummy onLongPress,
+  onTapCancel, or hold timer. Gates: flutter 608 green (was 601, +7), analyze
+  clean; no Rust/protocol/extension file touched so cargo 202 and dart 13 cannot
+  have regressed. NEXT: 11-13 task 4 is a BLOCKING human checkpoint -- the owner
+  must re-run UAT-8 on device (checks B1-B6) and record it in 11-UAT.md before the
+  phase can close. Note deferred items 2 and 3 remain OUT of scope by owner
+  decision, and the browser profile is still dirty from the first UAT run
+  (`Search by name` id 587, empty `UAT8 test folder` id 588).
+  PREVIOUS -- 11-12 task 2 (on-device UAT) RUN AND RECORDED. All eleven
   rows carry an observation: 10 PASS, 1 FAIL. Full detail in 11-UAT.md.
   **PHASE IS NOT CLEAR TO CLOSE** -- UAT-8 is a real functional gap (Failure B):
   `_BmRow` (bookmarks_section.dart:315-319) puts onTapDown activate and onLongPress
