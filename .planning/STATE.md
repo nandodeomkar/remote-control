@@ -495,11 +495,23 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-2 pending — see .planning/todos/pending/
+**0 pending** — `.planning/todos/pending/` is empty. (The previous "2 pending" line was stale: it
+still listed an item that had already moved to `todos/done/`.)
 
-- ~~Absolute pointer injection~~ — DONE in 04-01 (raw SendInput ABSOLUTE|VIRTUALDESK; moved to todos/done/)
-- `noPairing` reason is overloaded: server returns authFail{noPairing} both for an unknown/revoked TOKEN (reconnect path) and for a PIN submitted with NO active pairing window (pairing path). The pairing-path case wrongly shows the revoked "no longer recognizes this phone" copy. A distinct reason code (e.g. `noPinWindow`) would let the copy say "ask your PC for a new PIN." (area: server protocol + client copy) — from the 03-07 E2E
-- Server supports ONE pairing per process run: the PIN-refresh loop breaks on is_paired() and a completed pair clears the active window, so re-pairing needs a server restart. Closes when Phase 7 adds persistent token storage. (area: server) — from the 03-07 E2E
+- ~~Absolute pointer injection~~ — DONE in 04-01 (raw SendInput ABSOLUTE|VIRTUALDESK; in todos/done/)
+- ~~Server supports ONE pairing per process run~~ — DONE; closed by Phase 7's persistent token
+  storage exactly as predicted (in todos/done/). STATE listed it as pending until 2026-07-31.
+- ~~`noPairing` reason is overloaded~~ — DONE 2026-07-31, quick task 260731-d45 (in todos/done/).
+  **The todo's own fix sketch turned out to be stale and was NOT followed.** It proposed a new wire
+  reason `noPinWindow` plus server, fixture and protocol changes; in fact the server already
+  distinguishes the two cases (`session.rs:626` emits `noPairing` only from `PinOutcome::NoPairing`,
+  `:645` emits `badMac` only from the token path). The collapse was purely the client's fallthrough
+  arm, so the fix was Dart-copy-only with ZERO wire change: new `kNoPinWindowCopy` in
+  `connection_copy.dart`, `badMac` left on `kRevokedExplanation`.
+  **Still open, deliberately:** `reconnect_fsm.dart:333` continues to treat `noPairing` as revoked
+  and fire `ClearTokenEffect` — arguably wrong for a PIN-window problem, but a D-05 behaviour change
+  with its own test surface, and invisible to the user because a live `FailedEffect` outranks
+  `explanation` in `_errorCopy`.
 
 ### Blockers/Concerns
 
@@ -525,6 +537,7 @@ Recent decisions affecting current work:
 | 260729-4rg | No console window on launch + rolling file logging | 2026-07-29 | 564a744 | [260729-4rg-hide-console-window-and-add-file-logging](./quick/260729-4rg-hide-console-window-and-add-file-logging/) |
 | 260729-58x | Tab-group visual hierarchy — grouped runs contained in a tinted `_GroupBlock` | 2026-07-29 | 088c53b | [260729-58x-fix-tab-group-visual-hierarchy-on-the-br](./quick/260729-58x-fix-tab-group-visual-hierarchy-on-the-br/) |
 | 260730-bm0 | Ship v1.4.0-rc1 prerelease with phase 11 bookmarks artifacts (server 1.4.0, app 1.4.0+7, extension 1.2.0) | 2026-07-30 | 2fca0cb | [260730-bm0-ship-v1-4-0-rc1-prerelease-with-phase-11](./quick/260730-bm0-ship-v1-4-0-rc1-prerelease-with-phase-11/) |
+| 260731-d45 | Close 2 deferred items: `noPairing` gets its own copy (client-only, zero wire change); group titles trimmed of lone surrogates via a shared `capTitle(s, max)` | 2026-07-31 | 0cd5104, 081df65 | [260731-d45-close-deferred-nopairing-copy-and-group-title-cap](./quick/260731-d45-close-deferred-nopairing-copy-and-group-title-cap/) |
 
 ## Deferred Items
 
