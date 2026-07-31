@@ -13,8 +13,12 @@
 /// does own is the confirm dialog — that is where the [BuildContext] is.
 ///
 /// Row chrome clones `_TabRow` (kSurface fill, radius 16, 1px border,
-/// minHeight 56, 12px horizontal padding, tap-DOWN fire + a 100ms accent
-/// press flash). There is NO resting accent anywhere in this segment: the
+/// minHeight 56, 12px horizontal padding, a 100ms accent press flash on
+/// tap-DOWN, with the ACTION on tap). `_BmRow` deliberately diverges from
+/// `_TabRow` here — a row whose tap action REPLACES the list must fire on
+/// `onTap`, because `onTapDown` runs at `kPressTimeout` (100ms) on every long
+/// press too, which made the D-14 delete unreachable (11-UAT.md Failure B).
+/// There is NO resting accent anywhere in this segment: the
 /// Tabs segment has a true "current" item to anchor on, the Bookmarks segment
 /// does not, and inventing a highlighted row here would be a lie about PC
 /// state.
@@ -51,7 +55,16 @@ const String kBmTruncatedFolder = "Some bookmarks here aren't shown.";
 /// Long-press discoverability line — the delete affordance is invisible by
 /// design (D-14), so the only folder that advertises it is one that has at
 /// least one deletable child.
-const String kBmDeleteHint = 'Long-press a bookmark to delete it.';
+///
+/// Names BOTH deletable kinds because [BookmarksViewState.hasDeletableChild]
+/// is true for a deletable LINK **or** a deletable (empty, unlocked) FOLDER.
+/// Before Failure B was fixed the folder branch was unreachable, so the older
+/// bookmark-only copy was accidentally accurate; now that D-14's empty-folder
+/// delete genuinely works, the hint has to name it. Saying "empty" also
+/// teaches the D-14 rule, so a user who long-presses a NON-empty folder and
+/// gets nothing reads it as the documented rule rather than a broken app.
+const String kBmDeleteHint =
+    'Long-press a bookmark or empty folder to delete it.';
 
 /// Semantic label for the icon-only folder back button.
 const String kBmBackSemantic = 'Back to parent folder';
@@ -230,7 +243,7 @@ class _MutedLine extends StatelessWidget {
 /// One bookmark row — folder or link, one widget.
 ///
 /// The two kinds differ only in their leading glyph, their trailing content
-/// and what tap-down fires; every measurement, color and gesture is shared,
+/// and what tap fires; every measurement, color and gesture is shared,
 /// so a folder row and a link row can never drift apart visually.
 ///
 /// The long-press delete is offered ONLY when
@@ -265,17 +278,33 @@ class _BmRowState extends State<_BmRow> {
 
   bool get _isFolder => widget.node.folder == true;
 
-  /// Tap-DOWN fire + the 100ms accent relax (the shipped `_TabRow._fire`).
-  void _fire() {
+  /// The 100ms accent press flash — VISUAL ONLY, fired from `onTapDown`.
+  ///
+  /// Deliberately has NO tap-cancel counterpart: the relax below already
+  /// clears `_pressed` ~200ms into a press, 300ms before
+  /// `LongPressGestureRecognizer` can resolve at `kLongPressTimeout` (500ms),
+  /// so there is no stuck-flash state left for a cancel handler to clear. The
+  /// same reasoning covers a scroll drag winning the arena — the row flashes
+  /// for 100ms exactly as it does today, which is unchanged behaviour.
+  void _flash() {
+    setState(() => _pressed = true);
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) setState(() => _pressed = false);
+    });
+  }
+
+  /// The side effect — fired from `onTap`, i.e. only once the tap has WON the
+  /// gesture arena. It must never hang off `onTapDown`: that runs at
+  /// `kPressTimeout` (100ms) on a long press too, and on a folder the
+  /// resulting list swap destroys the row 400ms before the long press can
+  /// resolve, which is exactly what made D-14's delete unreachable
+  /// (11-UAT.md Failure B).
+  void _activate() {
     if (_isFolder) {
       widget.onEnterFolder(widget.node.id);
     } else {
       widget.onOpen(widget.node.id);
     }
-    setState(() => _pressed = true);
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) setState(() => _pressed = false);
-    });
   }
 
   /// Long-press → confirm → delete. [onDelete] fires ONLY on a true result,
@@ -314,8 +343,8 @@ class _BmRowState extends State<_BmRow> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: widget.enabled ? () {} : null,
-        onTapDown: widget.enabled ? (_) => _fire() : null,
+        onTap: widget.enabled ? _activate : null,
+        onTapDown: widget.enabled ? (_) => _flash() : null,
         onLongPress: deletable ? _confirmDelete : null,
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 56),
