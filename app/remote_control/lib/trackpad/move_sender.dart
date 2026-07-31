@@ -35,4 +35,10 @@ class MoveSender {
   void sendScroll(double dx, double dy) {
     sink.add(encodeScroll(dx, dy));
   }
+
+  /// Encodes a pinch-zoom delta (0x03) and adds it to the sink,
+  /// fire-and-forget. `dx` is reserved by SPEC section 9 — pass 0.0.
+  void sendZoom(double dx, double dy) {
+    sink.add(encodeZoom(dx, dy));
+  }
 }

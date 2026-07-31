@@ -370,4 +370,157 @@ void main() {
               'FULL -30 (the bug emitted -15)');
     });
   });
+
+  group('GestureClassifier — pinch zoom (SPEC section 9 opcode 0x03)', () {
+    /// Lands two fingers 40px apart on the x-axis: 1@(100,100), 2@(140,100).
+    /// Distance 40, midpoint (120,100). Nothing is classified yet.
+    GestureClassifier twoDown(GestureClassifier c) {
+      c.onPointerDown(1, 100, 100);
+      c.onPointerDown(2, 140, 100);
+      return c;
+    }
+
+    test('symmetric spread past slop classifies as pinch and emits ZoomIntent',
+        () {
+      final (c, _) = make();
+      twoDown(c);
+      // Four 3px steps, alternating fingers, moving apart. Each step adds 3
+      // to spread and 1.5 to translation, so the ratio sits at 2.0 — clear of
+      // kPinchDominanceRatio — while combinedTravel climbs 3, 6, 9, 12.
+      expect(c.onPointerMove(1, 97, 100), isEmpty, reason: 'travel 3 <= slop');
+      expect(c.onPointerMove(2, 143, 100), isEmpty, reason: 'travel 6 <= slop');
+      expect(c.onPointerMove(1, 94, 100), isEmpty, reason: 'travel 9 <= slop');
+
+      final intents = c.onPointerMove(2, 146, 100);
+      expect(intents, const [ZoomIntent(3)],
+          reason: 'travel 12 crosses slop; spread 12 beats 1.5 x trans 6');
+    });
+
+    test('fingers together give a NEGATIVE dz (zoom out)', () {
+      final (c, _) = make();
+      twoDown(c);
+      // Same shape, converging: each step shrinks the separation by 3.
+      c.onPointerMove(1, 103, 100);
+      c.onPointerMove(2, 137, 100);
+      c.onPointerMove(1, 106, 100);
+      final intents = c.onPointerMove(2, 134, 100);
+      expect(intents, const [ZoomIntent(-3)],
+          reason: 'converging fingers zoom out');
+    });
+
+    test('pinch LOCKS: translating both fingers afterwards still zooms, '
+        'never scrolls', () {
+      final (c, _) = make();
+      twoDown(c);
+      c.onPointerMove(1, 97, 100);
+      c.onPointerMove(2, 143, 100);
+      c.onPointerMove(1, 94, 100);
+      expect(c.onPointerMove(2, 146, 100), const [ZoomIntent(3)]);
+
+      // Now drag both fingers down together — pure translation, which in a
+      // fresh episode would classify as a scroll.
+      final a = c.onPointerMove(1, 94, 140);
+      final b = c.onPointerMove(2, 146, 140);
+      for (final intents in [a, b]) {
+        expect(intents.whereType<ScrollIntent>(), isEmpty,
+            reason: 'a locked pinch can never emit a scroll');
+        expect(intents.every((i) => i is ZoomIntent), isTrue,
+            reason: 'still pinching');
+      }
+    });
+
+    test('scroll LOCKS: spreading the fingers afterwards still scrolls, '
+        'never zooms', () {
+      final (c, _) = make();
+      twoDown(c);
+      // Both fingers translate down together: translation dominates, spread
+      // stays near zero, so the slop crossing picks scroll.
+      c.onPointerMove(1, 100, 90);
+      expect(c.onPointerMove(2, 140, 90), isA<List<GestureIntent>>());
+      final crossing = c.onPointerMove(1, 100, 80);
+      expect(crossing.whereType<ScrollIntent>(), isNotEmpty,
+          reason: 'translation-dominated episode classifies as scroll');
+
+      // Now pull them apart — a fresh episode would zoom.
+      final a = c.onPointerMove(1, 60, 80);
+      final b = c.onPointerMove(2, 180, 80);
+      for (final intents in [a, b]) {
+        expect(intents.whereType<ZoomIntent>(), isEmpty,
+            reason: 'a locked scroll can never emit a zoom');
+      }
+    });
+
+    test('rotation about the midpoint scrolls — it must not zoom', () {
+      final (c, _) = make();
+      twoDown(c);
+      // Counter-rotating the two fingers barely changes their separation, so
+      // the spread signal never dominates and the episode is not a pinch.
+      final a = c.onPointerMove(1, 100, 88);
+      final b = c.onPointerMove(2, 140, 112);
+      for (final intents in [a, b]) {
+        expect(intents.whereType<ZoomIntent>(), isEmpty,
+            reason: 'rotation is not a pinch');
+      }
+    });
+
+    test('two-finger TAP still fires exactly one right click (regression)', () {
+      final (c, clock) = make();
+      twoDown(c);
+      clock.now = kTwoFingerTapWindowMs - 50;
+      c.onPointerUp(1);
+      expect(c.onPointerUp(2), const [ClickRightIntent()],
+          reason: 'under slop no pinch decision is ever reached');
+    });
+
+    test('one finger lifting mid-pinch goes quiet — no phantom zoom', () {
+      final (c, _) = make();
+      twoDown(c);
+      c.onPointerMove(1, 97, 100);
+      c.onPointerMove(2, 143, 100);
+      c.onPointerMove(1, 94, 100);
+      expect(c.onPointerMove(2, 146, 100), const [ZoomIntent(3)]);
+
+      expect(c.onPointerUp(1), isEmpty, reason: 'a lift emits nothing');
+      expect(c.onPointerMove(2, 200, 100), isEmpty,
+          reason: 'one finger cannot define a separation — pinch goes quiet '
+              '(deliberately asymmetric with WR-04 scroll behaviour)');
+    });
+
+    test('a pinch NEVER seeds a fling, however fast the fingers leave', () {
+      final (c, clock) = make();
+      twoDown(c);
+      clock.now = 10;
+      c.onPointerMove(1, 97, 100);
+      clock.now = 20;
+      c.onPointerMove(2, 143, 100);
+      clock.now = 30;
+      c.onPointerMove(1, 94, 100);
+      clock.now = 40;
+      expect(c.onPointerMove(2, 146, 100), const [ZoomIntent(3)]);
+
+      clock.now = 45;
+      c.onPointerUp(1);
+      expect(c.onPointerUp(2), isEmpty,
+          reason: 'zoom has no momentum — _flingFrom is never consulted');
+    });
+
+    test('reset() mid-pinch lets the next episode classify from scratch', () {
+      final (c, _) = make();
+      twoDown(c);
+      c.onPointerMove(1, 97, 100);
+      c.onPointerMove(2, 143, 100);
+      c.onPointerMove(1, 94, 100);
+      expect(c.onPointerMove(2, 146, 100), const [ZoomIntent(3)]);
+
+      c.reset();
+
+      // A fresh translation-dominated episode must be free to pick scroll.
+      twoDown(c);
+      c.onPointerMove(1, 100, 90);
+      c.onPointerMove(2, 140, 90);
+      final crossing = c.onPointerMove(1, 100, 80);
+      expect(crossing.whereType<ScrollIntent>(), isNotEmpty,
+          reason: 'stale pinch state would have kept this episode zooming');
+    });
+  });
 }

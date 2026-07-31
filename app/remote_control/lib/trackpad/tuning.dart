@@ -52,6 +52,33 @@ const double kScrollUnitPerPx = 0.05;
 /// Flip to 1.0 on device if the owner prefers reverse.
 const double kScrollDirection = -1.0;
 
+// -- Pinch zoom (SPEC section 9 opcode 0x03, quick 260731-euq) ----------------
+
+/// Wheel units per pixel of inter-finger separation change when emitting
+/// 0x03 frames.
+///
+/// A ~100px pinch produces ~2 wheel units, i.e. roughly two zoom steps —
+/// which is about what the same gesture does on a physical trackpad.
+/// Deliberately smaller than [kScrollUnitPerPx] because separation change
+/// accumulates faster than scroll travel for the same intent.
+const double kZoomUnitPerPx = 0.02;
+
+/// How far the accumulated SPREAD signal (change in inter-finger distance)
+/// must beat the accumulated TRANSLATION signal (movement of their midpoint)
+/// before a two-finger episode is classified as a pinch rather than a scroll.
+///
+/// The tie-break deliberately favours SCROLL, which is by far the more common
+/// two-finger gesture: a genuine pinch has near-zero translation and clears
+/// this ratio easily, while a scroll that drifts slightly apart does not.
+const double kPinchDominanceRatio = 1.5;
+
+/// Absolute floor (px) on accumulated spread before a pinch may be declared.
+///
+/// Without it, two nearly-stationary fingers whose jitter happens to be
+/// radial would out-ratio their own near-zero translation and start zooming
+/// on what the user meant as a rest.
+const double kPinchMinSpreadPx = 6.0;
+
 // -- Velocity acceleration curve (PAD-01, D-05) -------------------------------
 
 /// Gain multiplier at (near-)zero speed — slow precise moves stay ~1:1 so the

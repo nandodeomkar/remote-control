@@ -543,6 +543,17 @@ class ConnectionService {
     _probe?.onMove();
   }
 
+  /// Hot path: volatile zoom frame (pinch, SPEC section 9 opcode 0x03). The
+  /// third volatile binary class, with the identical policy shape to
+  /// [sendMove]/[sendScroll]: dropped, never queued, unless authed — a queued
+  /// zoom would fire a burst of zoom steps on reconnect, the same teleport
+  /// failure queued moves and scrolls have. `dx` is reserved — pass 0.0.
+  void sendZoom(double dx, double dy) {
+    if (!_policy.shouldSendVolatile()) return;
+    _sender?.sendZoom(dx, dy);
+    _probe?.onMove();
+  }
+
   /// Reliable-class message: sent immediately when authed, queued (bounded,
   /// FIFO, ≤10) during blips and flushed on auth (design spec §8).
   void sendReliable(RemoteMessage msg) {

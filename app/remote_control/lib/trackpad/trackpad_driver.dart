@@ -45,6 +45,7 @@ import 'tuning.dart';
 class TrackpadDriver {
   final void Function(double dx, double dy) _onSendMove;
   final void Function(double dx, double dy) _onSendScroll;
+  final void Function(double dx, double dy) _onSendZoom;
   final void Function(RemoteMessage msg) _onSendReliable;
   final void Function() _onHaptic;
   final void Function(bool locked) _onDragLockChanged;
@@ -80,6 +81,7 @@ class TrackpadDriver {
   TrackpadDriver({
     required void Function(double dx, double dy) onSendMove,
     required void Function(double dx, double dy) onSendScroll,
+    required void Function(double dx, double dy) onSendZoom,
     required void Function(RemoteMessage msg) onSendReliable,
     required void Function() onHaptic,
     required void Function(bool locked) onDragLockChanged,
@@ -90,6 +92,7 @@ class TrackpadDriver {
     void Function()? onReset,
   })  : _onSendMove = onSendMove,
         _onSendScroll = onSendScroll,
+        _onSendZoom = onSendZoom,
         _onSendReliable = onSendReliable,
         _onHaptic = onHaptic,
         _onDragLockChanged = onDragLockChanged,
@@ -129,6 +132,17 @@ class TrackpadDriver {
             dx * kScrollUnitPerPx,
             dy * kScrollUnitPerPx * kScrollDirection * _directionSign(),
           );
+        case ZoomIntent(:final dz):
+          // dx is 0.0 because SPEC section 9 RESERVES it on opcode 0x03.
+          //
+          // The D-11 scrollReversed / _directionSign gate is deliberately NOT
+          // applied here: Natural-vs-Reversed is a SCROLL preference, and
+          // pinch-apart-is-zoom-in is invariant on every platform. Inverting
+          // zoom with the scroll setting would be a bug, not a feature.
+          //
+          // No momentum, no generation counter, no timer — a pinch has no
+          // fling, so there is nothing to schedule or cancel.
+          _onSendZoom(0.0, dz * kZoomUnitPerPx);
         case FlingIntent(:final vx, :final vy):
           _startMomentum(vx, vy);
         case StopFlingIntent():

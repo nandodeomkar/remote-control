@@ -52,20 +52,24 @@ class Harness {
   final FakeScheduler scheduler = FakeScheduler();
   final List<(double, double)> moves = [];
   final List<(double, double)> scrolls = [];
+  final List<(double, double)> zooms = [];
   final List<RemoteMessage> reliable = [];
   final List<bool> dragLock = [];
   int haptics = 0;
   int longPressElapsed = 0;
   double sensitivity = 1.0;
+  bool scrollReversed = false;
 
   late final TrackpadDriver driver = TrackpadDriver(
     onSendMove: (dx, dy) => moves.add((dx, dy)),
     onSendScroll: (dx, dy) => scrolls.add((dx, dy)),
+    onSendZoom: (dx, dy) => zooms.add((dx, dy)),
     onSendReliable: reliable.add,
     onHaptic: () => haptics++,
     onDragLockChanged: dragLock.add,
     onLongPressElapsed: () => longPressElapsed++,
     sensitivity: () => sensitivity,
+    scrollReversed: () => scrollReversed,
     schedule: scheduler.call,
   );
 }
@@ -244,6 +248,43 @@ void main() {
     });
   });
 
+  group('TrackpadDriver — ZoomIntent (SPEC section 9 opcode 0x03)', () {
+    test('sends dx 0.0 (reserved) and dy = dz * kZoomUnitPerPx', () {
+      final h = Harness();
+      h.driver.handle(const [ZoomIntent(20)]);
+      expect(h.zooms, [(0.0, 20 * kZoomUnitPerPx)]);
+      expect(h.scrolls, isEmpty, reason: 'zoom never rides the scroll seam');
+      expect(h.haptics, 0, reason: 'zoom does not tick haptics');
+    });
+
+    test('a negative dz stays negative (zoom out)', () {
+      final h = Harness();
+      h.driver.handle(const [ZoomIntent(-7)]);
+      expect(h.zooms, [(0.0, -7 * kZoomUnitPerPx)]);
+    });
+
+    test('scrollReversed flips SCROLL but leaves ZOOM untouched (D-11 is a '
+        'scroll preference; pinch-apart is always zoom-in)', () {
+      final natural = Harness()..scrollReversed = false;
+      natural.driver.handle(const [ScrollIntent(0, 10), ZoomIntent(10)]);
+
+      final reversed = Harness()..scrollReversed = true;
+      reversed.driver.handle(const [ScrollIntent(0, 10), ZoomIntent(10)]);
+
+      expect(reversed.scrolls.single.$2, -natural.scrolls.single.$2,
+          reason: 'the scroll sign gate still works');
+      expect(reversed.zooms, natural.zooms,
+          reason: 'zoom is identical under both settings');
+    });
+
+    test('zoom schedules nothing — a pinch has no momentum', () {
+      final h = Harness();
+      h.driver.handle(const [ZoomIntent(50)]);
+      expect(h.scheduler.tasks, isEmpty,
+          reason: 'no fling loop, no timer, nothing to cancel');
+    });
+  });
+
   group('TrackpadDriver — reset() (disconnect hygiene)', () {
     test('clears drag-lock, cancels momentum + long-press, resets the '
         'classifier via the onReset hook', () {
@@ -252,6 +293,7 @@ void main() {
       final driver = TrackpadDriver(
         onSendMove: (dx, dy) => h.moves.add((dx, dy)),
         onSendScroll: (dx, dy) => h.scrolls.add((dx, dy)),
+        onSendZoom: (dx, dy) => h.zooms.add((dx, dy)),
         onSendReliable: h.reliable.add,
         onHaptic: () => h.haptics++,
         onDragLockChanged: h.dragLock.add,

@@ -97,6 +97,7 @@ Widget _host(ConnectionService service, Widget child) => ProviderScope(
 TrackpadDriver _inertDriver() => TrackpadDriver(
       onSendMove: (_, _) {},
       onSendScroll: (_, _) {},
+      onSendZoom: (_, _) {},
       onSendReliable: (_) {},
       onHaptic: () {},
       onDragLockChanged: (_) {},

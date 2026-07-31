@@ -36,11 +36,13 @@ void main() {
   group('TrackpadDriver scroll-sign gate (D-11)', () {
     TrackpadDriver buildDriver({
       required void Function(double dx, double dy) onSendScroll,
+      void Function(double dx, double dy)? onSendZoom,
       bool Function()? scrollReversed,
     }) =>
         TrackpadDriver(
           onSendMove: (_, _) {},
           onSendScroll: onSendScroll,
+          onSendZoom: onSendZoom ?? (_, _) {},
           onSendReliable: (_) {},
           onHaptic: () {},
           onDragLockChanged: (_) {},
@@ -115,6 +117,7 @@ void main() {
       final driver = TrackpadDriver(
         onSendMove: (_, _) {},
         onSendScroll: (dx, dy) => scrolls.add((dx, dy)),
+        onSendZoom: (_, _) {},
         onSendReliable: (_) {},
         onHaptic: () {},
         onDragLockChanged: (_) {},

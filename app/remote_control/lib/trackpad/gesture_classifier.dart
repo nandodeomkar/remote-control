@@ -14,9 +14,16 @@
 /// Vocabulary (D-04): single-finger move, tap = left click, two-finger tap =
 /// right click (Pitfall 4 disambiguated by [kTwoFingerTapWindowMs] +
 /// [kTapSlopPx]), two-finger scroll with fling seed + instant touch-stop
-/// (PAD-03), and long-press drag with drag-lock (PAD-04 — the lock survives
-/// the lift for screen-edge drags; the next tap "drops"). More than two
-/// concurrent pointers: extras are ignored.
+/// (PAD-03), two-finger PINCH to zoom (SPEC section 9 opcode 0x03), and
+/// long-press drag with drag-lock (PAD-04 — the lock survives the lift for
+/// screen-edge drags; the next tap "drops"). More than two concurrent
+/// pointers: extras are ignored.
+///
+/// Scroll and pinch are the SAME two-finger gesture until the slop crossing,
+/// where ONE arbitration decides between them — accumulated separation change
+/// versus accumulated midpoint translation — and LOCKS for the rest of the
+/// contact. Under slop nothing is decided, which is why the two-finger tap
+/// (right click) path is untouched by pinch.
 ///
 /// Every threshold is a `k*` constant from tuning.dart (D-06) — this file
 /// contains no magic numbers. The clock is the injected [nowMillis] seam
@@ -112,6 +119,27 @@ final class ScrollIntent extends GestureIntent {
 
   @override
   String toString() => 'ScrollIntent($dx, $dy)';
+}
+
+/// Zoom by a change in inter-finger separation (pinch, SPEC section 9 opcode
+/// 0x03). The driver converts px → wheel units ([kZoomUnitPerPx]) — the same
+/// division of labour as [ScrollIntent].
+final class ZoomIntent extends GestureIntent {
+  /// Raw change in the distance between the two pointers, in logical px.
+  /// Positive when the fingers moved APART (zoom in).
+  final double dz;
+
+  /// Creates a zoom intent carrying the raw separation delta.
+  const ZoomIntent(this.dz);
+
+  @override
+  bool operator ==(Object other) => other is ZoomIntent && other.dz == dz;
+
+  @override
+  int get hashCode => Object.hash(ZoomIntent, dz);
+
+  @override
+  String toString() => 'ZoomIntent($dz)';
 }
 
 /// Two-finger lift with velocity: seed the driver's momentum loop (PAD-03).
@@ -241,6 +269,11 @@ enum _Phase {
 
   /// Two-finger travel exceeded slop — streaming [ScrollIntent]s.
   scrolling,
+
+  /// Two-finger SEPARATION dominated at the slop crossing — streaming
+  /// [ZoomIntent]s. Locked for the rest of the contact: a pinch never
+  /// degrades into a scroll, and a scroll never becomes a pinch.
+  pinching,
 }
 
 class _Pointer {
@@ -270,6 +303,19 @@ class GestureClassifier {
   bool _cancelled = false;
   int _firstDownAt = 0;
   double _combinedTravel = 0;
+
+  /// Pinch-vs-scroll arbitration signals, accumulated as ABSOLUTE magnitudes
+  /// from the moment the second finger lands so an in-and-out pinch and a
+  /// there-and-back scroll both register honestly. Compared exactly once, at
+  /// the slop crossing in [_Phase.tapPending2].
+  double _spreadAccum = 0;
+  double _transAccum = 0;
+
+  /// Last observed inter-pointer distance and midpoint; null until two
+  /// pointers are down.
+  double? _lastDist;
+  double _lastMidX = 0;
+  double _lastMidY = 0;
 
   /// Creates a classifier reading time through the injected [nowMillis] seam
   /// (same idiom as ConnectionService — deterministic in tests).
@@ -304,6 +350,9 @@ class GestureClassifier {
     }
     // Second finger.
     _pointers[pointer] = _Pointer(x, y);
+    // Seed the pinch signals from the two live pointers — both accumulators
+    // start at zero so only motion AFTER the second touchdown can classify.
+    _seedPinchGeometry();
     if (_armed) {
       _armed = false;
       intents.add(const DisarmLongPressIntent());
@@ -327,6 +376,10 @@ class GestureClassifier {
     p.x = x;
     p.y = y;
     _combinedTravel += math.sqrt(dx * dx + dy * dy);
+    // Fold this event into the pinch signals BEFORE the phase switch, so the
+    // arbitration below sees the current sample and the pinching arm has its
+    // separation delta ready. Null while fewer than two pointers are live.
+    final dz = _updatePinchGeometry();
     if (_cancelled) return const [];
     switch (_phase) {
       case _Phase.idle:
@@ -345,11 +398,28 @@ class GestureClassifier {
       case _Phase.dragging:
         return [MoveIntent(dx, dy)];
       case _Phase.tapPending2:
+        // Under slop this is still a two-finger TAP candidate — unchanged,
+        // and the reason the right-click path is untouched by pinch.
         if (_combinedTravel <= kTapSlopPx) return const [];
+        // THE arbitration, made exactly once and then locked: separation
+        // must clear an absolute floor AND beat midpoint translation by
+        // kPinchDominanceRatio. Ties go to scroll, the commoner gesture.
+        final isPinch = _spreadAccum >= kPinchMinSpreadPx &&
+            _spreadAccum >= kPinchDominanceRatio * _transAccum;
+        if (isPinch) {
+          _phase = _Phase.pinching;
+          return dz == null ? const [] : [ZoomIntent(dz)];
+        }
         _phase = _Phase.scrolling;
         return [_emitScroll(dx, dy)];
       case _Phase.scrolling:
         return [_emitScroll(dx, dy)];
+      case _Phase.pinching:
+        // Deliberately ASYMMETRIC with scrolling: WR-04 lets a scroll keep
+        // running at full rate on one remaining finger, but one finger
+        // cannot define a separation, so a pinch simply goes quiet. Do not
+        // "fix" this into a single-finger fallback.
+        return dz == null ? const [] : [ZoomIntent(dz)];
     }
   }
 
@@ -401,6 +471,12 @@ class GestureClassifier {
         final fling = _cancelled ? null : _flingFrom(now);
         _samples.clear();
         return fling == null ? const [] : [fling];
+      case _Phase.pinching:
+        // A pinch NEVER seeds a fling — zoom has no momentum, so _flingFrom
+        // is deliberately not consulted here and _samples is never touched
+        // from any pinch path.
+        if (_pointers.isEmpty) _phase = _Phase.idle;
+        return const [];
     }
   }
 
@@ -450,6 +526,69 @@ class GestureClassifier {
     _dragLocked = false;
     _cancelled = false;
     _combinedTravel = 0;
+    _spreadAccum = 0;
+    _transAccum = 0;
+    _lastDist = null;
+    _lastMidX = 0;
+    _lastMidY = 0;
+  }
+
+  /// Zeroes both arbitration accumulators and records the current distance
+  /// and midpoint. Called when the second finger lands; a no-op unless
+  /// exactly two pointers are tracked.
+  void _seedPinchGeometry() {
+    if (_pointers.length != 2) return;
+    final it = _pointers.values.iterator;
+    it.moveNext();
+    final a = it.current;
+    it.moveNext();
+    final b = it.current;
+    _spreadAccum = 0;
+    _transAccum = 0;
+    _lastDist = _distance(a.x, a.y, b.x, b.y);
+    _lastMidX = (a.x + b.x) / 2;
+    _lastMidY = (a.y + b.y) / 2;
+  }
+
+  /// Folds one two-finger move into the arbitration signals and returns the
+  /// raw separation delta (positive = fingers moved apart), or null when two
+  /// pointers are not both live — a single finger cannot define a separation.
+  double? _updatePinchGeometry() {
+    if (_pointers.length != 2) return null;
+    final it = _pointers.values.iterator;
+    it.moveNext();
+    final a = it.current;
+    it.moveNext();
+    final b = it.current;
+
+    final dist = _distance(a.x, a.y, b.x, b.y);
+    final midX = (a.x + b.x) / 2;
+    final midY = (a.y + b.y) / 2;
+
+    final prevDist = _lastDist;
+    if (prevDist == null) {
+      // Defensive: geometry was never seeded (e.g. a pointer arrived out of
+      // order). Adopt the current sample and emit nothing this event.
+      _lastDist = dist;
+      _lastMidX = midX;
+      _lastMidY = midY;
+      return null;
+    }
+
+    final dz = dist - prevDist;
+    _spreadAccum += dz.abs();
+    _transAccum += _distance(midX, midY, _lastMidX, _lastMidY);
+
+    _lastDist = dist;
+    _lastMidX = midX;
+    _lastMidY = midY;
+    return dz;
+  }
+
+  static double _distance(double ax, double ay, double bx, double by) {
+    final dx = ax - bx;
+    final dy = ay - by;
+    return math.sqrt(dx * dx + dy * dy);
   }
 
   /// Records a velocity sample and returns the scroll intent scaled to the

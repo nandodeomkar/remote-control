@@ -161,6 +161,7 @@ class TrackpadCoreState extends ConsumerState<TrackpadCore> {
         TrackpadDriver(
           onSendMove: _service.sendMove,
           onSendScroll: _service.sendScroll,
+          onSendZoom: _service.sendZoom,
           onSendReliable: _service.sendReliable,
           onHaptic: hapticTick,
           onDragLockChanged: (locked) => widget.dragLock.value = locked,
