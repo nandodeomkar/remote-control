@@ -4,8 +4,8 @@ milestone: v1.0
 milestone_name: milestone
 status: Phase 11 COMPLETE and VERIFIED
 stopped_at: Phase 11 closed -- 13/13 plans, VERIFICATION status passed (7/7 goal clauses, 14/14 decisions, 0 gaps)
-last_updated: "2026-07-31T05:10:00.000Z"
-last_activity: 2026-07-31 -- phase 11 VERIFIED (11-VERIFICATION.md, passed); quick 260731-d45 closed 2 deferred items; pending todos 0
+last_updated: "2026-07-31T06:05:00.000Z"
+last_activity: 2026-07-31 -- quick 260731-euq added pinch-to-zoom (binary opcode 0x03, protoVersion 1.7); phase 11 VERIFIED; pending todos 0
 progress:
   total_phases: 11
   completed_phases: 11
@@ -515,6 +515,10 @@ still listed an item that had already moved to `todos/done/`.)
 
 ### Blockers/Concerns
 
+- [quick 260731-euq — SHIP-TOGETHER]: protoVersion is now **1.7** (binary opcode `0x03`, zoom). The next release MUST ship the server exe alongside the APK. An old server does NOT break — `UnknownOpcode` is dropped and counted per SPEC §9 rule 4, the handshake compares only the major component, so the session stays up and move/scroll/click keep working — but **pinch silently does nothing** until the server is updated. Same rule as the phase-10 keymap growth, same reason.
+- [quick 260731-euq — KNOWN EDGE, accepted]: a keyboard-panel sticky Ctrl held at the instant of a pinch is dropped by the zoom arm's `Direction::Release` without updating `dispatch/held.rs` bookkeeping. Self-corrects on the next modifier interaction; consulting held state from the input thread was out of scope.
+- [quick 260731-euq — STALE, unfixed]: `app/packages/remote_protocol/lib/src/version.dart` still declares `protoVersion = '1.1'` (stale since phase 1), aliased into `clientProtoVersion` at `handshake_fsm.dart:23`, so the phone advertises `"1.1"` in `hello` while the server is at `"1.7"`. Harmless (major-only comparison) but wrong. Left unfixed deliberately — changing what the client advertises is a handshake-path behaviour change with its own test surface.
+
 - [Phase 3 — RESOLVED 2026-07-08]: Android UDP broadcast reception CONFIRMED on the owner's Xiaomi 25080RABDI (Android 16 / HyperOS) at the 03-04 early on-device checkpoint — beacons listed within seconds, continuous 2s-interval reception, no MulticastLock failure, no OEM filtering. Cleartext ws:// also proven under the new network_security_config. See 03-04-SUMMARY.md.
 - [Phase 6]: apps.focus foreground-lock workarounds and EnumWindows filtering flagged as highest-fiddliness area — research recommends a phase-level spike during planning
 - [Phase 2 — RESOLVED 2026-07-08]: Hard transport gate PASSED on-device (p50 = 6ms, p95 = 10ms on real WiFi, all four PAD-05 criteria). TCP_NODELAY empirical verification also resolved — sub-6ms p50 under continuous load with no traffic-pattern-dependent hitching. UDP-channel reconsideration NOT triggered. See 02-04-GATE-RESULT.md.
@@ -538,6 +542,7 @@ still listed an item that had already moved to `todos/done/`.)
 | 260729-58x | Tab-group visual hierarchy — grouped runs contained in a tinted `_GroupBlock` | 2026-07-29 | 088c53b | [260729-58x-fix-tab-group-visual-hierarchy-on-the-br](./quick/260729-58x-fix-tab-group-visual-hierarchy-on-the-br/) |
 | 260730-bm0 | Ship v1.4.0-rc1 prerelease with phase 11 bookmarks artifacts (server 1.4.0, app 1.4.0+7, extension 1.2.0) | 2026-07-30 | 2fca0cb | [260730-bm0-ship-v1-4-0-rc1-prerelease-with-phase-11](./quick/260730-bm0-ship-v1-4-0-rc1-prerelease-with-phase-11/) |
 | 260731-d45 | Close 2 deferred items: `noPairing` gets its own copy (client-only, zero wire change); group titles trimmed of lone surrogates via a shared `capTitle(s, max)` | 2026-07-31 | 0cd5104, 081df65 | [260731-d45-close-deferred-nopairing-copy-and-group-title-cap](./quick/260731-d45-close-deferred-nopairing-copy-and-group-title-cap/) |
+| 260731-euq | Pinch-to-zoom: binary opcode `0x03` executed as a Ctrl-held wheel tick, spread-vs-translation gesture arbitration locked per episode (protoVersion 1.7) | 2026-07-31 | d2900af, 3a7b0c8 | [260731-euq-add-pinch-zoom-to-trackpad-binary-opcode](./quick/260731-euq-add-pinch-zoom-to-trackpad-binary-opcode/) |
 
 ## Deferred Items
 
