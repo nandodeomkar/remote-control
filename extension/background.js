@@ -36,6 +36,21 @@ function bytesOf(s) {
   return new TextEncoder().encode(s).length;
 }
 
+// Cap a title at `max` code units, never leaving a lone surrogate behind.
+// slice() cuts on UTF-16 CODE UNITS, so an emoji straddling the cap is split in
+// half and JSON.stringify then emits a bare "\ud83d", which serde_json rejects
+// as a hard decode error. On BOTH consumers the server decodes the WHOLE frame
+// envelope before any per-field tolerance can run, so one such title costs the
+// entire snapshot: the whole bm.state tree on the bookmarks path, and the whole
+// tabs.state frame - including the extension-connected signal the phone reads -
+// on the tabs path. Shared by the group cap and the bookmark cap so the trim has
+// exactly ONE implementation; the failure it prevents is silent on both paths.
+function capTitle(s, max) {
+  const t = (s || "").slice(0, max);
+  const last = t.charCodeAt(t.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? t.slice(0, -1) : t;
+}
+
 // chrome.tabGroups may be absent (older browsers / non-Chromium forks) — the
 // worker must still load and report ungrouped tabs.
 const GROUP_ID_NONE = chrome.tabGroups ? chrome.tabGroups.TAB_GROUP_ID_NONE : -1;
@@ -489,7 +504,7 @@ async function buildAndSend() {
         .slice(0, MAX_GROUPS)
         .map((g) => ({
           id: g.id,
-          title: (g.title || "").slice(0, MAX_GROUP_TITLE),
+          title: capTitle(g.title, MAX_GROUP_TITLE),
           color: g.color,
           collapsed: !!g.collapsed,
         }));
@@ -540,17 +555,6 @@ async function buildAndSend() {
 // hint instead of being told the collection is empty.
 // ---------------------------------------------------------------------------
 
-// Cap a bookmark title at MAX_BM_TITLE, never leaving a lone surrogate behind.
-// slice() cuts on UTF-16 code units, so an emoji straddling the cap is split in
-// half; JSON.stringify then emits a bare "\ud83d", which serde_json rejects as
-// a hard decode error — and bm.state ingest is STRICT, so ONE such title would
-// silently cost the phone the entire bookmark tree.
-function capBmTitle(s) {
-  const t = (s || "").slice(0, MAX_BM_TITLE);
-  const last = t.charCodeAt(t.length - 1);
-  return last >= 0xd800 && last <= 0xdbff ? t.slice(0, -1) : t;
-}
-
 async function buildBmSnapshot() {
   if (!chrome.bookmarks) return null; // permission withheld / API absent
   let tree;
@@ -588,7 +592,7 @@ async function buildBmSnapshot() {
     const el = {
       id: n.id,
       parentId,
-      title: capBmTitle(n.title),
+      title: capTitle(n.title, MAX_BM_TITLE),
     };
     if (n.children !== undefined) {
       el.folder = true;
