@@ -377,7 +377,7 @@ Plans:
 **Goal:** The phone can browse the PC browser's bookmark tree by folder, open a bookmark in a new tab, star/unstar any tab, and delete a bookmark or an empty folder — delivered as a second segment on the existing Browser screen (protoVersion 1.6), with URL resolution staying extension-side so no `url` field ever crosses the phone-facing wire.
 **Requirements**: none mapped — the acceptance surface is decisions D-01..D-14 in `11-CONTEXT.md`
 **Depends on:** Phase 10
-**Plans:** 11/13 plans executed
+**Plans:** 13/13 plans executed
 
 Plans:
 
@@ -392,5 +392,5 @@ Plans:
 - [x] 11-09-PLAN.md — BookmarksSection widget, shared InstallHintCard, confirmDestructive + copy, isolated widget tests
 - [x] 11-10-PLAN.md — Browser screen restructure: Tabs|Bookmarks segment, pinned macro grid, lazy bm.list prime, persistence
 - [x] 11-11-PLAN.md — trailing star slot on tab rows: tri-state render, arena isolation, unstar confirm gate
-- [ ] 11-12-PLAN.md — phase gate, on-device UAT (11 steps), extension README written from the observed UAT-1 outcome
-- [ ] 11-13-PLAN.md — UAT-8 / Failure B fix: move _BmRow's drill-in/open off onTapDown onto onTap, real-timed-press regression tests, 11-UI-SPEC gesture-map amendment
+- [x] 11-12-PLAN.md — phase gate, on-device UAT (11 steps), extension README written from the observed UAT-1 outcome
+- [x] 11-13-PLAN.md — UAT-8 / Failure B fix: move _BmRow's drill-in/open off onTapDown onto onTap, real-timed-press regression tests, 11-UI-SPEC gesture-map amendment

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 11
-stopped_at: 11-13 COMPLETE (4/4, UAT-8 re-run PASSED on device); all 13 plans done; phase 11 ready for verification
-last_updated: "2026-07-31T03:45:00.000Z"
-last_activity: 2026-07-31 -- 11-13 task 4 UAT-8 re-run PASSED (B1-B6); Failure B closed; phase 11 blocking item resolved
+status: Phase 11 COMPLETE and VERIFIED
+stopped_at: Phase 11 closed -- 13/13 plans, VERIFICATION status passed (7/7 goal clauses, 14/14 decisions, 0 gaps)
+last_updated: "2026-07-31T05:10:00.000Z"
+last_activity: 2026-07-31 -- phase 11 VERIFIED (11-VERIFICATION.md, passed); quick 260731-d45 closed 2 deferred items; pending todos 0
 progress:
   total_phases: 11
-  completed_phases: 10
-  total_plans: 89
-  completed_plans: 88
-  percent: 91
+  completed_phases: 11
+  total_plans: 90
+  completed_plans: 90
+  percent: 100
 ---
 
 # Project State
@@ -21,11 +21,11 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 11 — browser-bookmarks-view-open-star-current-tab
+**Current focus:** Phase 11 CLOSED. Milestone v1.0 phases all complete — next is milestone close / a new milestone.
 
 ## Current Position
 
-Phase: 11 (browser-bookmarks-view-open-star-current-tab) — EXECUTING
+Phase: 11 (browser-bookmarks-view-open-star-current-tab) — COMPLETE and VERIFIED 2026-07-31
 Plan: 12 of 12
 Next: wave 7 is 11-12 — the phase's docs + UAT plan (SPEC/README prose and the
   on-device checks), the last plan of phase 11.
@@ -188,7 +188,7 @@ Last activity: 2026-07-31 -- 11-13 COMPLETE (4/4). **UAT-8 RE-RUN PASSED ON DEVI
   `Search by name` id 587 in Bookmarks bar, empty `UAT8 test folder` id 588 in
   Other bookmarks.
 
-Progress: [█████████░] 88% (10 of 11 phases complete; 78 of 89 plans)
+Progress: [██████████] 100% (11 of 11 phases complete; 90 of 90 plans)
 
 ## Performance Metrics
 
