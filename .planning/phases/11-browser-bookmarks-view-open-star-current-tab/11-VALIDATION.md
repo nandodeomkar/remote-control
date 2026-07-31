@@ -84,12 +84,17 @@ canonical-cwd assertion lives at `fixture_test.dart:24-31`.
 | 11-12-01 | 12 | 7 | — (phase gate) | — | All three suites + analyzer green before any device run | full suite | `cd server && cargo test --workspace && cd ../app/packages/remote_protocol && dart test && cd ../../remote_control && flutter analyze && flutter test` | ✅ | ⬜ pending |
 | 11-12-02 | 12 | 7 | D-04/D-08/D-10/D-11/D-12/D-14 | T-11-07, T-11-04, T-11-01 | Real-collection frame size; real Chrome delete rejection path | **human-check (UAT-1…UAT-11)** | manual — recorded in `11-UAT.md` | ❌ created here | ⬜ pending |
 | 11-12-03 | 12 | 7 | — (docs) | T-11-02, T-11-12 | Smoke check prints counts and sizes only; permission justified | source assertion | `node -e "…README + UAT-1 recorded check…"` | ✅ | ⬜ pending |
+| 11-13-01 | 13 | 8 | D-13/D-14 | T-11-04, T-11-13 | The action must fire only once the tap WINS the arena — `onTapDown` runs at `kPressTimeout` on every long press too | source assertion + widget | `cd app/remote_control && flutter analyze && flutter test test/browser/` | ✅ | ⬜ pending |
+| 11-13-02 | 13 | 8 | D-13/D-14 | T-11-04, T-11-16 | A REAL timed press at the screen layer, where the live notifier actually swaps the list; RED-proof against the pre-fix wiring | widget (2 layers) | `cd app/remote_control && flutter test test/browser/bookmarks_section_test.dart test/browser/browser_screen_test.dart` | ✅ | ⬜ pending |
+| 11-13-03 | 13 | 8 | D-13/D-14 | T-11-13 | The SPEC was the root cause — a contradictory gesture map cannot survive, or the defect is re-implemented | source assertion | `test "$(grep -c 'tap-DOWN fire' 11-UI-SPEC.md)" = 0 && test "$(grep -c 'flash ONLY' 11-UI-SPEC.md)" = 2` | ✅ | ⬜ pending |
+| 11-13-04 | 13 | 8 | D-13/D-14 | T-11-04 | Only real hardware can prove the gesture is reachable by a human finger — the defect was invisible to a green suite | **human-check (UAT-8 re-run, B1–B6)** | manual — recorded in `11-UAT.md` | ❌ created here | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
-**Sampling continuity check:** 35 tasks, exactly one (`11-12-02`) without an `<automated>` command,
-and it is bracketed by automated tasks on both sides. No three consecutive tasks lack automated
-verification.
+**Sampling continuity check:** 39 tasks, exactly two (`11-12-02` and `11-13-04`) without an
+`<automated>` command. Neither is adjacent to another human-check — `11-12-02` is bracketed by
+automated tasks on both sides, and `11-13-04` follows three automated tasks (`11-13-01`…`11-13-03`).
+No three consecutive tasks lack automated verification.
 
 **Layer assignments carried from research (preserved by the plan set):**
 
@@ -163,7 +168,7 @@ Manual-only because each needs a real Chrome, a real bookmark collection, or a r
 
 ## Validation Sign-Off
 
-- [x] All tasks have `<automated>` verify or a documented human-check (35 tasks; 1 human-check)
+- [x] All tasks have `<automated>` verify or a documented human-check (39 tasks; 2 human-checks)
 - [x] Sampling continuity: no 3 consecutive tasks without automated verify
 - [x] Wave 0 covers all MISSING references (each assigned to an owning task)
 - [x] No watch-mode flags

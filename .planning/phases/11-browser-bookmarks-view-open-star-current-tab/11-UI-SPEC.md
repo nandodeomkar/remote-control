@@ -33,7 +33,7 @@ reviewed_at: 2026-07-29
 | Idiom | Source | What carries over |
 |-------|--------|-------------------|
 | Segmented control | `lib/settings/settings_screen.dart` `_ScrollDirectionSegment` + `_SegmentButton` (`:409-485`) | Two `Expanded` children, 8px gap, `Material(kBg)` + `InkWell`, `minHeight 40`, radius 8, border `kAccent` when selected else `kHairline`, label 14/400 `kAccent`/`kMuted` |
-| List row | `lib/browser/browser_screen.dart` `_TabRow` (`:738-818`) | `Material(kSurface)` + radius-16 `RoundedRectangleBorder`, `kHairline` border, `minHeight 56`, 12px horizontal padding, `InkWell` with tap-DOWN fire + 100ms accent flash |
+| List row | `lib/browser/browser_screen.dart` `_TabRow` (`:738-818`) | `Material(kSurface)` + radius-16 `RoundedRectangleBorder`, `kHairline` border, `minHeight 56`, 12px horizontal padding, `InkWell` with a 100ms accent flash on tap-DOWN; the ACTION fires on tap-down for `_TabRow` ONLY — any new row must read § Why `_BmRow` fires on tap while `_TabRow` fires on tap-down first |
 | Install-hint card | `lib/browser/browser_screen.dart` `_InstallHintCard` (`:555-599`) | `kSurface` fill, `kHairline` border, radius 16, padding 16, 24px muted glyph + 12px gap + 14/600 title + 4px + 12/400 muted body |
 | Muted one-liner empty state | `lib/browser/browser_screen.dart` (`:450-461`) | Left-aligned `Text` 12/400 `kMuted`, no card, no icon |
 | Destructive confirm dialog | `lib/settings/settings_screen.dart` `_confirmRevoke` (`:272-301`) | `AlertDialog` `kSurface` bg, radius 16, title 16/600 `kText`, body 14/400 `kMuted`, `TextButton` Cancel (`kMuted`) + `FilledButton` (`kError` bg, `kBg` fg, `minimumSize (0,48)`) |
@@ -207,7 +207,7 @@ Row(children: [
 ])
 ```
 
-| Node kind | Leading glyph | Trailing | Tap-down action |
+| Node kind | Leading glyph | Trailing | Tap action |
 |-----------|---------------|----------|-----------------|
 | Folder | `Symbols.folder_rounded` 24px | `· N` count + chevron | Drill in (local nav) + `hapticTick()` |
 | Link | `Symbols.bookmark_rounded` 24px | none | `bm.open {nodeId}` + `hapticTick()` |
@@ -222,7 +222,7 @@ Row(children: [
 - **Gesture (discretion resolved): long-press a row → confirm dialog.** This keeps the screen's gesture vocabulary coherent — long-press already means "remove" on tab rows in the sibling segment — and keeps the row's only content (its title) free of a permanently-visible destructive button.
 - **No swipe on bookmark rows.** Swipe-to-close stays exclusive to tab rows; a destructive bookmark action must not have a fast, undoable-looking gesture.
 - Long-press is offered **only** when the row is deletable: a link, or a folder with `count == 0`, and in both cases `locked != true`. A non-empty folder, a locked (managed) node, and every root folder offer **no** long-press at all — `onLongPress: null`, no visual difference, nothing to discover.
-- **Discoverability line:** when the current folder holds at least one deletable child, render a final muted line after the rows: `Long-press a bookmark to delete it.` (12/400 `kMuted`, left-aligned, 8px above). If the folder is also truncated, the truncation line renders **above** the hint line with a 4px gap.
+- **Discoverability line:** when the current folder holds at least one deletable child, render a final muted line after the rows: `Long-press a bookmark or empty folder to delete it.` (12/400 `kMuted`, left-aligned, 8px above). If the folder is also truncated, the truncation line renders **above** the hint line with a 4px gap. The line names the empty-folder case because D-14 genuinely permits it — `hasDeletableChild` is true for a deletable link **or** a deletable empty unlocked folder, so a hint that mentions only bookmarks advertises less than the app actually does. Naming "empty" also teaches the D-14 rule, so a user who long-presses a non-empty folder and gets nothing reads it as the documented rule rather than a broken app.
 
 ### Truncation (D-06)
 
@@ -300,10 +300,27 @@ The row gesture budget is the reason D-09 exists — this table is the contract.
 | Segment button | — | switch segment + haptic (always enabled) | — | — |
 | Tab row (existing) | activate + flash + haptic | no-op | close + haptic | `Dismissible` → close + spring back |
 | **Tab row star (new)** | — | **star / open unstar dialog** — must NOT activate the tab | — | drag still belongs to the `Dismissible` (correct, unchanged) |
-| **Bookmark link row (new)** | `bm.open` + flash + haptic | no-op | confirm → delete | **none** |
-| **Folder row (new)** | drill in + flash + haptic | no-op | confirm → delete, **only when `count == 0` and unlocked** | **none** |
+| **Bookmark link row (new)** | flash ONLY — no send | `bm.open` + haptic | confirm → delete | **none** |
+| **Folder row (new)** | flash ONLY — no navigation | drill in + haptic | confirm → delete, **only when `count == 0` and unlocked** | **none** |
 | **Folder back button (new)** | — | pop one level + haptic | — | — |
 | Macro button (existing) | fire + flash + haptic | — | — | — |
+
+### Why _BmRow fires on tap while _TabRow fires on tap-down (deliberate divergence)
+
+This table originally put the drill-in on tap-down **and** a `long-press: confirm → delete` on the same folder row. Those two are mutually exclusive by construction, and plan 11-09 implemented the contradiction faithfully. The result was Failure B, observed on device 2026-07-30 (Comet 150.0.7871.115) and recorded in `11-UAT.md`.
+
+**The mechanism.** `BaseTapGestureRecognizer.didExceedDeadline()` calls `_checkDown()`, so `onTapDown` fires at `kPressTimeout` (100ms) whether or not the tap won the arena. `LongPressGestureRecognizer` sets `deadline: kLongPressTimeout` (500ms) and only then calls `resolve(GestureDisposition.accepted)`. A side effect on `onTapDown` therefore runs on EVERY long press, 400ms before the long press can resolve.
+
+- `_TabRow` **survives** this because activating a tab does not remove the row, so its long-press close still lands (UAT-11 passed). Its tap-down activate is LOCKED by 11-10/11-11 and stays.
+- `_BmRow` **does not survive** it: a folder drill-in REPLACES the list, so the pressed row is gone before the long press resolves. That made D-14's empty-folder delete unreachable by any gesture, and made a link's D-13 delete force an unwanted `bm.open` first.
+
+**The rule for any future row: a row whose tap action REPLACES or REMOVES the row must fire on `onTap`, never on `onTapDown`. Only a row that survives its own tap action may keep a tap-down send.**
+
+**Corollary, and it is load-bearing: a NON-deletable row behaves differently under a hold than a deletable one, and that is intended.** A deletable row carries a `LongPressGestureRecognizer`, which wins the arena at 500ms and rejects the tap, so nothing navigates. A non-deletable row (`onLongPress: null` — a non-empty folder, a locked node, every root) registers no long-press recognizer at all, so the tap recognizer is unopposed, has no upper time bound, and fires `onTap` on pointer-up however long the hold was. **Holding a non-empty folder and releasing therefore DOES drill in.** The D-14 gate withholds the DELETE, never the navigation. Do not "fix" this with a dummy `onLongPress`, an `onTapCancel`, or a hold timer — all three would add unspecified, untested suppression to a row that is behaving correctly.
+
+The two row kinds are visually and tactilely identical on a quick tap — both flash on tap-down at the press instant — and differ only under a held press. This divergence is intentional; do not "harmonise" it away.
+
+`onTapCancel` is deliberately not wired on `_BmRow`: the 100ms relax clears `_pressed` at ~200ms, 300ms before a long press can resolve, so there is no stuck-flash state to clear.
 
 ---
 
@@ -318,7 +335,7 @@ The row gesture budget is the reason D-09 exists — this table is the contract.
 | Rest (online) | `kSurface` | `kHairline` | glyph `kMuted`, title `kText` |
 | Pressed flash (100ms) | `kSurface` | `kAccent` | glyph + title `kAccent` |
 | Active tab (existing) | `kSurface` | `kAccent` | title `kText` |
-| Gated | `kSurface` | `kHairline` | glyph + title `kMuted`, tap-down + long-press null |
+| Gated | `kSurface` | `kHairline` | glyph + title `kMuted`, every callback null (tap, tap-down, long-press) |
 
 **Star slot:** filled/accent · filled/muted (gated) · outline/muted · absent — per the tri-state table above.
 
@@ -334,7 +351,7 @@ The row gesture budget is the reason D-09 exists — this table is the contract.
 
 | Element | Duration / curve |
 |---------|------------------|
-| Row press flash (bookmark, folder, tab) | 100ms relax, no easing — the shipped `_TabRow` pattern |
+| Row press flash (bookmark, folder, tab) | 100ms relax, no easing — the shipped `_TabRow` pattern. The flash still STARTS on tap-down for all three row kinds; only the ACTION moved to tap on bookmark rows, so a quick tap is visually and tactilely identical across the two segments. |
 | Macro button press flash (existing) | momentary, no easing — unchanged |
 | Segment switch | **0ms — instant swap.** No cross-fade, no slide, no `PageView`. |
 | Star fill flip | **0ms — instant.** Optimistic feedback must be immediate. |
@@ -396,7 +413,7 @@ House rule: **no inline copy literals** — every string below ships as a named 
 | Extension missing (shared by both segments) | `Install the browser extension` / `See tabs here by loading the free Tab Bridge extension on your PC — the extension/README.md file in the Remote Control download walks through it.` (existing card, verbatim — **do not fork a bookmarks-specific variant**) |
 | Truncation — snapshot level | `Showing the first 500 bookmarks.` |
 | Truncation — per folder | `Some bookmarks here aren't shown.` |
-| Delete discoverability hint | `Long-press a bookmark to delete it.` |
+| Delete discoverability hint | `Long-press a bookmark or empty folder to delete it.` |
 | Semantic labels (icon-only controls) | `Bookmark this tab` · `Remove bookmark` · `Back to parent folder` — see § Accessibility Labels |
 | Destructive confirmation — unstar | `Remove bookmark?` / `This removes every bookmark on your PC that points to this page. It can't be undone.` / `Remove` / `Cancel` |
 | Destructive confirmation — bookmark | `Delete this bookmark?` / `It will be removed from your PC's bookmarks. This can't be undone.` / `Delete` / `Cancel` |
