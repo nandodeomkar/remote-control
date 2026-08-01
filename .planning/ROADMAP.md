@@ -401,7 +401,7 @@ Plans:
 **Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
 **Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
 **Depends on:** Phase 11
-**Plans:** 2/18 plans executed
+**Plans:** 7/18 plans executed
 
 **Success Criteria** (what must be TRUE):
 
@@ -422,11 +422,11 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 12-04-PLAN.md — server-core `update.*` codecs, the `UpdateExecutor` trait and state types, fixture registration, and the SC6 structural guard test (wave 2)
-- [ ] 12-05-PLAN.md — Dart `update.*` codecs pinned to the same fixtures, plus the SC8 forward-compat tests (wave 2)
-- [ ] 12-06-PLAN.md — server-windows `update/{mod,feed,download}.rs`: `ureq`, the compiled-in locator constants, feed parse, streaming download and verify-or-delete (wave 2)
-- [ ] 12-07-PLAN.md — phone `version.dart`, `update_cache.dart` (24h TTL) and `update_format.dart`, pinned to the shared version-compare table (wave 2)
-- [ ] 12-08-PLAN.md — Android install channel: `apk_installer.dart`, the `PackageInstaller` session, `InstallResultReceiver`, and the manifest entries (wave 2)
+- [x] 12-04-PLAN.md — server-core `update.*` codecs, the `UpdateExecutor` trait and state types, fixture registration, and the SC6 structural guard test (wave 2)
+- [x] 12-05-PLAN.md — Dart `update.*` codecs pinned to the same fixtures, plus the SC8 forward-compat tests (wave 2)
+- [x] 12-06-PLAN.md — server-windows `update/{mod,feed,download}.rs`: `ureq`, the compiled-in locator constants, feed parse, streaming download and verify-or-delete (wave 2)
+- [x] 12-07-PLAN.md — phone `version.dart`, `update_cache.dart` (24h TTL) and `update_format.dart`, pinned to the shared version-compare table (wave 2)
+- [x] 12-08-PLAN.md — Android install channel: `apk_installer.dart`, the `PackageInstaller` session, `InstallResultReceiver`, and the manifest entries (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 

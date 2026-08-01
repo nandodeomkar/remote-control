@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-08-01T10:45:56.137Z"
-last_activity: 2026-08-01 -- Phase 12 execution started
+status: Executing Phase 12
+stopped_at: Completed wave 2 (12-04, 12-05, 12-06, 12-07, 12-08)
+last_updated: "2026-08-01T15:54:56.407Z"
+last_activity: 2026-08-01 -- Phase 12 wave 2 complete, merged and gated
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 92
-  percent: 85
+  completed_plans: 97
+  percent: 90
 ---
 
 # Project State
@@ -26,12 +26,47 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 3 of 18
-Next: /gsd-execute-phase 12.
+Plan: 8 of 18
+Next: /gsd-execute-phase 12 --wave 3 — BUT see checkpoint 1 below; 12-03 T1
+needs the public mirror repo to exist before wave 3 can get past its first task.
 
-  Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) · W2
-  `12-04,12-05,12-06,12-07,12-08` · W3 `12-03,12-09` · W4 `12-10,12-11` · W5
-  `12-12,12-14` · W6 `12-13,12-15,12-17` · W7 `12-16` · W8 `12-18`.
+  Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) — DONE · W2
+  `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` · W4
+  `12-10,12-11` · W5 `12-12,12-14` · W6 `12-13,12-15,12-17` · W7 `12-16` · W8
+  `12-18`.
+
+  WAVE 2 RESULT (merged to master, post-merge gates green): Rust workspace 246
+  passed / 0 failed / 2 ignored (was 207); `remote_protocol` 22/22;
+  `remote_control` 679/679; `cargo build --workspace` and `flutter build apk
+  --debug` both exit 0. Both language halves of the `update.*` wire contract now
+  exist and are pinned to the SAME nine shared fixtures, and both version
+  comparators are pinned to the same 15-case truth table
+  (`protocol/fixtures/update/10-version-compare.json`).
+
+  CARRIED FROM WAVE 2 — things a later plan must not rediscover:
+
+  - `router.rs` holds a DOCUMENTED PLACEHOLDER: `UpdateCheck`/`UpdateApply` =>
+    `Vec::new()`. It is deliberately NOT `err{unknownType}` — a false
+    `unknownType` is what the phone caches as "server too old to update itself"
+    per SPEC §10. 12-12 must replace this when `Executors.update` exists.
+    `UpdateStatus`/`UpdateProgress` joined the permanent S→C-only ignore chain
+    and are FINAL (12-13 asks for exactly that).
+  - sha2 0.11 has NO `std` feature, so `Sha256` is NOT an `io::copy` sink — the
+    RESEARCH.md example does not compile. `download.rs` uses a 64 KiB chunked
+    read loop instead. Do not "simplify" it back into a build error.
+  - `is_valid_target` (server-windows `update/download.rs`) is public precisely
+    so 12-09 does not invent a second version regex. Reuse it.
+  - 12-08's outcome seam is a reverse `MethodCall` on the SAME channel, not an
+    `EventChannel`. 12-10/12-14/12-15 consume `ApkInstaller().outcomes` as a
+    `Stream<InstallEvent>`.
+  - Asset sizes are deliberately NOT cached by `update_cache.dart`. A plan
+    needing `{size}` offline must add a third `update.` key, not assume one.
+  - `LastUpdate.toPayload()` (Dart) is inconsistent with `toJson()` on the three
+    older nested value classes in the same file. Plan-specified; rename
+    deliberately if ever, not incidentally.
+  - Dart `specialCaseFixtures` is keyed by family; the Rust
+    `SPECIAL_CASE_FIXTURES` is keyed by `(family, filename)` and is the stricter
+    of the two. Align the Dart side if a `text/10-*.json` ever appears.
 
   THREE BLOCKING HUMAN CHECKPOINTS, all `autonomous: false`:
 
@@ -147,7 +182,7 @@ Phase 11 (browser-bookmarks-view-open-star-current-tab) — COMPLETE and VERIFIE
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-08-01 -- Completed quick task 260801-r8x: stage server/Cargo.lock in the release commit
+Last activity: 2026-08-01 -- Phase 12 execution started
   (B1-B6), so Failure B is closed and phase 11's blocking item is resolved. All 13
   plans now have SUMMARY files. B2 proved the originally-unreachable gesture: a
   long-press on an EMPTY folder surfaced `Delete this folder?` WITHOUT navigating
