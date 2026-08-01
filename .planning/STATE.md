@@ -147,7 +147,7 @@ Phase 11 (browser-bookmarks-view-open-star-current-tab) — COMPLETE and VERIFIE
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-08-01 -- Phase 12 execution started
+Last activity: 2026-08-01 -- Completed quick task 260801-r8x: stage server/Cargo.lock in the release commit
   (B1-B6), so Failure B is closed and phase 11's blocking item is resolved. All 13
   plans now have SUMMARY files. B2 proved the originally-unreachable gesture: a
   long-press on an EMPTY folder surfaced `Delete this folder?` WITHOUT navigating
@@ -597,6 +597,7 @@ still listed an item that had already moved to `todos/done/`.)
 | 260730-bm0 | Ship v1.4.0-rc1 prerelease with phase 11 bookmarks artifacts (server 1.4.0, app 1.4.0+7, extension 1.2.0) | 2026-07-30 | 2fca0cb | [260730-bm0-ship-v1-4-0-rc1-prerelease-with-phase-11](./quick/260730-bm0-ship-v1-4-0-rc1-prerelease-with-phase-11/) |
 | 260731-d45 | Close 2 deferred items: `noPairing` gets its own copy (client-only, zero wire change); group titles trimmed of lone surrogates via a shared `capTitle(s, max)` | 2026-07-31 | 0cd5104, 081df65 | [260731-d45-close-deferred-nopairing-copy-and-group-title-cap](./quick/260731-d45-close-deferred-nopairing-copy-and-group-title-cap/) |
 | 260731-euq | Pinch-to-zoom: binary opcode `0x03` executed as a Ctrl-held wheel tick, spread-vs-translation gesture arbitration locked per episode (protoVersion 1.7) | 2026-07-31 | d2900af, 3a7b0c8 | [260731-euq-add-pinch-zoom-to-trackpad-binary-opcode](./quick/260731-euq-add-pinch-zoom-to-trackpad-binary-opcode/) |
+| 260801-r8x | Stage `server/Cargo.lock` in the release commit — Codex P1 on PR #1: cargo rewrites the lockfile during the installer build, so leaving it out made the tag name a stale tree (`cargo build --locked` fails) and left dirt that tripped the next run's preflight | 2026-08-01 | 8b875b1 | [260801-r8x-stage-server-cargo-lock-in-the-release-c](./quick/260801-r8x-stage-server-cargo-lock-in-the-release-c/) |
 
 ## Deferred Items
 
