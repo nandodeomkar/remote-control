@@ -294,6 +294,137 @@ pub trait Bookmarks: Send + Sync {
     fn remove(&self, node_id: &str);
 }
 
+/// One `update.progress` push in plain-data form (protoVersion 1.8, phase 12,
+/// D-10/D-11) — the core-owned twin of `codec::json::UpdateProgressPayload`,
+/// ZERO OS deps so server-core keeps compiling on CI Linux.
+///
+/// **`Default` yields an EMPTY `stage`, and an empty stage is a SENTINEL that
+/// is NEVER sent on the wire** — the session push arm skips it. The D-10
+/// vocabulary (`checking`, `downloading`, `verifying`, `installing`,
+/// `restarting`, `uptodate`, `failed`) has no idle value, and a watch channel
+/// needs an initial one; rather than invent an eighth stage that the phone
+/// would have to learn to ignore, the initial value is a shape the protocol
+/// cannot express and the producer filters out. Anything reading this type
+/// must treat `stage.is_empty()` as "nothing has happened yet", not as a
+/// stage.
+///
+/// `pct` belongs to `downloading` alone (D-10) and `error` draws from the
+/// closed D-11 vocabulary — never free text, never a path, never a URL.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct UpdateProgress {
+    /// Closed D-10 vocabulary, or EMPTY for the never-sent initial value.
+    pub stage: String,
+    /// `downloading` only (D-10).
+    pub pct: Option<u8>,
+    pub version: Option<String>,
+    /// Closed D-11 vocabulary.
+    pub error: Option<String>,
+}
+
+/// The outcome of the PREVIOUS update attempt (protoVersion 1.8, D-12) — the
+/// plain-data twin of `codec::json::LastUpdatePayload`.
+///
+/// Read at startup from a marker file the server wrote before handing control
+/// to the installer. It exists because the process that would otherwise have
+/// reported a failed install **had already exited to let the installer replace
+/// it**: without the marker, a failed PC install is indistinguishable from a
+/// successful one that simply took a while to come back.
+///
+/// Deliberately NOT `Default`: there is no meaningful "no previous attempt"
+/// value of this struct — that state is `UpdateInfo::last_update == None`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct LastUpdate {
+    pub target: String,
+    pub ok: bool,
+    /// Closed D-11 vocabulary; present only when `ok` is `false`.
+    pub error: Option<String>,
+}
+
+/// Everything behind an `update.status` reply (protoVersion 1.8, D-09/D-12) —
+/// the plain-data twin of `codec::json::UpdateStatusPayload`, returned by
+/// [`UpdateExecutor::info`].
+///
+/// `Default` is the "no version known, extension never connected, no previous
+/// attempt" shape. A real implementation always fills `server_version` from
+/// its own compiled-in version, so the default's empty string should never
+/// reach the wire.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct UpdateInfo {
+    pub server_version: String,
+    pub ext_connected: bool,
+    /// `None` when the extension has never connected — skipped on the wire,
+    /// never emitted as null.
+    pub ext_version: Option<String>,
+    /// `None` is the NORMAL case (no marker); see [`LastUpdate`].
+    pub last_update: Option<LastUpdate>,
+}
+
+/// What the server knows about the connected browser extension (protoVersion
+/// 1.8, phase 12) — the THIRD relay watch payload, beside [`TabsState`] and
+/// [`BookmarksState`].
+///
+/// The ext relay publishes into it when it captures `ext.hello`'s `extVersion`
+/// (12-12), and the Windows update executor reads it to fill
+/// `update.status`'s `extConnected` and `extVersion`. It is defined HERE, in
+/// the plan that owns the update state types, so that the executor can be
+/// constructed a wave before the relay actually produces into it.
+///
+/// `Default` is the never-connected shape `{connected: false, version: None}`
+/// — and `version: None` means "we have never seen a version", which is
+/// exactly what `update.status` renders by omitting `extVersion`.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ExtInfo {
+    /// Whether a browser extension is currently connected (SPEC §15).
+    pub connected: bool,
+    /// The extension's self-reported version, `None` until an `ext.hello`
+    /// carrying one has been seen.
+    pub version: Option<String>,
+}
+
+/// In-app update control (protoVersion 1.8, phase 12).
+///
+/// Sync `&self` methods and NO OS types, per this module's header rule — which
+/// here is not only a portability rule but the security boundary itself
+/// (D-14, below). All I/O (feed fetch, download, sha256, installer spawn)
+/// lives in the `server-windows` implementation, in a crate the codec cannot
+/// see.
+pub trait UpdateExecutor: Send + Sync {
+    /// The data behind an `update.status` reply.
+    ///
+    /// A CHEAP READ with NO I/O — it reports state the executor already holds
+    /// (its own version, the latest relay snapshot, a marker read once at
+    /// startup). It never touches the network: the release feed is polled on
+    /// the executor's own schedule, never on the request path.
+    ///
+    /// **It TAKES the pending `last_update`** rather than copying it: a marker
+    /// is reported on exactly ONE `update.status` and never again (D-12).
+    /// Reporting a stale marker on every subsequent status would show the
+    /// owner a failure that has already been superseded — possibly by a
+    /// success. That is why this read is `&self` but not idempotent.
+    fn info(&self) -> UpdateInfo;
+
+    /// Install `target` on this machine. FIRE-AND-FORGET: the work happens on
+    /// the executor's own thread and reports back through `update.progress`
+    /// pushes, so there is no return value and no error to surface here.
+    ///
+    /// **D-14 — `target` is a version string and NOTHING else.** The executor
+    /// resolves the asset's download URL and its sha256 **itself**, from a
+    /// repo constant compiled into its own binary, and never accepts, derives,
+    /// or is influenced by a locator supplied over the wire. `target` is used
+    /// for exactly two things: an equality check against the version the
+    /// executor just resolved as latest (mismatch ⇒ `stale`) and an ordering
+    /// check against the running version (at-or-below ⇒ `downgrade`, D-15).
+    /// It is never concatenated into a URL or a filesystem path.
+    ///
+    /// **Widening this signature to accept a URL, a filename, an asset index,
+    /// an asset id or a hash would convert a paired phone — or anything that
+    /// obtained a token — into arbitrary code execution on the PC.** This is
+    /// the strongest constraint in the protocol; it must not be relaxed for
+    /// convenience, now or later. `tests/update_guard.rs` fails the build if a
+    /// locator-named parameter appears here.
+    fn apply(&self, target: &str);
+}
+
 /// The full executor bundle injected into dispatch and transport.
 #[derive(Clone)]
 pub struct Executors {
