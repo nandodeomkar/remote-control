@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 12-01-PLAN.md
-last_updated: "2026-08-01T10:34:09.177Z"
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-08-01T10:45:56.137Z"
 last_activity: 2026-08-01 -- Phase 12 execution started
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 91
-  percent: 84
+  completed_plans: 92
+  percent: 85
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 2 of 18
+Plan: 3 of 18
 Next: /gsd-execute-phase 12.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) · W2
@@ -337,6 +337,7 @@ Progress: [██████████] 100% (11 of 11 phases complete; 90 of
 | Phase 11 P10 | 12min | 3 tasks | 3 files |
 | Phase 11 P11 | 35min | 3 tasks | 2 files |
 | Phase 12 P01 | 35min | 3 tasks | 2 files |
+| Phase 12 P02 | 30min | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -541,6 +542,9 @@ Recent decisions affecting current work:
 - [Phase 12]: release.ps1 probes /repos/<mirror> AND /releases/latest -- a lone latest 404 also means 'no releases yet', which would block the first-ever publish
 - [Phase 12]: dry-run degrades environment-state refusals (dirty tree, unreachable mirror) to warnings; argument refusals (bad format, version at or below published latest) still throw
 - [Phase 12]: the version bump is committed as chore(release): vX.Y.Z before tagging, so the tag names the source the artifacts were built from
+- [Phase 12]: SPEC.md documents the protoVersion 1.8 update.* family but line 3 still declares 1.7 — 12-13 flips the version declaration atomically with SERVER_PROTO_VERSION so the spec never runs ahead of the code
+- [Phase 12]: additionalProperties:false appears on exactly one payload in messages.schema.json (updateApply) — the schema-level restatement of D-14; D-05 ignore-unknown leniency stays permissive everywhere else
+- [Phase 12]: protocol/fixtures/update/ mixes kinds: 01-09 are standard wire fixtures, 10-12 are special cases needing their own Rust and Dart loaders; README numbers them special cases 3/4/5 because 1 and 2 predate the phase
 
 ### Pending Todos
 
@@ -604,6 +608,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-01T10:34:00.499Z
-Stopped at: Completed 12-01-PLAN.md
+Last session: 2026-08-01T10:45:56.111Z
+Stopped at: Completed 12-02-PLAN.md
 Resume file: None
