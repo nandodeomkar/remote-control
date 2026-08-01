@@ -24,6 +24,7 @@ mod logging;
 mod notify;
 mod shell;
 mod single_instance;
+mod update;
 
 use std::sync::{Arc, Mutex};
 
