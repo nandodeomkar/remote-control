@@ -19,6 +19,7 @@ pub mod dispatch;
 pub mod error;
 pub mod executors;
 pub mod transport;
+pub mod version;
 
 pub use error::CodecError;
 pub use transport::run;
