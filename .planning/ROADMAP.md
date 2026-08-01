@@ -401,7 +401,7 @@ Plans:
 **Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
 **Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
 **Depends on:** Phase 11
-**Plans:** 18 plans in 8 waves
+**Plans:** 1/18 plans executed
 
 **Success Criteria** (what must be TRUE):
 
@@ -417,7 +417,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 12-01-PLAN.md — `tools/release.ps1`: preflight refusals, the three-file version bump, build, hash, tag, publish, and a side-effect-free `-DryRun` harness (wave 1)
+- [x] 12-01-PLAN.md — `tools/release.ps1`: preflight refusals, the three-file version bump, build, hash, tag, publish, and a side-effect-free `-DryRun` harness (wave 1)
 - [ ] 12-02-PLAN.md — protoVersion 1.8 contract: SPEC registry rows, both closed vocabularies, the D-14 locator note, and the twelve shared `protocol/fixtures/update/` files (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*

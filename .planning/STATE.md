@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Phase 12 planned -- 18 plans in 8 waves, plan-checker PASSED
-last_updated: "2026-08-01T11:05:00.000Z"
-last_activity: 2026-08-01 -- Phase 12 PLANNED (18 plans, 8 waves). Plan-checker passed on iteration 2.
+stopped_at: Completed 12-01-PLAN.md
+last_updated: "2026-08-01T10:34:09.177Z"
+last_activity: 2026-08-01 -- Phase 12 execution started
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 90
-  percent: 92
+  completed_plans: 91
+  percent: 84
 ---
 
 # Project State
@@ -21,12 +21,12 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 12 (in-app updates) PLANNED 2026-08-01 — 18 plans in 8 waves, ready to execute. Phases 1–11 all COMPLETE and VERIFIED.
+**Current focus:** Phase 12 — in-app-updates
 
 ## Current Position
 
-Phase: 12 (in-app-updates) — PLANNED 2026-08-01, 18 plans in 8 waves, 0 executed
-Plan: none started
+Phase: 12 (in-app-updates) — EXECUTING
+Plan: 2 of 18
 Next: /gsd-execute-phase 12.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) · W2
@@ -34,14 +34,17 @@ Next: /gsd-execute-phase 12.
   `12-12,12-14` · W6 `12-13,12-15,12-17` · W7 `12-16` · W8 `12-18`.
 
   THREE BLOCKING HUMAN CHECKPOINTS, all `autonomous: false`:
+
   1. **12-03 T1 (wave 3)** — the owner must create the PUBLIC mirror repo
      `nandodeomkar/remote-control-releases`. It 404s today. The agent is
      forbidden from proceeding past this task; nothing downstream has a real
      release to check against until it exists.
+
   2. **12-16 T1 (wave 7)** — observe on the real machine whether Chrome blocks
      Inno's `{app}\extension` overwrite and whether `chrome.runtime.reload()`
      picks up a new manifest version. This observation is settled BEFORE 12-16
      T3 chooses the `.iss` change, and SC7 may not be claimed until it is made.
+
   3. **12-18 T2/T3/T4 (wave 8)** — on-hardware UAT. 12-18 exists because the
      phase is otherwise undemonstrable: it publishes `v1.6.0` from the finished
      tree AND `v1.6.1` as the strictly-newer tap target, hand-installs both
@@ -144,7 +147,7 @@ Phase 11 (browser-bookmarks-view-open-star-current-tab) — COMPLETE and VERIFIE
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-07-31 -- 11-13 COMPLETE (4/4). **UAT-8 RE-RUN PASSED ON DEVICE**
+Last activity: 2026-08-01 -- Phase 12 execution started
   (B1-B6), so Failure B is closed and phase 11's blocking item is resolved. All 13
   plans now have SUMMARY files. B2 proved the originally-unreachable gesture: a
   long-press on an EMPTY folder surfaced `Delete this folder?` WITHOUT navigating
@@ -333,6 +336,7 @@ Progress: [██████████] 100% (11 of 11 phases complete; 90 of
 | Phase 11 P09 | 8min | 3 tasks | 5 files |
 | Phase 11 P10 | 12min | 3 tasks | 3 files |
 | Phase 11 P11 | 35min | 3 tasks | 2 files |
+| Phase 12 P01 | 35min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -534,6 +538,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Phase 11-11]: the tab-row star is tri-state — UNKNOWN (bookmarked == null) renders NO slot and NO semantics node, so an unreadable bookmark state can never be misreported as not-bookmarked
 - [Phase ?]: [Phase 11-11]: an icon-only button whose onTap can be null needs Semantics(container: true, enabled: ...) — otherwise the disabled state has no a11y node at all and a screen reader hears nothing instead of a disabled button
 - [Phase ?]: [Phase 11-11]: nested-recognizer isolation is asserted by observation (zero TabsActivateMsg on a star tap), never inferred from TapGestureRecognizer deadlines — and the deadline caveat that survives is press-and-hold, logged as deferred item 2
+- [Phase 12]: release.ps1 probes /repos/<mirror> AND /releases/latest -- a lone latest 404 also means 'no releases yet', which would block the first-ever publish
+- [Phase 12]: dry-run degrades environment-state refusals (dirty tree, unreachable mirror) to warnings; argument refusals (bad format, version at or below published latest) still throw
+- [Phase 12]: the version bump is committed as chore(release): vX.Y.Z before tagging, so the tag names the source the artifacts were built from
 
 ### Pending Todos
 
@@ -597,6 +604,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-01T08:55:51.419Z
-Stopped at: Phase 12 UI-SPEC approved
-Resume file: .planning/phases/12-in-app-updates/12-UI-SPEC.md
+Last session: 2026-08-01T10:34:00.499Z
+Stopped at: Completed 12-01-PLAN.md
+Resume file: None
