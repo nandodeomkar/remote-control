@@ -60,6 +60,7 @@ No framework installation is needed — every runner already exists in the tree.
 | D-06 | 12-15 T3 · 12-17 T2 | Settings badge appears when anything is out of date, and clears | widget | `flutter test test/settings/settings_screen_test.dart` | ✅ extend existing | ⬜ pending |
 | D-19 | 12-08 T1 | `apk_installer.dart` no-ops on `MissingPluginException` | unit | `flutter test test/update/apk_installer_test.dart` | ❌ W0 (mirror the `multicast_lock` test) | ⬜ pending |
 | SC1 | 12-01 T2 | `release.ps1 -DryRun` bumps three files to the same version, exactly one line each | script test | `pwsh tools/release.ps1 -Version 9.9.9 -DryRun` + `git diff --stat` assertion | ❌ W0 | ⬜ pending |
+| SC1 / D-04 | 12-18 T1 | Two releases published from the FINISHED tree, so `releases/latest` is strictly ahead of both installed clients | script + live API | `python` probe asserting `releases/latest` is `v1.6.1` and `releases/tags/v1.6.0` is complete, both with three `sha256:` digests | — needs the mirror, which 12-03 creates | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -77,20 +78,30 @@ No framework installation is needed — every runner already exists in the tree.
 
 ## Manual-Only Verifications
 
-| Behavior | Ref | Why Manual | Test Instructions |
-|----------|-----|------------|-------------------|
-| APK self-update end to end | SC4 | Needs a physical Android device, the "install unknown apps" grant, and a real published release | Publish an rc release; from the phone's Updates screen tap Update app; confirm sha256 verification, the system install dialog, and that the app relaunches on the new version |
-| PC self-update end to end | SC5 | Needs a real Windows install, a real signed setup exe, and the process to actually exit and come back | From the phone tap Update PC; confirm the server installs silently, relaunches, the phone reconnects, and the new version is reported. Then force a failure (corrupt the temp file) and confirm `lastUpdate` surfaces it |
-| Extension reload after a PC update | SC7 | Needs a running Chrome/Edge with the unpacked extension loaded | Leave the browser OPEN across the PC update; confirm the extension reports the new version without touching `chrome://extensions`. Repeat with the browser closed to isolate file locking |
-| Chrome file-lock behavior during install | RESEARCH OQ-1 | Only observable against a real Chrome holding the extension directory | Run the setup exe over an install while Chrome has the extension loaded; observe whether the file replace is blocked and whether Inno aborts the WHOLE install. **Settle this before planning the extension slice** |
+Every row below names the plan and task that OWNS it. All of them run against the real
+`v1.6.0` / `v1.6.1` releases that `12-18` Task 1 publishes from the finished tree — they
+are unreachable before that, because until a release postdates the implementation every
+client resolves latest as at-or-below installed and reports "up to date" (D-21, D-26).
+
+| Behavior | Ref | Owning plan | Why Manual | Test Instructions |
+|----------|-----|-------------|------------|-------------------|
+| Both clients brought onto the feature-complete build | SC2, SC3 | **12-18 T2** | Installing a setup exe on the owner's desktop and sideloading an APK onto a physical phone, then reading two GUIs | Install the `v1.6.0` assets (from the `v1.6.0` tag, not `latest`); confirm both surfaces report `1.6.0`, all three Updates rows name `1.6.1` as latest, the App row shows a download size before downloading, and both badge placements are lit. This is the documented one-time manual upgrade, not a defect |
+| APK self-update end to end | SC4 | **12-18 T3** | Needs a physical Android device, the "install unknown apps" grant, and a real published release | From the phone's Updates screen tap Update app against the real `v1.6.1` release; confirm the missing-grant explainer, a declined system dialog that does NOT retry, sha256 verification, the system install dialog, and that the app relaunches on the new version. **Not an rc:** `releases/latest` excludes pre-releases and the client parser rejects `X.Y.Z-rcN` as unknown, so a pre-release is never offered (D-20, D-26) — the target must be a stable tag |
+| PC self-update end to end | SC5 | **12-18 T4** (steps 1-3, 6) | Needs a real Windows install, a real signed setup exe, and the process to actually exit and come back | From the phone tap Update PC; confirm the server installs silently, relaunches, the phone reconnects on its EXISTING FSM (D-17) and the new version is reported on both surfaces, and that the marker is reported once and deleted. Then stand in for a non-zero installer exit by hand-writing the `ok:false` marker and confirm `lastUpdate` surfaces it once, in one of the seven fixed sentences, and clears (D-12, D-24) |
+| Extension reload after a PC update | SC7 | **12-18 T4** (step 4) | Needs a running Chrome/Edge with the unpacked extension loaded | Leave the browser OPEN across the PC update; confirm the extension reports the new version without touching `chrome://extensions`, OR degrades to the documented restart-your-browser copy. Both are a pass; record which one happened rather than inferring it from the code. Repeat with the browser closed to isolate file locking |
+| Chrome file-lock behavior during install | RESEARCH OQ-1 | **12-16 T1** (pre-hardening) · **12-18 T4** step 5 (post-hardening) | Only observable against a real Chrome holding the extension directory | 12-16 T1: run the setup exe over an install while Chrome has the extension loaded; observe whether the file replace is blocked and whether Inno aborts the WHOLE install. **Settle this before 12-16 T3 chooses the `.iss` change.** 12-18 T4 step 5: repeat after the `restartreplace` hardening and state plainly whether the outcome changed and whether the extension directory was replaced immediately or scheduled for next boot |
 
 ---
 
 ## Validation Sign-Off
 
-- [x] All tasks have `<automated>` verify or Wave 0 dependencies — the single exception is
-      12-16 Task 1, the Chrome file-lock observation, which carries an explicit
-      `<automated>MISSING</automated>` marker and is listed under Manual-Only Verifications below
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies — the exceptions are
+      12-16 Task 1 (the Chrome file-lock observation) and 12-18 Tasks 2, 3 and 4 (the
+      on-hardware end-to-end verifications). Each carries an explicit
+      `<automated>MISSING</automated>` marker with a stated reason and each is listed
+      under Manual-Only Verifications above
+- [x] Every Manual-Only Verification names an owning plan and task, and an artifact to
+      run against: `12-18` Task 1 publishes `v1.6.0` and `v1.6.1` from the finished tree
 - [x] Sampling continuity: no 3 consecutive tasks without automated verify
 - [x] Wave 0 covers all MISSING references (fixtures in 12-02; Rust test modules in 12-06/12-09/12-11;
       Dart test dir in 12-07/12-08/12-10; harness registration in 12-04/12-05; `-DryRun` in 12-01)
@@ -98,4 +109,6 @@ No framework installation is needed — every runner already exists in the tree.
 - [x] Feedback latency < 30s
 - [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** approved (planner, 2026-08-01) — task IDs filled from the 17-plan breakdown
+**Approval:** approved (planner, 2026-08-01) — task IDs filled from the 18-plan breakdown.
+Revised 2026-08-01 after plan-check: the Manual-Only Verifications now name owning plans,
+and `12-18` was added to publish the release they run against (BLOCKER 1).
