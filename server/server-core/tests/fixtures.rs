@@ -88,17 +88,37 @@ fn codec_fixtures_mouse_binary() {
     }
 }
 
-/// Shared driver for the JSON text-frame families (`handshake/`, `text/`).
+/// Fixture files that are NOT standard `{wire, expect}` wire fixtures and must
+/// therefore be skipped by [`run_json_family`]. Each has its own bespoke loader
+/// (`auth_proof_fixture`, `version_compare_matches_fixture`) or belongs to a
+/// consumer outside this harness entirely (the release-feed parsers, 12-06 and
+/// 12-10).
 ///
-/// Skips `05-auth-proof.json` by filename — it has no `wire` field (special
-/// format; covered by `auth_proof_fixture`). Ignores any `compute` block
-/// (Dart-only diff-helper concern).
-fn run_json_family(family: &str) {
+/// Keyed by `(family, filename)` rather than by filename alone: a bare name
+/// list would silently skip a future `text/10-*.json` that IS a wire fixture,
+/// which is the same silent-zero-coverage failure the hard-registration rule
+/// below exists to prevent.
+const SPECIAL_CASE_FIXTURES: &[(&str, &str)] = &[
+    ("handshake", "05-auth-proof.json"),
+    ("update", "10-version-compare.json"),
+    ("update", "11-releases-latest.json"),
+    ("update", "12-releases-latest-null-digest.json"),
+];
+
+/// Shared driver for the JSON text-frame families (`handshake/`, `text/`, …).
+///
+/// Skips the [`SPECIAL_CASE_FIXTURES`] by `(family, filename)` — those have no
+/// `{wire, expect}` envelope. Ignores any `compute` block (Dart-only
+/// diff-helper concern). Returns the number of fixtures actually exercised, so
+/// a caller can pin the family's file count.
+fn run_json_family(family: &str) -> usize {
+    let mut exercised = 0usize;
     for path in fixture_files(family) {
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
-        if name == "05-auth-proof.json" {
+        if SPECIAL_CASE_FIXTURES.contains(&(family, name.as_str())) {
             continue;
         }
+        exercised += 1;
         let fixture = load(&path);
 
         let wire = serde_json::to_string(&fixture["wire"])
@@ -140,6 +160,7 @@ fn run_json_family(family: &str) {
             "{name}: encode(decode(wire)) must equal the canonical expect envelope"
         );
     }
+    exercised
 }
 
 #[test]
@@ -195,6 +216,61 @@ fn codec_fixtures_bookmarks() {
     // input.blocked lesson), so without this function the nine golden files
     // would be silently untested — zero coverage AND zero failures.
     run_json_family("bookmarks");
+}
+
+#[test]
+fn codec_fixtures_update() {
+    // protocol 1.8 (phase 12): the update.* family — the empty update.check
+    // request, the full update.status with its nested D-12 lastUpdate object
+    // (unknown `future` key dropped per D-05) and the minimal never-connected
+    // twin, the one-field update.apply that IS the D-14 rule, the three
+    // update.progress shapes (pct on `downloading` only, `error` on `failed`
+    // only, `uptodate` with nothing else), and the two missing-required-field
+    // negatives. Hard-registered: neither harness globs directories (the 07-02
+    // input.blocked lesson), so without this function the nine golden files
+    // would be silently untested — zero coverage AND zero failures.
+    //
+    // The directory is MIXED-KIND: files 10-12 are special cases with no
+    // {wire, expect} envelope and are excluded via SPECIAL_CASE_FIXTURES.
+    // Pinning the count keeps that exclusion honest — dropping a wire fixture
+    // into the skip list by mistake turns this test red instead of quietly
+    // shrinking coverage.
+    let exercised = run_json_family("update");
+    assert_eq!(
+        exercised, 9,
+        "the update family has exactly nine wire fixtures (01-09); \
+         10-12 are special cases with their own loaders"
+    );
+}
+
+#[test]
+fn version_compare_matches_fixture() {
+    // SPECIAL CASE (protocol 1.8, D-26): 10-version-compare.json has no
+    // {wire, expect} envelope — it is a cross-language truth table, and this
+    // is its bespoke loader. The phone's Dart comparator loads the SAME file
+    // and must agree case-for-case: a disagreement never shows as a test
+    // failure, it shows in the field as a phone offering an update the server
+    // then refuses as `stale`.
+    let path = Path::new(FIXTURES_ROOT).join("update/10-version-compare.json");
+    let fixture = load(&path);
+    let cases = fixture["cases"]
+        .as_array()
+        .expect("10-version-compare.json must carry a `cases` array");
+    assert!(!cases.is_empty(), "the truth table must not be empty");
+
+    for case in cases {
+        let a = case["a"].as_str().expect("case.a must be a string");
+        let b = case["b"].as_str().expect("case.b must be a string");
+        let expect = case["expect"].as_str().expect("case.expect must be a string");
+        let why = case["why"].as_str().unwrap_or("");
+        let actual = server_core::version::compare_versions(a, b);
+        assert_eq!(
+            actual.as_str(),
+            expect,
+            "compare_versions({a:?}, {b:?}) == {:?}, fixture says {expect:?} — {why}",
+            actual.as_str()
+        );
+    }
 }
 
 #[test]
