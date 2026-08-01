@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12 added, not yet planned
-stopped_at: Phase 12 (in-app updates) added to the roadmap from an approved design spec; next step is /gsd-plan-phase 12
-last_updated: "2026-08-01T00:00:00.000Z"
-last_activity: 2026-08-01 -- brainstormed and approved the in-app updates design (docs/superpowers/specs/2026-08-01-in-app-updates-design.md, commit 3e0135f); added Phase 12 to the roadmap
+status: Ready to execute
+stopped_at: Phase 12 planned -- 18 plans in 8 waves, plan-checker PASSED
+last_updated: "2026-08-01T11:05:00.000Z"
+last_activity: 2026-08-01 -- Phase 12 PLANNED (18 plans, 8 waves). Plan-checker passed on iteration 2.
 progress:
   total_phases: 12
   completed_phases: 11
-  total_plans: 90
+  total_plans: 108
   completed_plans: 90
   percent: 92
 ---
@@ -21,18 +21,51 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 12 (in-app updates) added from an approved design spec and awaiting planning. Phases 1–11 all COMPLETE and VERIFIED.
+**Current focus:** Phase 12 (in-app updates) PLANNED 2026-08-01 — 18 plans in 8 waves, ready to execute. Phases 1–11 all COMPLETE and VERIFIED.
 
 ## Current Position
 
-Phase: 12 (in-app-updates) — ADDED 2026-08-01, not yet planned
-Plan: none yet
-Next: /gsd-plan-phase 12. Read
-  `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` first — it is the
-  approved design and its Decisions table is the acceptance surface. Plan the
-  release tooling + mirror repo BEFORE any client work: nothing is testable
-  end-to-end until a real release exists to check against. The public mirror
-  repo is an owner action and does not exist yet.
+Phase: 12 (in-app-updates) — PLANNED 2026-08-01, 18 plans in 8 waves, 0 executed
+Plan: none started
+Next: /gsd-execute-phase 12.
+
+  Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) · W2
+  `12-04,12-05,12-06,12-07,12-08` · W3 `12-03,12-09` · W4 `12-10,12-11` · W5
+  `12-12,12-14` · W6 `12-13,12-15,12-17` · W7 `12-16` · W8 `12-18`.
+
+  THREE BLOCKING HUMAN CHECKPOINTS, all `autonomous: false`:
+  1. **12-03 T1 (wave 3)** — the owner must create the PUBLIC mirror repo
+     `nandodeomkar/remote-control-releases`. It 404s today. The agent is
+     forbidden from proceeding past this task; nothing downstream has a real
+     release to check against until it exists.
+  2. **12-16 T1 (wave 7)** — observe on the real machine whether Chrome blocks
+     Inno's `{app}\extension` overwrite and whether `chrome.runtime.reload()`
+     picks up a new manifest version. This observation is settled BEFORE 12-16
+     T3 chooses the `.iss` change, and SC7 may not be claimed until it is made.
+  3. **12-18 T2/T3/T4 (wave 8)** — on-hardware UAT. 12-18 exists because the
+     phase is otherwise undemonstrable: it publishes `v1.6.0` from the finished
+     tree AND `v1.6.1` as the strictly-newer tap target, hand-installs both
+     clients onto 1.6.0 (the accepted one-time manual-install cost), then runs
+     the APK self-update (incl. revoked-grant and declined-dialog paths) and the
+     PC self-update with the browser open. Acceptance criteria demand verbatim
+     recorded observations and explicitly forbid inference.
+
+  Plan-checker PASSED on iteration 2 (iteration 1 found 3 blockers, all fixed in
+  `032de24`). The material catch was that the original 17-plan set published its
+  only release BEFORE the feature existed, so `latest == installed` forever and
+  SC4/SC5/SC7 could never be exercised — that is what 12-18 fixes.
+
+  Note on a pre-release: an `X.Y.Z-rcN` tag can NEVER be the update target.
+  `releases/latest` excludes pre-releases and the client parser rejects the
+  suffix as unknown (D-20/D-26), so 12-18 uses a real `v1.6.1`, not an rc.
+
+  ONE ACCEPTED GAP (checker warning, non-blocking): D-24's helper-side branch —
+  on a non-zero installer exit the helper relaunches the still-installed OLD exe
+  and leaves the marker at `ok:false` — is proven only by 12-09's golden-string
+  test on the script TEXT, plus a hand-written marker in 12-18 T4 step 6 that
+  exercises the phone-facing half. The helper's own relaunch-old-exe behavior is
+  never run. Cheap remedy if wanted: point the helper at a stub installer that
+  exits 1.
 
 Phase 11 (browser-bookmarks-view-open-star-current-tab) — COMPLETE and VERIFIED
 2026-07-31, 13/13 plans. History below.
@@ -510,6 +543,7 @@ still listed an item that had already moved to `todos/done/`.)
 - ~~Absolute pointer injection~~ — DONE in 04-01 (raw SendInput ABSOLUTE|VIRTUALDESK; in todos/done/)
 - ~~Server supports ONE pairing per process run~~ — DONE; closed by Phase 7's persistent token
   storage exactly as predicted (in todos/done/). STATE listed it as pending until 2026-07-31.
+
 - ~~`noPairing` reason is overloaded~~ — DONE 2026-07-31, quick task 260731-d45 (in todos/done/).
   **The todo's own fix sketch turned out to be stale and was NOT followed.** It proposed a new wire
   reason `noPinWindow` plus server, fixture and protocol changes; in fact the server already
@@ -563,6 +597,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-07-30T02:25:52.565Z
-Stopped at: Completed 11-09-PLAN.md
-Resume file: None
+Last session: 2026-08-01T08:55:51.419Z
+Stopped at: Phase 12 UI-SPEC approved
+Resume file: .planning/phases/12-in-app-updates/12-UI-SPEC.md
