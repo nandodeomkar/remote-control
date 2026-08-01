@@ -1235,6 +1235,241 @@ final class BmRemoveMsg extends RemoteMessage {
   Map<String, Object?> toPayload() => {'nodeId': nodeId};
 }
 
+/// `update.check` (C→S, protoVersion 1.8, SPEC section 7): ask the server
+/// what it and the extension are running, and what the last update attempt
+/// did. The payload is EMPTY — the client asks nothing and supplies nothing,
+/// because everything the answer contains is resolved server-side.
+///
+/// The canonical re-encode still emits `p` as `{}` (the Phase-01
+/// canonical-form rule), which is what fixture `01-update-check-request.json`
+/// pins.
+final class UpdateCheckMsg extends RemoteMessage {
+  /// Creates an update.check request.
+  const UpdateCheckMsg();
+
+  /// Decodes the (empty) `update.check` payload. Unknown keys are ignored
+  /// per D-05, so the payload argument is deliberately unused.
+  factory UpdateCheckMsg.fromPayload(Map<String, dynamic> p) =>
+      const UpdateCheckMsg();
+
+  @override
+  String get t => 'update.check';
+
+  @override
+  Map<String, Object?> toPayload() => const {};
+}
+
+/// The previous update attempt, as read from the server's startup marker
+/// (protoVersion 1.8, D-12): `{target, ok, error?}`.
+///
+/// It has to exist at all because the process that would have reported a
+/// failure had already exited to let the installer replace it — so the
+/// outcome is reported by the NEXT server start, not by the run that
+/// attempted it. `error` draws from the SAME closed D-11 vocabulary as
+/// [UpdateProgressMsg.error]; absent when `ok` is true.
+final class LastUpdate {
+  /// Version the previous attempt targeted.
+  final String target;
+
+  /// Whether that attempt succeeded.
+  final bool ok;
+
+  /// Closed-vocabulary failure reason; absent (null) on success.
+  final String? error;
+
+  /// Creates a last-update marker.
+  const LastUpdate({required this.target, required this.ok, this.error});
+
+  /// Decodes a nested `lastUpdate` object. `target` and `ok` are required;
+  /// unknown keys are ignored (D-05).
+  factory LastUpdate.fromPayload(Object? v) {
+    if (v is! Map<String, dynamic>) {
+      throw const FormatException('field lastUpdate must be an object');
+    }
+    return LastUpdate(
+      target: _req<String>(v, 'target'),
+      ok: _req<bool>(v, 'ok'),
+      error: _opt<String>(v, 'error'),
+    );
+  }
+
+  /// Canonical JSON form: `{target, ok}` plus `error` only when non-null
+  /// (mirrors the Rust `skip_serializing_if = "Option::is_none"`).
+  Map<String, Object?> toPayload() => {
+        'target': target,
+        'ok': ok,
+        if (error != null) 'error': error,
+      };
+
+  @override
+  bool operator ==(Object other) =>
+      other is LastUpdate &&
+      other.target == target &&
+      other.ok == ok &&
+      other.error == error;
+
+  @override
+  int get hashCode => Object.hash(target, ok, error);
+}
+
+/// `update.status` (S→C reply, protoVersion 1.8, SPEC section 7): the answer
+/// to [UpdateCheckMsg].
+///
+/// [serverVersion] and [extConnected] are REQUIRED — a missing one is a hard
+/// decode error (D-05), never a default. A silently-absent `serverVersion`
+/// would make the phone's version comparison run against nothing, and
+/// "unknown" must never be treated as newer (D-26).
+///
+/// [extVersion] and [lastUpdate] are optional and ABSENT-not-null: the
+/// "extension has never connected AND no previous update attempt" case omits
+/// both keys, and the canonical re-encode must not materialise them.
+final class UpdateStatusMsg extends RemoteMessage {
+  /// Version of the running server.
+  final String serverVersion;
+
+  /// Whether the browser extension is currently connected.
+  final bool extConnected;
+
+  /// Version of the connected extension; absent when never connected.
+  final String? extVersion;
+
+  /// Outcome of the PREVIOUS update attempt; absent when no marker exists
+  /// (the normal case, never an error).
+  final LastUpdate? lastUpdate;
+
+  /// Creates an update.status reply.
+  const UpdateStatusMsg({
+    required this.serverVersion,
+    required this.extConnected,
+    this.extVersion,
+    this.lastUpdate,
+  });
+
+  /// Decodes the `update.status` payload.
+  factory UpdateStatusMsg.fromPayload(Map<String, dynamic> p) {
+    final serverVersion = _req<String>(p, 'serverVersion');
+    final extConnected = _req<bool>(p, 'extConnected');
+    final raw = p['lastUpdate'];
+    return UpdateStatusMsg(
+      serverVersion: serverVersion,
+      extConnected: extConnected,
+      extVersion: _opt<String>(p, 'extVersion'),
+      lastUpdate: raw == null ? null : LastUpdate.fromPayload(raw),
+    );
+  }
+
+  @override
+  String get t => 'update.status';
+
+  @override
+  Map<String, Object?> toPayload() => {
+        'serverVersion': serverVersion,
+        'extConnected': extConnected,
+        if (extVersion != null) 'extVersion': extVersion,
+        if (lastUpdate != null) 'lastUpdate': lastUpdate!.toPayload(),
+      };
+}
+
+/// `update.apply` (C→S, protoVersion 1.8, SPEC sections 7 and 12, D-14):
+/// install that version.
+///
+/// **This message carries a version string and NOTHING else.** The server
+/// resolves the asset location and its sha256 itself from a compiled-in repo
+/// constant, and refuses any locator supplied, implied or influenced by the
+/// wire. [target] is used only for the equality check against the server's
+/// own resolved latest (mismatch ⇒ `stale`) and the ordering check against
+/// the running version (at-or-below ⇒ `downgrade`, D-15); it is never
+/// concatenated into a URL or a path.
+///
+/// **No field may ever be added here.** A wire-supplied locator — a url, an
+/// asset name, a filename, a hash — would turn a paired phone, or anything
+/// that obtained a token, into arbitrary code execution on the PC. The
+/// one-field shape is the phone-side half of that rule: a compromised or
+/// buggy client cannot even construct the dangerous message. Fixture
+/// `04-update-apply.json` asserts the single key structurally, and
+/// `messages.schema.json` closes this one payload with
+/// `additionalProperties: false`.
+final class UpdateApplyMsg extends RemoteMessage {
+  /// Version to install (e.g. `1.5.0`). The ONLY field — see the class doc.
+  final String target;
+
+  /// Creates an update.apply command.
+  const UpdateApplyMsg({required this.target});
+
+  /// Decodes the `update.apply` payload. A missing `target` is a hard decode
+  /// error: the safe behaviour must come from the decoder refusing the frame,
+  /// not from a downstream check happening to catch an empty string.
+  factory UpdateApplyMsg.fromPayload(Map<String, dynamic> p) =>
+      UpdateApplyMsg(target: _req<String>(p, 'target'));
+
+  @override
+  String get t => 'update.apply';
+
+  @override
+  Map<String, Object?> toPayload() => {'target': target};
+}
+
+/// `update.progress` (S→C push, protoVersion 1.8, SPEC section 7): one step
+/// of an in-flight update.
+///
+/// [stage] and [error] stay plain [String]s. The closed D-10 stage vocabulary
+/// (`checking`, `downloading`, `verifying`, `installing`, `restarting`,
+/// `uptodate`, `failed`) and the closed D-11 error vocabulary (`network`,
+/// `checksum`, `disk`, `installer`, `downgrade`, `stale`, `busy`) are
+/// rendered by the UI copy map, not enforced by the codec — the same
+/// value-lenient treatment the Rust side gives them, and the same rule every
+/// other enum-valued field in this file follows.
+///
+/// The vocabularies being closed is itself the mitigation: no path, URL, HTTP
+/// status or exception name can reach the phone through this channel, so a
+/// server that violated D-11 still could not paint a filesystem path onto the
+/// screen.
+///
+/// [pct] belongs to `downloading` ALONE (D-10) — the other six stages have no
+/// byte count, so a percentage would be invented. All three optionals stay
+/// absent on canonical re-encode rather than being emitted as null.
+final class UpdateProgressMsg extends RemoteMessage {
+  /// Closed-vocabulary stage name (D-10).
+  final String stage;
+
+  /// Download percentage; present on `downloading` only.
+  final int? pct;
+
+  /// Version being installed; absent when there is nothing to install.
+  final String? version;
+
+  /// Closed-vocabulary failure reason (D-11); present on `failed`.
+  final String? error;
+
+  /// Creates an update.progress push.
+  const UpdateProgressMsg({
+    required this.stage,
+    this.pct,
+    this.version,
+    this.error,
+  });
+
+  /// Decodes the `update.progress` payload.
+  factory UpdateProgressMsg.fromPayload(Map<String, dynamic> p) =>
+      UpdateProgressMsg(
+        stage: _req<String>(p, 'stage'),
+        pct: _opt<int>(p, 'pct'),
+        version: _opt<String>(p, 'version'),
+        error: _opt<String>(p, 'error'),
+      );
+
+  @override
+  String get t => 'update.progress';
+
+  @override
+  Map<String, Object?> toPayload() => {
+        'stage': stage,
+        if (pct != null) 'pct': pct,
+        if (version != null) 'version': version,
+        if (error != null) 'error': error,
+      };
+}
+
 /// `browser` (C→S): key-macro actions.
 final class BrowserMsg extends RemoteMessage {
   /// Browser action string.
@@ -1437,6 +1672,10 @@ final class UnknownMsg extends RemoteMessage {
     'bm.star' => BmStarMsg.fromPayload(p),
     'bm.unstar' => BmUnstarMsg.fromPayload(p),
     'bm.remove' => BmRemoveMsg.fromPayload(p),
+    'update.check' => UpdateCheckMsg.fromPayload(p),
+    'update.status' => UpdateStatusMsg.fromPayload(p),
+    'update.apply' => UpdateApplyMsg.fromPayload(p),
+    'update.progress' => UpdateProgressMsg.fromPayload(p),
     'browser' => BrowserMsg.fromPayload(p),
     'present' => PresentMsg.fromPayload(p),
     'ping' => PingMsg.fromPayload(p),
