@@ -129,6 +129,24 @@ glutin-winit = "0.5"
 # payload rendered as egui rects. Pure-Rust, no default image feature (we paint
 # the module matrix ourselves).
 qrcode = { version = "0.14", default-features = false }
+# ── Phase 12 (12-06) in-app updates ──
+# Blocking HTTP client for the release feed + asset download. BLOCKING BY
+# DESIGN: the work belongs on a dedicated OS thread beside apps_thread /
+# clip_thread / audio_thread, never on a tokio worker (a 5 MB download would
+# stall one for its whole duration). `reqwest`'s blocking mode spins a SECOND
+# private tokio runtime inside a process that already owns one — bigger tree,
+# no benefit, for one request a day. Default features are rustls + the bundled
+# webpki-roots, so there is no OpenSSL and no Windows cert-store plumbing.
+# RESEARCH Package Legitimacy Audit verdict OK/Approved (algesten/ureq, first
+# published 2018, 169M downloads); 3.3.0 re-verified with `cargo search ureq`
+# at execution time. NOTE: every ureq timeout defaults to None — see
+# update::feed::feed_agent (RESEARCH Pitfall 1).
+ureq = "3.3"
+# JSON codec for the releases/latest feed body (update::feed::parse_release).
+# NOT new supply-chain surface: serde_json 1 is already in the tree via
+# server-core; this only declares the direct dependency server-windows needs
+# now that it parses a JSON body of its own. serde (derive) was already here.
+serde_json = "1"
 
 [build-dependencies]
 # Embeds assets/icon/icon.ico + VERSIONINFO into the exe (build.rs, quick
