@@ -3,14 +3,16 @@ name: ci
 on: [push, pull_request]
 jobs:
   rust:
-    runs-on: ubuntu-latest          # proves zero-Windows-deps claim by construction
+    runs-on: ubuntu-latest          # proves server-core's zero-Windows-deps claim by construction
     defaults: { run: { working-directory: server } }
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with: { workspaces: server }
-      - run: cargo test --workspace
+      # scoped, not --workspace: server-windows is a Windows-only binary and its
+      # GUI stack (tray-icon/winit/egui/glutin) needs GTK headers no Linux runner has
+      - run: cargo test -p server-core
   dart:
     runs-on: ubuntu-latest
     defaults: { run: { working-directory: app/packages/remote_protocol } }
