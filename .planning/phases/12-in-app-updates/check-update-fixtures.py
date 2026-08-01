@@ -123,12 +123,96 @@ def check_pct_belongs_to_downloading_only():
     return None
 
 
+def check_version_compare_table():
+    """10-version-compare.json holds a non-empty case table incl. the lexical trap."""
+    data, failure = _load("10-version-compare.json")
+    if failure:
+        return failure
+    cases = data.get("cases")
+    if not isinstance(cases, list) or not cases:
+        return "10-version-compare.json: `cases` must be a non-empty array"
+    allowed = {"newer", "older", "same", "unknown"}
+    for index, case in enumerate(cases):
+        if not isinstance(case, dict):
+            return "10-version-compare.json: cases[%d] must be an object" % index
+        for key in ("a", "b", "expect"):
+            if key not in case:
+                return "10-version-compare.json: cases[%d] missing key %r" % (index, key)
+        if case["expect"] not in allowed:
+            return "10-version-compare.json: cases[%d] expect=%r is outside the closed set %s" % (
+                index,
+                case["expect"],
+                sorted(allowed),
+            )
+    trap = [c for c in cases if c["a"] == "1.10.0" and c["b"] == "1.9.0"]
+    if not trap:
+        return (
+            "10-version-compare.json: the lexical-trap case (a=1.10.0, b=1.9.0) is missing - "
+            "it is the whole reason this table exists"
+        )
+    if trap[0]["expect"] != "newer":
+        return "10-version-compare.json: 1.10.0 vs 1.9.0 must expect `newer`, found %r" % trap[0]["expect"]
+    return None
+
+
+def check_releases_latest_digests():
+    """11-releases-latest.json holds exactly three assets, each with a sha256 digest."""
+    data, failure = _load("11-releases-latest.json")
+    if failure:
+        return failure
+    assets = data.get("response", {}).get("assets")
+    if not isinstance(assets, list):
+        return "11-releases-latest.json: response.assets must be an array"
+    if len(assets) != 3:
+        return "11-releases-latest.json: expected exactly 3 assets (apk, setup exe, extension zip), found %d" % len(
+            assets
+        )
+    digest_re = re.compile(r"^sha256:[0-9a-f]{64}$")
+    for asset in assets:
+        name = asset.get("name", "(unnamed)")
+        for key in ("name", "browser_download_url", "size", "state", "digest"):
+            if key not in asset:
+                return "11-releases-latest.json: asset %s is missing the %r field" % (name, key)
+        digest = asset.get("digest")
+        if not isinstance(digest, str) or not digest_re.match(digest):
+            return "11-releases-latest.json: asset %s has digest %r - expected sha256: + 64 lowercase hex" % (
+                name,
+                digest,
+            )
+    return None
+
+
+def check_null_digest_is_a_hard_refusal():
+    """12-releases-latest-null-digest.json pins D-15: a null digest refuses with `checksum`."""
+    data, failure = _load("12-releases-latest-null-digest.json")
+    if failure:
+        return failure
+    assets = data.get("response", {}).get("assets")
+    if not isinstance(assets, list):
+        return "12-releases-latest-null-digest.json: response.assets must be an array"
+    if not any(asset.get("digest") is None for asset in assets):
+        return (
+            "12-releases-latest-null-digest.json: no asset carries a null digest - the fixture "
+            "cannot prove the D-15 hard-refusal rule without one"
+        )
+    refusal = data.get("expectRefusal")
+    if refusal != "checksum":
+        return (
+            "12-releases-latest-null-digest.json: expectRefusal must be \"checksum\" (a missing "
+            "digest is a HARD refusal, never a skipped verification - D-15), found %r" % refusal
+        )
+    return None
+
+
 CHECKS = [
     check_fixture_dir_exists,
     check_nine_wire_fixtures,
     check_wire_fixture_schema,
     check_apply_payload_has_only_target,
     check_pct_belongs_to_downloading_only,
+    check_version_compare_table,
+    check_releases_latest_digests,
+    check_null_digest_is_a_hard_refusal,
 ]
 
 

@@ -15,6 +15,19 @@
       "$comment": "protoVersion 1.1 dispatch hook (D-03): the vol.changed push carries a payload with required value+muted. Older types remain doc-grade $defs; retrofitting per-type p dispatch to every family is out of scope.",
       "if": { "properties": { "t": { "const": "vol.changed" } }, "required": ["t"] },
       "then": { "properties": { "p": { "$ref": "#/$defs/volChanged" } } }
+    },
+    {
+      "$comment": "protoVersion 1.8 dispatch hooks (phase 12, D-09): the update.* family mirrors SPEC §7 exactly. update.check has an empty payload and needs no hook.",
+      "if": { "properties": { "t": { "const": "update.status" } }, "required": ["t"] },
+      "then": { "properties": { "p": { "$ref": "#/$defs/updateStatus" } } }
+    },
+    {
+      "if": { "properties": { "t": { "const": "update.apply" } }, "required": ["t"] },
+      "then": { "properties": { "p": { "$ref": "#/$defs/updateApply" } } }
+    },
+    {
+      "if": { "properties": { "t": { "const": "update.progress" } }, "required": ["t"] },
+      "then": { "properties": { "p": { "$ref": "#/$defs/updateProgress" } } }
     }
   ],
   "$defs": {
@@ -247,6 +260,66 @@
       "type": "object",
       "properties": { "ts": { "type": "integer" } },
       "required": ["ts"]
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "description": "A unified X.Y.Z release version (D-04). A leading `v` belongs to git tags, not to wire values; a pre-release suffix (X.Y.Z-rcN) is NOT accepted and compares as unknown (D-26)."
+    },
+    "updateStage": {
+      "type": "string",
+      "enum": ["checking", "downloading", "verifying", "installing", "restarting", "uptodate", "failed"],
+      "description": "CLOSED vocabulary (SPEC §7, D-10). `pct` accompanies `downloading` ONLY. `uptodate` and `failed` are terminal."
+    },
+    "updateError": {
+      "type": "string",
+      "enum": ["network", "checksum", "disk", "installer", "downgrade", "stale", "busy"],
+      "description": "CLOSED vocabulary (SPEC §7, D-11). Never free text, never a path, never a URL, never an HTTP status, never an exception name — so that no server-side detail can reach the phone through the error channel."
+    },
+    "updateLastUpdate": {
+      "description": "update.status.lastUpdate — the PREVIOUS attempt's outcome, read at startup from the marker file (SPEC §7, D-12). Present only when a marker existed; a missing marker is the normal case, never an error.",
+      "type": "object",
+      "properties": {
+        "target": { "$ref": "#/$defs/semver" },
+        "ok": { "type": "boolean" },
+        "error": { "$ref": "#/$defs/updateError", "description": "Present only when ok is false." }
+      },
+      "required": ["target", "ok"]
+    },
+    "updateCheck": {
+      "description": "update.check — C→S, empty payload (SPEC §7, protoVersion 1.8, D-09). Executor-bound despite being a read (SPEC §11, D-13). Reply is update.status.",
+      "type": "object"
+    },
+    "updateStatus": {
+      "description": "update.status — S→C reply to update.check (SPEC §7, protoVersion 1.8, D-09). extVersion is ABSENT when the extension has never connected — skipped entirely, never emitted as null.",
+      "type": "object",
+      "properties": {
+        "serverVersion": { "$ref": "#/$defs/semver" },
+        "extConnected": { "type": "boolean" },
+        "extVersion": { "$ref": "#/$defs/semver" },
+        "lastUpdate": { "$ref": "#/$defs/updateLastUpdate" }
+      },
+      "required": ["serverVersion", "extConnected"]
+    },
+    "updateApply": {
+      "description": "update.apply — C→S (SPEC §7 and §12, protoVersion 1.8, D-09/D-14). `target` is the ONLY field this message carries, now or ever: the server resolves the asset URL and its sha256 itself from a compiled-in repo constant and refuses any locator supplied, implied or influenced by the wire. additionalProperties is false HERE and only here — the D-05 ignore-unknown leniency is permissive everywhere else in this schema, but a wire-supplied locator would be arbitrary code execution on the PC, so this payload is closed by design. Executor-bound (SPEC §11).",
+      "type": "object",
+      "properties": {
+        "target": { "$ref": "#/$defs/semver" }
+      },
+      "required": ["target"],
+      "additionalProperties": false
+    },
+    "updateProgress": {
+      "description": "update.progress — S→C push (SPEC §7, protoVersion 1.8, D-09/D-10/D-11). Optional fields are skipped entirely when absent, never emitted as null.",
+      "type": "object",
+      "properties": {
+        "stage": { "$ref": "#/$defs/updateStage" },
+        "pct": { "type": "integer", "minimum": 0, "maximum": 100, "description": "Present iff stage = downloading (D-10)." },
+        "version": { "$ref": "#/$defs/semver" },
+        "error": { "$ref": "#/$defs/updateError", "description": "Present iff stage = failed (D-10/D-11)." }
+      },
+      "required": ["stage"]
     },
     "err": {
       "description": "S→C. Failure report. Codes: versionMismatch (+ serverVersion, clientVersion), unknownType, noPendingAction, bsTooLarge, internal (SPEC §7).",

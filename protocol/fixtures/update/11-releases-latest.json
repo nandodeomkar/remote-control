@@ -1,0 +1,38 @@
+{
+  "name": "releases-latest",
+  "description": "SPECIAL CASE (not a wire fixture — no `wire`/`expect` envelope, its own loader on both sides). A captured-shape GitHub `GET /repos/{owner}/{repo}/releases/latest` response (D-02), and the SHARED parse fixture for BOTH feed parsers — the Rust one in the server and the Dart one on the phone. There is deliberately no update-manifest file to pin instead: the releases API already carries the tag, the asset names and a per-asset sha256 digest, and a manifest would be a second source of truth that can drift from the assets it describes (D-03). FIELD NAMES CONFIRMED LIVE on 2026-08-01 against https://api.github.com/repos/jrsoftware/issrc/releases/latest (a public repo, fetched anonymously with NO auth header — sending one would reintroduce the token problem D-01 exists to avoid): `tag_name`, `prerelease`, and per asset `name`, `browser_download_url`, `size`, `state` and `digest` were all present, with `digest` in the form `sha256:` + 64 lowercase hex. Only the values below are synthetic — the shape is the observed one. The three `size` values are the REAL observed artifact sizes from `dist/` (APK 69630935 B, setup exe 5177240 B, extension zip 13454 B) so the phone's size formatter is exercised against real magnitudes rather than round numbers, and D-08's \"~70 MB\" figure is what the parser actually sees. Asset names follow the locked convention that `tools/release.ps1` publishes and the parsers match rather than guess: RemoteControl-vX.Y.Z.apk, RemoteControl-Setup-vX.Y.Z.exe, RemoteControl-Extension-vX.Y.Z.zip. NOTE ON AUTHORITY: this fixture pins how a feed is PARSED. It does not grant the feed locator authority over the server — `update.apply` still carries only a version string, and the server resolves the URL and digest itself from its own compiled-in repo constant (D-14, SPEC §12).",
+  "response": {
+    "tag_name": "v1.5.0",
+    "name": "v1.5.0",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-08-01T12:00:00Z",
+    "html_url": "https://github.com/nandodeomkar/remote-control-releases/releases/tag/v1.5.0",
+    "assets": [
+      {
+        "name": "RemoteControl-v1.5.0.apk",
+        "browser_download_url": "https://github.com/nandodeomkar/remote-control-releases/releases/download/v1.5.0/RemoteControl-v1.5.0.apk",
+        "size": 69630935,
+        "state": "uploaded",
+        "content_type": "application/vnd.android.package-archive",
+        "digest": "sha256:3333cf18753033586c895652cd3cff6cd25c00b2e713a241a01a388c26e3f730"
+      },
+      {
+        "name": "RemoteControl-Setup-v1.5.0.exe",
+        "browser_download_url": "https://github.com/nandodeomkar/remote-control-releases/releases/download/v1.5.0/RemoteControl-Setup-v1.5.0.exe",
+        "size": 5177240,
+        "state": "uploaded",
+        "content_type": "application/x-msdownload",
+        "digest": "sha256:74dcced8f351704c0e18c409cc63064ad5c72894e937f9915e3ab38c37027af1"
+      },
+      {
+        "name": "RemoteControl-Extension-v1.5.0.zip",
+        "browser_download_url": "https://github.com/nandodeomkar/remote-control-releases/releases/download/v1.5.0/RemoteControl-Extension-v1.5.0.zip",
+        "size": 13454,
+        "state": "uploaded",
+        "content_type": "application/zip",
+        "digest": "sha256:19266fa182418190e8d6ae1339a1ce9098b2d7c184ace70b555b2a03343ca2c5"
+      }
+    ]
+  }
+}

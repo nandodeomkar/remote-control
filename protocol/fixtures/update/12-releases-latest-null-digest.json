@@ -1,0 +1,39 @@
+{
+  "name": "releases-latest-null-digest",
+  "description": "SPECIAL CASE, NEGATIVE (not a wire fixture — no `wire`/`expect` envelope, its own loader on both sides). The same captured `releases/latest` shape as 11-releases-latest.json, but the setup-exe asset carries `\"digest\": null`. This is a REAL GitHub state, not a hypothetical: the per-asset `digest` field only started being populated on 2025-06-03, so any asset uploaded before that date returns null, and a re-uploaded or replaced asset can too. THE RULE BOTH PARSERS MUST IMPLEMENT (D-15): a missing or null digest is a HARD REFUSAL — the update fails with `update.progress {stage:\"failed\", error:\"checksum\"}` and nothing is downloaded, executed or installed. It is NEVER a skipped verification and NEVER a \"download it anyway and trust the TLS transport\". `expectRefusal` below names the exact D-11 error code the refusal must produce, which makes this an executable contract rather than a code comment. Rationale: the digest is the ONLY integrity check standing between a tampered asset and an installer run with the owner's privileges — treating its absence as permission to skip verification would silently disable the one defence that exists (SPEC §12).",
+  "expectRefusal": "checksum",
+  "response": {
+    "tag_name": "v1.5.0",
+    "name": "v1.5.0",
+    "prerelease": false,
+    "draft": false,
+    "published_at": "2026-08-01T12:00:00Z",
+    "html_url": "https://github.com/nandodeomkar/remote-control-releases/releases/tag/v1.5.0",
+    "assets": [
+      {
+        "name": "RemoteControl-v1.5.0.apk",
+        "browser_download_url": "https://github.com/nandodeomkar/remote-control-releases/releases/download/v1.5.0/RemoteControl-v1.5.0.apk",
+        "size": 69630935,
+        "state": "uploaded",
+        "content_type": "application/vnd.android.package-archive",
+        "digest": "sha256:3333cf18753033586c895652cd3cff6cd25c00b2e713a241a01a388c26e3f730"
+      },
+      {
+        "name": "RemoteControl-Setup-v1.5.0.exe",
+        "browser_download_url": "https://github.com/nandodeomkar/remote-control-releases/releases/download/v1.5.0/RemoteControl-Setup-v1.5.0.exe",
+        "size": 5177240,
+        "state": "uploaded",
+        "content_type": "application/x-msdownload",
+        "digest": null
+      },
+      {
+        "name": "RemoteControl-Extension-v1.5.0.zip",
+        "browser_download_url": "https://github.com/nandodeomkar/remote-control-releases/releases/download/v1.5.0/RemoteControl-Extension-v1.5.0.zip",
+        "size": 13454,
+        "state": "uploaded",
+        "content_type": "application/zip",
+        "digest": "sha256:19266fa182418190e8d6ae1339a1ce9098b2d7c184ace70b555b2a03343ca2c5"
+      }
+    ]
+  }
+}

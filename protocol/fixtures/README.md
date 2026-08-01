@@ -61,6 +61,36 @@ Text fixtures carry an optional extra block:
 
 This block is consumed ONLY by the Dart diff-helper test: it must derive exactly `wire.p.bs` / `wire.p.ins` from `old`/`new` using extended-grapheme-cluster counting (SPEC §8). The Rust fixture loader ignores the block (in the D-05 ignore-unknown spirit). It is not part of the wire format.
 
+## Special case 3: `update/10-version-compare.json`
+
+The cross-language version-compare truth table (protoVersion 1.8, D-26). It does not follow the wire/expect schema; its shape is:
+
+```json
+{
+  "name": "version-compare",
+  "description": "...",
+  "cases": [ { "a": "1.10.0", "b": "1.9.0", "expect": "newer", "why": "..." } ]
+}
+```
+
+`expect` is one of `newer`, `older`, `same`, `unknown`, answering "how does `a` compare to `b`?". **`unknown` means at least one side failed to parse as an `X.Y.Z` triple, and an unknown must NEVER be treated as newer** — a malformed tag must not trigger an update offer. The Rust comparator (server) and the Dart comparator (phone) each need their own loader for this file; both must agree case-for-case, because a disagreement shows up in the field as a phone offering an update the server then refuses as `stale`. `why` is an informational note for humans and is ignored by both loaders.
+
+## Special case 4: `update/11-releases-latest.json`
+
+A captured-shape GitHub `GET /repos/{owner}/{repo}/releases/latest` response (protoVersion 1.8, D-02) under a `response` key, and the **shared parse fixture for BOTH feed parsers** — the server's and the phone's. No update-manifest file is pinned instead, deliberately: the releases API already carries the tag, the asset names and a per-asset sha256 `digest`, so a manifest would be a second source of truth that can drift (D-03).
+
+It is not a wire fixture and needs its own loader on each side. Field names were confirmed live against a public repo, fetched anonymously with no auth header; only the values are synthetic, except the three `size` values, which are the real observed artifact sizes so the size formatter is exercised against real magnitudes. This fixture pins how a feed is **parsed** — it grants the feed no locator authority over the server, which still resolves URL and digest itself from a compiled-in constant (SPEC §12, D-14).
+
+## Special case 5: `update/12-releases-latest-null-digest.json`
+
+The same `releases/latest` shape with one asset's `digest` set to `null` — a real GitHub state, since the field was only populated from 2025-06-03 onward. It carries an extra top-level key:
+
+```json
+"expectRefusal": "checksum"
+```
+
+**A missing or null digest is a HARD refusal, never a skipped verification (D-15).** Both parsers must fail the update with the named `err` vocabulary value rather than download the asset unverified. `expectRefusal` is what makes that rule executable rather than a code comment.
+
 ## Loader contract (D-09 — copies are forbidden)
 
 Both test suites load **these exact files**; per-language fixture copies are forbidden.

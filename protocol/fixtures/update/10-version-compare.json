@@ -1,0 +1,21 @@
+{
+  "name": "version-compare",
+  "description": "SPECIAL CASE (not a wire fixture — no `wire`/`expect` envelope, its own loader on both sides). The cross-language version-compare truth table for protoVersion 1.8 (D-26). Each case asks: how does `a` compare to `b`? `expect` is one of `newer`, `older`, `same`, `unknown`. `unknown` means at least one side FAILED TO PARSE as an X.Y.Z triple of non-negative integers, and an unknown MUST NOT be treated as `newer` — a malformed or unreadable tag never triggers an update offer, on either side. The Rust comparator (server) and the Dart comparator (phone) load this exact file and must agree case-for-case; a disagreement shows in the field as a phone offering an update the server then refuses as `stale`. The 1.10.0-vs-1.9.0 row is the lexical trap: string comparison AND float parsing both get it wrong, only an explicit (major, minor, patch) integer tuple compare gets it right. PRE-RELEASE CONSEQUENCE, deliberate not accidental: `X.Y.Z-rcN` parses as `unknown`, so a pre-release is NEVER offered to a client. GitHub's /releases/latest already excludes pre-releases, so this is the second belt rather than the primary mechanism, and it is the phase's reading of latest-stable-only (update channels are Deferred). A leading `v` is stripped before parsing, because tags are published as `vX.Y.Z` while package versions are bare.",
+  "cases": [
+    { "a": "1.10.0", "b": "1.9.0", "expect": "newer", "why": "the lexical trap - \"1.10.0\" < \"1.9.0\" as strings, and 1.10 < 1.9 as floats; only an integer tuple compare is correct" },
+    { "a": "1.9.0", "b": "1.10.0", "expect": "older", "why": "the same trap in the other direction" },
+    { "a": "1.4.0", "b": "1.4.0", "expect": "same", "why": "equality" },
+    { "a": "1.4.0", "b": "1.4.1", "expect": "older", "why": "patch ordering" },
+    { "a": "1.4.1", "b": "1.4.0", "expect": "newer", "why": "patch ordering" },
+    { "a": "2.0.0", "b": "1.99.99", "expect": "newer", "why": "major dominates minor and patch" },
+    { "a": "v1.4.0", "b": "1.4.0", "expect": "same", "why": "a leading v is stripped - git tags are vX.Y.Z, package versions are bare" },
+    { "a": "v1.5.0", "b": "v1.4.0", "expect": "newer", "why": "a leading v on both sides is still stripped" },
+    { "a": "1.4", "b": "1.4.0", "expect": "unknown", "why": "two components is not X.Y.Z - never coerced to 1.4.0" },
+    { "a": "1.4.0-rc1", "b": "1.4.0", "expect": "unknown", "why": "a pre-release suffix does not parse, so a pre-release is never offered (D-20/D-26)" },
+    { "a": "1.4.0", "b": "1.4.0-rc1", "expect": "unknown", "why": "unknown on EITHER side makes the whole comparison unknown" },
+    { "a": "", "b": "1.4.0", "expect": "unknown", "why": "the empty string - an absent or blank tag is never newer" },
+    { "a": "latest", "b": "1.4.0", "expect": "unknown", "why": "a non-numeric tag - never newer" },
+    { "a": "999999999999999999999.0.0", "b": "1.4.0", "expect": "unknown", "why": "integer overflow - a component that does not fit the parser's integer type is unknown, NOT saturated to a huge value that would compare as newer" },
+    { "a": "1.4.0", "b": "999999999999999999999.0.0", "expect": "unknown", "why": "overflow on the other side is equally unknown" }
+  ]
+}
