@@ -335,3 +335,141 @@ Check the network, then re-run.
 }
 
 Write-Host "`nPreflight OK." -ForegroundColor Green
+
+# ---- Version bump ------------------------------------------------------
+#
+# ANCHORED SINGLE-LINE REGEX REPLACEMENT ONLY. Never parse-and-reserialise:
+# both pubspec.yaml and Cargo.toml carry load-bearing comments (the 8-line
+# block explaining why the build number must increase, the note naming
+# Cargo.toml as the single source of the server version) that any YAML/TOML
+# round trip would silently delete. There is deliberately no YAML, TOML or
+# JSON serializer anywhere in this script.
+
+function Get-LineSpans {
+    <# One Match per line, terminator excluded, so the caller can splice a line
+       in place without touching any line ending. The three version files do
+       not agree on CRLF vs LF, so joining them back together with one chosen
+       separator would rewrite the whole file. #>
+    param([Parameter(Mandatory)][string]$Text)
+
+    return [regex]::Matches($Text, '^[^\r\n]*', [System.Text.RegularExpressions.RegexOptions]::Multiline)
+}
+
+function Set-VersionField {
+    <#
+        Rewrites the version value(s) inside the FIRST line matching $Pattern.
+
+        $Rewrite receives the line's regex Match and returns:
+            @{ Groups = @{ <group number> = <new text> ; ... }
+               Old    = <old value, for the BUMP line>
+               New    = <new value, for the BUMP line> }
+
+        Only the named capture groups are spliced, so indentation, quoting,
+        trailing commas and spacing all survive byte for byte.
+
+        Post-condition: exactly one line differs from the pre-image, and that
+        line contains $Version. Either check failing aborts the release.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Path,
+        [Parameter(Mandatory)][string]$RelativePath,
+        [Parameter(Mandatory)][string]$Pattern,
+        [Parameter(Mandatory)][scriptblock]$Rewrite
+    )
+
+    if (-not (Test-Path $Path)) {
+        throw "Cannot bump the version: $RelativePath not found at $Path."
+    }
+
+    # Bytes in, bytes out. UTF8.GetString keeps a BOM (if the file has one) as
+    # a leading U+FEFF character, so it round-trips untouched.
+    $before = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($Path))
+
+    $spans  = Get-LineSpans -Text $before
+    $target = $null
+    foreach ($span in $spans) {
+        if ([regex]::IsMatch($span.Value, $Pattern)) { $target = $span; break }
+    }
+    if (-not $target) {
+        throw @"
+No line matching the version anchor in $RelativePath
+  anchor: $Pattern
+
+The anchor has moved. Fix the anchor -- do NOT fall back to a YAML/TOML/JSON
+parser, which would delete this file's comments.
+"@
+    }
+
+    $match     = [regex]::Match($target.Value, $Pattern)
+    $rewritten = & $Rewrite $match
+
+    # Splice highest group index first so the earlier offsets stay valid.
+    $after = $before
+    foreach ($group in ($rewritten.Groups.Keys | Sort-Object -Descending)) {
+        $capture  = $match.Groups[$group]
+        $absolute = $target.Index + $capture.Index
+        $after = $after.Remove($absolute, $capture.Length).Insert($absolute, [string]$rewritten.Groups[$group])
+    }
+
+    # ---- Post-condition: exactly one line changed, and it carries $Version.
+    $beforeLines = @($spans | ForEach-Object { $_.Value })
+    $afterLines  = @(Get-LineSpans -Text $after | ForEach-Object { $_.Value })
+    if ($beforeLines.Count -ne $afterLines.Count) {
+        throw "Rewriting $RelativePath changed the line count ($($beforeLines.Count) -> $($afterLines.Count)). Aborting before anything is built."
+    }
+    $changed = @(0..($beforeLines.Count - 1) | Where-Object { $beforeLines[$_] -ne $afterLines[$_] })
+    if ($changed.Count -ne 1) {
+        throw "Rewriting $RelativePath changed $($changed.Count) lines; exactly 1 was expected. Aborting before anything is built."
+    }
+    if (-not $afterLines[$changed[0]].Contains($Version)) {
+        throw "Rewriting $RelativePath produced '$($afterLines[$changed[0]])', which does not contain $Version. Aborting before anything is built."
+    }
+
+    Write-Host ("BUMP {0} {1} -> {2}" -f $RelativePath, $rewritten.Old, $rewritten.New)
+
+    if ($DryRun) { return }
+
+    [System.IO.File]::WriteAllBytes($Path, (New-Object System.Text.UTF8Encoding($false)).GetBytes($after))
+
+    $readBack = [System.Text.Encoding]::UTF8.GetString([System.IO.File]::ReadAllBytes($Path))
+    if ($readBack -ne $after) {
+        throw "Wrote $RelativePath but reading it back produced different bytes. Aborting before anything is built."
+    }
+}
+
+Write-Host "`nVersion bump" -ForegroundColor Cyan
+
+# server/server-windows/Cargo.toml -- FIRST `version = "..."` line, which is
+# the [package] one; dependency versions further down are all inside inline
+# tables. Same anchor installer/build-installer.ps1 reads, so the two scripts
+# cannot disagree about where the server's version lives.
+Set-VersionField -Path $CargoToml -RelativePath 'server/server-windows/Cargo.toml' `
+    -Pattern '^\s*version\s*=\s*"([^"]+)"' -Rewrite {
+        param($m)
+        @{ Groups = @{ 1 = $Version }; Old = $m.Groups[1].Value; New = $Version }
+    }
+
+# app/remote_control/pubspec.yaml -- BOTH halves. The build number after the +
+# is Android's versionCode and must STRICTLY increase: Android refuses to
+# install a lower code over a higher one. Leaving it pinned is the exact bug
+# that made four shipped APKs all report themselves as 1.0.0.
+Set-VersionField -Path $PubSpec -RelativePath 'app/remote_control/pubspec.yaml' `
+    -Pattern '^version:\s*(\d+\.\d+\.\d+)\+(\d+)$' -Rewrite {
+        param($m)
+        $oldSemver = $m.Groups[1].Value
+        $oldBuild  = [int]$m.Groups[2].Value
+        $newBuild  = $oldBuild + 1
+        if ($newBuild -le $oldBuild) {
+            throw "pubspec.yaml build number would not increase ($oldBuild -> $newBuild); Android would refuse the install."
+        }
+        @{ Groups = @{ 1 = $Version; 2 = [string]$newBuild }
+           Old    = "$oldSemver+$oldBuild"
+           New    = "$Version+$newBuild" }
+    }
+
+# extension/manifest.json -- the extension joins the unified version line here.
+Set-VersionField -Path $ExtManifest -RelativePath 'extension/manifest.json' `
+    -Pattern '"version"\s*:\s*"([^"]+)"' -Rewrite {
+        param($m)
+        @{ Groups = @{ 1 = $Version }; Old = $m.Groups[1].Value; New = $Version }
+    }
