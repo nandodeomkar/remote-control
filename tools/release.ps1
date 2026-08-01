@@ -148,7 +148,7 @@ function Compare-VersionTriple {
 }
 
 function Invoke-GitHubProbe {
-    <# Anonymous GET. NO Authorization header, no token, ever (D-01): this is
+    <# Anonymous GET. No auth header and no credential, ever (D-01): this is
        the same anonymous read every installed client performs. #>
     param([Parameter(Mandatory)][string]$Uri)
 
@@ -473,3 +473,188 @@ Set-VersionField -Path $ExtManifest -RelativePath 'extension/manifest.json' `
         param($m)
         @{ Groups = @{ 1 = $Version }; Old = $m.Groups[1].Value; New = $Version }
     }
+
+# ---- Artifacts ---------------------------------------------------------
+#
+# These three names are a CONTRACT, not a convention: the server resolves each
+# asset URL and its sha256 from a compiled-in prefix plus the release tag, and
+# never accepts a download target supplied over the wire. Renaming an asset
+# here silently breaks every installed client's self-update.
+
+$Tag        = "v$Version"
+$ApkAsset   = Join-Path $DistDir "RemoteControl-v$Version.apk"
+$SetupAsset = Join-Path $DistDir "RemoteControl-Setup-v$Version.exe"
+$ExtAsset   = Join-Path $DistDir "RemoteControl-Extension-v$Version.zip"
+$FlutterApk = Join-Path $AppDir 'build\app\outputs\flutter-apk\app-release.apk'
+$NotesFile  = Join-Path $env:TEMP "RemoteControl-$Tag-notes.md"
+
+$BumpedFiles = @(
+    'server/server-windows/Cargo.toml',
+    'app/remote_control/pubspec.yaml',
+    'extension/manifest.json'
+)
+
+function Write-DryRunStep {
+    param([Parameter(Mandatory)][string]$Command)
+    Write-Host "DRYRUN $Command" -ForegroundColor Yellow
+}
+
+# ---- Build -------------------------------------------------------------
+
+Write-Host "`nBuild" -ForegroundColor Cyan
+
+if ($DryRun) {
+    Write-DryRunStep "cd `"$AppDir`"; flutter build apk --release"
+    Write-DryRunStep "copy `"$FlutterApk`" -> `"$ApkAsset`""
+    Write-DryRunStep "& `"$Installer`" -Version $Version   (writes `"$SetupAsset`")"
+    Write-DryRunStep "Compress-Archive -Path `"$ExtDir`" -DestinationPath `"$ExtAsset`""
+} else {
+    if (-not (Test-Path $DistDir)) { New-Item -ItemType Directory -Path $DistDir | Out-Null }
+
+    Write-Host "  flutter build apk --release ..."
+    Push-Location $AppDir
+    try {
+        Invoke-Native -Exe 'flutter' -Arguments @('build', 'apk', '--release')
+        if ($LASTEXITCODE -ne 0) {
+            throw "flutter build apk --release failed with exit code $LASTEXITCODE."
+        }
+    } finally {
+        Pop-Location
+    }
+    if (-not (Test-Path $FlutterApk)) {
+        throw "flutter reported success but $FlutterApk is missing."
+    }
+    Copy-Item -Path $FlutterApk -Destination $ApkAsset -Force
+
+    # CALL installer/build-installer.ps1 -- never reimplement it. It already
+    # writes exactly dist\RemoteControl-Setup-v<version>.exe.
+    Write-Host "  installer/build-installer.ps1 ..."
+    & $Installer -Version $Version
+    if (-not (Test-Path $SetupAsset)) {
+        throw "build-installer.ps1 reported success but $SetupAsset is missing."
+    }
+
+    # -Path <dir> puts the `extension` folder itself at the zip root, which is
+    # what the extension README's "load the extension folder unpacked"
+    # instructions assume.
+    Write-Host "  extension zip ..."
+    if (Test-Path $ExtAsset) { Remove-Item -Path $ExtAsset -Force }
+    Compress-Archive -Path $ExtDir -DestinationPath $ExtAsset
+    if (-not (Test-Path $ExtAsset)) {
+        throw "Compress-Archive reported success but $ExtAsset is missing."
+    }
+
+    Write-Host "  three artifacts in $DistDir" -ForegroundColor Green
+}
+
+# ---- Hash --------------------------------------------------------------
+#
+# Printed so the published per-asset digests can be eyeballed against what
+# was actually built on this machine.
+
+Write-Host "`nsha256" -ForegroundColor Cyan
+
+foreach ($asset in @($ApkAsset, $SetupAsset, $ExtAsset)) {
+    if ($DryRun) {
+        Write-DryRunStep "Get-FileHash -Algorithm SHA256 `"$asset`""
+        continue
+    }
+    $digest = Get-FileHash -Algorithm SHA256 -Path $asset
+    Write-Host ("SHA256 {0} {1}" -f (Split-Path -Leaf $asset), $digest.Hash.ToLowerInvariant())
+}
+
+# ---- Tag ---------------------------------------------------------------
+#
+# "Tag both repos" (D-20) is satisfied by this private-repo tag PLUS the
+# mirror's own release tag, which `gh release create` creates for us -- the
+# mirror holds no source, so it needs no --target.
+#
+# The bump is committed first: a tag placed on a dirty tree would point at the
+# PREVIOUS commit, so the tag would not name the source the artifacts were
+# built from.
+
+Write-Host "`nTag" -ForegroundColor Cyan
+
+if ($DryRun) {
+    Write-DryRunStep "git add $($BumpedFiles -join ' ')"
+    Write-DryRunStep "git commit -m `"chore(release): $Tag`""
+    Write-DryRunStep "git tag $Tag"
+    Write-DryRunStep "git push origin HEAD"
+    Write-DryRunStep "git push origin $Tag"
+} else {
+    $existing = Invoke-Native -Exe 'git' -Arguments @('-C', $RepoRoot, 'tag', '--list', $Tag)
+    if ($existing) {
+        throw @"
+The tag $Tag already exists in the private repo.
+
+The version bump has been written to the working tree but nothing has been
+pushed or published. Either delete the stale tag, or re-run with a higher
+-Version after reverting the bump (git checkout -- $($BumpedFiles -join ' ')).
+"@
+    }
+
+    Invoke-Native -Exe 'git' -Arguments (@('-C', $RepoRoot, 'add') + $BumpedFiles)
+    if ($LASTEXITCODE -ne 0) { throw "git add of the bumped version files failed with exit code $LASTEXITCODE." }
+
+    Invoke-Native -Exe 'git' -Arguments @('-C', $RepoRoot, 'commit', '-m', "chore(release): $Tag")
+    if ($LASTEXITCODE -ne 0) { throw "git commit of the version bump failed with exit code $LASTEXITCODE." }
+
+    Invoke-Native -Exe 'git' -Arguments @('-C', $RepoRoot, 'tag', $Tag)
+    if ($LASTEXITCODE -ne 0) { throw "git tag $Tag failed with exit code $LASTEXITCODE." }
+
+    Invoke-Native -Exe 'git' -Arguments @('-C', $RepoRoot, 'push', 'origin', 'HEAD')
+    if ($LASTEXITCODE -ne 0) { throw "git push origin HEAD failed with exit code $LASTEXITCODE." }
+
+    Invoke-Native -Exe 'git' -Arguments @('-C', $RepoRoot, 'push', 'origin', $Tag)
+    if ($LASTEXITCODE -ne 0) { throw "git push origin $Tag failed with exit code $LASTEXITCODE." }
+
+    Write-Host "  $Tag tagged and pushed" -ForegroundColor Green
+}
+
+# ---- Publish -----------------------------------------------------------
+#
+# Publishing authenticates through the operator's own `gh` login only. No
+# credential, no auth header and no credential-bearing argument appears
+# anywhere in this script, so nothing secret can leak into an artifact.
+#
+# -PreRelease semantics: a pre-release is published for the owner's own UAT
+# and is DELIBERATELY INVISIBLE TO CLIENTS. The /releases/latest endpoint the
+# clients read excludes pre-releases, and the client version parser rejects
+# X.Y.Z-rcN tags as unknown, so a pre-release is never offered as an update.
+
+Write-Host "`nPublish" -ForegroundColor Cyan
+
+$Notes = "Remote Control $Tag -- Android app, Windows server and browser extension, all at $Version."
+
+$GhArgs = @(
+    'release', 'create', $Tag,
+    $ApkAsset, $SetupAsset, $ExtAsset,
+    '--repo', $MirrorRepo,
+    '--title', $Tag,
+    '--notes-file', $NotesFile
+)
+if ($PreRelease) { $GhArgs += '--prerelease' }
+
+if ($DryRun) {
+    Write-DryRunStep "write release notes -> `"$NotesFile`""
+    Write-DryRunStep "& `"$Gh`" $($GhArgs -join ' ')"
+    Write-Host "`nDry run complete. Nothing was written, built, tagged or published." -ForegroundColor Green
+} else {
+    Set-Content -Path $NotesFile -Value $Notes -Encoding UTF8
+
+    Invoke-Native -Exe $Gh -Arguments $GhArgs
+    if ($LASTEXITCODE -ne 0) {
+        throw @"
+gh release create failed with exit code $LASTEXITCODE.
+
+$Tag is already tagged and pushed in the private repo, so re-running this
+script would refuse the tag. Fix the cause (usually `gh auth login`, or an
+existing draft release on $MirrorRepo) and finish by hand:
+
+  & "$Gh" $($GhArgs -join ' ')
+"@
+    }
+
+    Write-Host "`nReleased." -ForegroundColor Green
+    Write-Host "  https://github.com/$MirrorRepo/releases/tag/$Tag"
+}
