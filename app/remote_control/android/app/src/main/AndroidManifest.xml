@@ -7,10 +7,15 @@
          The multicast permission backs the WifiManager.MulticastLock —
          OEM broadcast-filter insurance for UDP beacon discovery.
          Camera backs the QR pairing scanner (260716-kba); mobile_scanner
-         requests the runtime grant itself when the scanner starts. -->
+         requests the runtime grant itself when the scanner starts.
+         The install-packages permission below backs the APK self-update
+         (D-19): it lets the app open a PackageInstaller session. It is only
+         half the story — the user must also grant "install unknown apps" for
+         this package once, per device, which the explainer sheet routes to. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
     <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
         android:label="Remote Control"
         android:name="${applicationName}"
@@ -38,6 +43,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <!-- PackageInstaller session status sink (D-19). NOT exported: it is
+             targeted by an explicit-component PendingIntent from MainActivity,
+             so only the system's install callback can reach it and no other
+             app can feed it a forged status. -->
+        <receiver android:name=".InstallResultReceiver" android:exported="false"/>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
