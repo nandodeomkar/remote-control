@@ -490,6 +490,13 @@ $NotesFile  = Join-Path $env:TEMP "RemoteControl-$Tag-notes.md"
 
 $BumpedFiles = @(
     'server/server-windows/Cargo.toml',
+    # Not version-bearing itself -- cargo rewrites this lockfile's
+    # `server-windows` entry when the installer build below runs `cargo build`,
+    # so it has to ride the release commit. Left out, the tag names a tree whose
+    # lockfile still pins the PREVIOUS version (`cargo build --locked` then
+    # fails from that tag) and the leftover dirt trips the NEXT run's clean-tree
+    # preflight.
+    'server/Cargo.lock',
     'app/remote_control/pubspec.yaml',
     'extension/manifest.json'
 )
