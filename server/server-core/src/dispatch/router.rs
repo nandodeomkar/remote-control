@@ -321,6 +321,25 @@ pub fn route(
         // drop them defensively (the session FSM owns them).
         Msg::Hello(_) | Msg::Pin(_) | Msg::Auth(_) => Vec::new(),
 
+        // ── update.* (protoVersion 1.8) — NOT YET ROUTED ───────────────
+        // Plan 12-04 landed the codecs and the `UpdateExecutor` trait but
+        // deliberately did NOT add `update` to the `Executors` bundle — that
+        // change ripples into server-windows/src/main.rs and every test
+        // harness, and it belongs to 12-12. Plan 12-13 then replaces this
+        // placeholder with the real arms: `update.check` calls
+        // `exec.update.info()` and replies with one `update.status`,
+        // `update.apply` calls `exec.update.apply(&p.target)` and replies with
+        // nothing (D-14 — the target string is the ONLY value that crosses),
+        // and both join `is_executor_bound` (D-13: `update.check` is a read
+        // that is deliberately NOT pause-exempt).
+        //
+        // Until then these decode fine and route nowhere: the type IS known,
+        // so `err{unknownType}` would be a lie, and there is no executor to
+        // reach yet. A phone on a server built from this commit sees no reply
+        // to `update.check` — the 1.8 flip in 12-13 is what makes the family
+        // live, which is exactly why SPEC.md still declares 1.7.
+        Msg::UpdateCheck(_) | Msg::UpdateApply(_) => Vec::new(),
+
         // S→C-only types arriving FROM a client are known-but-invalid
         // direction: ignored silently (no unknownType — the type IS known;
         // no routing fallthrough — nothing executes).
@@ -334,6 +353,8 @@ pub fn route(
         | Msg::InputBlocked(_)
         | Msg::TabsChanged(_)
         | Msg::BmChanged(_)
+        | Msg::UpdateStatus(_)
+        | Msg::UpdateProgress(_)
         | Msg::Pong(_)
         | Msg::Err(_) => Vec::new(),
     }

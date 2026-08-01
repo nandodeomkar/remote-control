@@ -339,6 +339,113 @@ pub struct BmRemovePayload {
     pub node_id: String,
 }
 
+/// `update.check` payload (C→S, protoVersion 1.8, D-09): EMPTY — the client
+/// asks nothing and supplies nothing, because everything the answer contains
+/// is resolved server-side. The [`ClipGetPayload`] empty-struct shape, so the
+/// canonical re-encode still emits `p` as `{}`. The reply is `update.status`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UpdateCheckPayload {}
+
+/// The nested `lastUpdate` object on [`UpdateStatusPayload`] (protoVersion
+/// 1.8, D-12): the outcome of the **PREVIOUS** update attempt, not the current
+/// one.
+///
+/// It exists because the process that would otherwise have reported a failed
+/// install **had already exited to let the installer replace it** — without
+/// this marker a failed PC install is indistinguishable from a successful one
+/// that simply took a while to come back. The server reads it at startup from
+/// a marker file and clears it once reported, so it appears on exactly one
+/// `update.status` and never again.
+///
+/// `error` draws from the SAME closed D-11 vocabulary as
+/// [`UpdateProgressPayload::error`] and is present only when `ok` is `false`.
+/// It is a plain `String` per the file-level rule: closed vocabularies are
+/// validated by the producer and the router, never by the codec.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LastUpdatePayload {
+    pub target: String,
+    pub ok: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// `update.status` payload (S→C reply to `update.check`, protoVersion 1.8,
+/// D-09/D-12): what the server knows about its own — and the extension's —
+/// version state.
+///
+/// `serverVersion` and `extConnected` are REQUIRED (a missing `serverVersion`
+/// is a hard decode error: a silently-absent version would make the phone's
+/// comparison run against nothing, and unknown must never read as newer,
+/// D-26). `extVersion` and `lastUpdate` follow the skip-when-absent
+/// convention every optional field in this protocol uses — ABSENT, never
+/// emitted as null.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UpdateStatusPayload {
+    #[serde(rename = "serverVersion")]
+    pub server_version: String,
+    #[serde(rename = "extConnected")]
+    pub ext_connected: bool,
+    /// Absent when the extension has never connected — skipped entirely.
+    #[serde(rename = "extVersion", default, skip_serializing_if = "Option::is_none")]
+    pub ext_version: Option<String>,
+    /// Present only while a startup marker exists (D-12). A missing marker is
+    /// the NORMAL case, never an error.
+    #[serde(rename = "lastUpdate", default, skip_serializing_if = "Option::is_none")]
+    pub last_update: Option<LastUpdatePayload>,
+}
+
+/// `update.apply` payload (C→S, protoVersion 1.8, SPEC §7 and §12, **D-14**):
+/// **EXACTLY ONE FIELD — a version string, and nothing else.**
+///
+/// The server resolves the asset's download URL and its sha256 **itself**,
+/// from a repo constant compiled into its own binary, and never accepts,
+/// derives, or is influenced by a locator supplied over the wire. `target` is
+/// used for exactly two things — an equality check against the version the
+/// server just resolved as latest (mismatch ⇒ `stale`) and an ordering check
+/// against the running version (at-or-below ⇒ `downgrade`, D-15) — and is
+/// never concatenated into a URL or a filesystem path.
+///
+/// **Adding any field to this struct that names a URL, asset, filename, hash
+/// or path is remote code execution on the PC.** A paired phone — or anything
+/// that obtained a token — would then choose what binary the machine runs.
+/// This is the strongest constraint in the protocol and it is not to be
+/// relaxed for convenience, now or later. `tests/update_guard.rs` fails the
+/// build if such a field appears, so the rule is enforced by the test suite
+/// rather than by anyone remembering it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UpdateApplyPayload {
+    pub target: String,
+}
+
+/// `update.progress` payload (S→C push, protoVersion 1.8, D-09/D-10/D-11):
+/// an in-flight or finished `update.apply`.
+///
+/// `stage` is REQUIRED and draws from the closed D-10 vocabulary
+/// (`checking`, `downloading`, `verifying`, `installing`, `restarting`, plus
+/// the terminals `uptodate` and `failed`); `error` draws from the closed D-11
+/// vocabulary (`network`, `checksum`, `disk`, `installer`, `downgrade`,
+/// `stale`, `busy`). Both are plain `String` here per the file-level rule —
+/// enum-valued wire fields decode as strings and are validated by the producer
+/// and the router, not by the codec.
+///
+/// `pct` belongs to `downloading` ALONE (D-10): the other six stages have no
+/// byte count, so a percentage would be invented. `failed` always carries
+/// `error`; `uptodate` carries neither. Absent optionals stay absent on
+/// canonical re-encode, never emitted as null.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct UpdateProgressPayload {
+    pub stage: String,
+    /// `downloading` only (D-10).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pct: Option<u8>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// Closed D-11 vocabulary — never free text, never a path, never a URL,
+    /// never an HTTP status, never an exception name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
 /// `browser` payload (C→S): key-macro actions (SPEC §7).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BrowserPayload {
@@ -423,6 +530,10 @@ pub enum Msg {
     BmStar(BmStarPayload),
     BmUnstar(BmUnstarPayload),
     BmRemove(BmRemovePayload),
+    UpdateCheck(UpdateCheckPayload),
+    UpdateStatus(UpdateStatusPayload),
+    UpdateApply(UpdateApplyPayload),
+    UpdateProgress(UpdateProgressPayload),
     Browser(BrowserPayload),
     Present(PresentPayload),
     Ping(PingPayload),
@@ -484,6 +595,10 @@ pub fn decode_text(s: &str) -> Result<Decoded, CodecError> {
         "bm.star" => Msg::BmStar(payload(p)?),
         "bm.unstar" => Msg::BmUnstar(payload(p)?),
         "bm.remove" => Msg::BmRemove(payload(p)?),
+        "update.check" => Msg::UpdateCheck(payload(p)?),
+        "update.status" => Msg::UpdateStatus(payload(p)?),
+        "update.apply" => Msg::UpdateApply(payload(p)?),
+        "update.progress" => Msg::UpdateProgress(payload(p)?),
         "browser" => Msg::Browser(payload(p)?),
         "present" => Msg::Present(payload(p)?),
         "ping" => Msg::Ping(payload(p)?),
@@ -561,6 +676,10 @@ pub fn encode_msg(msg: &Msg, seq: Option<u64>) -> String {
         Msg::BmStar(pl) => ("bm.star", val(pl)),
         Msg::BmUnstar(pl) => ("bm.unstar", val(pl)),
         Msg::BmRemove(pl) => ("bm.remove", val(pl)),
+        Msg::UpdateCheck(pl) => ("update.check", val(pl)),
+        Msg::UpdateStatus(pl) => ("update.status", val(pl)),
+        Msg::UpdateApply(pl) => ("update.apply", val(pl)),
+        Msg::UpdateProgress(pl) => ("update.progress", val(pl)),
         Msg::Browser(pl) => ("browser", val(pl)),
         Msg::Present(pl) => ("present", val(pl)),
         Msg::Ping(pl) => ("ping", val(pl)),
@@ -734,6 +853,130 @@ mod tests {
             Msg::InputBlocked(InputBlockedPayload { reason: "elevated".into() }),
             None,
         );
+    }
+
+    #[test]
+    fn round_trip_update_check() {
+        // proto 1.8 (D-09): the empty request payload — `p` is still emitted
+        // as `{}` by the canonical-form rule, so decode(encode()) is identity.
+        round_trip(Msg::UpdateCheck(UpdateCheckPayload {}), Some(21));
+        // Absent `p` is equivalent to `{}` (SPEC §1).
+        let decoded = decode_text(r#"{"t":"update.check"}"#).unwrap();
+        assert_eq!(decoded.msg, Msg::UpdateCheck(UpdateCheckPayload {}));
+    }
+
+    #[test]
+    fn round_trip_update_status() {
+        // proto 1.8 (D-09/D-12): the full shape, incl. the nested lastUpdate
+        // object whose `error` draws from the closed D-11 vocabulary.
+        round_trip(
+            Msg::UpdateStatus(UpdateStatusPayload {
+                server_version: "1.4.0".into(),
+                ext_connected: true,
+                ext_version: Some("1.2.1".into()),
+                last_update: Some(LastUpdatePayload {
+                    target: "1.5.0".into(),
+                    ok: false,
+                    error: Some("installer".into()),
+                }),
+            }),
+            Some(22),
+        );
+        // The minimal shape: extension never connected, no marker. Both
+        // optionals must stay ABSENT on canonical re-encode, not null.
+        let msg = Msg::UpdateStatus(UpdateStatusPayload {
+            server_version: "1.4.0".into(),
+            ext_connected: false,
+            ext_version: None,
+            last_update: None,
+        });
+        let wire = encode_msg(&msg, None);
+        let v: Value = serde_json::from_str(&wire).unwrap();
+        assert!(v["p"].get("extVersion").is_none());
+        assert!(v["p"].get("lastUpdate").is_none());
+        round_trip(msg, None);
+        // A successful marker omits `error` entirely (D-12: present only when
+        // ok is false).
+        round_trip(
+            Msg::UpdateStatus(UpdateStatusPayload {
+                server_version: "1.5.0".into(),
+                ext_connected: false,
+                ext_version: None,
+                last_update: Some(LastUpdatePayload {
+                    target: "1.5.0".into(),
+                    ok: true,
+                    error: None,
+                }),
+            }),
+            None,
+        );
+        // `serverVersion` is REQUIRED — never defaulted (D-05, D-26).
+        let err = decode_text(r#"{"t":"update.status","p":{"extConnected":true}}"#).unwrap_err();
+        assert_eq!(err, CodecError::MissingField("serverVersion".to_string()));
+    }
+
+    #[test]
+    fn round_trip_update_apply() {
+        // proto 1.8 (D-14): `target` is the ONLY field this payload carries,
+        // now or ever — the server resolves the asset URL and its sha256
+        // itself from a compiled-in repo constant. See tests/update_guard.rs.
+        round_trip(
+            Msg::UpdateApply(UpdateApplyPayload { target: "1.5.0".into() }),
+            Some(23),
+        );
+        // The canonical payload has exactly one key: the wire form of D-14.
+        let wire = encode_msg(
+            &Msg::UpdateApply(UpdateApplyPayload { target: "1.5.0".into() }),
+            None,
+        );
+        let v: Value = serde_json::from_str(&wire).unwrap();
+        assert_eq!(
+            v["p"].as_object().unwrap().len(),
+            1,
+            "D-14: update.apply carries a version string and NOTHING else"
+        );
+        // `target` is REQUIRED — a missing one is a hard decode error, never
+        // a coerced empty string (D-05).
+        let err = decode_text(r#"{"t":"update.apply","p":{}}"#).unwrap_err();
+        assert_eq!(err, CodecError::MissingField("target".to_string()));
+    }
+
+    #[test]
+    fn round_trip_update_progress() {
+        // proto 1.8 (D-10/D-11): `downloading` is the only stage carrying pct.
+        round_trip(
+            Msg::UpdateProgress(UpdateProgressPayload {
+                stage: "downloading".into(),
+                pct: Some(43),
+                version: Some("1.5.0".into()),
+                error: None,
+            }),
+            None,
+        );
+        // Terminal failure: `error` from the closed vocabulary, no pct.
+        round_trip(
+            Msg::UpdateProgress(UpdateProgressPayload {
+                stage: "failed".into(),
+                pct: None,
+                version: Some("1.5.0".into()),
+                error: Some("checksum".into()),
+            }),
+            None,
+        );
+        // Terminal success-with-nothing-to-do: stage and nothing else — all
+        // three optionals stay ABSENT rather than being emitted as null.
+        let msg = Msg::UpdateProgress(UpdateProgressPayload {
+            stage: "uptodate".into(),
+            pct: None,
+            version: None,
+            error: None,
+        });
+        let wire = encode_msg(&msg, None);
+        let v: Value = serde_json::from_str(&wire).unwrap();
+        assert!(v["p"].get("pct").is_none());
+        assert!(v["p"].get("version").is_none());
+        assert!(v["p"].get("error").is_none());
+        round_trip(msg, None);
     }
 
     #[test]
