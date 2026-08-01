@@ -401,7 +401,7 @@ Plans:
 **Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
 **Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
 **Depends on:** Phase 11
-**Plans:** 0 plans
+**Plans:** 17 plans in 7 waves
 
 **Success Criteria** (what must be TRUE):
 
@@ -416,4 +416,20 @@ Plans:
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 12 to break down)
+- [ ] 12-01-PLAN.md — `tools/release.ps1`: preflight refusals, the three-file version bump, build, hash, tag, publish, and a side-effect-free `-DryRun` harness (wave 1)
+- [ ] 12-02-PLAN.md — protoVersion 1.8 contract: SPEC registry rows, both closed vocabularies, the D-14 locator note, and the twelve shared `protocol/fixtures/update/` files (wave 1)
+- [ ] 12-03-PLAN.md — public mirror repo (owner action) + the first real published release + `DISTRIBUTION.md` rewritten around the script (wave 2, human-gated)
+- [ ] 12-04-PLAN.md — server-core `update.*` codecs, the `UpdateExecutor` trait and state types, fixture registration, and the SC6 structural guard test (wave 2)
+- [ ] 12-05-PLAN.md — Dart `update.*` codecs pinned to the same fixtures, plus the SC8 forward-compat tests (wave 2)
+- [ ] 12-06-PLAN.md — server-windows `update/{mod,feed,download}.rs`: `ureq`, the compiled-in locator constants, feed parse, streaming download and verify-or-delete (wave 2)
+- [ ] 12-07-PLAN.md — phone `version.dart`, `update_cache.dart` (24h TTL) and `update_format.dart`, pinned to the shared version-compare table (wave 2)
+- [ ] 12-08-PLAN.md — Android install channel: `apk_installer.dart`, the `PackageInstaller` session, `InstallResultReceiver`, and the manifest entries (wave 2)
+- [ ] 12-09-PLAN.md — server-windows `marker.rs` and `apply.rs`: the pessimistic marker lifecycle and the golden-tested detached helper script (wave 3)
+- [ ] 12-10-PLAN.md — phone `release_feed.dart` and `apk_download.dart`: `crypto`, the feed fetch, streamed download with progress, chunked sha256 and delete-on-failure (wave 3)
+- [ ] 12-11-PLAN.md — server-windows `update_thread.rs` and `WinUpdate`: the D-15 refusal ladder, the ordered apply pipeline and the executor implementation (wave 4)
+- [ ] 12-12-PLAN.md — server-core wiring: `Executors.update`, `ServerDeps.update`, the third relay watch capturing `ext.hello`'s `extVersion`, and the `main.rs` thread spawn (wave 5)
+- [ ] 12-13-PLAN.md — router arms, executor binding, the authed-gated progress push, the atomic 1.8 bump, and the SC6/SC8 integration tests (wave 6)
+- [ ] 12-14-PLAN.md — phone `update_providers.dart`: the row-state matrix, the badge truth rule, the connection-service update seam and a bare installed-version provider (wave 4)
+- [ ] 12-15-PLAN.md — Updates screen, the Settings nav row, both badge placements, the install-permission sheet, and widget tests over the whole state matrix (wave 5)
+- [ ] 12-16-PLAN.md — extension reload: `ExtCmd::Reload`, the once-per-target-version guard, the `background.js` arm, the installer hardening, and the Chrome file-lock observation (wave 7, human-gated)
+- [ ] 12-17-PLAN.md — PC settings `UPDATES` section: the D-06 fallback that performs its own feed check and shares the phone path's handles (wave 6)
