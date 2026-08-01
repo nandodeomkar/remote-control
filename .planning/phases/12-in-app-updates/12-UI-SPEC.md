@@ -1,10 +1,11 @@
 ---
 phase: 12
 slug: in-app-updates
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-01
+reviewed_at: 2026-08-01
 ---
 
 # Phase 12 — UI Design Contract
@@ -69,6 +70,8 @@ Inherited from 09/10/11-UI-SPEC (multiples of 4 plus the established component-i
 - **8px** badge-dot diameter (see § Component 4). This is the token `sm` used as a diameter, not a new value.
 
 **Off-grid rule (binding):** the only off-grid value permitted in phase-12 code is the **2px** title/subtitle gap listed above, and only inside a two-line row that is already a `_PairedPcRow` clone. **Phase 12 may introduce no NEW off-grid spacing, gap, padding, radius, or size value.** Every new measurement an executor writes must come from the token column above (4 · 8 · 12 · 16 · 24 · 48). If a layout appears to need a new off-grid value, that is a signal the layout is wrong — round to the nearest token instead of adding a value.
+
+**Scope of this rule: the phone only.** The PC settings window (`server/server-windows/src/shell/style.rs`) is a separate design system and is deliberately outside the phone's 4px grid — the `ui.add_space(7.0)` in § PC Settings — Updates Section matches the shipped `GENERAL` / `PAIRED DEVICES` sibling sections and is correct there. Do not "fix" it to 8, and do not read it as drift from the scale above.
 
 ---
 
@@ -618,11 +621,11 @@ ui.add_space(12.0);
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved
