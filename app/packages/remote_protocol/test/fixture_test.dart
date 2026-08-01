@@ -50,6 +50,39 @@ Map<String, dynamic> loadFixture(File file) =>
 /// Basename of a fixture file, for assertion messages and skip logic.
 String baseName(File file) => file.path.split(Platform.pathSeparator).last.split('/').last;
 
+/// Fixture files that are NOT wire fixtures — they carry no `wire`/`expect`
+/// envelope and are covered by bespoke loaders elsewhere, so the shared
+/// [runJsonFamily] harness must skip them by name.
+///
+/// The alternative — a per-call skip argument — would have moved the
+/// exclusion to the registration site, where a family with an unusual file
+/// is easy to register without it. Keeping the list here means the harness
+/// itself knows which files it cannot read, and the registration lines all
+/// stay `runJsonFamily('family')`.
+const Map<String, Set<String>> specialCaseFixtures = {
+  // Special format; covered by auth_proof_test.dart (fixtures README
+  // special case 1).
+  'handshake': {'05-auth-proof.json'},
+  // protocol 1.8: `update/` is a MIXED-KIND directory (12-02). 01-09 are
+  // standard wire fixtures; 10-12 are the cross-language version-compare
+  // truth table and two captured releases/latest feed shapes, which have no
+  // `t`/`p` envelope at all and belong to 12-07's comparator and feed-parser
+  // suites (fixtures README special cases 3, 4 and 5).
+  'update': {
+    '10-version-compare.json',
+    '11-releases-latest.json',
+    '12-releases-latest-null-digest.json',
+  },
+};
+
+/// The wire fixtures of a family: every `*.json` minus the special cases.
+List<File> wireFixtureFiles(String family) {
+  final special = specialCaseFixtures[family] ?? const <String>{};
+  return fixtureFiles(family)
+      .where((f) => !special.contains(baseName(f)))
+      .toList();
+}
+
 /// Convert a JSON number to its f32-rounded double so Dart doubles compare
 /// exactly against decoded f32 values (fixtures are f32-exact by
 /// construction — no epsilon comparison anywhere).
@@ -110,15 +143,15 @@ void main() {
 
   /// Shared driver for the JSON text-frame families (`handshake/`, `text/`).
   ///
-  /// Skips `05-auth-proof.json` by filename — special format, covered by
-  /// auth_proof_test.dart. Text fixtures additionally exercise the
-  /// `compute` block via [computeDiff] (Dart-only concern).
+  /// Skips the [specialCaseFixtures] of the family by filename — files with
+  /// no `wire`/`expect` envelope, covered by their own suites. Text fixtures
+  /// additionally exercise the `compute` block via [computeDiff] (Dart-only
+  /// concern).
   void runJsonFamily(String family) {
     test('all scenarios', () {
       requireFixtureRoot();
-      for (final file in fixtureFiles(family)) {
+      for (final file in wireFixtureFiles(family)) {
         final name = baseName(file);
-        if (name == '05-auth-proof.json') continue;
         final fixture = loadFixture(file);
 
         final wire = jsonEncode(fixture['wire']);
@@ -229,5 +262,37 @@ void main() {
   // zero failures, silently.
   group('bookmarks fixtures', () {
     runJsonFamily('bookmarks');
+  });
+
+  // protocol 1.8 (phase 12): the additive update.* family. 01 is the
+  // empty-payload update.check request whose canonical re-encode must still
+  // emit `p` as `{}`; 02 round-trips a full update.status including the
+  // nested lastUpdate object and drops the unknown `future` key inside it
+  // (D-05); 03 is the minimal status where BOTH optionals stay absent rather
+  // than becoming null; 04 is the one-key update.apply that carries the D-14
+  // no-locator-authority rule structurally; 05-07 cover the three
+  // update.progress shapes (pct belongs to `downloading` alone, `failed`
+  // always carries `error`, `uptodate` carries nothing else); 08 and 09
+  // prove a missing required field is a hard decode error. Hard-registered
+  // because neither harness globs directories (the 07-02 input.blocked
+  // lesson): an unregistered family yields zero coverage AND zero failures,
+  // silently. The directory is MIXED-KIND — 10-12 are excluded by
+  // specialCaseFixtures above and belong to 12-07.
+  group('update fixtures', () {
+    runJsonFamily('update');
+
+    // Guards the exclusion above from the failure mode it creates: if a
+    // future special-case entry (or a typo in one) silently removed a wire
+    // fixture from the harness, `all scenarios` would still pass while
+    // covering less. Nine is the count 12-02 froze.
+    test('exercises exactly nine wire fixtures', () {
+      requireFixtureRoot();
+      expect(
+        wireFixtureFiles('update').map(baseName).toList(),
+        hasLength(9),
+        reason: 'the update family has nine wire fixtures (01-09); '
+            '10-12 are special cases with bespoke loaders',
+      );
+    });
   });
 }
