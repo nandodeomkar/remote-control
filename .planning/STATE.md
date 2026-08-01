@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 11 COMPLETE and VERIFIED
-stopped_at: Phase 11 closed -- 13/13 plans, VERIFICATION status passed (7/7 goal clauses, 14/14 decisions, 0 gaps)
-last_updated: "2026-07-31T06:05:00.000Z"
-last_activity: 2026-07-31 -- quick 260731-euq added pinch-to-zoom (binary opcode 0x03, protoVersion 1.7); phase 11 VERIFIED; pending todos 0
+status: Phase 12 added, not yet planned
+stopped_at: Phase 12 (in-app updates) added to the roadmap from an approved design spec; next step is /gsd-plan-phase 12
+last_updated: "2026-08-01T00:00:00.000Z"
+last_activity: 2026-08-01 -- brainstormed and approved the in-app updates design (docs/superpowers/specs/2026-08-01-in-app-updates-design.md, commit 3e0135f); added Phase 12 to the roadmap
 progress:
-  total_phases: 11
+  total_phases: 12
   completed_phases: 11
   total_plans: 90
   completed_plans: 90
-  percent: 100
+  percent: 92
 ---
 
 # Project State
@@ -21,14 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 11 CLOSED. Milestone v1.0 phases all complete — next is milestone close / a new milestone.
+**Current focus:** Phase 12 (in-app updates) added from an approved design spec and awaiting planning. Phases 1–11 all COMPLETE and VERIFIED.
 
 ## Current Position
 
-Phase: 11 (browser-bookmarks-view-open-star-current-tab) — COMPLETE and VERIFIED 2026-07-31
-Plan: 12 of 12
-Next: wave 7 is 11-12 — the phase's docs + UAT plan (SPEC/README prose and the
-  on-device checks), the last plan of phase 11.
+Phase: 12 (in-app-updates) — ADDED 2026-08-01, not yet planned
+Plan: none yet
+Next: /gsd-plan-phase 12. Read
+  `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` first — it is the
+  approved design and its Decisions table is the acceptance surface. Plan the
+  release tooling + mirror repo BEFORE any client work: nothing is testable
+  end-to-end until a real release exists to check against. The public mirror
+  repo is an owner action and does not exist yet.
+
+Phase 11 (browser-bookmarks-view-open-star-current-tab) — COMPLETE and VERIFIED
+2026-07-31, 13/13 plans. History below.
+
   11-11 is DONE: every tab row whose bookmark state is KNOWN now carries a 48x48
   trailing star — Symbols.star_rounded with the FILL axis as the whole state
   signal (fill 1 + kAccent live, fill 0 + kMuted, never the destructive red),
@@ -300,6 +308,7 @@ Progress: [██████████] 100% (11 of 11 phases complete; 90 of
 - Phase 8 added: Floating trackpad bubble — replace quick-bar with draggable bubble + floating trackpad window (spec: docs/superpowers/specs/2026-07-15-trackpad-bubble-design.md)
 - Phase 10 added: Keyboard rethink + Shortcuts tile — full-screen swipeable keyboard pads (Type w/ system IME + slim extras row, Arrows, Numpad, Fn) with persistent modifier chips + bottom tabs replacing the bottom-docked panel/switcher; new Shortcuts hub tile of one-tap Windows shortcut buttons (show desktop, snip/screenshots, task manager, explorer, settings, snap, refresh, tabs, find, zoom, edit ops) via existing key tap+mods path; keymap.rs CLIENT_KEY_CODES + Dart mirror extended (letters, PrintScreen, etc). Excluded by user: Alt+Tab (Apps remote exists), Win+L lock, Ctrl+Alt+Del (uninjectable)
 - Phase 9 added: UI refinement to design prototype — visual pass across all screens to match the Claude Design handoff (spec: docs/superpowers/specs/2026-07-16-ui-refinement-prototype/Prototype.dc.html). User-decided: dot-grid trackpad texture only — NO fake cursor dot, NO tap ripple. Palette untouched (7 D-12 tokens already byte-identical to prototype).
+- Phase 12 added: In-App Updates — a "check for updates" surface that self-updates all three components (Flutter app, Windows server, browser extension), driven from the phone. Design spec approved 2026-08-01: `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (commit 3e0135f) — read it before planning; its Decisions table IS the acceptance surface. LOCKED decisions: (a) a second, PUBLIC repo `nandodeomkar/remote-control-releases` holds the 3 release assets so no auth token ships inside any artifact — the private repo keeps source and `.planning/`; (b) the phone is the control surface for all three, PC settings keeps a fallback check; (c) one unified `X.Y.Z` across `server-windows/Cargo.toml`, `pubspec.yaml`, and `extension/manifest.json`, with NO update manifest file — the public releases API already returns tag, asset names, and per-asset sha256 `digest`; (d) protoVersion 1.7 → 1.8 adds `update.check` / `update.status` / `update.apply` / `update.progress` plus srv→ext `ext.reload`; (e) the server resolves asset URL + hash itself from a compiled-in constant and NEVER accepts one from the wire (a wire-supplied URL is RCE on the PC — this is not negotiable for convenience); (f) PC apply = silent Inno install + detached relaunch helper + an `update-result.json` marker read at startup, because the process that would report a failed install has already exited; (g) the extension rides the installer (it is already bundled at `{app}\extension`) and reloads in place via `chrome.runtime.reload()`, guarded to one attempt per target version per process run. Entry-scan notes for planning, NOT locked: new deps look like `ureq` 3.3 server-side (blocking + rustls, off the tokio runtime like the other worker threads) and `crypto` app-side (Dart has no built-in sha256); the Android install channel should mirror the hand-written `platform/multicast_lock.dart` MethodChannel pattern rather than take a plugin. Sequencing constraint: `tools/release.ps1` and the mirror repo come FIRST — nothing client-side is testable end-to-end until a real release exists to check against. Owner action outstanding: the public mirror repo does not exist yet and must be created by the owner. Known one-time cost: every already-installed client predates this, so the first upgrade onto it is still a manual install for both users.
 - Phase 11 added: Browser bookmarks — view the PC browser's bookmarks on the Browser tile, open one in a new tab, and star/unstar the current tab. Extends the existing Tab Bridge extension leg (SPEC §15) with a `bookmarks` permission and a new `bm.*` phone-facing family (proto minor bump 1.6 — 1.0–1.5 clients stay accepted). Entry-scan notes for planning, NOT locked decisions: (a) the §7 "no `url` ever crosses the phone-facing wire" invariant is preserved by keeping URL resolution extension-side — the phone sends `bm.open {id}` and the extension does `bookmarks.get(id)` → `tabs.create({url})`; (b) a full flattened `bm.state` push snapshot mirrors `tabs.state`, avoiding request-correlation machinery on the push-only ext leg, but needs node/title caps against the 56 KB frame budget; (c) the bookmarks-bar parent for new bookmarks must be resolved via `getTree()`, not the hardcoded id `"1"`; (d) a per-TabEl `bookmarked` flag would drive the star state; (e) tab rows already spend tap-down (activate), long-press and swipe (close), so a star needs a trailing button, not another row gesture. Open scope questions for discuss-phase: whether `bm.remove` (destructive, no undo) is in v1 at all, and Tabs/Bookmarks segmented control vs a separate screen.
 
 ### Decisions

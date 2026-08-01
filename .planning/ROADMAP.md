@@ -394,3 +394,26 @@ Plans:
 - [x] 11-11-PLAN.md — trailing star slot on tab rows: tri-state render, arena isolation, unstar confirm gate
 - [x] 11-12-PLAN.md — phase gate, on-device UAT (11 steps), extension README written from the observed UAT-1 outcome
 - [x] 11-13-PLAN.md — UAT-8 / Failure B fix: move _BmRow's drill-in/open off onTapDown onto onTap, real-timed-press regression tests, 11-UI-SPEC gesture-map amendment
+
+### Phase 12: In-App Updates — check and self-update app, server, extension
+
+**Goal:** Both users can update every component from the phone: the Updates screen reports the installed version of the app, the PC server, and the browser extension against the latest published release, and one tap installs each — the APK through `PackageInstaller`, the PC through a silent installer run the server applies to itself, and the extension in place by riding the server installer and reloading (protoVersion 1.8). Release assets live in a PUBLIC mirror repo so no auth token ships inside any build artifact, and one `tools/release.ps1` run bumps all three versions, builds all three artifacts, and publishes them.
+**Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
+**Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
+**Depends on:** Phase 11
+**Plans:** 0 plans
+
+**Success Criteria** (what must be TRUE):
+
+1. `tools/release.ps1 -Version X.Y.Z` bumps `server-windows/Cargo.toml`, `pubspec.yaml` (both halves), and `extension/manifest.json` to the same version, builds all three artifacts, and publishes them to the public mirror repo — a released tag whose three assets disagree on version is impossible to produce by hand
+2. Every component reports the version of the package it is actually running (`package_info_plus`, `CARGO_PKG_VERSION`, `chrome.runtime.getManifest()`), never a hardcoded constant
+3. The phone's Updates screen shows all three components against the latest release, refreshed on demand and at most once per 24h in the background, and renders every failure state without breaking the screen
+4. A tap updates the APK end-to-end: sha256 verified before install, `PackageInstaller` invoked, the missing "install unknown apps" grant explained rather than silently failing
+5. A tap updates the PC end-to-end: the server verifies sha256, installs silently, relaunches itself, and the phone reconnects and reports the new version — with a failed install diagnosable from the phone via the startup marker, not silent
+6. The server resolves every asset URL and hash itself from a compiled-in repo constant and refuses any target supplied, implied, or influenced by the wire — proven by a test that a forged `update.apply` cannot make the server fetch an arbitrary URL
+7. The extension is running the new version after a PC update without the user touching `chrome://extensions`, and a blocked overwrite degrades to a "restart your browser" message instead of a reload loop
+8. A 1.7 server and a 1.8 phone still work: the unknown `update.*` types are refused per SPEC §10 and the session survives
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 12 to break down)
