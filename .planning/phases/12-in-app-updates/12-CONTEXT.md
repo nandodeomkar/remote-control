@@ -120,11 +120,25 @@ this document's; the spec is the source of truth for prose.
   `%APPDATA%\RemoteControl\update-result.json` as `{target, ok:false,
   error:"installer"}`, spawn a detached helper script, exit. The helper waits
   for the server PID to die (releasing `AppMutex=RemoteControl.SingleInstance`,
-  `installer/RemoteControl.iss`), runs the setup `/VERYSILENT /NORESTART`,
-  rewrites the marker to `ok:true` on a zero exit code, then relaunches the
-  installed exe. No `.iss` change is needed — its `[Run]` entry is already
-  `skipifsilent`. No SmartScreen prompt either: the server's own HTTP client
-  writes the file, so it never receives a Mark-of-the-Web.
+  `installer/RemoteControl.iss`), runs the setup
+  `/VERYSILENT /NORESTART /SUPPRESSMSGBOXES`, rewrites the marker to `ok:true`
+  on a zero exit code, then relaunches the installed exe. No SmartScreen prompt:
+  the server's own HTTP client writes the file, so it never receives a
+  Mark-of-the-Web.
+
+  **CORRECTED 2026-08-01 by 12-RESEARCH.md** (this supersedes the design spec's
+  wording, which said `/VERYSILENT /NORESTART` and "no `.iss` change is
+  needed"):
+  - `/VERYSILENT` ALONE DOES NOT suppress the AppMutex dialog. Verified from
+    Inno's `Setup.MainFunc.pas`: the check is a suppressible `MB_OKCANCEL` whose
+    suppression is armed only by `/SUPPRESSMSGBOXES` combined with a silent
+    switch, and it runs BEFORE the `CloseApplications` stage. `/SUPPRESSMSGBOXES`
+    is therefore mandatory, and the helper's wait-for-PID-exit is load-bearing
+    rather than defensive — its suppressed default is `IDCANCEL`, so a still-held
+    mutex aborts the install outright.
+  - The "no `.iss` change is needed" claim holds ONLY for `[Run]`'s
+    `skipifsilent` (the helper does the relaunch). It is OPEN for extension-file
+    locking — see the D-18 note.
 - **D-17** — The socket drops during the swap. The phone's EXISTING reconnect
   FSM rides it out and re-checks on reconnect; that re-check is what confirms
   the new version. Do not build a second reconnect path.
@@ -136,6 +150,19 @@ this document's; the spec is the source of truth for prose.
   versions still disagree afterwards there is no second attempt — the phone row
   falls back to "restart your browser". The guard exists so a Chrome-blocked
   overwrite cannot produce a reload loop.
+
+  **RISK RAISED 2026-08-01 by 12-RESEARCH.md (Open Question 1), not anticipated
+  by the design spec:** if Chrome holds a write lock on `{app}\extension\*`,
+  Inno's file-replace failure raises an Abort/Retry/Ignore whose SUPPRESSED
+  DEFAULT IS ABORT — which aborts the ENTIRE server install, not just the
+  extension. That would turn "the browser happened to be open" into a total
+  PC-update failure, which is the common case rather than an edge case. Two
+  consequences for planning: (a) whether Chrome actually holds such a lock must
+  be settled by observation BEFORE the extension slice is planned in detail —
+  it is a five-minute manual check; (b) if it does, the `restartreplace`
+  mitigation the research proposes DOES require an `.iss` change, which is why
+  D-16's "no `.iss` change is needed" is scoped to `[Run]` only. Do not treat
+  the extension slice as low-risk glue.
 - **D-19** — APK apply: download to the app cache with progress, verify sha256,
   install via `PackageInstaller` session behind a MethodChannel. Requires
   `REQUEST_INSTALL_PACKAGES` plus the one-time per-device "install unknown apps"
