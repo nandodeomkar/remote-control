@@ -1,0 +1,12 @@
+{
+  "name": "update-apply-missing-target",
+  "description": "NEGATIVE (D-05, protocol 1.8, SPEC §1 and §7): update.apply without the required `target` field must be a hard decode error in both codecs — missing required fields are never silently coerced. Doubly load-bearing here: a coerced empty target would be compared against the server's resolved latest and could not match, but the safe behaviour must come from the decoder refusing the frame, not from a downstream check happening to catch it. The bookmarks/08-bm-open-missing-nodeid.json clone for the update family.",
+  "wire": {
+    "t": "update.apply",
+    "p": {}
+  },
+  "expect": {
+    "error": true,
+    "reason": "missing required field: target"
+  }
+}

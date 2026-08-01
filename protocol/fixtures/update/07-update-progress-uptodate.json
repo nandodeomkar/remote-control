@@ -1,0 +1,16 @@
+{
+  "name": "update-progress-uptodate",
+  "description": "S→C update.progress push (protocol 1.8, SPEC §7, D-10): the terminal success-with-nothing-to-do shape — stage `uptodate` and NOTHING else. No `pct` (not `downloading`), no `error` (not `failed`), and no `version` is required to say \"you already have it\". Proves all three optional keys stay ABSENT on canonical re-encode rather than being emitted as null.",
+  "wire": {
+    "t": "update.progress",
+    "p": {
+      "stage": "uptodate"
+    }
+  },
+  "expect": {
+    "t": "update.progress",
+    "p": {
+      "stage": "uptodate"
+    }
+  }
+}

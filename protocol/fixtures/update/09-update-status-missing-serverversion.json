@@ -1,0 +1,14 @@
+{
+  "name": "update-status-missing-serverversion",
+  "description": "NEGATIVE (D-05, protocol 1.8, SPEC §1 and §7): update.status carrying only `extConnected` must be a hard decode error — `serverVersion` is required and is never defaulted. A silently-absent serverVersion would make the phone's version comparison run against nothing, and \"unknown\" must never be treated as newer (D-26); the decoder refuses the frame instead.",
+  "wire": {
+    "t": "update.status",
+    "p": {
+      "extConnected": true
+    }
+  },
+  "expect": {
+    "error": true,
+    "reason": "missing required field: serverVersion"
+  }
+}

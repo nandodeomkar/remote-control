@@ -1,0 +1,18 @@
+{
+  "name": "update-status-minimal",
+  "description": "S→C update.status reply (protocol 1.8, SPEC §7, D-09): the minimal shape — only the two required fields. This is the \"extension has never connected AND no previous update attempt\" case: `extVersion` and `lastUpdate` are ABSENT, not null (the skip-when-absent convention every optional field in this protocol follows, cf. TabEl `icon`/`groupId`). A missing marker is the NORMAL case, never an error. The canonical re-encode must not materialise either key.",
+  "wire": {
+    "t": "update.status",
+    "p": {
+      "serverVersion": "1.4.0",
+      "extConnected": false
+    }
+  },
+  "expect": {
+    "t": "update.status",
+    "p": {
+      "serverVersion": "1.4.0",
+      "extConnected": false
+    }
+  }
+}

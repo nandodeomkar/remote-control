@@ -1,0 +1,20 @@
+{
+  "name": "update-progress-downloading",
+  "description": "S→C update.progress push (protocol 1.8, SPEC §7, D-09/D-10): the mid-flight shape — stage `downloading` with `pct` and `version` present and no `error`. `downloading` is the ONLY stage that carries `pct` (D-10); the other six stages have no byte count, so a percentage would be invented. Non-terminal: `verifying`, `installing` and `restarting` follow.",
+  "wire": {
+    "t": "update.progress",
+    "p": {
+      "stage": "downloading",
+      "pct": 43,
+      "version": "1.5.0"
+    }
+  },
+  "expect": {
+    "t": "update.progress",
+    "p": {
+      "stage": "downloading",
+      "pct": 43,
+      "version": "1.5.0"
+    }
+  }
+}

@@ -4,8 +4,9 @@ These files are the executable cross-language contract for the Remote Control wi
 
 ## Layout (D-08)
 
-- One directory per message family: `handshake/`, `text/`, `mouse-binary/` (more families may be added by later protocol minors).
+- One directory per message family: `handshake/`, `text/`, `mouse-binary/`, `beacon/`, `volume/`, `input_blocked/`, `window_info/`, `tabs/`, `bookmarks/`, `update/` (more families may be added by later protocol minors).
 - One scenario per JSON file, named `NN-scenario-slug.json` (two-digit ordinal + kebab-case slug).
+- `update/` (protoVersion 1.8) is the only family that mixes kinds: files `01-`–`09-` are standard wire fixtures, while `10-`, `11-` and `12-` are **special cases** documented below — they do not follow the wire/expect schema and need their own loaders on both the Rust and Dart sides. The whole directory is validated by `python .planning/phases/12-in-app-updates/check-update-fixtures.py`.
 
 ## Standard fixture schema
 

@@ -1,0 +1,12 @@
+{
+  "name": "update-check-request",
+  "description": "C→S update.check request (protocol 1.8, SPEC §7, D-09): the payload is empty — the client asks nothing and supplies nothing, because everything the answer contains is resolved server-side. `encode_msg` always emits `p`, as `{}` for an empty payload (the Phase-01 canonical-form rule), so the canonical re-encode keeps the empty object. The bookmarks/09-bm-list-request.json clone for the update family. Executor-bound despite being a read (SPEC §11, D-13).",
+  "wire": {
+    "t": "update.check",
+    "p": {}
+  },
+  "expect": {
+    "t": "update.check",
+    "p": {}
+  }
+}

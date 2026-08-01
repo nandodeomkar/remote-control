@@ -1,0 +1,16 @@
+{
+  "name": "update-apply",
+  "description": "C→S update.apply (protocol 1.8, SPEC §7 and §12, D-14): the payload carries a version string and NOTHING else — the server resolves the asset URL and its sha256 itself from a compiled-in repo constant and refuses any locator supplied, implied or influenced by the wire. This fixture is the machine-checkable form of that rule: `wire.p` has exactly one key and that key is `target`. A wire-supplied locator would turn a paired phone — or anything that obtained a token — into arbitrary code execution on the PC, which is why no field may ever be added here. `target` is used only for the equality check against the server's own resolved latest (mismatch ⇒ `stale`) and the ordering check against the running version (at-or-below ⇒ `downgrade`, D-15); it is never concatenated into a URL or a path. Executor-bound (SPEC §11, D-13).",
+  "wire": {
+    "t": "update.apply",
+    "p": {
+      "target": "1.5.0"
+    }
+  },
+  "expect": {
+    "t": "update.apply",
+    "p": {
+      "target": "1.5.0"
+    }
+  }
+}

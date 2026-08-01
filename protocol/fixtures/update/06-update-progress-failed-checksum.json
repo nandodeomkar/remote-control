@@ -1,0 +1,20 @@
+{
+  "name": "update-progress-failed-checksum",
+  "description": "S→C update.progress push (protocol 1.8, SPEC §7, D-10/D-11): the terminal failure shape — stage `failed` always carries `error`, drawn from the closed seven-value vocabulary, and there is NO `pct` key (D-10 gives pct to `downloading` only). `checksum` here means the downloaded sha256 did not match the digest the server resolved for itself, so the file was deleted and the installer was never spawned (D-15). The vocabulary is closed precisely so that no path, URL, HTTP status or exception name can reach the phone through this channel (D-11) — the human-readable rendering is entirely client-side.",
+  "wire": {
+    "t": "update.progress",
+    "p": {
+      "stage": "failed",
+      "error": "checksum",
+      "version": "1.5.0"
+    }
+  },
+  "expect": {
+    "t": "update.progress",
+    "p": {
+      "stage": "failed",
+      "error": "checksum",
+      "version": "1.5.0"
+    }
+  }
+}
