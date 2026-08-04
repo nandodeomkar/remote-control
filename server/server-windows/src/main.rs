@@ -204,6 +204,18 @@ async fn main() -> anyhow::Result<()> {
         let busy = Arc::clone(&update_busy);
         std::thread::spawn(move || update_thread::run_update_thread(update_cmd_rx, progress, busy));
     }
+    //     The shell's settings window holds its own clones (12-17, D-06): a
+    //     broken, unpaired or absent phone must not leave this machine with no
+    //     way to update itself. The UPDATES section commands the SAME thread
+    //     and reads the SAME progress watch the phone-driven path uses, so the
+    //     two surfaces cannot show different truths — and it shares the busy
+    //     flag so its buttons disable rather than producing a `busy` refusal it
+    //     would then have to explain. Cloned HERE, before `update_cmd_tx` moves
+    //     into `WinUpdate` at step 4 and `update_rx` into `ServerDeps` at step
+    //     6a (the `clip_sync_for_shell` precedent above).
+    let update_cmd_for_shell = update_cmd_tx.clone();
+    let update_progress_for_shell = update_rx.clone();
+    let update_busy_for_shell = Arc::clone(&update_busy);
 
     // 4. Executor bundle: real enigo mouse + real media/power (05-05) + real
     //    apps (06-02) + real clipboard (06-04) — every trait now has a Windows
@@ -478,6 +490,9 @@ async fn main() -> anyhow::Result<()> {
         revoke_tx,
         config: Arc::clone(&settings),
         clip_sync: clip_sync_for_shell,
+        update_cmd: update_cmd_for_shell,
+        update_progress: update_progress_for_shell,
+        update_busy: update_busy_for_shell,
         resolved_port: port,
         firewall_status,
         notify_firewall,

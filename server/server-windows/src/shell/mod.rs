@@ -31,6 +31,7 @@ use winit::window::WindowId;
 
 use crate::config::SharedSettings;
 use crate::firewall::FirewallStatus;
+use crate::update::update_thread;
 use chrome::ShellAction;
 use flyout::Flyout;
 use main_window::MainWindow;
@@ -82,6 +83,26 @@ pub struct ShellCtx {
     pub config: Arc<Mutex<SharedSettings>>,
     /// The clip thread's LIVE clipboard auto-sync gate (RESEARCH Open Q5).
     pub clip_sync: Arc<AtomicBool>,
+    /// The update thread's command channel (12-17, D-06).
+    ///
+    /// This exists so a broken, unpaired or absent phone does not leave the PC
+    /// with no update path — deleting the hand-download procedure is the whole
+    /// point of the phase, so the fallback must not BE that procedure.
+    ///
+    /// It is deliberately the same `Sender` the phone-driven path uses, not a
+    /// second one: two channels would be two places an apply could start from,
+    /// and the busy flag below could not serialise them. D-14 is unaffected —
+    /// [`UpdateCmd::Apply`] carries a version string and has no field a
+    /// locator could travel in.
+    pub update_cmd: std::sync::mpsc::Sender<update_thread::UpdateCmd>,
+    /// The update thread's progress watch — the SAME one the session's
+    /// `update.progress` push arm reads, so the settings window and the phone
+    /// can never disagree about what is happening.
+    pub update_progress: watch::Receiver<server_core::executors::UpdateProgress>,
+    /// The shared apply-in-flight flag. The settings window's buttons disable
+    /// while it is set, so the local surface cannot generate a `busy` refusal
+    /// it would then have to explain (T-12-60).
+    pub update_busy: Arc<AtomicBool>,
     /// The RESOLVED WebSocket port actually bound at startup.
     pub resolved_port: u16,
     /// The startup firewall/bind self-test verdict (SRV-04 / D-06).
