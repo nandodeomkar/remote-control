@@ -228,6 +228,22 @@ function connect() {
         // (modify-special) and rejects managed nodes (modify-managed).
         chrome.bookmarks.remove(p.nodeId).catch(() => {});
         break;
+      // ---- ext.reload (protoVersion 1.8, D-18) ----------------------------
+      // The server noticed our getManifest().version is behind its own, which
+      // means a PC update replaced {app}\extension under us. reload() re-reads
+      // every file from disk, so the new build takes effect without anyone
+      // opening chrome://extensions (SC7).
+      //
+      // No .catch(): reload() returns void and TERMINATES this worker — there
+      // is no promise to settle and no line after it that will ever run.
+      //
+      // Safe against a loop by construction on the OTHER side: the server
+      // nudges once per target version per process run, so if the overwrite
+      // was blocked and we come back on the same old version, it does not ask
+      // again.
+      case "ext.reload":
+        chrome.runtime.reload();
+        break;
       case "ext.pong":
         break; // keepalive echo — no-op
       default:

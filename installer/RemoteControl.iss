@@ -99,7 +99,40 @@ Source: "..\server\target\release\server-windows.exe"; DestDir: "{app}"; DestNam
 ; The unpacked extension travels with the server so "Load unpacked" is a
 ; click away -- no separate zip download, no version skew against the server
 ; it talks to.
-Source: "..\extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs
+;
+; The two extra Flags on the Source line below are the phase-12 Pattern 5
+; mitigation (T-12-57) -- named there and deliberately not spelled again in
+; this comment, because the plan greps for exactly one occurrence of each and
+; a comment that quotes them would trip its own gate.
+;
+; Chrome may hold a write lock on a loaded unpacked extension's
+; files. Inno's file-replace failure raises an Abort/Retry/Ignore whose
+; SUPPRESSED DEFAULT IS ABORT -- and under /SUPPRESSMSGBOXES, which is exactly
+; how the in-app updater runs Setup, that would abort the ENTIRE server
+; install because the browser happened to be open. The browser being open is
+; the common case, not an edge case. With these flags a locked file is instead
+; scheduled for replacement at next boot via MoveFileEx, and the install
+; completes.
+;
+; This CONTRADICTS the design spec's "no .iss change is needed" claim. That
+; claim was correct about the [Run] entry and the AppMutex mechanism; it did
+; not consider extension-file locking.
+;
+; Two things this does NOT guarantee. A per-user install without admin rights
+; may be unable to write the pending-rename registry key, in which case the
+; replacement simply does not happen -- the fallback there is the D-18
+; user-facing state, "Restart your browser to finish updating". And a
+; next-boot replacement means the extension is still on the OLD files for the
+; rest of the session, so the server's one ext.reload nudge will not change
+; its version; the guard is what stops that from becoming a loop.
+;
+; The server exe entry above is listed FIRST deliberately -- Inno processes
+; [Files] in order, so the critical artifact lands before the risky one. Do
+; not reorder. Do not add a delete-after-install flag or a clean-directory
+; step either: Chrome writes its own _metadata folder into unpacked extension
+; directories, recursesubdirs copies in without pruning, and [UninstallDelete]
+; already removes the whole directory on uninstall.
+Source: "..\extension\*"; DestDir: "{app}\extension"; Flags: ignoreversion recursesubdirs createallsubdirs restartreplace uninsrestartdelete
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

@@ -114,6 +114,43 @@ fn extension_bm_elements_carry_no_url() {
     }
 }
 
+/// protoVersion 1.8 / D-18 / SC7: the extension must answer `ext.reload` by
+/// calling `chrome.runtime.reload()`.
+///
+/// Source-text, like its siblings, because the failure it guards is silent.
+/// The server sends the nudge whether or not this arm exists, and the guard is
+/// keyed on the target version — so a missing arm produces no error, no retry
+/// and no log line anywhere. The only symptom is a version mismatch on the
+/// phone's Updates screen that never resolves.
+#[test]
+fn extension_reloads_itself_on_command() {
+    let code = ext_code_lines();
+
+    assert!(
+        code.contains("case \"ext.reload\""),
+        "extension/background.js has no `ext.reload` arm in its switch (msg.t).\n\
+         SC7 depends on it: after a PC update replaces {{app}}\\extension, the \
+         server compares the extension's getManifest().version against its own \
+         and sends ONE ext.reload. Without this arm that nudge lands in the \
+         default branch and is silently ignored — the extension keeps running \
+         the old code, no error is raised on either side, and the only visible \
+         symptom is a version mismatch on the phone's Updates screen that never \
+         clears. The server will not ask again: the guard is once per target \
+         version per process run, deliberately, so this arm is the whole \
+         mechanism."
+    );
+
+    assert!(
+        code.contains("chrome.runtime.reload"),
+        "extension/background.js never calls chrome.runtime.reload().\n\
+         An `ext.reload` arm that does anything else does not satisfy D-18: \
+         re-reading the extension's files from disk is the entire point, and it \
+         is the only Chrome API that does it without the user opening \
+         chrome://extensions. Reconnecting the socket, re-sending ext.hello or \
+         re-running the snapshot walk all leave the OLD code running."
+    );
+}
+
 #[test]
 fn extension_declares_bookmarks_permission() {
     let manifest: serde_json::Value = serde_json::from_str(&read(EXT_MANIFEST))
