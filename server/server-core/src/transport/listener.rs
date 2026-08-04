@@ -32,6 +32,12 @@ pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
         blocked,
         tabs,
         bookmarks,
+        // 12-12 wires the seam; 12-13 consumes it. The update-progress watch
+        // arrives here but has no session arm yet — when the authed-gated
+        // `update.progress` push lands it threads into `run_session` exactly
+        // as `bookmarks` does. Bound by NAME rather than swallowed by `..` so
+        // a future ServerDeps field still has to be handled here explicitly.
+        update: _update,
     } = deps;
 
     loop {

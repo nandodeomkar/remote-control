@@ -112,6 +112,14 @@ pub struct MockExecutors {
 impl MockExecutors {
     /// Build a recording executor bundle: every trait object in the returned
     /// [`Executors`] appends to the returned [`CallLog`] (one shared sink).
+    ///
+    /// The `update` slot is the ONE exception: it is a fresh [`MockUpdate`],
+    /// not this recorder. [`MockUpdate`] keeps its own state (settable
+    /// [`UpdateInfo`], a `Vec` of applied targets) because the update tests
+    /// need to SET what `info()` reports per case, which the shared
+    /// [`CallLog`] cannot express. A test that needs to inspect it builds its
+    /// own and overrides the field — `Executors { update: mine, ..base }` —
+    /// exactly as the `bm.*`/`tabs.*` router tests already do.
     pub fn recording() -> (Executors, CallLog) {
         let log = CallLog::default();
         let mock = Arc::new(MockExecutors { log: log.clone() });
@@ -123,6 +131,7 @@ impl MockExecutors {
             clipboard: Arc::clone(&mock) as Arc<dyn Clipboard>,
             tabs: Arc::clone(&mock) as Arc<dyn Tabs>,
             bookmarks: mock as Arc<dyn Bookmarks>,
+            update: Arc::new(MockUpdate::new()) as Arc<dyn UpdateExecutor>,
         };
         (executors, log)
     }

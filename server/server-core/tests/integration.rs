@@ -27,7 +27,8 @@ use server_core::auth::challenge::auth_proof;
 use server_core::auth::token::hash_token;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
 use server_core::executors::{
-    BmNode, BookmarksState, Button, GroupInfo, KeyCode, TabInfo, TabsState, WindowInfo,
+    BmNode, BookmarksState, Button, GroupInfo, KeyCode, TabInfo, TabsState, UpdateProgress,
+    WindowInfo,
 };
 use server_core::executors::mock::{Call, CallLog, MockExecutors};
 use server_core::transport::{ClipState, SERVER_PROTO_VERSION, ServerDeps, VolumeState};
@@ -92,6 +93,8 @@ async fn walking_skeleton_pair_auth_input() {
     // Same discipline for the bookmarks watch (phase 11): keep the sender
     // alive so `bookmarks_alive` never flips false spuriously.
     let (_bm_tx, bm_rx) = tokio::sync::watch::channel(BookmarksState::default());
+    // Same discipline for the update watch (phase 12): keep the sender alive.
+    let (_update_tx, update_rx) = tokio::sync::watch::channel(UpdateProgress::default());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
@@ -104,6 +107,7 @@ async fn walking_skeleton_pair_auth_input() {
         blocked: blocked_rx,
         tabs: tabs_rx,
         bookmarks: bm_rx,
+        update: update_rx,
     };
 
     let (addr, _server) = spawn_test_server(deps).await;
@@ -218,6 +222,13 @@ struct Harness {
     /// merely to drive pushes — dropping it would flip `bookmarks_alive`
     /// false and silently disable the session branch under test.
     bm_tx: tokio::sync::watch::Sender<BookmarksState>,
+    /// Test-owned producer end of the update watch (phase 12): stands in for
+    /// the Windows update thread. Held on the Harness for its LIFETIME —
+    /// dropping it would close the watch and silently disable the
+    /// `update.progress` branch 12-13 adds, which is precisely the
+    /// `bm_tx` precedent (a local would drop at `start_server`'s exit).
+    /// Prefixed `_` because no test drives it yet; 12-13's suite renames it.
+    _update_tx: tokio::sync::watch::Sender<UpdateProgress>,
     _server: tokio::task::JoinHandle<()>,
 }
 
@@ -233,6 +244,7 @@ async fn start_server() -> Harness {
     let (blocked_tx, blocked_rx) = tokio::sync::watch::channel(0u64);
     let (tabs_tx, tabs_rx) = tokio::sync::watch::channel(TabsState::default());
     let (bm_tx, bm_rx) = tokio::sync::watch::channel(BookmarksState::default());
+    let (update_tx, update_rx) = tokio::sync::watch::channel(UpdateProgress::default());
     let deps = ServerDeps {
         executors,
         auth: Arc::clone(&auth),
@@ -245,6 +257,7 @@ async fn start_server() -> Harness {
         blocked: blocked_rx,
         tabs: tabs_rx,
         bookmarks: bm_rx,
+        update: update_rx,
     };
     let (addr, server) = spawn_test_server(deps).await;
     Harness {
@@ -260,6 +273,7 @@ async fn start_server() -> Harness {
         blocked_tx,
         tabs_tx,
         bm_tx,
+        _update_tx: update_tx,
         _server: server,
     }
 }

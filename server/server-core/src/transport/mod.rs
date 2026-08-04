@@ -24,7 +24,7 @@ pub use session::SERVER_PROTO_VERSION;
 use std::sync::{Arc, Mutex};
 
 use crate::auth::AuthManager;
-use crate::executors::{BookmarksState, Executors, TabsState, WindowInfo};
+use crate::executors::{BookmarksState, Executors, TabsState, UpdateProgress, WindowInfo};
 
 /// Server-side volume state pushed to authed sessions as `vol.changed`
 /// (MED-02, D-03). Core-owned plain data — ZERO OS deps, so server-core
@@ -116,6 +116,27 @@ pub struct ServerDeps {
     /// on first Bookmarks-segment display (D-03 lazy prime). Producer is
     /// [`ext::run_ext`] on the loopback extension listener.
     pub bookmarks: tokio::sync::watch::Receiver<BookmarksState>,
+    /// Latest in-app update progress (protoVersion 1.8, phase 12, D-10):
+    /// authed sessions receive an `update.progress` push on every change.
+    ///
+    /// Apps-style: there is NO after-auth snapshot, and here that is stronger
+    /// than a convention — progress is a TRANSITION event, not a state prime.
+    /// Pushing the last value at connect time would paint a finished (or
+    /// failed) update onto a session that never asked for one; the phone pulls
+    /// what it needs via `update.check`/`update.status` instead.
+    ///
+    /// Producer is the Windows update thread (`server-windows`'s
+    /// `update::update_thread`) — the only tier allowed to do update I/O — plus
+    /// `WinUpdate` itself for the immediate pre-fetch refusals. Core-owned
+    /// plain data ([`UpdateProgress`] is all `String`s and an `Option<u8>`), so
+    /// server-core keeps compiling on CI Linux.
+    ///
+    /// **The watch's default value carries an EMPTY `stage`, which the session
+    /// arm SKIPS.** The D-10 vocabulary has no idle value and a watch needs an
+    /// initial one; rather than invent an eighth stage the phone would have to
+    /// learn to ignore, the initial value is a shape the protocol cannot
+    /// express. See [`UpdateProgress`] for the full rationale.
+    pub update: tokio::sync::watch::Receiver<UpdateProgress>,
 }
 
 /// Run the accept loop on an already-bound listener until the task is

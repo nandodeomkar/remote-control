@@ -435,4 +435,10 @@ pub struct Executors {
     pub clipboard: Arc<dyn Clipboard>,
     pub tabs: Arc<dyn Tabs>,
     pub bookmarks: Arc<dyn Bookmarks>,
+    /// In-app updates (protoVersion 1.8, phase 12) — the wire's ONE and ONLY
+    /// route into the update path (T-12-01). It is a trait object like every
+    /// sibling, and its `apply` takes a single `&str` version: there is
+    /// deliberately no second entry point, no locator parameter and no
+    /// side-channel through which the router could name a file (D-14).
+    pub update: Arc<dyn UpdateExecutor>,
 }
