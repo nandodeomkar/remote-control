@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 12
-stopped_at: Completed wave 2 (12-04, 12-05, 12-06, 12-07, 12-08)
-last_updated: "2026-08-01T15:54:56.407Z"
-last_activity: 2026-08-01 -- Phase 12 wave 2 complete, merged and gated
+status: Ready to execute
+stopped_at: Completed 12-02-PLAN.md
+last_updated: "2026-08-04T11:53:07.068Z"
+last_activity: 2026-08-04 -- Phase 12 execution resumed (wave continue)
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 97
-  percent: 90
+  completed_plans: 98
+  percent: 91
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 8 of 18
+Plan: 9 of 18
 Next: /gsd-execute-phase 12 --wave 3 — BUT see checkpoint 1 below; 12-03 T1
 needs the public mirror repo to exist before wave 3 can get past its first task.
 
@@ -51,19 +51,25 @@ needs the public mirror repo to exist before wave 3 can get past its first task.
     per SPEC §10. 12-12 must replace this when `Executors.update` exists.
     `UpdateStatus`/`UpdateProgress` joined the permanent S→C-only ignore chain
     and are FINAL (12-13 asks for exactly that).
+
   - sha2 0.11 has NO `std` feature, so `Sha256` is NOT an `io::copy` sink — the
     RESEARCH.md example does not compile. `download.rs` uses a 64 KiB chunked
     read loop instead. Do not "simplify" it back into a build error.
+
   - `is_valid_target` (server-windows `update/download.rs`) is public precisely
     so 12-09 does not invent a second version regex. Reuse it.
+
   - 12-08's outcome seam is a reverse `MethodCall` on the SAME channel, not an
     `EventChannel`. 12-10/12-14/12-15 consume `ApkInstaller().outcomes` as a
     `Stream<InstallEvent>`.
+
   - Asset sizes are deliberately NOT cached by `update_cache.dart`. A plan
     needing `{size}` offline must add a third `update.` key, not assume one.
+
   - `LastUpdate.toPayload()` (Dart) is inconsistent with `toJson()` on the three
     older nested value classes in the same file. Plan-specified; rename
     deliberately if ever, not incidentally.
+
   - Dart `specialCaseFixtures` is keyed by family; the Rust
     `SPECIAL_CASE_FIXTURES` is keyed by `(family, filename)` and is the stricter
     of the two. Align the Dart side if a `text/10-*.json` ever appears.
@@ -182,7 +188,7 @@ Phase 11 (browser-bookmarks-view-open-star-current-tab) — COMPLETE and VERIFIE
   deltas — workaround is disabling it; absolute-injection fix (enigo Coordinate::Abs)
   is a pending todo (Phase 4 candidate).
   See: 03-VERIFICATION.md, 03-07-SUMMARY.md
-Last activity: 2026-08-01 -- Phase 12 execution started
+Last activity: 2026-08-04 -- Phase 12 execution resumed (wave continue)
   (B1-B6), so Failure B is closed and phase 11's blocking item is resolved. All 13
   plans now have SUMMARY files. B2 proved the originally-unreachable gesture: a
   long-press on an EMPTY folder surfaced `Delete this folder?` WITHOUT navigating
@@ -373,6 +379,7 @@ Progress: [██████████] 100% (11 of 11 phases complete; 90 of
 | Phase 11 P11 | 35min | 3 tasks | 2 files |
 | Phase 12 P01 | 35min | 3 tasks | 2 files |
 | Phase 12 P02 | 30min | 3 tasks | 16 files |
+| Phase 12 P09 | 25min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -580,6 +587,8 @@ Recent decisions affecting current work:
 - [Phase 12]: SPEC.md documents the protoVersion 1.8 update.* family but line 3 still declares 1.7 — 12-13 flips the version declaration atomically with SERVER_PROTO_VERSION so the spec never runs ahead of the code
 - [Phase 12]: additionalProperties:false appears on exactly one payload in messages.schema.json (updateApply) — the schema-level restatement of D-14; D-05 ignore-unknown leniency stays permissive everywhere else
 - [Phase 12]: protocol/fixtures/update/ mixes kinds: 01-09 are standard wire fixtures, 10-12 are special cases needing their own Rust and Dart loaders; README numbers them special cases 3/4/5 because 1 and 2 predate the phase
+- [Phase 12]: 12-09: update.log truncates at 64 KiB on server startup (RESEARCH Open Question 4 resolved to truncate, not accept-unbounded) because the cmd helper cannot join tracing-appender rotation
+- [Phase 12]: 12-09: the marker file is validated on read as untrusted input - a malformed target is discarded and an out-of-vocabulary error collapses to installer, because its contents travel to the phone via update.status
 
 ### Pending Todos
 
@@ -644,6 +653,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-01T10:45:56.111Z
+Last session: 2026-08-04T11:52:46.722Z
 Stopped at: Completed 12-02-PLAN.md
 Resume file: None

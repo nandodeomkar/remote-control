@@ -401,7 +401,7 @@ Plans:
 **Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
 **Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
 **Depends on:** Phase 11
-**Plans:** 7/18 plans executed
+**Plans:** 8/18 plans executed
 
 **Success Criteria** (what must be TRUE):
 
@@ -431,7 +431,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [ ] 12-03-PLAN.md — public mirror repo (owner action) + the first real published release + `DISTRIBUTION.md` rewritten around the script + the D-04 three-file version bump (wave 3, human-gated)
-- [ ] 12-09-PLAN.md — server-windows `marker.rs` and `apply.rs`: the pessimistic marker lifecycle and the golden-tested detached helper script (wave 3)
+- [x] 12-09-PLAN.md — server-windows `marker.rs` and `apply.rs`: the pessimistic marker lifecycle and the golden-tested detached helper script (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
