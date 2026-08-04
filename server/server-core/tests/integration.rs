@@ -27,10 +27,10 @@ use server_core::auth::challenge::auth_proof;
 use server_core::auth::token::hash_token;
 use server_core::codec::binary::{MouseFrame, encode as encode_frame};
 use server_core::executors::{
-    BmNode, BookmarksState, Button, GroupInfo, KeyCode, TabInfo, TabsState, UpdateProgress,
-    WindowInfo,
+    BmNode, BookmarksState, Button, Executors, GroupInfo, KeyCode, LastUpdate, TabInfo, TabsState,
+    UpdateExecutor, UpdateInfo, UpdateProgress, WindowInfo,
 };
-use server_core::executors::mock::{Call, CallLog, MockExecutors};
+use server_core::executors::mock::{Call, CallLog, MockExecutors, MockUpdate};
 use server_core::transport::{ClipState, SERVER_PROTO_VERSION, ServerDeps, VolumeState};
 
 /// Every recv (and the connect) is wrapped in this timeout so a silent
@@ -228,11 +228,22 @@ struct Harness {
     /// `update.progress` branch 12-13 adds, which is precisely the
     /// `bm_tx` precedent (a local would drop at `start_server`'s exit).
     update_tx: tokio::sync::watch::Sender<UpdateProgress>,
+    /// The update executor the running server actually holds (phase 12). It
+    /// is a SEPARATE handle from `log` because the `update` slot is
+    /// deliberately not the shared CallLog: the update tests need to SET what
+    /// `info()` reports per case, which the CallLog cannot express (see
+    /// `MockUpdate`'s doc). Cloned into `Executors.update` in `start_server`.
+    update_exec: Arc<MockUpdate>,
     _server: tokio::task::JoinHandle<()>,
 }
 
 async fn start_server() -> Harness {
-    let (executors, log) = MockExecutors::recording();
+    let (base, log) = MockExecutors::recording();
+    // Phase 12: swap in a test-owned MockUpdate so the update suite can seed
+    // `info()` and read back every recorded `apply` target (D-14).
+    let update_exec = Arc::new(MockUpdate::new());
+    let executors =
+        Executors { update: Arc::clone(&update_exec) as Arc<dyn UpdateExecutor>, ..base };
     let auth = Arc::new(Mutex::new(AuthManager::new()));
     let (pause_tx, pause_rx) = tokio::sync::watch::channel(false);
     let (volume_tx, volume_rx) = tokio::sync::watch::channel(VolumeState::default());
@@ -273,6 +284,7 @@ async fn start_server() -> Harness {
         tabs_tx,
         bm_tx,
         update_tx,
+        update_exec,
         _server: server,
     }
 }
@@ -1632,5 +1644,200 @@ async fn update_progress_authed_gate_silence_then_single_push() {
     assert_eq!(
         p["stage"], "uptodate",
         "skipping the sentinel must not disable the branch for the NEXT real stage"
+    );
+}
+
+// ─────────── update.* command surface (phase 12, SC6 and SC8) ───────────
+
+/// Receive the next frame, requiring an `update.status` reply; returns the
+/// `p` object for field-level assertions.
+async fn recv_update_status(ws: &mut WsClient) -> Value {
+    let v = recv_json(ws).await;
+    assert_eq!(v["t"], "update.status", "expected an update.status reply, got: {v}");
+    v["p"].clone()
+}
+
+/// **SC6, behavioural third.** An authed session sends `update.apply` naming
+/// a URL where a version belongs. The router passes the string through
+/// verbatim and replies nothing; the executor records exactly that string and
+/// nothing else.
+///
+/// **What this proves:** the wire cannot smuggle a locator into the update
+/// path *through any field*, because there is no field — the whole
+/// `update.apply` payload is one `target` string, and the executor resolves
+/// the download URL and its sha256 itself from a constant compiled into
+/// `server-windows` (D-14, T-12-01). Even a caller who fully controls a
+/// paired session can only ever hand the executor a string it will compare
+/// against versions it resolved itself.
+///
+/// **What this does NOT prove**, and where the other two thirds of SC6 live:
+/// - That the executor REFUSES this string (as `stale`, then `downgrade`) is
+///   asserted by `cargo test -p server-windows refusal_order` — the refusal
+///   ladder lives in `update_thread.rs` (`pre_fetch_refusal`), which
+///   server-core cannot see.
+/// - That such a field can never be ADDED to the payload is asserted by
+///   `cargo test -p server-core --test update_guard`, which fails the build
+///   if a locator-named field or parameter appears on the type or the trait.
+///
+/// All three must stay green together; none of them is sufficient alone.
+#[tokio::test]
+async fn forged_apply_is_refused() {
+    let h = start_server().await;
+    let mut ws = authed_client(&h).await;
+
+    const FORGED: &str = "https://evil.example/x.exe";
+    send_json(
+        &mut ws,
+        json!({"t": "update.apply", "seq": 3, "p": {"target": FORGED}}),
+    )
+    .await;
+
+    // Zero reply frames: update.apply is fire-and-forget, and in particular
+    // there is no err carrying the forged string back out.
+    assert_no_frame(&mut ws, "update.apply must produce NO reply frame of any kind").await;
+
+    assert_eq!(
+        h.update_exec.applies(),
+        vec![FORGED.to_string()],
+        "the executor must observe exactly one apply, carrying the target string \
+         verbatim and NOTHING else — no second argument exists to carry a locator"
+    );
+    assert!(
+        h.log.calls().is_empty(),
+        "an update.apply must reach NO other executor: not the apps launcher, \
+         not the clipboard, not the power actions"
+    );
+
+    // The session survives a forged apply — it is refused, not fatal.
+    send_json(&mut ws, json!({"t": "ping", "seq": 4, "p": {"ts": 7}})).await;
+    let pong = recv_json(&mut ws).await;
+    assert_eq!(pong["t"], "pong", "the session must survive a forged apply, got: {pong}");
+}
+
+/// D-12: a startup marker is reported on EXACTLY ONE `update.status` and
+/// never again. `info()` TAKES the marker rather than copying it, so the
+/// second `update.check` on the same session must omit `lastUpdate` entirely
+/// — reporting a stale failure forever would show the owner an outcome that
+/// has since been superseded, possibly by a success.
+#[tokio::test]
+async fn update_check_reports_marker_once() {
+    let h = start_server().await;
+    h.update_exec.set_info(UpdateInfo {
+        server_version: "1.5.0".into(),
+        ext_connected: true,
+        ext_version: Some("1.4.0".into()),
+        last_update: Some(LastUpdate {
+            target: "1.4.9".into(),
+            ok: false,
+            error: Some("installer".into()),
+        }),
+    });
+    let mut ws = authed_client(&h).await;
+
+    send_json(&mut ws, json!({"t": "update.check", "seq": 3, "p": {}})).await;
+    let p = recv_update_status(&mut ws).await;
+    assert_eq!(p["serverVersion"], "1.5.0", "serverVersion is REQUIRED (D-26)");
+    assert_eq!(p["extConnected"], true);
+    assert_eq!(p["extVersion"], "1.4.0");
+    assert_eq!(p["lastUpdate"]["target"], "1.4.9");
+    assert_eq!(p["lastUpdate"]["ok"], false);
+    assert_eq!(
+        p["lastUpdate"]["error"], "installer",
+        "error draws from the closed D-11 vocabulary"
+    );
+
+    send_json(&mut ws, json!({"t": "update.check", "seq": 4, "p": {}})).await;
+    let p = recv_update_status(&mut ws).await;
+    assert_eq!(p["serverVersion"], "1.5.0", "the rest of the status is unchanged");
+    assert_eq!(p["extConnected"], true);
+    assert!(
+        p.get("lastUpdate").is_none(),
+        "D-12: the marker appears on exactly ONE update.status — the second \
+         check must omit the key entirely (never null, never a repeat)"
+    );
+}
+
+/// **SC8.** An `update.*` type this server does not know answers
+/// `err{unknownType}` and the session SURVIVES — which is the whole point of
+/// SPEC §10 and the reason a 1.7 server paired with a 1.8 phone keeps working
+/// for every other feature.
+///
+/// `update.notARealType` is fabricated on purpose: it is shaped like a member
+/// of the family so the assertion is about the UNKNOWN-TYPE rule, not about
+/// an unrecognised prefix.
+#[tokio::test]
+async fn unknown_update_type_keeps_session_alive() {
+    let h = start_server().await;
+    let mut ws = authed_client(&h).await;
+
+    send_json(&mut ws, json!({"t": "update.notARealType", "seq": 3, "p": {}})).await;
+    let err = recv_json(&mut ws).await;
+    assert_eq!(err["t"], "err", "expected err for an unknown update.* type, got: {err}");
+    assert_eq!(err["p"]["code"], "unknownType");
+
+    // The session survives, and specifically the KNOWN half of the same
+    // family still answers on the SAME connection.
+    send_json(&mut ws, json!({"t": "update.check", "seq": 4, "p": {}})).await;
+    let p = recv_update_status(&mut ws).await;
+    assert!(
+        p.get("serverVersion").is_some(),
+        "a known update.check must still answer after an unknown update.* type"
+    );
+
+    send_json(&mut ws, json!({"t": "ping", "seq": 5, "p": {"ts": 11}})).await;
+    let pong = recv_json(&mut ws).await;
+    assert_eq!(pong["t"], "pong", "session must survive an unknown type, got: {pong}");
+    assert_eq!(pong["p"]["ts"], 11);
+}
+
+/// T-12-45 at SOCKET level. The router unit test
+/// `paused_drops_every_executor_bound_family_silently` proves the gate itself;
+/// this proves the gate is reached through the real session path — the same
+/// division of labour `paused_input_dropped` already uses for the input
+/// families.
+///
+/// D-13 is the load-bearing half: `update.check` is a READ and is still
+/// dropped, unlike `apps.list`/`clip.get`/`tabs.list`/`bm.list`, which SPEC
+/// §11 exempts. Answering it while paused would advertise an install the
+/// session has just been told it may not perform.
+#[tokio::test]
+async fn pause_drops_update() {
+    let h = start_server().await;
+    let mut ws = authed_client(&h).await;
+
+    h.pause_tx.send(true).expect("pause watch alive");
+
+    send_json(&mut ws, json!({"t": "update.check", "seq": 3, "p": {}})).await;
+    assert_no_frame(
+        &mut ws,
+        "a paused update.check must be dropped SILENTLY — no update.status, no err \
+         (D-13: this read is deliberately NOT in the SPEC §11 exemption list)",
+    )
+    .await;
+
+    send_json(
+        &mut ws,
+        json!({"t": "update.apply", "seq": 4, "p": {"target": "1.6.0"}}),
+    )
+    .await;
+    assert_no_frame(&mut ws, "a paused update.apply must be dropped silently").await;
+    assert!(
+        h.update_exec.applies().is_empty(),
+        "a paused session must NOT be able to start an install"
+    );
+
+    // Liveness is unaffected: ping still pongs while paused (SPEC §11).
+    send_json(&mut ws, json!({"t": "ping", "seq": 5, "p": {"ts": 3}})).await;
+    let pong = recv_json(&mut ws).await;
+    assert_eq!(pong["t"], "pong", "pause must never break liveness probing");
+
+    // Unpause: the same session's update.check now answers, proving the
+    // silence above was the pause gate and not a dead route.
+    h.pause_tx.send(false).expect("pause watch alive");
+    send_json(&mut ws, json!({"t": "update.check", "seq": 6, "p": {}})).await;
+    let p = recv_update_status(&mut ws).await;
+    assert!(
+        p.get("serverVersion").is_some(),
+        "unpausing must re-enable the update family on the SAME session"
     );
 }
