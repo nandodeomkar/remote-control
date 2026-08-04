@@ -460,7 +460,19 @@ async fn main() -> anyhow::Result<()> {
     match tokio::net::TcpListener::bind(("127.0.0.1", ext_port)).await {
         Ok(ext_listener) => {
             tracing::info!(port = ext_port, "extension listener on 127.0.0.1");
-            tokio::spawn(ext::run_ext(ext_listener, tabs_tx, bm_tx, ext_info_tx, ext_cmd_rx));
+            // D-05/D-18: the version handed to `run_ext` is THIS package's —
+            // the binary that actually ships. `server-core`'s own
+            // CARGO_PKG_VERSION is the library crate's and is not what an
+            // extension should be compared against, which is why the value is
+            // passed in rather than read there.
+            tokio::spawn(ext::run_ext(
+                ext_listener,
+                tabs_tx,
+                bm_tx,
+                ext_info_tx,
+                ext_cmd_rx,
+                env!("CARGO_PKG_VERSION").to_string(),
+            ));
         }
         Err(e) => {
             tracing::warn!(

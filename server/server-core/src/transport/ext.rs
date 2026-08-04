@@ -77,6 +77,16 @@ pub enum ExtCmd {
     /// `bm.remove {nodeId}` — remove one bookmark or one EMPTY folder (D-14;
     /// `removeTree` is never expressed).
     BmRemove(String),
+    /// `ext.reload {}` — srv-to-ext ONLY, empty payload (protoVersion 1.8,
+    /// D-18). The extension answers by calling `chrome.runtime.reload()`,
+    /// which re-reads its files from disk — so a PC update that replaced
+    /// `{app}\extension` takes effect without anyone opening
+    /// `chrome://extensions` (SC7).
+    ///
+    /// It carries NOTHING. There is no path, no url and no version in it: the
+    /// extension reloads itself from wherever it was already loaded, and this
+    /// command cannot redirect that (T-12-01). The extension never sends it.
+    Reload,
 }
 
 /// The [`Tabs`] executor backed by the extension relay: list reads come
@@ -168,6 +178,41 @@ struct ExtFrame {
     p: Value,
 }
 
+/// The `ext.reload` wire frame, spelled ONCE.
+///
+/// Two call sites reach it — the [`ExtCmd::Reload`] dispatch arm and the
+/// version-drift nudge on `ext.hello` — and a second spelling is a second
+/// thing that can drift from `background.js`'s `case "ext.reload"`.
+fn reload_frame() -> String {
+    serde_json::json!({"t": "ext.reload", "p": {}}).to_string()
+}
+
+/// Should a stale `ext.hello` be answered with exactly one reload nudge?
+///
+/// Pure, so the three ways to say "no" are testable without a socket:
+///
+///   1. **No reported version at all** — unknown is not "different". An
+///      extension built before protoVersion 1.8 omits `extVersion` entirely,
+///      and nudging it would reload a browser worker on no evidence.
+///   2. **The reported version already matches** — nothing to do.
+///   3. **A reload was already attempted for this server version this process
+///      run** — THE LOOP BREAKER (D-18, T-12-56). `chrome.runtime.reload()`
+///      makes the extension reconnect and send a fresh `ext.hello`, so if the
+///      overwrite did not actually take (Chrome held the file), that second
+///      hello carries the SAME stale version. Without this clause the pair
+///      would nudge each other forever.
+///
+/// The guard is keyed on the SERVER's version, not the extension's: the
+/// question it answers is "have I already asked for this target", and the
+/// target is what the server wants the extension to become.
+fn should_nudge(reported: Option<&str>, server_version: &str, attempted_for: Option<&str>) -> bool {
+    match reported {
+        None => false,
+        Some(v) if v == server_version => false,
+        Some(_) => attempted_for != Some(server_version),
+    }
+}
+
 /// Reset EVERY relay watch to its never-connected default — the single
 /// session-death cleanup point.
 ///
@@ -215,12 +260,19 @@ fn reset_relay_watches(
 /// 12-16's version comparison — never as a locator (D-14), and never trusted
 /// as an authenticated claim (T-12-40: a local process able to open the
 /// loopback socket already owns the machine, SPEC §15).
+/// `server_version` is the SHIPPING binary's version, passed in from the
+/// composition root (D-05). It is deliberately NOT read from this crate's own
+/// package-version env var — that would be `server-core`'s library version,
+/// which is not what ships and not what an extension should be compared
+/// against. A plan-check greps this file for that env var and requires zero
+/// occurrences, which is why this sentence does not spell it.
 pub async fn run_ext(
     listener: TcpListener,
     tabs_tx: watch::Sender<TabsState>,
     bm_tx: watch::Sender<BookmarksState>,
     ext_tx: watch::Sender<ExtInfo>,
     mut cmd_rx: mpsc::Receiver<ExtCmd>,
+    server_version: String,
 ) {
     // SPEC §13 per-listener caps, applied AT ACCEPT (same as listener.rs).
     let config = WebSocketConfig::default()
@@ -228,6 +280,14 @@ pub async fn run_ext(
         .max_frame_size(Some(MAX_WS_MESSAGE_BYTES));
 
     let mut session: Option<WebSocketStream<TcpStream>> = None;
+
+    // The target version a reload has already been attempted for, this process
+    // run. NEVER reset — not on session end, not in `reset_relay_watches`, not
+    // on a newest-wins replacement. A server restart is the only reset, and
+    // that is precisely the intent (D-18, T-12-56): a reload makes the
+    // extension reconnect and hello again, so anything that cleared this would
+    // reopen the loop it exists to close.
+    let mut reload_attempted_for: Option<String> = None;
 
     loop {
         tokio::select! {
@@ -298,6 +358,7 @@ pub async fn run_ext(
                             serde_json::json!({"t": "bm.remove", "p": {"nodeId": node_id}})
                                 .to_string()
                         }
+                        ExtCmd::Reload => reload_frame(),
                     };
                     if ws.send(Message::text(text)).await.is_err() {
                         // Send failure: the extension is gone — drop the
@@ -312,9 +373,14 @@ pub async fn run_ext(
             incoming = async { session.as_mut().expect("branch guarded by is_some").next().await }, if session.is_some() => {
                 match incoming {
                     Some(Ok(Message::Text(text))) => {
-                        if let Some(pong) =
-                            handle_ext_text(text.as_str(), &tabs_tx, &bm_tx, &ext_tx)
-                        {
+                        if let Some(pong) = handle_ext_text(
+                            text.as_str(),
+                            &tabs_tx,
+                            &bm_tx,
+                            &ext_tx,
+                            &server_version,
+                            &mut reload_attempted_for,
+                        ) {
                             if let Some(ws) = session.as_mut() {
                                 if ws.send(pong).await.is_err() {
                                     session = None;
@@ -339,15 +405,24 @@ pub async fn run_ext(
     }
 }
 
-/// Handle one extension text frame. Returns an optional reply frame
-/// (`ext.pong`). Tolerant end to end: malformed JSON, a bad `tabs` payload,
-/// and unknown types are all ignored (SPEC §15 — no err vocabulary on this
-/// leg).
+/// Handle one extension text frame. Returns an optional frame to send back —
+/// `ext.pong` for a ping, or the one `ext.reload` nudge for a version-drifted
+/// hello. Tolerant end to end: malformed JSON, a bad `tabs` payload, and
+/// unknown types are all ignored (SPEC §15 — no err vocabulary on this leg).
+///
+/// The reload rides the existing return channel rather than looping back
+/// through `cmd_rx`: a self-send into the mpsc this same `select!` drains
+/// would be a needless round trip, and a full channel would silently drop the
+/// nudge. `reload_attempted_for` is `&mut` because the decision and the
+/// recording of it must be the same step — a guard set anywhere other than the
+/// instant the nudge is emitted is a guard with a window in it.
 fn handle_ext_text(
     text: &str,
     tabs_tx: &watch::Sender<TabsState>,
     bm_tx: &watch::Sender<BookmarksState>,
     ext_tx: &watch::Sender<ExtInfo>,
+    server_version: &str,
+    reload_attempted_for: &mut Option<String>,
 ) -> Option<Message> {
     let frame: ExtFrame = match serde_json::from_str(text) {
         Ok(frame) => frame,
@@ -414,14 +489,33 @@ fn handle_ext_text(
         // a truthful state the wire can express by omitting `extVersion`.
         // T-12-41: this is also why a malformed payload cannot panic here.
         //
-        // The arm still returns `None` — this is a SIDE EFFECT, not a reply.
+        // protoVersion 1.8 also makes this the ONLY place a version-drift
+        // nudge can originate (D-18): the hello is the one frame that reports
+        // which extension build is running, so it is the one frame that can
+        // notice the build is behind the server.
         "ext.hello" => {
             let version = frame
                 .p
                 .get("extVersion")
                 .and_then(Value::as_str)
                 .map(str::to_string);
-            let _ = ext_tx.send(ExtInfo { connected: true, version });
+            let _ = ext_tx.send(ExtInfo {
+                connected: true,
+                version: version.clone(),
+            });
+            // D-18/SC7: the extension is running an older build than the
+            // server, so a PC update replaced `{app}\extension` under it.
+            // Nudge it EXACTLY once per target version per process run — set
+            // the guard in the same step that emits, so there is no window in
+            // which a second hello could slip past.
+            if should_nudge(
+                version.as_deref(),
+                server_version,
+                reload_attempted_for.as_deref(),
+            ) {
+                *reload_attempted_for = Some(server_version.to_string());
+                return Some(Message::text(reload_frame()));
+            }
             None
         }
         // Unknown type: ignored (forward compatibility).

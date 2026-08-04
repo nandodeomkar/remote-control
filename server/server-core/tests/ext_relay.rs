@@ -48,8 +48,22 @@ struct Relay {
     _relay: tokio::task::JoinHandle<()>,
 }
 
+/// The server version the default harness reports (protoVersion 1.8, D-18).
+///
+/// Chosen to MATCH the `extVersion` the pre-1.8 scenarios already send, so
+/// those tests stay in the no-nudge case and their observations are unchanged.
+/// The version-drift scenarios use [`spawn_relay_with_version`] to set up a
+/// mismatch deliberately.
+const HARNESS_SERVER_VERSION: &str = "1.0.0";
+
 /// Bind 127.0.0.1:0, spawn `run_ext`, return the handles.
 async fn spawn_relay() -> Relay {
+    spawn_relay_with_version(HARNESS_SERVER_VERSION).await
+}
+
+/// [`spawn_relay`] with the SERVER's own version set explicitly — the input
+/// the D-18 version comparison is made against.
+async fn spawn_relay_with_version(server_version: &str) -> Relay {
     let listener = TcpListener::bind("127.0.0.1:0")
         .await
         .expect("bind ephemeral port on 127.0.0.1");
@@ -61,7 +75,14 @@ async fn spawn_relay() -> Relay {
     // protoVersion 1.8: the THIRD, same discipline.
     let (ext_tx, ext_rx) = watch::channel(ExtInfo::default());
     let (cmd_tx, cmd_rx) = mpsc::channel::<ExtCmd>(16);
-    let relay = tokio::spawn(run_ext(listener, tabs_tx, bm_tx, ext_tx, cmd_rx));
+    let relay = tokio::spawn(run_ext(
+        listener,
+        tabs_tx,
+        bm_tx,
+        ext_tx,
+        cmd_rx,
+        server_version.to_string(),
+    ));
     Relay { addr, tabs_rx, bm_rx, ext_rx, cmd_tx, _relay: relay }
 }
 
@@ -731,4 +752,165 @@ async fn ext_disconnect_resets_all_three_watches() {
         BookmarksState::default(),
         "bookmarks must be reset in the SAME instant as ext info"
     );
+}
+
+// ── protoVersion 1.8: the D-18 version-drift nudge ──────────────────────────
+//
+// The server notices the extension is running an older build than itself and
+// nudges it exactly ONCE per target version per process run. The nudge is the
+// easy half; the guard is the load-bearing half, because
+// `chrome.runtime.reload()` makes the extension reconnect and hello again —
+// so if the overwrite did NOT take (Chrome held the file), that second hello
+// carries the same stale version and an unguarded server would nudge forever.
+
+/// How long "no frame arrived" is observed for. Every frame in this suite is
+/// produced synchronously inside one `select!` arm on loopback, so a nudge
+/// that was going to happen has happened long before this elapses.
+const QUIET_WINDOW: Duration = Duration::from_millis(300);
+
+/// Assert the relay sends NOTHING for [`QUIET_WINDOW`].
+async fn expect_no_frame(ws: &mut WsClient, why: &str) {
+    match tokio::time::timeout(QUIET_WINDOW, ws.next()).await {
+        // Timed out waiting for a frame — silence, which is the assertion.
+        Err(_) => {}
+        Ok(Some(Ok(Message::Text(t)))) => panic!("{why}; got a frame: {t}"),
+        Ok(other) => panic!("{why}; got: {other:?}"),
+    }
+}
+
+/// A hello whose `extVersion` differs from the server's own version gets
+/// exactly one `ext.reload` (D-18, SC7).
+#[tokio::test]
+async fn ext_reload_guard_nudges_a_stale_extension() {
+    let mut r = spawn_relay_with_version("1.5.0").await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(&mut ext, json!({"t": "ext.hello", "p": {"extVersion": "1.4.0"}})).await;
+
+    let frame = recv_json(&mut ext).await;
+    assert_eq!(frame["t"], "ext.reload", "expected ext.reload, got: {frame}");
+    assert_eq!(
+        frame["p"],
+        json!({}),
+        "ext.reload carries NOTHING — no path, no url, no version (T-12-01)"
+    );
+
+    // The nudge does not disturb the watch: the extension is still connected
+    // and still reporting the OLD version, which is exactly what the Updates
+    // screen should show until the reload actually takes.
+    let info = wait_ext_watch(&mut r.ext_rx, |s| s.connected, "ext watch never connected").await;
+    assert_eq!(info.version.as_deref(), Some("1.4.0"));
+}
+
+/// **The single most important test in this plan (T-12-56).** A SECOND hello
+/// carrying the same stale version produces NO second reload — the guard is
+/// what turns a Chrome-blocked overwrite into a message instead of a loop.
+#[tokio::test]
+async fn ext_reload_guard_does_not_loop_on_a_repeated_stale_hello() {
+    let mut r = spawn_relay_with_version("1.5.0").await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(&mut ext, json!({"t": "ext.hello", "p": {"extVersion": "1.4.0"}})).await;
+    let first = recv_json(&mut ext).await;
+    assert_eq!(first["t"], "ext.reload", "the first stale hello must be nudged");
+
+    // What a reloaded-but-not-actually-updated extension sends: it came back,
+    // and it is STILL on the old version because the file was never replaced.
+    send_json(&mut ext, json!({"t": "ext.hello", "p": {"extVersion": "1.4.0"}})).await;
+    expect_no_frame(&mut ext, "a second stale hello must NOT produce a second reload").await;
+
+    // Ordering belt: the very next frame the relay sends is the pong, so there
+    // is no reload queued behind the quiet window either.
+    send_json(&mut ext, json!({"t": "ext.ping", "p": {}})).await;
+    let next = recv_json(&mut ext).await;
+    assert_eq!(
+        next["t"], "ext.pong",
+        "the next frame after a guarded hello must be the pong, not a reload: {next}"
+    );
+
+    // And the relay is still healthy afterwards.
+    send_json(&mut ext, tabs_state_frame()).await;
+    wait_watch(&mut r.tabs_rx, |s| s.connected, "the relay died after the guarded hello").await;
+}
+
+/// A hello whose version MATCHES the server's produces no reload at all.
+#[tokio::test]
+async fn ext_reload_guard_stays_silent_on_a_matching_version() {
+    let mut r = spawn_relay_with_version("1.5.0").await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(&mut ext, json!({"t": "ext.hello", "p": {"extVersion": "1.5.0"}})).await;
+    expect_no_frame(&mut ext, "an up-to-date extension must never be reloaded").await;
+
+    let info = wait_ext_watch(&mut r.ext_rx, |s| s.connected, "ext watch never connected").await;
+    assert_eq!(info.version.as_deref(), Some("1.5.0"));
+}
+
+/// An ABSENT `extVersion` never triggers a reload — unknown is not
+/// "different". A pre-1.8 extension omits the field entirely, and reloading a
+/// browser worker on no evidence is not a thing this server does.
+#[tokio::test]
+async fn ext_reload_guard_stays_silent_without_an_ext_version() {
+    for payload in [json!({}), json!({"extVersion": null}), json!({"extVersion": 150})] {
+        let r = spawn_relay_with_version("1.5.0").await;
+        let mut ext = connect_ext(r.addr).await;
+
+        send_json(&mut ext, json!({"t": "ext.hello", "p": payload.clone()})).await;
+        expect_no_frame(
+            &mut ext,
+            "a hello with no readable extVersion must not be nudged",
+        )
+        .await;
+    }
+}
+
+/// The guard outlives the SESSION, not just the frame: a reload ends the
+/// extension's worker, so the next hello arrives on a brand-new connection.
+/// If the guard were per-session — or were cleared by `reset_relay_watches` —
+/// the loop would be exactly as open as if it did not exist.
+#[tokio::test]
+async fn ext_reload_guard_survives_a_reconnect_in_the_same_process_run() {
+    let mut r = spawn_relay_with_version("1.5.0").await;
+
+    let mut first = connect_ext(r.addr).await;
+    send_json(&mut first, json!({"t": "ext.hello", "p": {"extVersion": "1.4.0"}})).await;
+    let nudge = recv_json(&mut first).await;
+    assert_eq!(nudge["t"], "ext.reload");
+
+    // chrome.runtime.reload() terminates the worker: the socket goes away and
+    // a fresh one arrives moments later.
+    drop(first);
+    wait_ext_watch(&mut r.ext_rx, |s| !s.connected, "ext watch never reset on drop").await;
+
+    let mut second = connect_ext(r.addr).await;
+    send_json(&mut second, json!({"t": "ext.hello", "p": {"extVersion": "1.4.0"}})).await;
+    expect_no_frame(
+        &mut second,
+        "the guard must survive the reconnect its own nudge caused",
+    )
+    .await;
+
+    send_json(&mut second, json!({"t": "ext.ping", "p": {}})).await;
+    let next = recv_json(&mut second).await;
+    assert_eq!(next["t"], "ext.pong", "expected pong, got: {next}");
+}
+
+/// The dispatch arm: `ExtCmd::Reload` serialises as `{"t":"ext.reload","p":{}}`
+/// — the same frame the hello nudge emits, because both go through
+/// `reload_frame()`.
+#[tokio::test]
+async fn ext_cmd_forwards_reload_frame() {
+    let r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    // Register the session before commanding (the relay drops commands that
+    // arrive with no session — the established pattern in this file).
+    send_json(&mut ext, tabs_state_frame()).await;
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    r.cmd_tx.send(ExtCmd::Reload).await.expect("send reload command");
+
+    let frame = recv_json(&mut ext).await;
+    assert_eq!(frame["t"], "ext.reload", "expected ext.reload, got: {frame}");
+    assert_eq!(frame["p"], json!({}));
 }
