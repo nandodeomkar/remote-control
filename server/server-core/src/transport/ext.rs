@@ -26,7 +26,7 @@ use tokio_tungstenite::tungstenite::protocol::WebSocketConfig;
 
 use crate::codec::json::{self, Msg, TabsActivatePayload, TabsClosePayload};
 use crate::executors::{
-    BmNode, Bookmarks, BookmarksState, GroupInfo, TabInfo, Tabs, TabsState,
+    BmNode, Bookmarks, BookmarksState, ExtInfo, GroupInfo, TabInfo, Tabs, TabsState,
 };
 
 /// Default extension-listener port (SPEC §15). Doc-pinned against the
@@ -175,14 +175,22 @@ struct ExtFrame {
 /// failure, stream end/error). It exists so the sites cannot drift apart: a
 /// stale bookmark tree sitting next to a correct "install the extension"
 /// hint is exactly the bug a per-site `send(Default)` invites. **A future
-/// fourth relay watch must be added HERE and nowhere else** — then a missed
+/// FOURTH relay watch must be added HERE and nowhere else** — then a missed
 /// site is structurally impossible rather than merely unlikely.
+///
+/// The three watches are tabs (protoVersion 1.4), bookmarks (1.6) and ext
+/// info (1.8). The last resets to `{connected: false, version: None}`, which
+/// is what makes `update.status` stop claiming a browser extension is
+/// connected the instant it is not — and stop reporting the version of an
+/// extension that is no longer running.
 fn reset_relay_watches(
     tabs_tx: &watch::Sender<TabsState>,
     bm_tx: &watch::Sender<BookmarksState>,
+    ext_tx: &watch::Sender<ExtInfo>,
 ) {
     let _ = tabs_tx.send(TabsState::default());
     let _ = bm_tx.send(BookmarksState::default());
+    let _ = ext_tx.send(ExtInfo::default());
 }
 
 /// Run the extension accept/relay loop until every [`ExtCmd`] sender is
@@ -191,16 +199,27 @@ fn reset_relay_watches(
 ///
 /// Watch-channel contract: `tabs_tx` carries `{connected:true, tabs}` on
 /// every extension `tabs.state` frame, `bm_tx` carries
-/// `{connected:true, nodes}` on every `bm.state` frame, and BOTH reset to
-/// their defaults UNCONDITIONALLY and in the SAME instant when the extension
-/// session ends for ANY reason (CONN-07-style cleanup — this is what flips
-/// the phone to the install-hint state when the browser closes). Resetting
-/// only one would leave the phone rendering a stale, tappable bookmark tree
-/// beside a correct install hint.
+/// `{connected:true, nodes}` on every `bm.state` frame, `ext_tx` carries
+/// `{connected:true, version}` from the moment an `ext.hello` is received,
+/// and ALL THREE reset to their defaults UNCONDITIONALLY and in the SAME
+/// instant when the extension session ends for ANY reason (CONN-07-style
+/// cleanup — this is what flips the phone to the install-hint state when the
+/// browser closes). Resetting only some would leave the phone rendering a
+/// stale, tappable bookmark tree — or a stale extension version on the
+/// Updates screen — beside a correct install hint.
+///
+/// `ext_tx` (protoVersion 1.8, D-09/D-18) is the odd one out in one respect:
+/// its producer frame is `ext.hello`, which arrives ONCE at the start of a
+/// session rather than repeatedly like the two snapshot frames. Its `version`
+/// is the extension's OWN self-report and is used only for display and for
+/// 12-16's version comparison — never as a locator (D-14), and never trusted
+/// as an authenticated claim (T-12-40: a local process able to open the
+/// loopback socket already owns the machine, SPEC §15).
 pub async fn run_ext(
     listener: TcpListener,
     tabs_tx: watch::Sender<TabsState>,
     bm_tx: watch::Sender<BookmarksState>,
+    ext_tx: watch::Sender<ExtInfo>,
     mut cmd_rx: mpsc::Receiver<ExtCmd>,
 ) {
     // SPEC §13 per-listener caps, applied AT ACCEPT (same as listener.rs).
@@ -282,9 +301,9 @@ pub async fn run_ext(
                     };
                     if ws.send(Message::text(text)).await.is_err() {
                         // Send failure: the extension is gone — drop the
-                        // session AND reset BOTH watches (hint state).
+                        // session AND reset EVERY watch (hint state).
                         session = None;
-                        reset_relay_watches(&tabs_tx, &bm_tx);
+                        reset_relay_watches(&tabs_tx, &bm_tx, &ext_tx);
                     }
                 }
                 // No session → the command is dropped silently (the phone
@@ -293,11 +312,13 @@ pub async fn run_ext(
             incoming = async { session.as_mut().expect("branch guarded by is_some").next().await }, if session.is_some() => {
                 match incoming {
                     Some(Ok(Message::Text(text))) => {
-                        if let Some(pong) = handle_ext_text(text.as_str(), &tabs_tx, &bm_tx) {
+                        if let Some(pong) =
+                            handle_ext_text(text.as_str(), &tabs_tx, &bm_tx, &ext_tx)
+                        {
                             if let Some(ws) = session.as_mut() {
                                 if ws.send(pong).await.is_err() {
                                     session = None;
-                                    reset_relay_watches(&tabs_tx, &bm_tx);
+                                    reset_relay_watches(&tabs_tx, &bm_tx, &ext_tx);
                                 }
                             }
                         }
@@ -306,11 +327,11 @@ pub async fn run_ext(
                     // itself; anything else on this leg is ignored.
                     Some(Ok(_)) => {}
                     // Stream end or error — INCLUDING a 64 KB-cap kill:
-                    // reset BOTH watches UNCONDITIONALLY (CONN-07-style
+                    // reset EVERY watch UNCONDITIONALLY (CONN-07-style
                     // cleanup) and clear the session.
                     None | Some(Err(_)) => {
                         session = None;
-                        reset_relay_watches(&tabs_tx, &bm_tx);
+                        reset_relay_watches(&tabs_tx, &bm_tx, &ext_tx);
                     }
                 }
             }
@@ -326,6 +347,7 @@ fn handle_ext_text(
     text: &str,
     tabs_tx: &watch::Sender<TabsState>,
     bm_tx: &watch::Sender<BookmarksState>,
+    ext_tx: &watch::Sender<ExtInfo>,
 ) -> Option<Message> {
     let frame: ExtFrame = match serde_json::from_str(text) {
         Ok(frame) => frame,
@@ -379,8 +401,29 @@ fn handle_ext_text(
         "ext.ping" => Some(Message::text(
             serde_json::json!({"t": "ext.pong", "p": {}}).to_string(),
         )),
-        // First frame after connect: accepted silently (SPEC §15).
-        "ext.hello" => None,
+        // First frame after connect: still answered silently (SPEC §15 — no
+        // reply on this leg), but no longer a no-op. protoVersion 1.8 turns
+        // it into the THIRD relay watch's producer (D-09/D-18): the server
+        // learns which extension build is running, which is what
+        // `update.status` reports as `extConnected`/`extVersion`.
+        //
+        // `extVersion` is read with the LENIENT ext-leg convention (the
+        // `truncated` precedent above): absent, null or non-string yields
+        // `None` — never an error, never a dropped frame. An extension built
+        // before 1.8 does not send it, and "connected but version unknown" is
+        // a truthful state the wire can express by omitting `extVersion`.
+        // T-12-41: this is also why a malformed payload cannot panic here.
+        //
+        // The arm still returns `None` — this is a SIDE EFFECT, not a reply.
+        "ext.hello" => {
+            let version = frame
+                .p
+                .get("extVersion")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let _ = ext_tx.send(ExtInfo { connected: true, version });
+            None
+        }
         // Unknown type: ignored (forward compatibility).
         _ => None,
     }

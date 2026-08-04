@@ -26,7 +26,7 @@ use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
 
-use server_core::executors::{Bookmarks, BookmarksState, TabsState};
+use server_core::executors::{Bookmarks, BookmarksState, ExtInfo, TabsState};
 use server_core::transport::ext::{BookmarksRelay, ExtCmd, run_ext};
 
 const RECV_TIMEOUT: Duration = Duration::from_secs(2);
@@ -41,6 +41,9 @@ struct Relay {
     tabs_rx: watch::Receiver<TabsState>,
     /// protoVersion 1.6: the SECOND watch `run_ext` produces into.
     bm_rx: watch::Receiver<BookmarksState>,
+    /// protoVersion 1.8: the THIRD watch `run_ext` produces into (the
+    /// `ext.hello` version capture, D-09/D-18).
+    ext_rx: watch::Receiver<ExtInfo>,
     cmd_tx: mpsc::Sender<ExtCmd>,
     _relay: tokio::task::JoinHandle<()>,
 }
@@ -55,9 +58,11 @@ async fn spawn_relay() -> Relay {
     // protoVersion 1.6: `run_ext` owns a SECOND watch, surfaced alongside
     // the tabs receiver so every test can observe both.
     let (bm_tx, bm_rx) = watch::channel(BookmarksState::default());
+    // protoVersion 1.8: the THIRD, same discipline.
+    let (ext_tx, ext_rx) = watch::channel(ExtInfo::default());
     let (cmd_tx, cmd_rx) = mpsc::channel::<ExtCmd>(16);
-    let relay = tokio::spawn(run_ext(listener, tabs_tx, bm_tx, cmd_rx));
-    Relay { addr, tabs_rx, bm_rx, cmd_tx, _relay: relay }
+    let relay = tokio::spawn(run_ext(listener, tabs_tx, bm_tx, ext_tx, cmd_rx));
+    Relay { addr, tabs_rx, bm_rx, ext_rx, cmd_tx, _relay: relay }
 }
 
 /// Connect a fake extension to the relay.
@@ -112,6 +117,19 @@ async fn wait_bm_watch(
         .await
         .unwrap_or_else(|_| panic!("timed out: {why}"))
         .expect("bookmarks watch sender dropped")
+        .clone()
+}
+
+/// Wait (bounded) for the EXT-INFO watch to satisfy `pred`.
+async fn wait_ext_watch(
+    rx: &mut watch::Receiver<ExtInfo>,
+    pred: impl FnMut(&ExtInfo) -> bool,
+    why: &str,
+) -> ExtInfo {
+    tokio::time::timeout(RECV_TIMEOUT, rx.wait_for(pred))
+        .await
+        .unwrap_or_else(|_| panic!("timed out: {why}"))
+        .expect("ext watch sender dropped")
         .clone()
 }
 
@@ -598,4 +616,119 @@ async fn malformed_bm_nodes_ignore_frame() {
     assert_eq!(state.nodes[0].id, "1");
     assert_eq!(state.nodes[1].id, "12");
     assert!(state.connected, "the frame was ignored, not treated as a disconnect");
+}
+
+/// protoVersion 1.8 scenario 1 (D-09/D-18): an `ext.hello` carrying
+/// `extVersion` populates the THIRD watch with `connected:true` and that
+/// version — the field `update.status` reports as `extVersion`.
+#[tokio::test]
+async fn ext_hello_populates_ext_watch_with_version() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(&mut ext, json!({"t": "ext.hello", "p": {"extVersion": "1.5.0"}})).await;
+
+    let info = wait_ext_watch(
+        &mut r.ext_rx,
+        |s| s.connected,
+        "ext watch never showed connected:true",
+    )
+    .await;
+    assert_eq!(
+        info.version.as_deref(),
+        Some("1.5.0"),
+        "the extension's self-reported version must reach the watch verbatim"
+    );
+    assert_eq!(info, ExtInfo { connected: true, version: Some("1.5.0".into()) });
+}
+
+/// protoVersion 1.8 scenario 2 (T-12-41, the lenient ext-leg convention): an
+/// `ext.hello` with NO `extVersion` is NOT an error — it yields
+/// `{connected:true, version:None}`. An extension built before 1.8 sends
+/// exactly this frame, and "connected but version unknown" is a truthful
+/// state (`update.status` omits `extVersion` for it).
+///
+/// The `null` and non-string cases ride along: `and_then(Value::as_str)`
+/// makes all three the same answer, and none of them may drop the frame or
+/// panic.
+#[tokio::test]
+async fn ext_hello_without_version_is_not_an_error() {
+    for payload in [json!({}), json!({"extVersion": null}), json!({"extVersion": 150})] {
+        let mut r = spawn_relay().await;
+        let mut ext = connect_ext(r.addr).await;
+
+        send_json(&mut ext, json!({"t": "ext.hello", "p": payload.clone()})).await;
+
+        let info = wait_ext_watch(
+            &mut r.ext_rx,
+            |s| s.connected,
+            "a versionless ext.hello must still mark the extension connected",
+        )
+        .await;
+        assert_eq!(
+            info.version, None,
+            "{payload} must degrade to version:None, never an error"
+        );
+
+        // The relay is still alive and still processing frames afterwards —
+        // the lenient read did not kill the session.
+        send_json(&mut ext, tabs_state_frame()).await;
+        wait_watch(
+            &mut r.tabs_rx,
+            |s| s.connected,
+            "the relay died on a versionless ext.hello",
+        )
+        .await;
+    }
+}
+
+/// protoVersion 1.8 scenario 3 — the three-watch reset, asserted in ONE
+/// observation so the cleanup sites cannot drift apart.
+///
+/// All three watches are populated first, so every reset is a real
+/// transition: this test is capable of failing if ANY of the three is missed
+/// at `reset_relay_watches`. That function is the single session-death
+/// cleanup point precisely so a fourth watch cannot be added without landing
+/// here too.
+#[tokio::test]
+async fn ext_disconnect_resets_all_three_watches() {
+    let mut r = spawn_relay().await;
+    let mut ext = connect_ext(r.addr).await;
+
+    send_json(&mut ext, json!({"t": "ext.hello", "p": {"extVersion": "1.5.0"}})).await;
+    send_json(&mut ext, tabs_state_frame()).await;
+    send_json(&mut ext, bm_state_frame(bm_nodes(), None)).await;
+    wait_watch(&mut r.tabs_rx, |s| s.connected, "tabs watch never showed connected").await;
+    wait_bm_watch(&mut r.bm_rx, |s| s.connected, "bm watch never showed connected").await;
+    wait_ext_watch(&mut r.ext_rx, |s| s.connected, "ext watch never showed connected").await;
+
+    // Abrupt drop: no close frame, no goodbye.
+    drop(ext);
+
+    // Wait on the LAST watch to be reset in source order, then read the other
+    // two synchronously: `reset_relay_watches` sends all three before it
+    // returns, so once the third has landed the first two cannot still be
+    // stale. That is what makes this ONE observation rather than three.
+    let ext_info = wait_ext_watch(
+        &mut r.ext_rx,
+        |s| !s.connected,
+        "EXT watch never reset after the ext disconnect",
+    )
+    .await;
+    assert_eq!(
+        ext_info,
+        ExtInfo::default(),
+        "ext reset must be the full default — the version cleared, not just connected:false"
+    );
+
+    assert_eq!(
+        r.tabs_rx.borrow().clone(),
+        TabsState::default(),
+        "tabs must be reset in the SAME instant as ext info"
+    );
+    assert_eq!(
+        r.bm_rx.borrow().clone(),
+        BookmarksState::default(),
+        "bookmarks must be reset in the SAME instant as ext info"
+    );
 }
