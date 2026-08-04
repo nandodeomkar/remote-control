@@ -105,26 +105,46 @@ Source: "..\server\target\release\server-windows.exe"; DestDir: "{app}"; DestNam
 ; this comment, because the plan greps for exactly one occurrence of each and
 ; a comment that quotes them would trip its own gate.
 ;
-; Chrome may hold a write lock on a loaded unpacked extension's
-; files. Inno's file-replace failure raises an Abort/Retry/Ignore whose
-; SUPPRESSED DEFAULT IS ABORT -- and under /SUPPRESSMSGBOXES, which is exactly
-; how the in-app updater runs Setup, that would abort the ENTIRE server
-; install because the browser happened to be open. The browser being open is
-; the common case, not an edge case. With these flags a locked file is instead
-; scheduled for replacement at next boot via MoveFileEx, and the install
-; completes.
+; The risk they cover: if Chrome held a write lock on a loaded unpacked
+; extension's files, Inno's file-replace failure would raise an
+; Abort/Retry/Ignore whose SUPPRESSED DEFAULT IS ABORT -- and under
+; /SUPPRESSMSGBOXES, which is exactly how the in-app updater runs Setup, that
+; would abort the ENTIRE server install because the browser happened to be
+; open. The browser being open is the common case, not an edge case. With
+; these flags a locked file is instead scheduled for replacement at next boot
+; via MoveFileEx, and the install completes.
+;
+; NOT REPRODUCED (12-16 Task 1, observed 2026-08-05 on Windows 11 26200,
+; per-user install, Chrome holding the extension via Load unpacked):
+;
+;   * two consecutive silent upgrades (1.5.0 -> 1.5.1 -> 1.5.2) both logged
+;     "Installation process succeeded" with exit code 0;
+;   * neither log contained ErrorReplacingExistingFile or any
+;     Abort/Retry/Ignore entry;
+;   * both logged "Need to restart Windows? No", so nothing even reached the
+;     deferred-replacement path these flags provide;
+;   * background.js, manifest.json and README.md were all overwritten in place
+;     underneath the running browser.
+;
+; So Chrome does NOT appear to hold a write lock on an unpacked extension
+; directory. THE FLAGS STAY ANYWAY: they cost nothing, the observation is one
+; machine and one Chrome version, and the failure they prevent takes down the
+; whole update rather than just the extension. Do not remove them on the
+; strength of that single clean run.
 ;
 ; This CONTRADICTS the design spec's "no .iss change is needed" claim. That
 ; claim was correct about the [Run] entry and the AppMutex mechanism; it did
 ; not consider extension-file locking.
 ;
-; Two things this does NOT guarantee. A per-user install without admin rights
-; may be unable to write the pending-rename registry key, in which case the
-; replacement simply does not happen -- the fallback there is the D-18
-; user-facing state, "Restart your browser to finish updating". And a
-; next-boot replacement means the extension is still on the OLD files for the
-; rest of the session, so the server's one ext.reload nudge will not change
-; its version; the guard is what stops that from becoming a loop.
+; Two things these flags would NOT guarantee if the lock ever does appear. A
+; per-user install without admin rights may be unable to write the
+; pending-rename registry key -- and the observed install WAS per-user
+; ("User privileges: None" in the log) -- in which case the replacement simply
+; does not happen; the fallback there is the D-18 user-facing state, "Restart
+; your browser to finish updating". And a next-boot replacement means the
+; extension is still on the OLD files for the rest of the session, so the
+; server's one ext.reload nudge will not change its version; the guard is what
+; stops that from becoming a loop.
 ;
 ; The server exe entry above is listed FIRST deliberately -- Inno processes
 ; [Files] in order, so the critical artifact lands before the risky one. Do

@@ -3,7 +3,7 @@ phase: 12-in-app-updates
 plan: 16
 subsystem: updates
 tags: [rust, javascript, inno-setup, extension, transport, security, guard-tests]
-status: code-complete; Task 1 checkpoint OUTSTANDING
+status: complete; Task 1 checkpoint CLOSED 2026-08-05 — SC7 OBSERVED MET
 
 # Dependency graph
 requires:
@@ -53,8 +53,7 @@ patterns-established:
   - "Negative socket assertions get two halves: a bounded quiet window proving nothing arrived, and an ordering belt (send a ping, assert the next frame is the pong) proving nothing is queued behind it"
   - "A guard test whose failure message explains the SILENCE of the bug it catches, not just the rule — this one fails with no error on either side and no log line anywhere"
 
-requirements-completed: [D-04, D-05, D-18]
-requirements-pending: [SC7]
+requirements-completed: [D-04, D-05, D-18, SC7]
 
 # Metrics
 duration: 1 session
@@ -65,43 +64,59 @@ completed: 2026-08-04
 
 **The server notices the extension is running an older build than itself and nudges it exactly once per target version per process run; the extension answers by re-reading its files from disk; and a Chrome-held file can no longer take the whole PC install down with it.**
 
-> **SC7 IS NOT CLAIMED.** Task 1 is a blocking human-action checkpoint and is **still outstanding** — see the section below. The code is complete and every automated gate is green, but whether the extension actually ends up on the new version after a real PC update is an observation nobody has made yet.
+> **SC7 IS OBSERVED MET.** The Task 1 checkpoint was performed by the owner on 2026-08-05 and its three facts are recorded verbatim below. The extension updated itself after a real PC update with the browser open and nobody touching `chrome://extensions`.
 
-## ⚠ Task 1 — OUTSTANDING (blocking human-action checkpoint)
+## Task 1 — CLOSED (observed 2026-08-05)
 
-**Not performed. Not assumed. Not skipped quietly.**
+Performed by the owner on the real machine, as the plan required. Environment: Windows 11 build 26200, **per-user install** (`User privileges: None`, `Administrative install mode: No` in the setup log), install root `%LOCALAPPDATA%\Programs\RemoteControl`, Chrome holding the extension via **Load unpacked** from `{app}\extension` for the whole run.
 
-The plan opens with a five-minute observation on a real machine, and says in terms: *"An agent cannot perform this and must not assume its outcome."* It requires loading an unpacked extension through `chrome://extensions` and running a real setup exe over a live install with the browser open — neither of which an agent can do.
+Two silent upgrades were run back to back with the browser open throughout: **1.5.0 → 1.5.1**, then **1.5.1 → 1.5.2**. Two rounds were necessary rather than one, for a reason worth recording: the `ext.reload` arm ships *in* the extension, so the build already loaded in Chrome at the start of round 1 (1.5.0) did not have it. **The first update to a reload-capable extension can never auto-reload** — it lands in `background.js`'s `default: break`. That is inherent to the design, not a defect, and it means SC7 holds from the *second* update onward. Round 2 is the one that tests the feature.
 
-### What still has to be observed
+### The three facts, verbatim
 
-| Fact | Question |
-|------|----------|
-| **A** | The setup's exit code, and whether `%TEMP%\t.log` contains `ErrorReplacingExistingFile` or any Abort/Retry/Ignore entry |
-| **B** | Whether the server exe itself was actually replaced |
-| **C** | Whether the extension's `ext.hello` reports the NEW version after the reload, or still the old one |
+**Fact A — the setup's exit code, and whether the log shows a file-replace failure.**
 
-### The procedure
+> Exit code **0**. `Select-String -Pattern 'ErrorReplacingExistingFile'` printed **nothing**, on both rounds. No Abort/Retry/Ignore entry in either log. Both logs end:
+>
+> ```
+> 2026-08-05 00:14:09.539   Installation process succeeded.
+> 2026-08-05 00:14:09.539   Need to restart Windows? No
+> ```
+>
+> and the round-2 log the same at `00:17:16`. The extension files are logged as written directly:
+>
+> ```
+> 2026-08-05 00:14:08.966   Dest filename: ...\RemoteControl\extension\background.js
+> 2026-08-05 00:14:08.969   Dest filename: ...\RemoteControl\extension\manifest.json
+> 2026-08-05 00:14:08.971   Dest filename: ...\RemoteControl\extension\README.md
+> ```
 
-1. Have the current release installed, so `{app}\extension` exists on disk.
-2. Chrome (or Edge) → `chrome://extensions` → Developer mode → **Load unpacked** from the installed `{app}\extension`. Confirm it connects (the phone's browser screen shows tabs).
-3. Leave the browser **open**.
-4. Run the setup over the existing install:
-   `RemoteControl-Setup-vX.Y.Z.exe /VERYSILENT /NORESTART /SUPPRESSMSGBOXES /LOG="%TEMP%\t.log"`
-5. Record `%ERRORLEVEL%` immediately.
-6. Search `%TEMP%\t.log` for `ErrorReplacingExistingFile`.
-7. Watch the server log after relaunch: does the extension reconnect, and what `extVersion` does its `ext.hello` report?
+**Fact B — was the server exe actually replaced.**
 
-### What each answer changes
+> Yes. `RemoteControl.exe` reported **1.5.1** after round 1 and **1.5.2** after round 2. Independent corroboration: the installed `background.js` contained `chrome.runtime.reload` after round 1 — a string that exists only in the build made that day — proving the extension files were genuinely overwritten underneath a running Chrome rather than skipped or deferred.
 
-- **A shows a replace failure AND B shows the server exe was NOT replaced** → the Pattern 5 mitigation is load-bearing; the comment in `RemoteControl.iss` changes from "may hold a write lock" to "does hold a write lock, observed".
-- **A shows a failure but B shows the server was replaced anyway** → the mitigation is advisable, not load-bearing.
-- **A is clean** → the flags stay as cheap insurance and the comment records that the lock was NOT reproduced on this machine.
-- **C** decides whether SC7 is met outright or only in its degraded form ("Restart your browser to finish updating"). Either way the feature degrades rather than breaks — but the claim must follow the observation, not the code.
+**Fact C — does the extension report the NEW version after the reload.**
 
-**Nothing in the shipped code is waiting on this.** Both branches of Task 3's installer decision produce the same two flags, which is why Tasks 2 and 3 were completed rather than parked. What is waiting is the SC7 claim and the confirmed/not-reproduced wording of one comment.
+> **Yes.** After round 2 the `chrome://extensions` card flipped from 1.5.1 to **1.5.2 on its own**, with the reload button untouched. The installed `manifest.json` reads `"version": "1.5.2"`.
 
-**When the facts are reported, this section is replaced with them verbatim** and the SC7 line below is settled.
+### What the facts settle
+
+- **The Chrome write lock was NOT reproduced.** "Need to restart Windows? No" is the sharpest evidence: had any file been locked, the `restartreplace` flag would have deferred it to a next-boot replacement and Inno would have flagged a restart. It did not. Chrome does not appear to hold a write lock on an unpacked extension directory on this version.
+- **The mitigation stays anyway**, per the plan's own instruction for a clean result: one machine and one Chrome version is not a general proof, the flags cost nothing, and the failure they prevent takes down the whole update rather than just the extension. `RemoteControl.iss`'s comment now records the observation as *not reproduced* rather than *confirmed*, with the environment stated so a future reader can judge how far it generalises.
+- **SC7 is met outright**, not in its degraded form. The "Restart your browser to finish updating" fallback exists and is correct, but is not the normal outcome.
+
+### One failed attempt, recorded because it is instructive
+
+The first run of round 1 returned **exit code 1** with no `ErrorReplacingExistingFile`. Cause, from the log:
+
+```
+Defaulting to Cancel for suppressed message box (OK/Cancel):
+Setup has detected that Remote Control is currently running.
+Please close all instances of it now, then click OK to continue, or Cancel to exit.
+Got EAbort exception.
+```
+
+The server was still running and holding `AppMutex=RemoteControl.SingleInstance`; under `/SUPPRESSMSGBOXES` that prompt defaults to Cancel and aborts the whole install before touching a file. This is **exactly the failure mode `apply.rs` documents as T-12-29**, and it confirms that analysis was right — which is why the real update path's helper script waits for the server PID to exit before launching Setup, and passes `/SUPPRESSMSGBOXES` anyway so a still-held mutex yields a decodable non-zero exit instead of a modal dialog stranded on the desktop. The manual procedure simply omitted the "stop the server first" step that the shipping code performs automatically. Not a product defect; a gap in the hand-run instructions.
 
 ## Performance
 
@@ -230,9 +245,9 @@ See `key-decisions` in the frontmatter. The four a later plan should not re-liti
 
 ## Known Stubs
 
-None in code.
+None in code, and no outstanding observations — Task 1's facts A, B and C are recorded above.
 
-**One outstanding observation**, recorded above: Task 1's facts A, B and C.
+**One machine-state note for `12-18`.** The Task 1 procedure left this PC running a **throwaway 1.5.2 test build** (`dist\RemoteControl-Setup-v1.5.1.exe` and `-v1.5.2.exe`, built from the tree and gitignored; the tree itself was reverted to 1.5.0 immediately afterwards). The updater refuses anything that is not strictly newer than what is installed (`pre_fetch_refusal` → `Downgrade`), so a real 1.5.x release will be refused on THIS machine until it is either uninstalled or the release version exceeds 1.5.2. Not a product issue — an artefact of testing with fabricated versions — but it will look like a bug during `12-18`'s UAT if nobody remembers.
 
 ## Success Criteria
 
@@ -240,8 +255,8 @@ None in code.
 |-----------|--------|
 | The reload guard fires once per target version per process run and is proven not to loop | **MET** — asserted by socket test |
 | The extension arm exists and is pinned by a source-text guard test | **MET** — mutation check performed |
-| The installer can no longer be aborted in full by a single locked extension file | **MET in code**; the lock itself is unobserved (Task 1 fact A) |
-| SC7 — the extension runs the new version after a PC update without touching `chrome://extensions` | **NOT OBSERVED.** Every mechanism is in place and tested, but the end-to-end outcome depends on Task 1 fact C. Do not claim SC7 until it is reported. |
+| The installer can no longer be aborted in full by a single locked extension file | **MET in code**; the lock itself was **not reproduced** (Task 1 fact A), so the flags are insurance rather than load-bearing |
+| SC7 — the extension runs the new version after a PC update without touching `chrome://extensions` | **OBSERVED MET** (Task 1 fact C, 2026-08-05). The card flipped 1.5.1 → 1.5.2 unaided after a real silent upgrade with the browser open. Holds from the SECOND update onward; the first update to a reload-capable extension cannot auto-reload, because the arm ships in the build being replaced. |
 
 ## Threat Flags
 
@@ -267,6 +282,6 @@ For `12-18`:
 - Task 1 of this plan can be folded into `12-18`'s UAT session — it is the same kind of activity (a real installer run on a real machine) and the phone is already in hand for the rest of it.
 - The `ext.reload` path is only exercisable end to end with a real browser holding a real unpacked extension, which is the same session again.
 
-## Self-Check: PARTIAL
+## Self-Check: PASSED
 
-All six files exist on disk with the described contents, and both code commits (`1f147e1`, `23027e6`) are present in `git log`. **Task 1 is not done**, and this summary says so in four places rather than burying it.
+All six files exist on disk with the described contents, and both code commits (`1f147e1`, `23027e6`) are present in `git log`. Task 1 was performed on 2026-08-05 and its three facts are recorded verbatim above; SC7 is claimed on the strength of that observation, not of the code.

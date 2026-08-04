@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 12
-stopped_at: 12-16-PLAN.md code-complete; its Task 1 human-action checkpoint OUTSTANDING
-last_updated: "2026-08-04T15:20:00.000Z"
-last_activity: 2026-08-04 -- 12-16 tasks 2+3 done (the ext.reload nudge, its guard, the installer hardening); TASK 1 IS A BLOCKING HUMAN OBSERVATION AND IS NOT DONE -- SC7 is not claimed
+stopped_at: Completed 12-16-PLAN.md (Task 1 checkpoint CLOSED, SC7 observed met)
+last_updated: "2026-08-05T00:20:00.000Z"
+last_activity: 2026-08-05 -- 12-16 COMPLETE; the extension auto-updated itself after a real PC update with the browser open. SC7 OBSERVED MET. Only 12-18 remains.
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 106
-  percent: 98
+  completed_plans: 107
+  percent: 99
 ---
 
 # Project State
@@ -29,26 +29,32 @@ Phase: 12 (in-app-updates) — EXECUTING
 Plan: 16 of 18 (17 SUMMARY files on disk; the plain counter above is a
 sequence number, not the completed count)
 
-**CHECKPOINT 2 IS OPEN — 12-16 Task 1, a blocking human observation.** The
-owner must run a real setup exe over a live install with Chrome holding the
-loaded unpacked extension, and report three facts: (A) the exit code and
-whether `%TEMP%\t.log` contains `ErrorReplacingExistingFile`, (B) whether the
-server exe was actually replaced, (C) whether the extension's `ext.hello`
-reports the NEW version afterwards. The full procedure is in
-`12-16-SUMMARY.md`. **SC7 IS NOT CLAIMED** until fact C is reported. No code
-is waiting on it — both branches of the installer decision produce the same
-flags — only the SC7 claim and one comment's wording.
+**CHECKPOINT 2 IS CLOSED.** 12-16's Task 1 was observed on 2026-08-05: two
+back-to-back silent upgrades (1.5.0→1.5.1→1.5.2) with Chrome holding the
+unpacked extension. Exit code 0 both times, no `ErrorReplacingExistingFile`,
+no Abort/Retry/Ignore, "Need to restart Windows? No" — so the Chrome write
+lock was **NOT REPRODUCED** and nothing even reached the deferred-replacement
+path. The server exe WAS replaced (1.5.1 then 1.5.2), and the extension card
+flipped 1.5.1 → 1.5.2 **on its own**. **SC7 IS OBSERVED MET.** Facts verbatim
+in `12-16-SUMMARY.md`.
 
-Next: WAVE 8 — `12-18` (the version bumps and the full UAT). It is
-`autonomous: false` and needs a physical Android phone on the LAN with the
-install-unknown-apps grant DECLINED once. 12-16's Task 1 folds naturally into
-that same session: same machine, same installer run, same browser.
+Next: WAVE 8 — `12-18` (the version bumps and the full UAT), the LAST plan of
+the phase. `autonomous: false`; needs a physical Android phone on the LAN with
+the install-unknown-apps grant DECLINED once.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) — DONE · W2
   `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` — DONE
   2026-08-04 · W4 `12-10,12-11` — DONE 2026-08-04 · W5 `12-12,12-14` — DONE
-  2026-08-04 · W6 `12-13,12-15,12-17` — DONE 2026-08-04 · W7 `12-16` CODE-DONE
-  / Task 1 checkpoint OPEN · W8 `12-18` PENDING.
+  2026-08-04 · W6 `12-13,12-15,12-17` — DONE 2026-08-04 · W7 `12-16` — DONE
+  2026-08-05 · W8 `12-18` PENDING.
+
+  ⚠ **BEFORE 12-18's UAT: this PC has a throwaway 1.5.2 test build
+  installed.** The Task 1 procedure installed fabricated 1.5.1 then 1.5.2
+  builds (`dist/` only, gitignored; the tree was reverted to 1.5.0
+  immediately). `pre_fetch_refusal` refuses anything not strictly newer than
+  what is installed, so a real 1.5.x release will be REFUSED as `Downgrade` on
+  this machine until it is uninstalled or the release exceeds 1.5.2. It will
+  look like a bug during UAT if nobody remembers.
 
   WAVE 7 (12-16) RESULT — **THE EXTENSION RELOADS ITSELF, EXACTLY ONCE.**
   `ExtCmd::Reload` + `reload_frame()` + the pure `should_nudge()` land in
@@ -85,6 +91,19 @@ that same session: same machine, same installer run, same browser.
 
   - **`server-core/src/executors/mod.rs` was in 12-16's `files_modified` and
     needed no change.** `ExtInfo` already landed there in 12-12.
+
+  - **SC7 holds from the SECOND update onward, not the first.** The
+    `ext.reload` arm ships INSIDE the extension, so the build already loaded
+    in the browser when an update lands is the one being replaced — it has no
+    arm and falls into `default: break`. Observed and expected. Do not read a
+    first-update non-reload as a defect.
+
+  - **Running Setup by hand needs the server stopped first.** The observation
+    hit exit code 1 with `Got EAbort exception` because `AppMutex` +
+    `/SUPPRESSMSGBOXES` defaults the "please close it" prompt to Cancel and
+    aborts the whole install — exactly the T-12-29 failure `apply.rs`
+    documents. The shipping path is fine (the helper waits for the PID), but
+    any manual run must `taskkill /IM RemoteControl.exe` first.
 
   WAVE 6 (12-17) RESULT — **THE PC CAN UPDATE ITSELF FROM ITS OWN
   WINDOW.** `ShellCtx` gained `update_cmd` / `update_progress` /
