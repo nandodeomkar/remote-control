@@ -401,7 +401,7 @@ Plans:
 **Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
 **Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
 **Depends on:** Phase 11
-**Plans:** 13/18 plans executed
+**Plans:** 14/18 plans executed
 
 **Success Criteria** (what must be TRUE):
 
@@ -445,7 +445,7 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 12-13-PLAN.md — router arms, executor binding, the authed-gated progress push, the atomic 1.8 bump, and the SC6/SC8 integration tests (wave 6)
+- [x] 12-13-PLAN.md — router arms, executor binding, the authed-gated progress push, the atomic 1.8 bump, and the SC6/SC8 integration tests (wave 6)
 - [ ] 12-15-PLAN.md — Updates screen, the Settings nav row, both badge placements, the install-permission sheet, and widget tests over the whole state matrix (wave 6)
 - [ ] 12-17-PLAN.md — PC settings `UPDATES` section: the D-06 fallback that performs its own feed check and shares the phone path's handles (wave 6)
 

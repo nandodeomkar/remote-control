@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 12-11-PLAN.md
-last_updated: "2026-08-04T14:29:01.271Z"
-last_activity: 2026-08-04 -- Phase 12 execution started
+status: Executing Phase 12
+stopped_at: Completed 12-13-PLAN.md
+last_updated: "2026-08-04T15:20:00.000Z"
+last_activity: 2026-08-04 -- 12-13 complete (wave 6 started); the update family is on the wire and protoVersion is 1.8
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 102
-  percent: 92
+  completed_plans: 104
+  percent: 96
 ---
 
 # Project State
@@ -26,16 +26,65 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 13 of 18 (12 SUMMARY files on disk; the plain counter above is a
+Plan: 14 of 18 (14 SUMMARY files on disk; the plain counter above is a
 sequence number, not the completed count)
-Next: finish wave 5 — `12-14` is the remaining plan in it. Waves 1-4 are DONE
-and checkpoint 1 below is CLOSED: the mirror exists, is public, and carries a
+Next: finish wave 6 — `12-15` and `12-17` remain. Waves 1-5 are DONE and
+checkpoint 1 below is CLOSED: the mirror exists, is public, and carries a
 real release.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) — DONE · W2
   `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` — DONE
-  2026-08-04 · W4 `12-10,12-11` — DONE 2026-08-04 · W5 `12-12` DONE / `12-14`
-  PENDING · W6 `12-13,12-15,12-17` · W7 `12-16` · W8 `12-18`.
+  2026-08-04 · W4 `12-10,12-11` — DONE 2026-08-04 · W5 `12-12,12-14` — DONE
+  2026-08-04 · W6 `12-13` DONE / `12-15,12-17` PENDING · W7 `12-16` · W8
+  `12-18`.
+
+  WAVE 6 (12-13) RESULT — **THE UPDATE FAMILY IS ON THE WIRE AND
+  protoVersion IS 1.8.** `router.rs`'s 12-02 placeholder is gone: `update.check`
+  calls `exec.update.info()` once and replies exactly one `update.status`,
+  `update.apply` passes `&p.target` and nothing else and replies nothing, and
+  both joined `is_executor_bound`. `session.rs` gained the authed-gated
+  `update.changed()` push arm with the empty-stage sentinel filtered.
+  `SERVER_PROTO_VERSION`, `SPEC.md` line 3 + its §2 sentence, and BOTH pins in
+  `protocol/fixtures/beacon/01-valid.json` moved to `1.8` in one commit. Rust
+  workspace 300 passed / 0 failed / 2 ignored (was 293), `cargo build
+  --workspace` exit 0, zero warnings. Commits `a4deabd`, `73ce5f1`, `6cb9599`.
+
+  CARRIED FROM 12-13 — things a later plan must not rediscover:
+
+  - **`SERVER_PROTO_VERSION` is `"1.8"` now.** Any new fixture or test
+    asserting "the current server version" uses 1.8. The handshake still
+    compares only the MAJOR component, so `integration.rs`'s
+    `hello_challenge` deliberately still pins `"1.0"` — that is the SPEC §2
+    minor-mismatch test, not a stale value.
+
+  - **`protocol/schema/mouse-binary.md`'s title still says `protoVersion
+    1.7`** and that is CORRECT — it names the version the `0x03` zoom opcode
+    was introduced in, not the current one. Do not "fix" it.
+
+  - **The plan's acceptance criteria named `codec_fixtures_beacon`, which
+    does not exist.** `tests/fixtures.rs` has no beacon family. The real
+    gates are the unit test `encode_beacon_matches_valid_fixture_wire`
+    (`src/transport/beacon.rs:136`) and the Dart
+    `app/remote_control/test/beacon_test.dart`. Both were run green.
+
+  - **`is_executor_bound`'s doc comment is now the authoritative statement of
+    the SPEC §11 read exemption AND its one counter-example.** `update.check`
+    is a read that is deliberately NOT exempt (D-13). Do not move it into the
+    exemption list on the grounds that it is a read.
+
+  - **`Harness.update_exec: Arc<MockUpdate>` exists** in `integration.rs`.
+    Any later socket test that needs to seed `info()` or read `applies()`
+    uses it — do not construct a second `MockUpdate` and override
+    `Executors` again.
+
+  - **`update/mod.rs`'s `#![allow(dead_code)]` is STILL there.** 12-13 added
+    no caller for `UpdateCmd::Check`, `marker::write_pending`,
+    `download::download_to` or `feed::APK_ASSET_PREFIX`. Removal point is
+    still 12-17; re-probe rather than assume.
+
+  - Tooling note: a `cat >> file <<'EOF'` heredoc append of a large Rust test
+    block fails in this shell with `unexpected EOF while looking for matching
+    '`. Write the block to the scratchpad with the Write tool and `cat >>` it.
 
   WAVE 5 (12-12) RESULT — **THE UPDATE PATH IS WIRED.** `Executors.update` and
   `ServerDeps.update` exist and every harness constructs them; `run_ext` gained
