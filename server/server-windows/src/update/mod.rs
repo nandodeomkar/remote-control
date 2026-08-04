@@ -43,6 +43,7 @@
 
 pub mod download;
 pub mod feed;
+pub mod marker;
 
 /// The D-11 error vocabulary, as a Rust type.
 ///
