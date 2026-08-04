@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 12
-stopped_at: Completed 12-17-PLAN.md
+stopped_at: 12-16-PLAN.md code-complete; its Task 1 human-action checkpoint OUTSTANDING
 last_updated: "2026-08-04T15:20:00.000Z"
-last_activity: 2026-08-04 -- 12-17 complete, WAVE 6 CLOSED; the PC settings window has its own UPDATES section on the same update thread
+last_activity: 2026-08-04 -- 12-16 tasks 2+3 done (the ext.reload nudge, its guard, the installer hardening); TASK 1 IS A BLOCKING HUMAN OBSERVATION AND IS NOT DONE -- SC7 is not claimed
 progress:
   total_phases: 12
   completed_phases: 11
@@ -26,18 +26,65 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 17 of 18 (16 SUMMARY files on disk; the plain counter above is a
+Plan: 16 of 18 (17 SUMMARY files on disk; the plain counter above is a
 sequence number, not the completed count)
-Next: WAVE 7 — `12-16` (the ext.reload version-drift arm). It is
-`autonomous: false`, so it wants a review pass before it runs. Waves 1-6
-are DONE and checkpoint 1 below is CLOSED: the mirror exists, is public,
-and carries a real release.
+
+**CHECKPOINT 2 IS OPEN — 12-16 Task 1, a blocking human observation.** The
+owner must run a real setup exe over a live install with Chrome holding the
+loaded unpacked extension, and report three facts: (A) the exit code and
+whether `%TEMP%\t.log` contains `ErrorReplacingExistingFile`, (B) whether the
+server exe was actually replaced, (C) whether the extension's `ext.hello`
+reports the NEW version afterwards. The full procedure is in
+`12-16-SUMMARY.md`. **SC7 IS NOT CLAIMED** until fact C is reported. No code
+is waiting on it — both branches of the installer decision produce the same
+flags — only the SC7 claim and one comment's wording.
+
+Next: WAVE 8 — `12-18` (the version bumps and the full UAT). It is
+`autonomous: false` and needs a physical Android phone on the LAN with the
+install-unknown-apps grant DECLINED once. 12-16's Task 1 folds naturally into
+that same session: same machine, same installer run, same browser.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) — DONE · W2
   `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` — DONE
   2026-08-04 · W4 `12-10,12-11` — DONE 2026-08-04 · W5 `12-12,12-14` — DONE
-  2026-08-04 · W6 `12-13,12-15,12-17` — DONE 2026-08-04 · W7 `12-16` PENDING ·
-  W8 `12-18` PENDING.
+  2026-08-04 · W6 `12-13,12-15,12-17` — DONE 2026-08-04 · W7 `12-16` CODE-DONE
+  / Task 1 checkpoint OPEN · W8 `12-18` PENDING.
+
+  WAVE 7 (12-16) RESULT — **THE EXTENSION RELOADS ITSELF, EXACTLY ONCE.**
+  `ExtCmd::Reload` + `reload_frame()` + the pure `should_nudge()` land in
+  `ext.rs`; `run_ext` gained a `server_version` parameter (from
+  `server-windows`, never server-core's own library version) and a
+  never-reset `reload_attempted_for` guard. `background.js` gained
+  `case "ext.reload": chrome.runtime.reload()`, pinned by a new
+  `extension_guard.rs` test whose mutation check was performed (arm removed ⇒
+  red, restored ⇒ green). `RemoteControl.iss`'s extension `[Files]` entry now
+  schedules a Chrome-locked file for next-boot replacement instead of raising
+  an Abort that would take the whole install down under `/SUPPRESSMSGBOXES`.
+  7 new tests; ext_relay 25 passed (was 19), workspace 312 passed / 0 failed /
+  2 ignored. Commits `1f147e1`, `23027e6`.
+
+  CARRIED FROM 12-16 — things a later plan must not rediscover:
+
+  - **NEVER reset the reload guard.** Not on session end, not in
+    `reset_relay_watches`, not on a newest-wins replacement. The reload
+    CAUSES the reconnect that produces the second hello, so anything that
+    clears the guard reopens the loop it exists to close (T-12-56).
+
+  - **The guard is keyed on the SERVER's version**, not the extension's — the
+    question is "have I already asked for this target".
+
+  - **`ext_relay.rs`'s `HARNESS_SERVER_VERSION` is `"1.0.0"`**, chosen to
+    match the `extVersion` the pre-1.8 scenarios already send so they stay in
+    the no-nudge case. Drift tests use `spawn_relay_with_version`.
+
+  - **Three comments in this change deliberately avoid spelling tokens the
+    plan greps for a fixed count of** (`CARGO_PKG_VERSION` in ext.rs must be
+    0; `restartreplace` in the .iss must be 1; `deleteafterinstall` must be
+    0). Each says so at the point of omission. This is the SECOND time this
+    class of self-tripping gate has bitten — assume it will again.
+
+  - **`server-core/src/executors/mod.rs` was in 12-16's `files_modified` and
+    needed no change.** `ExtInfo` already landed there in 12-12.
 
   WAVE 6 (12-17) RESULT — **THE PC CAN UPDATE ITSELF FROM ITS OWN
   WINDOW.** `ShellCtx` gained `update_cmd` / `update_progress` /
