@@ -67,6 +67,17 @@ dependencies:
   # wakelock_plus; no new permission, no runtime surface beyond one platform
   # call.
   package_info_plus: ^10.2.1
+  # sha256 of the downloaded APK before it is ever handed to the installer
+  # (D-15/SC4). Dart has no built-in digest. `dart.dev` verified publisher,
+  # 160/160 pub points, source dart-lang/core, pure Dart with no platform
+  # channel and no native code; 3.0.7 re-checked against the pub.dev API at
+  # execution time (still latest, published 2025-11-04). The reason it is THIS
+  # package and not a wrapper: `Hash.startChunkedConversion` hashes a ~70 MB
+  # APK without ever holding a second copy in memory. This is the phase's ONLY
+  # new dependency -- the cache directory comes from the existing
+  # remote_control/installer channel, not path_provider, and the HTTP work uses
+  # dart:io HttpClient, not package:http.
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:
