@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 12
-stopped_at: Completed 12-12-PLAN.md
-last_updated: "2026-08-04T14:04:03.589Z"
+status: Ready to execute
+stopped_at: Completed 12-11-PLAN.md
+last_updated: "2026-08-04T14:29:01.271Z"
 last_activity: 2026-08-04 -- Phase 12 execution started
 progress:
   total_phases: 12
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 12 of 18 (12 SUMMARY files on disk; the plain counter above is a
+Plan: 13 of 18 (12 SUMMARY files on disk; the plain counter above is a
 sequence number, not the completed count)
 Next: finish wave 5 — `12-14` is the remaining plan in it. Waves 1-4 are DONE
 and checkpoint 1 below is CLOSED: the mirror exists, is public, and carries a
@@ -470,6 +470,7 @@ Progress: [██████████] 100% (11 of 11 phases complete; 90 of
 | Phase 12 P10 | 42min | 2 tasks | 7 files |
 | Phase 12 P11 | 32min | 3 tasks | 4 files |
 | Phase 12 P12 | 18min | 3 tasks | 9 files |
+| Phase 12 P14 | 35min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -686,6 +687,8 @@ Recent decisions affecting current work:
 - [Phase 12]: 12-11: UpdateCmd::Check terminates on uptodate in BOTH outcomes, carrying the resolved version only when it is strictly newer — D-10 is a closed vocabulary with no available stage; version-present is therefore the available signal for 12-17, and inventing a stage would mean amending SPEC 7, the schema and both codecs first
 - [Phase ?]: 12-12: ExtInfo is NOT a ServerDeps field — those fields exist to drive session push arms and ExtInfo drives none; WinUpdate takes its own Receiver clone in main.rs
 - [Phase ?]: 12-12: the update.progress watch Sender is an Arc shared by the update thread AND WinUpdate, so a busy/downgrade/stale refusal reaches the phone without queueing behind an in-flight 5 MB download
+- [Phase ?]: 12-14: UpdateRowState is one value-equal class over an exhaustive UpdateRowKind enum, not 15 sealed subclasses - the enum IS the UI-SPEC matrix, one operator== covers every variant, and 'actionable' being part of the value makes D-18 assertable
+- [Phase ?]: 12-14: pcDidNotReturn (D-25) reads the EXISTING reconnect FSM attempt counter (>=5) instead of starting a timer, honouring D-17's ban on a second reconnect path
 
 ### Pending Todos
 
@@ -750,6 +753,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-04T14:03:34.819Z
+Last session: 2026-08-04T14:28:51.973Z
 Stopped at: Completed 12-11-PLAN.md
 Resume file: None
