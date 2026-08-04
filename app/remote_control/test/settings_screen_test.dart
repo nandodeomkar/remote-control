@@ -26,6 +26,8 @@ import 'package:remote_control/settings/settings_screen.dart';
 import 'package:remote_control/store/device_list_store.dart';
 import 'package:remote_control/store/device_store.dart';
 import 'package:remote_control/theme/tokens.dart';
+import 'package:remote_control/update/update_providers.dart';
+import 'package:remote_control/update/updates_screen.dart';
 
 class _FakeSecureKv implements SecureKv {
   final Map<String, String> backing = {};
@@ -74,7 +76,11 @@ class _StubPairedList extends DeviceListNotifier {
 /// than whatever pubspec happens to say today.
 const String _kTestVersion = '9.9.9 (99)';
 
-Widget _host(DeviceStore store) => ProviderScope(
+/// The badge's semantics label as a substring pattern — see the note at its
+/// use site for why the whole-label form does not hold.
+final RegExp _kBadgeLabelPattern = RegExp(RegExp.escape(kUpdateBadgeSemantic));
+
+Widget _host(DeviceStore store, {bool badge = false}) => ProviderScope(
       overrides: [
         deviceStoreProvider.overrideWithValue(store),
         connectionServiceProvider.overrideWith(
@@ -84,9 +90,31 @@ Widget _host(DeviceStore store) => ProviderScope(
         // Keeps the About row off the package_info_plus platform channel,
         // which has no registrant under flutter_test (260729-42w).
         appVersionProvider.overrideWith((ref) async => _kTestVersion),
+        // 12-15: the badge's truth rule is 12-14's business and is proven
+        // there. Here it is an input, so the two placements can be asserted
+        // against a value the test sets rather than against a cache it has to
+        // arrange.
+        updateBadgeProvider.overrideWithValue(badge),
       ],
       child: const MaterialApp(home: SettingsScreen()),
     );
+
+/// Pumps the screen tall enough that the About group — last of the six — is
+/// actually laid out. The `ListView` builds lazily, so on the default 800x600
+/// viewport the Updates row would simply not exist to find.
+Future<void> _pumpTall(
+  WidgetTester t,
+  DeviceStore store, {
+  bool badge = false,
+}) async {
+  t.view.physicalSize = const Size(1000, 2400);
+  t.view.devicePixelRatio = 1.0;
+  addTearDown(t.view.resetPhysicalSize);
+  addTearDown(t.view.resetDevicePixelRatio);
+
+  await t.pumpWidget(_host(store, badge: badge));
+  await t.pump();
+}
 
 void main() {
   late DeviceStore store;
@@ -255,6 +283,79 @@ void main() {
     expect(await store.isPaired('guid-office-pc'), isFalse);
     final devices = await store.loadDevices();
     expect(devices.containsKey('guid-office-pc'), isFalse);
+  });
+
+  // -- 12-15: the Updates entry and the badge ---------------------------------
+
+  group('the Updates entry in the About group (12-15, D-06)', () {
+    testWidgets('is the first child of About, above the shipped Version row',
+        (t) async {
+      await _pumpTall(t, store);
+
+      expect(find.byType(UpdatesNavRow), findsOneWidget);
+      expect(find.text(kUpdatesTitle), findsOneWidget);
+
+      final heading = t.getTopLeft(find.text(kAboutHeading)).dy;
+      final updates = t.getTopLeft(find.text(kUpdatesTitle)).dy;
+      final version = t.getTopLeft(find.text(kVersionLabel)).dy;
+
+      expect(updates, greaterThan(heading),
+          reason: 'Updates lives inside the About group, not above it');
+      expect(version, greaterThan(updates),
+          reason: 'Updates is the FIRST child; Version stays below it');
+    });
+
+    testWidgets('leaves the shipped Version row present and unchanged',
+        (t) async {
+      await _pumpTall(t, store);
+
+      expect(find.text(kVersionLabel), findsOneWidget);
+      expect(find.text(_kTestVersion), findsOneWidget,
+          reason: 'the About row still renders the package version verbatim');
+    });
+
+    testWidgets('shows the badge dot when the badge provider is true',
+        (t) async {
+      await _pumpTall(t, store, badge: true);
+
+      expect(find.byType(UpdateBadgeDot), findsOneWidget);
+    });
+
+    testWidgets('shows no badge dot when the badge provider is false',
+        (t) async {
+      await _pumpTall(t, store, badge: false);
+
+      expect(find.byType(UpdateBadgeDot), findsNothing,
+          reason: 'the dot clears when nothing known is behind');
+    });
+
+    testWidgets('the badge carries the "Update available" semantics label',
+        (t) async {
+      // Disposed inline rather than via addTearDown: the framework's
+      // end-of-test handle check runs BEFORE tear-downs, so a deferred dispose
+      // fails the test it was meant to clean up after.
+      final handle = t.ensureSemantics();
+
+      await _pumpTall(t, store, badge: true);
+
+      // The dot draws no text, so without this label the state would be shown
+      // and never announced. Matched as a pattern rather than as a whole
+      // label: the row is an `InkWell`, so the dot's node is merged into the
+      // row's and the announced string carries the row title too.
+      expect(find.bySemanticsLabel(_kBadgeLabelPattern), findsWidgets);
+
+      handle.dispose();
+    });
+
+    testWidgets('and that label is absent when the dot is', (t) async {
+      final handle = t.ensureSemantics();
+
+      await _pumpTall(t, store, badge: false);
+
+      expect(find.bySemanticsLabel(_kBadgeLabelPattern), findsNothing);
+
+      handle.dispose();
+    });
   });
 
   testWidgets('the add/switch-PC entry pushes the device list screen',
