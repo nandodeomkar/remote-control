@@ -718,4 +718,203 @@ void main() {
           reason: 'answered pings never accumulate toward the dead limit');
     });
   });
+
+  group('ConnectionService — update seam (12-14, protoVersion 1.8)', () {
+    test('UpdateSnapshot value-equality over all three parts', () {
+      const a = UpdateSnapshot(
+        status: UpdateStatusSnapshot(serverVersion: '1.5.0', extConnected: true),
+        progress: UpdateProgressSnapshot(stage: 'downloading', pct: 42),
+      );
+      const b = UpdateSnapshot(
+        status: UpdateStatusSnapshot(serverVersion: '1.5.0', extConnected: true),
+        progress: UpdateProgressSnapshot(stage: 'downloading', pct: 42),
+      );
+      expect(a, b);
+      expect(a.hashCode, b.hashCode);
+      expect(a, isNot(const UpdateSnapshot(serverTooOld: true)));
+      expect(UpdateSnapshot.empty, const UpdateSnapshot());
+    });
+
+    test('update.status parks a value-equal snapshot and pings changes',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      var pings = 0;
+      final sub = h.service.changes.listen((_) => pings++);
+
+      h.channel.feed(const UpdateStatusMsg(
+        serverVersion: '1.4.0',
+        extConnected: true,
+        extVersion: '1.4.0',
+        lastUpdate: LastUpdate(target: '1.4.0', ok: true),
+      ));
+      await h.pump();
+
+      final status = h.service.updateSnapshot.status;
+      expect(status, isNotNull);
+      expect(status!.serverVersion, '1.4.0');
+      expect(status.extConnected, isTrue);
+      expect(status.extVersion, '1.4.0');
+      expect(status.lastUpdate?.ok, isTrue);
+      expect(pings, greaterThan(0), reason: 'the reply pings changes');
+
+      final first = h.service.updateSnapshot;
+      h.channel.feed(const UpdateStatusMsg(
+        serverVersion: '1.4.0',
+        extConnected: true,
+        extVersion: '1.4.0',
+        lastUpdate: LastUpdate(target: '1.4.0', ok: true),
+      ));
+      await h.pump();
+      expect(h.service.updateSnapshot, first,
+          reason: 'two identical replies are value-equal (no spurious rebuild)');
+
+      await sub.cancel();
+    });
+
+    test('update.progress parks the stage/pct/error snapshot', () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      h.channel.feed(const UpdateProgressMsg(
+        stage: 'downloading',
+        pct: 43,
+        version: '1.5.0',
+      ));
+      await h.pump();
+      expect(h.service.updateSnapshot.progress?.stage, 'downloading');
+      expect(h.service.updateSnapshot.progress?.pct, 43);
+
+      // The service records what the wire said — the closed D-11 vocabulary is
+      // interpreted by the update store, never here.
+      h.channel.feed(const UpdateProgressMsg(stage: 'failed', error: 'busy'));
+      await h.pump();
+      expect(h.service.updateSnapshot.progress?.stage, 'failed');
+      expect(h.service.updateSnapshot.progress?.error, 'busy');
+    });
+
+    test('sendUpdateCheck rides the reliable path with an empty payload',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      h.service.sendUpdateCheck();
+      await h.pump();
+
+      final sent = h.channel.sentMessages.whereType<UpdateCheckMsg>();
+      expect(sent, hasLength(1));
+      expect(sent.single.toPayload(), isEmpty);
+    });
+
+    test('sendUpdateApply carries a version and nothing else (T-12-01)',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      h.service.sendUpdateApply('1.5.0');
+      await h.pump();
+
+      final sent = h.channel.sentMessages.whereType<UpdateApplyMsg>();
+      expect(sent, hasLength(1));
+      expect(sent.single.target, '1.5.0');
+      // The one-key shape is the phone-side half of D-14: there is nowhere for
+      // a url, an asset name, a file name or a hash to be added.
+      expect(sent.single.toPayload().keys, ['target']);
+    });
+
+    test('err{unknownType} while a check is outstanding sets serverTooOld',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      h.service.sendUpdateCheck();
+      await h.pump();
+      h.channel.feed(const ErrMsg(
+        code: kUnknownTypeErrCode,
+        msg: 'Unknown message type.',
+      ));
+      await h.pump();
+
+      expect(h.service.updateSnapshot.serverTooOld, isTrue);
+      expect(h.service.updateSnapshot.status, isNull);
+    });
+
+    test('err{unknownType} with NO outstanding check leaves the flag alone',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      h.channel.feed(const ErrMsg(
+        code: kUnknownTypeErrCode,
+        msg: 'Unknown message type.',
+      ));
+      await h.pump();
+
+      expect(h.service.updateSnapshot.serverTooOld, isFalse,
+          reason: 'a refusal of some OTHER family is not an update verdict');
+      expect(h.service.lastError?.code, kUnknownTypeErrCode);
+    });
+
+    test('a server that answers update.status clears the too-old flag',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      h.service.sendUpdateCheck();
+      await h.pump();
+      h.channel.feed(const ErrMsg(code: kUnknownTypeErrCode, msg: 'nope'));
+      await h.pump();
+      expect(h.service.updateSnapshot.serverTooOld, isTrue);
+
+      h.service.sendUpdateCheck();
+      await h.pump();
+      h.channel.feed(
+          const UpdateStatusMsg(serverVersion: '1.8.0', extConnected: false));
+      await h.pump();
+
+      expect(h.service.updateSnapshot.serverTooOld, isFalse);
+      expect(h.service.updateSnapshot.status?.serverVersion, '1.8.0');
+    });
+
+    test('the update snapshot is CLEARED when the session drops', () async {
+      final h = Harness();
+      await connectAndAuth(h);
+
+      h.channel.feed(const UpdateStatusMsg(
+        serverVersion: '1.4.0',
+        extConnected: true,
+        extVersion: '1.4.0',
+      ));
+      h.channel.feed(const UpdateProgressMsg(stage: 'restarting'));
+      await h.pump();
+      expect(h.service.updateSnapshot.status, isNotNull);
+
+      // The PC update deliberately drops this socket (D-17).
+      await h.channel.incoming.close();
+      await h.pump();
+
+      expect(h.service.updateSnapshot, UpdateSnapshot.empty,
+          reason: 'a stale serverVersion must not outlive its session');
+    });
+
+    test('the reconnect attempt count is readable — and no NEW timer exists',
+        () async {
+      final h = Harness();
+      await connectAndAuth(h);
+      expect(h.service.reconnectAttempt, 0);
+
+      final scheduledBefore = h.scheduled.length;
+      h.service.sendUpdateApply('1.5.0');
+      await h.pump();
+      expect(h.scheduled.length, scheduledBefore,
+          reason: 'apply schedules NOTHING — D-17 forbids a second reconnect '
+              'path; the existing FSM rides the drop out');
+
+      await h.channel.incoming.close();
+      await h.pump();
+      expect(h.service.reconnectAttempt, 1,
+          reason: 'the EXISTING FSM counter is what D-25 reads');
+    });
+  });
 }

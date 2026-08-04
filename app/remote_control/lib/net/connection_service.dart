@@ -291,6 +291,160 @@ class InputBlockedSnapshot {
   int get hashCode => Object.hash(reason, at);
 }
 
+/// The `err` code a server that predates protoVersion 1.8 answers an
+/// `update.*` frame with (SPEC section 10: an unknown message type is refused
+/// and the session SURVIVES). Seeing it in reply to an update check is the
+/// only way the phone can learn the PC is too old to update itself (D-13).
+const String kUnknownTypeErrCode = 'unknownType';
+
+/// The last `update.status` reply (protoVersion 1.8, D-09), projected into a
+/// value-equal snapshot so the update store suppresses no-op rebuilds on
+/// identical replies (mirrors [VolumeSnapshot] discipline).
+///
+/// A projection rather than the raw [UpdateStatusMsg] because [RemoteMessage]
+/// has no value equality: two identical replies would otherwise compare
+/// unequal and rebuild three rows for no change.
+class UpdateStatusSnapshot {
+  /// Version of the running server, verbatim (D-05 — the server reads its own
+  /// `CARGO_PKG_VERSION`, it is never configured).
+  final String serverVersion;
+
+  /// Whether the browser extension is currently connected to the server.
+  final bool extConnected;
+
+  /// Version of the connected extension; null when it has never connected.
+  final String? extVersion;
+
+  /// Outcome of the PREVIOUS update attempt (D-12), or null when there is no
+  /// marker — the normal case, never an error.
+  final LastUpdate? lastUpdate;
+
+  /// Creates a snapshot.
+  const UpdateStatusSnapshot({
+    required this.serverVersion,
+    required this.extConnected,
+    this.extVersion,
+    this.lastUpdate,
+  });
+
+  /// Projects an `update.status` frame.
+  factory UpdateStatusSnapshot.fromMessage(UpdateStatusMsg msg) =>
+      UpdateStatusSnapshot(
+        serverVersion: msg.serverVersion,
+        extConnected: msg.extConnected,
+        extVersion: msg.extVersion,
+        lastUpdate: msg.lastUpdate,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is UpdateStatusSnapshot &&
+      other.serverVersion == serverVersion &&
+      other.extConnected == extConnected &&
+      other.extVersion == extVersion &&
+      other.lastUpdate == lastUpdate;
+
+  @override
+  int get hashCode =>
+      Object.hash(serverVersion, extConnected, extVersion, lastUpdate);
+}
+
+/// The last `update.progress` push (protoVersion 1.8, D-10), value-equal.
+///
+/// The server throttles progress to about one percent or 250ms; value
+/// equality is the second half of that guard — an unchanged tick that does
+/// arrive rebuilds nothing (T-12-49).
+class UpdateProgressSnapshot {
+  /// Closed-vocabulary stage name (D-10).
+  final String stage;
+
+  /// Download percentage; present on `downloading` only.
+  final int? pct;
+
+  /// Version being installed, when there is one.
+  final String? version;
+
+  /// Closed-vocabulary failure reason (D-11); present on `failed`.
+  final String? error;
+
+  /// Creates a snapshot.
+  const UpdateProgressSnapshot({
+    required this.stage,
+    this.pct,
+    this.version,
+    this.error,
+  });
+
+  /// Projects an `update.progress` frame.
+  factory UpdateProgressSnapshot.fromMessage(UpdateProgressMsg msg) =>
+      UpdateProgressSnapshot(
+        stage: msg.stage,
+        pct: msg.pct,
+        version: msg.version,
+        error: msg.error,
+      );
+
+  @override
+  bool operator ==(Object other) =>
+      other is UpdateProgressSnapshot &&
+      other.stage == stage &&
+      other.pct == pct &&
+      other.version == version &&
+      other.error == error;
+
+  @override
+  int get hashCode => Object.hash(stage, pct, version, error);
+}
+
+/// Everything this session has learned about updates: the last
+/// `update.status` reply, the last `update.progress` push, and whether this
+/// server refused `update.check` as an unknown type (D-13).
+///
+/// **Session-scoped by design.** It is cleared with the channel, so a
+/// `serverVersion` can never outlive the session that reported it — a stale
+/// one would let the Updates screen claim a PC is up to date after the user
+/// switched to a different PC.
+class UpdateSnapshot {
+  /// The last `update.status` reply, or null before the first one.
+  final UpdateStatusSnapshot? status;
+
+  /// The last `update.progress` push, or null when none has arrived.
+  final UpdateProgressSnapshot? progress;
+
+  /// True once this server answered an outstanding update check with
+  /// `err {code: "unknownType"}` — it predates protoVersion 1.8 (D-13).
+  final bool serverTooOld;
+
+  /// Creates a snapshot.
+  const UpdateSnapshot({
+    this.status,
+    this.progress,
+    this.serverTooOld = false,
+  });
+
+  /// The nothing-known state: what every session starts and ends on.
+  static const UpdateSnapshot empty = UpdateSnapshot();
+
+  /// This snapshot with [status] replaced (and the too-old flag cleared — a
+  /// server that answers `update.status` is by definition new enough).
+  UpdateSnapshot withStatus(UpdateStatusSnapshot value) =>
+      UpdateSnapshot(status: value, progress: progress);
+
+  /// This snapshot with [progress] replaced.
+  UpdateSnapshot withProgress(UpdateProgressSnapshot value) =>
+      UpdateSnapshot(status: status, progress: value, serverTooOld: serverTooOld);
+
+  @override
+  bool operator ==(Object other) =>
+      other is UpdateSnapshot &&
+      other.status == status &&
+      other.progress == progress &&
+      other.serverTooOld == serverTooOld;
+
+  @override
+  int get hashCode => Object.hash(status, progress, serverTooOld);
+}
+
 /// True when [a] is an RFC1918 private IPv4 address or 169.254/16 link-local
 /// (phone-hotspot cases). IPv4 only — everything else is refused.
 ///
@@ -358,6 +512,17 @@ class ConnectionService {
   String? _clipFetchReply;
   ErrMsg? _lastError;
   InputBlockedSnapshot? _inputBlocked;
+  UpdateSnapshot _updateSnapshot = UpdateSnapshot.empty;
+
+  /// Whether an `update.check` sent on THIS channel is still unanswered.
+  ///
+  /// The protocol carries no request ids, so there is no correlation
+  /// mechanism to bind an `err` to the send that provoked it. This flag is the
+  /// narrowest correlation available: an `unknownType` refusal is read as "too
+  /// old to update itself" ONLY while a check is outstanding. Every other
+  /// `unknownType` (a future message family this build sends and this server
+  /// does not know) leaves the update snapshot alone.
+  bool _updateCheckOutstanding = false;
 
   /// Liveness generation: bumping it invalidates any in-flight tick chain
   /// (the schedule seam has no cancel — stale ticks no-op on a gen mismatch).
@@ -481,6 +646,19 @@ class ConnectionService {
   /// this to know a NEW reply landed (vs a stale, unrelated `changes` ping).
   String? get clipFetchReply => _clipFetchReply;
 
+  /// Everything this session knows about updates (protoVersion 1.8): the last
+  /// `update.status` reply, the last `update.progress` push, and the
+  /// server-too-old flag. Never null — [UpdateSnapshot.empty] is the
+  /// nothing-known state. The update store reads this off a [changes] ping.
+  UpdateSnapshot get updateSnapshot => _updateSnapshot;
+
+  /// Consecutive transport-failure count from the reconnect FSM (0 while
+  /// authed). D-25 reads it INSTEAD of starting a timer: after a PC update the
+  /// socket drops, the existing FSM rides it out, and a high attempt count is
+  /// what "the PC never came back" looks like without a second reconnect path
+  /// (D-17).
+  int get reconnectAttempt => _fsm.attempt;
+
   /// The last `err` frame the server sent (windowGone / launchFailed etc.),
   /// or null. Screens surface it as a transient toast off a [changes] ping.
   ErrMsg? get lastError => _lastError;
@@ -558,6 +736,28 @@ class ConnectionService {
   /// FIFO, ≤10) during blips and flushed on auth (design spec §8).
   void sendReliable(RemoteMessage msg) {
     _policy.enqueueOrSendReliable(encodeMessage(msg), _addToSink);
+  }
+
+  /// Asks the PC what it and the extension are running (`update.check`, D-09).
+  ///
+  /// The payload is empty — everything the answer contains is resolved
+  /// server-side. Rides the existing reliable path, so a check tapped during a
+  /// blip flushes on reauth instead of being lost.
+  void sendUpdateCheck() {
+    _updateCheckOutstanding = true;
+    sendReliable(const UpdateCheckMsg());
+  }
+
+  /// Tells the PC to install [target] (`update.apply`, D-14).
+  ///
+  /// **One `String` parameter, and there will never be a second.** The server
+  /// resolves the asset URL and its sha256 itself from a compiled-in repo
+  /// constant and refuses anything supplied, implied or influenced by the
+  /// wire; a wire-supplied locator would turn a paired phone into arbitrary
+  /// code execution on the PC (T-12-01). There is deliberately no overload and
+  /// no options object, so a future caller has nowhere to put one.
+  void sendUpdateApply(String target) {
+    sendReliable(UpdateApplyMsg(target: target));
   }
 
   /// Attaches the discovery beacon stream: a sighting of the CURRENT target's
@@ -770,6 +970,28 @@ class ConnectionService {
       _notify();
       return;
     }
+    if (msg is UpdateStatusMsg) {
+      // The update.check reply (protoVersion 1.8, D-09): park the value-equal
+      // projection and ping the update store. Answering at all proves the
+      // server is new enough, so this also clears the too-old flag. S→C only,
+      // no payload logged (three public version strings, but SPEC §12 is a
+      // rule about payloads, not about which payloads look harmless).
+      _updateCheckOutstanding = false;
+      _updateSnapshot =
+          _updateSnapshot.withStatus(UpdateStatusSnapshot.fromMessage(msg));
+      _notify();
+      return;
+    }
+    if (msg is UpdateProgressMsg) {
+      // Live apply progress push (D-10). Parked verbatim: deciding which
+      // stages and which D-11 error codes may reach the screen is the update
+      // store's job (busy is swallowed, downgrade degrades) — the service
+      // records what the wire said and nothing more.
+      _updateSnapshot =
+          _updateSnapshot.withProgress(UpdateProgressSnapshot.fromMessage(msg));
+      _notify();
+      return;
+    }
     if (msg is ClipChangedMsg) {
       // D-03 live clipboard push: park the value-equal snapshot and ping the
       // clipboard store. S→C only — never routed to the driver, no payload
@@ -802,6 +1024,14 @@ class ConnectionService {
       // NOT returned early — a handshake-phase err{versionMismatch} must still
       // reach the driver below (handshake_fsm terminal-fail path).
       _lastError = msg;
+      if (msg.code == kUnknownTypeErrCode && _updateCheckOutstanding) {
+        // SPEC §10: a server that predates protoVersion 1.8 refuses the frame
+        // and KEEPS the session. That refusal is the only signal the phone
+        // gets, so it is recorded here (D-13) and the Updates screen renders
+        // both PC-side rows as "needs one more update by hand".
+        _updateCheckOutstanding = false;
+        _updateSnapshot = const UpdateSnapshot(serverTooOld: true);
+      }
       _notify();
     }
     final driver = _driver;
@@ -923,6 +1153,16 @@ class ConnectionService {
     // Volatile gating drops with the channel; the reliable queue is KEPT so
     // frames sent during a blip flush after the redial auths.
     _policy.authed = false;
+    // The update snapshot is session-scoped and dies WITH the session — unlike
+    // the volume/apps/tabs snapshots, which describe a PC that is still the
+    // same PC after a blip. A stale serverVersion outliving its session is the
+    // one way the Updates screen could claim a PC is up to date when the phone
+    // has since been pointed at a different one (or the PC has just installed
+    // the update it is being asked about). The re-check on reconnect is what
+    // repopulates it, and that re-check is also how a PC update is confirmed
+    // (D-17) — so clearing here is load-bearing, not hygiene.
+    _updateSnapshot = UpdateSnapshot.empty;
+    _updateCheckOutstanding = false;
   }
 
   void _notify() {
