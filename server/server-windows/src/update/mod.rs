@@ -41,6 +41,7 @@
 // really is dead.
 #![allow(dead_code)]
 
+pub mod apply;
 pub mod download;
 pub mod feed;
 pub mod marker;
