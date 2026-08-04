@@ -25,6 +25,7 @@ import 'package:remote_control/settings/app_version.dart';
 import 'package:remote_control/settings/settings_screen.dart';
 import 'package:remote_control/store/device_list_store.dart';
 import 'package:remote_control/store/device_store.dart';
+import 'package:remote_control/update/version.dart';
 
 class _FakeSecureKv implements SecureKv {
   final Map<String, String> backing = {};
@@ -81,6 +82,80 @@ void main() {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
     store = DeviceStore(secure: _FakeSecureKv(), prefs: _FakePrefsKv());
+  });
+
+  // -- The 12-14 split: one lookup, two renderings -------------------------
+
+  test('the bare provider returns exactly PackageInfo.version', () async {
+    final c = ProviderContainer(overrides: [
+      packageInfoProvider.overrideWith(
+        (ref) async =>
+            const PackageVersion(version: '1.4.0', buildNumber: '8'),
+      ),
+    ]);
+    addTearDown(c.dispose);
+
+    expect(await c.read(appBareVersionProvider.future), '1.4.0');
+  });
+
+  test('the bare version parses as a SemVer — the display string does not',
+      () async {
+    final c = ProviderContainer(overrides: [
+      packageInfoProvider.overrideWith(
+        (ref) async =>
+            const PackageVersion(version: '1.4.0', buildNumber: '8'),
+      ),
+    ]);
+    addTearDown(c.dispose);
+
+    final bare = await c.read(appBareVersionProvider.future);
+    expect(SemVer.tryParse(bare), isNotNull,
+        reason: 'this is the whole reason the split exists (D-05/D-26)');
+
+    // And the reason it could not simply reuse the display string:
+    final display = await c.read(appVersionProvider.future);
+    expect(SemVer.tryParse(display), isNull);
+  });
+
+  test('the formatted display string is UNCHANGED by the split', () async {
+    final c = ProviderContainer(overrides: [
+      packageInfoProvider.overrideWith(
+        (ref) async =>
+            const PackageVersion(version: '1.3.0', buildNumber: '4'),
+      ),
+    ]);
+    addTearDown(c.dispose);
+
+    // Byte-identical to what the About row shipped before this plan.
+    expect(await c.read(appVersionProvider.future), '1.3.0 (4)');
+  });
+
+  test('one override fixes BOTH renderings — they cannot disagree', () async {
+    final c = ProviderContainer(overrides: [
+      packageInfoProvider.overrideWith(
+        (ref) async =>
+            const PackageVersion(version: '9.9.9', buildNumber: '99'),
+      ),
+    ]);
+    addTearDown(c.dispose);
+
+    final bare = await c.read(appBareVersionProvider.future);
+    final display = await c.read(appVersionProvider.future);
+    expect(display, startsWith(bare));
+    expect(display, '9.9.9 (99)');
+  });
+
+  test('a package lookup failure reaches both providers as an error',
+      () async {
+    final c = ProviderContainer(overrides: [
+      packageInfoProvider.overrideWith(
+        (ref) async => throw Exception('no plugin registrant'),
+      ),
+    ]);
+    addTearDown(c.dispose);
+
+    await expectLater(c.read(appBareVersionProvider.future), throwsException);
+    await expectLater(c.read(appVersionProvider.future), throwsException);
   });
 
   test('formatAppVersion pairs the name with the build number', () {
