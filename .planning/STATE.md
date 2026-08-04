@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 12-02-PLAN.md
-last_updated: "2026-08-04T11:53:07.068Z"
+stopped_at: Completed 12-03-PLAN.md
+last_updated: "2026-08-04T12:58:02.007Z"
 last_activity: 2026-08-04 -- Phase 12 execution resumed (wave continue)
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 98
-  percent: 91
+  completed_plans: 99
+  percent: 92
 ---
 
 # Project State
@@ -26,14 +26,49 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 9 of 18
-Next: /gsd-execute-phase 12 --wave 3 — BUT see checkpoint 1 below; 12-03 T1
-needs the public mirror repo to exist before wave 3 can get past its first task.
+Plan: 10 of 18
+Next: /gsd-execute-phase 12 --wave 4 (`12-10,12-11`). Wave 3 is DONE — checkpoint
+1 below is CLOSED: the mirror exists, is public, and now carries a real release.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) — DONE · W2
-  `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` · W4
-  `12-10,12-11` · W5 `12-12,12-14` · W6 `12-13,12-15,12-17` · W7 `12-16` · W8
-  `12-18`.
+  `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` — DONE
+  2026-08-04 · W4 `12-10,12-11` · W5 `12-12,12-14` · W6 `12-13,12-15,12-17` ·
+  W7 `12-16` · W8 `12-18`.
+
+  WAVE 3 RESULT — **v1.5.0 IS PUBLISHED AND D-21 IS SATISFIED.** The mirror
+  `nandodeomkar/remote-control-releases` returns 200 anonymously with
+  `tag_name` `v1.5.0`, `draft` False, `prerelease` False, exactly three assets
+  (`RemoteControl-v1.5.0.apk`, `RemoteControl-Setup-v1.5.0.exe`,
+  `RemoteControl-Extension-v1.5.0.zip`), each `state: uploaded` and each
+  carrying a `sha256:` digest equal to what the build machine printed. Every
+  client-side plan from here on has a real feed to check against. Built from
+  `2cd05f5`; the script's bump commit is `b6d405d`; the three version files now
+  agree at `1.5.0` / `1.5.0+9` / `1.5.0`.
+
+  CARRIED FROM WAVE 3 — things 12-18 must not rediscover:
+
+  - **The mirror was created BARE** (a `default_branch` but zero branches), so
+    `gh release create` failed with `HTTP 422 Repository is empty` AFTER the
+    bump was committed, the tag was pushed and all three artifacts were built.
+    Fixed by seeding `main` with a README (`53f310a`). That failure mode is
+    permanently gone for this mirror, but **`tools/release.ps1` has no
+    empty-mirror preflight** — its probe only checks `/repos/<mirror>` is 200,
+    which a bare repo satisfies. Possible follow-up: a sixth preflight on
+    `size`/`default_branch`.
+
+  - **`release.ps1` is NOT idempotent after a publish-stage failure.** Once the
+    tag is pushed a re-run refuses at the tag check. The script prints the exact
+    `gh release create` line to finish by hand — use it. Do NOT delete the tag
+    and re-run (that rebuilds three artifacts for nothing).
+
+  - **v1.5.0 carries 12-09's `update/marker.rs` and `apply.rs`** because 12-09
+    landed first in the same wave. They compile in but are wired to nothing, so
+    they are inert. Accepted deviation from the plan objective, recorded in
+    12-03-SUMMARY.md.
+
+  - `v1.5.0` is the floor for every later version comparison. 12-18's `1.6.0`
+    and `1.6.1` must both be strictly greater or the script's argument refusal
+    throws — even under `-DryRun`.
 
   WAVE 2 RESULT (merged to master, post-merge gates green): Rust workspace 246
   passed / 0 failed / 2 ignored (was 207); `remote_protocol` 22/22;
@@ -380,6 +415,7 @@ Progress: [██████████] 100% (11 of 11 phases complete; 90 of
 | Phase 12 P01 | 35min | 3 tasks | 2 files |
 | Phase 12 P02 | 30min | 3 tasks | 16 files |
 | Phase 12 P09 | 25min | 3 tasks | 3 files |
+| Phase 12 P03 | 45min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -589,6 +625,8 @@ Recent decisions affecting current work:
 - [Phase 12]: protocol/fixtures/update/ mixes kinds: 01-09 are standard wire fixtures, 10-12 are special cases needing their own Rust and Dart loaders; README numbers them special cases 3/4/5 because 1 and 2 predate the phase
 - [Phase 12]: 12-09: update.log truncates at 64 KiB on server startup (RESEARCH Open Question 4 resolved to truncate, not accept-unbounded) because the cmd helper cannot join tracing-appender rotation
 - [Phase 12]: 12-09: the marker file is validated on read as untrusted input - a malformed target is discarded and an out-of-vocabulary error collapses to installer, because its contents travel to the phone via update.status
+- [Phase 12]: 12-03: v1.5.0 is live on the public mirror -- three digest-bearing assets, anonymous 200, produced by tools/release.ps1. D-21 satisfied: every client-side plan now has a real release to check against.
+- [Phase 12]: 12-03: the mirror repo was created bare, so gh release create returned 422 'Repository is empty' AFTER the tag was already pushed. Recovery seeded main with a README (53f310a), then ran the script's own printed gh line. release.ps1 has NO empty-mirror preflight and is non-idempotent once the tag is pushed -- 12-18 must not delete-and-rerun on a failed publish.
 
 ### Pending Todos
 
@@ -653,6 +691,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-04T11:52:46.722Z
-Stopped at: Completed 12-02-PLAN.md
+Last session: 2026-08-04T12:58:01.987Z
+Stopped at: Completed 12-03-PLAN.md
 Resume file: None
