@@ -32,12 +32,11 @@ pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
         blocked,
         tabs,
         bookmarks,
-        // 12-12 wires the seam; 12-13 consumes it. The update-progress watch
-        // arrives here but has no session arm yet — when the authed-gated
-        // `update.progress` push lands it threads into `run_session` exactly
-        // as `bookmarks` does. Bound by NAME rather than swallowed by `..` so
-        // a future ServerDeps field still has to be handled here explicitly.
-        update: _update,
+        // 12-12 wired the seam; 12-13 consumes it — the update-progress watch
+        // threads into `run_session` exactly as `bookmarks` does. Bound by
+        // NAME rather than swallowed by `..` so a future ServerDeps field
+        // still has to be handled here explicitly.
+        update,
     } = deps;
 
     loop {
@@ -72,6 +71,7 @@ pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
         let blocked = blocked.clone();
         let tabs = tabs.clone();
         let bookmarks = bookmarks.clone();
+        let update = update.clone();
         tokio::spawn(async move {
             let ws =
                 match tokio_tungstenite::accept_async_with_config(stream, Some(config)).await {
@@ -94,6 +94,7 @@ pub(super) async fn accept_loop(listener: TcpListener, deps: ServerDeps) {
                 blocked,
                 tabs,
                 bookmarks,
+                update,
             )
             .await;
         });

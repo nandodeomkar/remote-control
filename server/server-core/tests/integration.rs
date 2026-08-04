@@ -227,8 +227,7 @@ struct Harness {
     /// dropping it would close the watch and silently disable the
     /// `update.progress` branch 12-13 adds, which is precisely the
     /// `bm_tx` precedent (a local would drop at `start_server`'s exit).
-    /// Prefixed `_` because no test drives it yet; 12-13's suite renames it.
-    _update_tx: tokio::sync::watch::Sender<UpdateProgress>,
+    update_tx: tokio::sync::watch::Sender<UpdateProgress>,
     _server: tokio::task::JoinHandle<()>,
 }
 
@@ -273,7 +272,7 @@ async fn start_server() -> Harness {
         blocked_tx,
         tabs_tx,
         bm_tx,
-        _update_tx: update_tx,
+        update_tx,
         _server: server,
     }
 }
@@ -1509,4 +1508,129 @@ async fn bm_changed_authed_gate_silence_then_single_push() {
     assert!(!connected, "the ext disconnect reset must carry connected:false");
     assert!(nodes.is_empty(), "the disconnect reset must carry an empty node list");
     assert!(!truncated);
+}
+
+// ────────── update.progress push gating (phase 12, protoVersion 1.8) ─────
+
+/// Receive the next frame, requiring an `update.progress` push; returns the
+/// `p` object for field-level assertions.
+async fn recv_update_progress(ws: &mut WsClient) -> Value {
+    let v = recv_json(ws).await;
+    assert_eq!(v["t"], "update.progress", "expected an update.progress push, got: {v}");
+    v["p"].clone()
+}
+
+/// T-12-42 (the T-11-01 clone for phase 12): update progress that changes
+/// while the session is still pre-auth must push NOTHING to the
+/// unauthenticated peer, and the EMPTY-stage sentinel (T-12-46) must never
+/// reach the wire even for an authed one.
+///
+/// Four things are proven:
+/// 1. No after-auth snapshot — and here that is stronger than the bookmarks
+///    convention: progress is a TRANSITION event, so a snapshot would paint a
+///    finished (or failed) update onto a session that never asked for one.
+/// 2. Pre-auth silence across a real state change, plus the positive control
+///    (the pending change is delivered once the branch enables) proving the
+///    silence was the auth gate, not a dead channel.
+/// 3. Exactly one push per post-auth change, field-for-field, with `pct`
+///    present only for `downloading` (D-10).
+/// 4. The empty-stage default is skipped ENTIRELY — an advance back to
+///    `UpdateProgress::default()` produces no frame at all, and the session
+///    keeps working afterwards (so the skip is a skip, not a stall).
+#[tokio::test]
+async fn update_progress_authed_gate_silence_then_single_push() {
+    let h = start_server().await;
+
+    // ── 1. No after-auth snapshot ───────────────────────────────────────
+    let mut primed = authed_client(&h).await; // drains the D-03 vol snapshot
+    assert_no_frame(&mut primed, "unexpected update.progress snapshot at the auth transition")
+        .await;
+
+    // ── 2. Pre-auth silence (T-12-42) ───────────────────────────────────
+    let pin = h.auth.lock().unwrap().begin_pairing();
+    let mut ws = connect(h.addr).await;
+    let _nonce = hello_challenge(&mut ws).await; // state: AwaitingAuth
+
+    h.update_tx
+        .send(UpdateProgress {
+            stage: "checking".into(),
+            pct: None,
+            version: None,
+            error: None,
+        })
+        .expect("update watch alive");
+    assert_no_frame(&mut ws, "update.progress leaked to an unauthed session").await;
+
+    // ── 3. Positive control: pair on the SAME connection ────────────────
+    // pairOk → the D-03 vol.changed snapshot → the pending pre-auth change
+    // fires through the now-enabled branch (mirrors the bm.changed suite).
+    send_json(&mut ws, json!({"t": "pin", "seq": 2, "p": {"pin": pin}})).await;
+    let pair_ok = recv_json(&mut ws).await;
+    assert_eq!(pair_ok["t"], "pairOk", "expected pairOk after correct pin, got: {pair_ok}");
+    let _snapshot = recv_vol_changed(&mut ws).await; // D-03 vol snapshot
+    let p = recv_update_progress(&mut ws).await;
+    assert_eq!(p["stage"], "checking", "the pending pre-auth change must be delivered once");
+    assert_no_frame(&mut ws, "duplicate update.progress after the pending pre-auth change").await;
+
+    // ── 4. Exactly one push per post-auth change ────────────────────────
+    h.update_tx
+        .send(UpdateProgress {
+            stage: "downloading".into(),
+            pct: Some(42),
+            version: Some("1.6.0".into()),
+            error: None,
+        })
+        .expect("update watch alive");
+    let p = recv_update_progress(&mut ws).await;
+    assert_eq!(p["stage"], "downloading");
+    assert_eq!(p["pct"], 42, "pct belongs to downloading alone (D-10)");
+    assert_eq!(p["version"], "1.6.0");
+    assert!(
+        p.get("error").is_none(),
+        "a non-failed stage must omit error entirely (never null)"
+    );
+    assert_no_frame(&mut ws, "duplicate update.progress after a single post-auth change").await;
+
+    // A terminal failure carries the closed D-11 vocabulary and no pct.
+    h.update_tx
+        .send(UpdateProgress {
+            stage: "failed".into(),
+            pct: None,
+            version: Some("1.6.0".into()),
+            error: Some("checksum".into()),
+        })
+        .expect("update watch alive");
+    let p = recv_update_progress(&mut ws).await;
+    assert_eq!(p["stage"], "failed");
+    assert_eq!(p["error"], "checksum", "error draws from the closed D-11 vocabulary");
+    assert!(p.get("pct").is_none(), "only downloading carries pct (D-10)");
+
+    // ── 5. The empty-stage sentinel NEVER reaches the wire (T-12-46) ────
+    // `UpdateProgress::default()` carries an empty stage, which the D-10
+    // vocabulary cannot express. The watch DOES advance (the previous value
+    // was `failed`), so the branch fires — and publishes nothing.
+    h.update_tx
+        .send(UpdateProgress::default())
+        .expect("update watch alive");
+    assert_no_frame(
+        &mut ws,
+        "the empty-stage sentinel must be skipped entirely, not sent as an empty stage",
+    )
+    .await;
+
+    // …and the skip must not have stalled the branch: a real stage after it
+    // still arrives.
+    h.update_tx
+        .send(UpdateProgress {
+            stage: "uptodate".into(),
+            pct: None,
+            version: Some("1.6.0".into()),
+            error: None,
+        })
+        .expect("update watch alive");
+    let p = recv_update_progress(&mut ws).await;
+    assert_eq!(
+        p["stage"], "uptodate",
+        "skipping the sentinel must not disable the branch for the NEXT real stage"
+    );
 }

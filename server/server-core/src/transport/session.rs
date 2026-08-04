@@ -33,13 +33,13 @@ use super::{ClipState, VolumeState};
 use crate::codec::json::{
     AppsChangedPayload, AuthFailPayload, AuthOkPayload, BmChangedPayload, ChallengePayload,
     ClipChangedPayload, ErrPayload, InputBlockedPayload, Msg, PairOkPayload, TabsChangedPayload,
-    VolChangedPayload,
+    UpdateProgressPayload, VolChangedPayload,
 };
 use crate::codec::{binary, json};
 use crate::dispatch::AuthState;
 use crate::dispatch::held::HeldInput;
 use crate::dispatch::router::{self, SessionCtx};
-use crate::executors::{BookmarksState, Executors, TabsState, WindowInfo};
+use crate::executors::{BookmarksState, Executors, TabsState, UpdateProgress, WindowInfo};
 
 /// The server's protocol version (SPEC §2). Only the MAJOR component is
 /// compared against the client's `hello.protoVersion`. `pub` (re-exported
@@ -62,7 +62,17 @@ use crate::executors::{BookmarksState, Executors, TabsState, WindowInfo};
 /// view, open, star/unstar and remove, fed by the localhost extension leg
 /// (SPEC §15) — plus the optional tri-state `TabInfo.bookmarked` flag;
 /// minor bump, so 1.0–1.5 clients remain accepted (§2).
-pub const SERVER_PROTO_VERSION: &str = "1.7";
+/// 1.7 adds the additive `0x03` zoom binary opcode (quick 260731-euq) — a
+/// 1.0–1.6 server's strict decoder simply drops the frame under §9 rule 4, so
+/// the degradation is graceful and no JSON type was added.
+/// 1.8 adds the additive `update.*` family (phase 12) — `update.check`,
+/// `update.status`, `update.apply` and the `update.progress` S→C push, for
+/// in-app APK and PC self-update; minor bump, so 1.0–1.7 clients remain
+/// accepted (§2). **This literal is also embedded in the UDP beacon payload
+/// (`beacon.rs`) and pinned TWICE in
+/// `protocol/fixtures/beacon/01-valid.json` — changing it here without
+/// changing the fixture fails `codec_fixtures_beacon`.**
+pub const SERVER_PROTO_VERSION: &str = "1.8";
 const SERVER_PROTO_MAJOR: u64 = 1;
 
 /// POST-auth liveness deadline: an Authed session receiving NO inbound
@@ -107,6 +117,7 @@ pub(super) async fn run_session(
     mut blocked: watch::Receiver<u64>,
     mut tabs: watch::Receiver<TabsState>,
     mut bookmarks: watch::Receiver<BookmarksState>,
+    mut update: watch::Receiver<UpdateProgress>,
 ) {
     let (mut sink, mut stream) = ws.split();
 
@@ -157,6 +168,10 @@ pub(super) async fn run_session(
     // dropped (e.g. the ext listener failed to bind) → disable the branch,
     // never busy-loop.
     let mut bookmarks_alive = true;
+    // Same discipline for the update-progress watch (protoVersion 1.8):
+    // producer dropped (e.g. the update thread exited) → disable the branch,
+    // never busy-loop.
+    let mut update_alive = true;
     // The phone's `hello.device` name, captured when Hello is processed so
     // the pin (pairing) path can record it via `complete_pairing_named`
     // (D-04/A7). `None` until Hello arrives.
@@ -381,6 +396,43 @@ pub(super) async fn run_session(
                         }
                     }
                     Err(_) => bookmarks_alive = false,
+                }
+            }
+            // Phase-12 update.progress live push, authed-gated: byte-discipline
+            // clone of the bm.changed branch (threat T-12-42 — progress names
+            // the versions running on the owner's machine and must never cross
+            // to an unauthed socket; the `== AuthState::Authed` guard is THE
+            // gate). watch is latest-value-only, and coalescing is exactly
+            // right for a percentage: a dropped tick re-delivers as a NEWER
+            // one. Like bookmarks there is NO after-auth snapshot — progress
+            // is a transition event, not a state prime (see ServerDeps).
+            changed = update.changed(), if update_alive && ctx.auth_state == AuthState::Authed => {
+                match changed {
+                    Ok(()) => {
+                        // UpdateProgress owns Strings (not Copy): clone the
+                        // borrowed snapshot. borrow_and_update clears the
+                        // changed flag.
+                        let progress = update.borrow_and_update().clone();
+                        // The EMPTY-stage sentinel NEVER reaches the wire
+                        // (T-12-46): it is the watch's initial value, and the
+                        // D-10 vocabulary has no idle stage — publishing it
+                        // would put an out-of-vocabulary `stage` on a wire
+                        // whose only defined values are checking/downloading/
+                        // verifying/installing/restarting/uptodate/failed.
+                        // The flag is still cleared above, so the branch does
+                        // not re-fire.
+                        if !progress.stage.is_empty() {
+                            // WR-08: non-blocking try_send (see the vol
+                            // branch) — drop on a full queue, the
+                            // latest-value re-delivers (T-12-47).
+                            match tx.try_send(update_progress_frame(progress)) {
+                                Ok(()) => {}
+                                Err(mpsc::error::TrySendError::Full(_)) => {}
+                                Err(mpsc::error::TrySendError::Closed(_)) => break 'read,
+                            }
+                        }
+                    }
+                    Err(_) => update_alive = false,
                 }
             }
             incoming = stream.next() => {
@@ -744,6 +796,27 @@ fn bm_changed_frame(state: BookmarksState) -> Message {
             // "1.5 server always emits groups" posture); older clients drop
             // the unknown key per SPEC §1.
             truncated: Some(state.truncated),
+        }),
+        None,
+    ))
+}
+
+/// Build the `update.progress` push frame (protoVersion 1.8, phase 12,
+/// D-10/D-11).
+///
+/// There is NO after-auth snapshot for this family — progress is a transition
+/// event, and the empty-stage sentinel is filtered by the caller, so this
+/// function is only ever reached with a stage drawn from the D-10 vocabulary.
+/// Privacy backstop (T-12-42): the frame only ever leaves through the
+/// authed-gated select! branch above. `error` is the closed D-11 vocabulary —
+/// never a path, never a URL, never an HTTP status (SPEC §12).
+fn update_progress_frame(progress: UpdateProgress) -> Message {
+    Message::text(json::encode_msg(
+        &Msg::UpdateProgress(UpdateProgressPayload {
+            stage: progress.stage,
+            pct: progress.pct,
+            version: progress.version,
+            error: progress.error,
         }),
         None,
     ))

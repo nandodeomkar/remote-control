@@ -1,6 +1,6 @@
 # Remote Control Wire Protocol — SPEC
 
-**protoVersion:** `"1.7"`
+**protoVersion:** `"1.8"`
 **Status:** Locked contract. Both codecs (Rust `server-core`, Dart `remote_protocol`) are written against this document and proven byte-identical by the golden fixtures in `protocol/fixtures/`. No codec may adjust a fixture to match its own output.
 
 Transport: a single WebSocket connection per session carrying two frame kinds — JSON text frames (everything) and 9-byte binary frames (mouse hot path only). Discovery is UDP broadcast (out of scope for this document; see design spec §4).
@@ -29,7 +29,7 @@ Every JSON text frame is an object of the shape:
 
 ## 2. Versioning (D-06)
 
-- `protoVersion` is a `"major.minor"` string. Current version: `"1.7"`.
+- `protoVersion` is a `"major.minor"` string. Current version: `"1.8"`.
 - `hello` carries `protoVersion`. The server parses only the **major** component.
 - **Major mismatch:** the server replies `err` with `code:"versionMismatch"` and payload fields `serverVersion` and `clientVersion` (both `"major.minor"` strings), then closes the connection.
 - **Minor mismatch:** accepted. Peers simply do not use features the other side does not know; unknown fields and unknown types are handled by the strictness rules (§1, §10).
