@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Ready to execute
-stopped_at: Completed 12-03-PLAN.md
-last_updated: "2026-08-04T13:24:20.606Z"
+stopped_at: Completed 12-11-PLAN.md
+last_updated: "2026-08-04T13:42:58.608Z"
 last_activity: 2026-08-04 -- Phase 12 execution started
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 100
+  completed_plans: 101
   percent: 92
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 2 of 18
+Plan: 3 of 18
 Next: /gsd-execute-phase 12 --wave 4 (`12-10,12-11`). Wave 3 is DONE — checkpoint
 1 below is CLOSED: the mirror exists, is public, and now carries a real release.
 
@@ -417,6 +417,7 @@ Progress: [██████████] 100% (11 of 11 phases complete; 90 of
 | Phase 12 P09 | 25min | 3 tasks | 3 files |
 | Phase 12 P03 | 45min | 3 tasks | 5 files |
 | Phase 12 P10 | 42min | 2 tasks | 7 files |
+| Phase 12 P11 | 32min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -628,6 +629,9 @@ Recent decisions affecting current work:
 - [Phase 12]: 12-09: the marker file is validated on read as untrusted input - a malformed target is discarded and an out-of-vocabulary error collapses to installer, because its contents travel to the phone via update.status
 - [Phase 12]: 12-03: v1.5.0 is live on the public mirror -- three digest-bearing assets, anonymous 200, produced by tools/release.ps1. D-21 satisfied: every client-side plan now has a real release to check against.
 - [Phase 12]: 12-03: the mirror repo was created bare, so gh release create returned 422 'Repository is empty' AFTER the tag was already pushed. Recovery seeded main with a README (53f310a), then ran the script's own printed gh line. release.ps1 has NO empty-mirror preflight and is non-idempotent once the tag is pushed -- 12-18 must not delete-and-rerun on a failed publish.
+- [Phase 12]: 12-11: the update refusal ladder is three pure functions with zero I/O; a forged URL-shaped target refuses as stale with no network activity, and the ORDER is asserted by a test — SC6/T-12-01; is_valid_target is re-exported from download.rs and ordering uses server_core::version::compare_versions so there is only one version regex and one comparator
+- [Phase 12]: 12-11: the update thread exits via the crate's existing std::process::exit path after a 750 ms flush grace, not a plumbed graceful shutdown — the detached helper is already counting down its bounded 30-poll wait; the grace window lets the session loop flush the restarting stage before the socket drops (D-17)
+- [Phase 12]: 12-11: UpdateCmd::Check terminates on uptodate in BOTH outcomes, carrying the resolved version only when it is strictly newer — D-10 is a closed vocabulary with no available stage; version-present is therefore the available signal for 12-17, and inventing a stage would mean amending SPEC 7, the schema and both codecs first
 
 ### Pending Todos
 
@@ -692,6 +696,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-04T13:24:12.273Z
-Stopped at: Completed 12-03-PLAN.md
+Last session: 2026-08-04T13:42:58.589Z
+Stopped at: Completed 12-11-PLAN.md
 Resume file: None
