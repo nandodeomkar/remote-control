@@ -34,7 +34,30 @@
 //! [`UpdateError::Installer`] — paths and OS error strings go to `tracing` and
 //! `update.log` only, never to the wire (T-12-06).
 
-use std::path::Path;
+use std::os::windows::process::CommandExt;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+
+use super::UpdateError;
+use super::marker;
+
+/// The child gets no console and is not attached to this process's console
+/// (MS "Process Creation Flags"). Together with the null stdio below, this is
+/// what lets the helper outlive the process that spawned it without flashing
+/// a window on the owner's desktop mid-update.
+const DETACHED_PROCESS: u32 = 0x0000_0008;
+/// Second half of the same pair (MS "Process Creation Flags") — a console
+/// application started without a console window at all.
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// The installed exe's fixed name, shared VERBATIM with the installer.
+///
+/// `installer/RemoteControl.iss` defines `MyAppExeName "RemoteControl.exe"`
+/// and renames the build output to it via `DestName`, so the running process
+/// IS `{app}\RemoteControl.exe`. Changing this string on one side only would
+/// leave the helper relaunching a path that does not exist — change both or
+/// neither.
+const INSTALLED_EXE_NAME: &str = "RemoteControl.exe";
 
 /// Placeholder tokens in [`HELPER_TEMPLATE`], substituted by
 /// [`helper_script`]. The `__NAME__` shape exists so a missed substitution is
@@ -183,10 +206,147 @@ pub fn helper_script(
     text.replace('\n', "\r\n")
 }
 
+/// The exe the helper must relaunch: `{app}\RemoteControl.exe`, resolved from
+/// the PARENT of `current_exe()` rather than from `current_exe()` itself.
+///
+/// The two are the same path today — the installer renames the build output
+/// via `DestName`, so the running process already is `{app}\RemoteControl.exe`
+/// — but relying on that is fragile. Rebuilding from the directory plus the
+/// installer's fixed name keeps the relaunch correct if the exe is ever run
+/// from a differently-named copy, and it is the same directory the HKCU `Run`
+/// value points at.
+///
+/// Degrades rather than panics: an unresolvable `current_exe()` yields the
+/// bare name, which `start ""` resolves through the helper's search path. A
+/// failed relaunch is a disappointing update, not a crashed server.
+pub fn installed_exe() -> PathBuf {
+    match std::env::current_exe() {
+        Ok(p) => p
+            .parent()
+            .map_or_else(|| PathBuf::from(INSTALLED_EXE_NAME), |d| d.join(INSTALLED_EXE_NAME)),
+        Err(e) => {
+            tracing::warn!(
+                "update: could not resolve the current exe ({}); the helper will \
+                 relaunch by name only",
+                e.kind()
+            );
+            PathBuf::from(INSTALLED_EXE_NAME)
+        }
+    }
+}
+
+/// `%TEMP%\rc-update-<pid>.cmd` — the helper's own path.
+///
+/// Per-PID so two attempts (or a stale file from a previous run) can never
+/// share one script, and under `%TEMP%` because that is where a self-deleting
+/// throwaway belongs. T-12-30 accepts the residual: a local process able to
+/// rewrite `%TEMP%` between the write and the spawn already owns the machine.
+pub fn helper_script_path() -> PathBuf {
+    std::env::temp_dir().join(format!("rc-update-{}.cmd", std::process::id()))
+}
+
+/// Spawn the helper DETACHED and walk away.
+///
+/// Three deliberate choices:
+/// - `DETACHED_PROCESS | CREATE_NO_WINDOW` so the child survives this
+///   process's exit with no console window;
+/// - all three stdio handles null — an inherited handle would keep this
+///   process's pipes alive and can block the child's writes;
+/// - **the child is never waited on.** This process is about to exit, and
+///   `std::process::Child`
+///   has no `Drop` impl that kills the child, so simply dropping it is what
+///   lets the helper outlive us. Waiting would deadlock the very sequence the
+///   helper exists to perform: it is waiting for us to die.
+fn spawn_helper(script: &Path) -> std::io::Result<()> {
+    Command::new("cmd.exe")
+        .args(["/c", &script.to_string_lossy()])
+        .creation_flags(DETACHED_PROCESS | CREATE_NO_WINDOW)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()?;
+    Ok(())
+}
+
+/// Sequence the hand-off: pessimistic marker, helper script, detached spawn.
+///
+/// Called ONLY after [`super::download::verify_or_delete`] has succeeded —
+/// unverified bytes must never reach this function (T-12-27), and by the time
+/// that function returns an error the file is already gone.
+///
+/// # This function does NOT exit the process
+///
+/// Deliberately. The caller owns the exit so it can publish a final
+/// `update.progress {stage:"restarting"}` first and give the phone a chance to
+/// render it before the socket drops. An `exit` here would race that frame off
+/// the wire and leave the phone staring at `installing` until its reconnect
+/// FSM gave up (D-25).
+///
+/// # Errors
+///
+/// Every failure — a script that cannot be written, a `cmd.exe` that cannot be
+/// spawned — collapses to [`UpdateError::Installer`]. The underlying error is
+/// logged and dropped: the closed D-11 vocabulary is what reaches the wire,
+/// and an OS error string carrying a path is exactly what must not (T-12-06).
+pub fn begin_apply(target: &str, setup_path: &Path) -> Result<(), UpdateError> {
+    begin_apply_with(
+        target,
+        setup_path,
+        &marker::marker_path(),
+        &marker::update_log_path(),
+        &helper_script_path(),
+        &installed_exe(),
+        spawn_helper,
+    )
+}
+
+/// [`begin_apply`] with every path and the spawn itself injected, so the
+/// sequencing can be tested without touching `%APPDATA%` and — the part that
+/// matters — without starting a detached process that installs software.
+#[allow(clippy::too_many_arguments)]
+fn begin_apply_with(
+    target: &str,
+    setup_path: &Path,
+    marker_path: &Path,
+    log_path: &Path,
+    script_path: &Path,
+    exe_path: &Path,
+    spawn: impl Fn(&Path) -> std::io::Result<()>,
+) -> Result<(), UpdateError> {
+    // 1. PESSIMISTIC FIRST (D-16). From here on every way this process can die
+    //    — including ways that never reach line 2 — leaves an honest record,
+    //    and only the helper observing a zero exit code can improve it.
+    marker::write_pending_at(marker_path, target);
+
+    // 2. The script text is pure and validates the target again on the way in.
+    let text = helper_script(
+        std::process::id(),
+        setup_path,
+        exe_path,
+        marker_path,
+        log_path,
+        target,
+    );
+    if let Err(e) = std::fs::write(script_path, text) {
+        tracing::error!("update: could not write the helper script ({})", e.kind());
+        return Err(UpdateError::Installer);
+    }
+
+    // 3. Hand off. After this returns Ok the helper is already polling for our
+    //    PID to disappear.
+    if let Err(e) = spawn(script_path) {
+        tracing::error!("update: could not spawn the update helper ({})", e.kind());
+        let _ = std::fs::remove_file(script_path);
+        return Err(UpdateError::Installer);
+    }
+
+    tracing::info!("update: helper spawned; exiting to let the installer replace this exe");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     fn sample() -> String {
         helper_script(
@@ -352,5 +512,175 @@ mod tests {
             "the only command separator is the self-delete idiom"
         );
         assert!(s.contains("set \"TARGET=10.20.30\""));
+    }
+
+    /// A unique scratch directory per test — the suite runs threaded.
+    fn scratch_dir(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "rc-apply-test-{}-{tag}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("create scratch dir");
+        dir
+    }
+
+    /// The full sequence with the spawn stubbed out: the marker is written
+    /// FIRST and in its pessimistic form, and the script lands at the given
+    /// path with exactly the golden text.
+    ///
+    /// The stub asserts the ordering from inside the sequence — by the time
+    /// anything is spawned, the marker must already exist.
+    #[test]
+    fn begin_apply_writes_the_marker_before_the_script() {
+        let dir = scratch_dir("sequence");
+        let marker = dir.join("update-result.json");
+        let log = dir.join("update.log");
+        let script = dir.join("rc-update-test.cmd");
+        let setup = dir.join("RemoteControl-Setup-v1.6.0.exe");
+        let exe = dir.join("RemoteControl.exe");
+
+        let spawned = std::cell::Cell::new(false);
+        let got = begin_apply_with(
+            "1.6.0",
+            &setup,
+            &marker,
+            &log,
+            &script,
+            &exe,
+            |p: &Path| {
+                assert!(
+                    marker.exists(),
+                    "the pessimistic marker must exist before anything is spawned"
+                );
+                assert_eq!(p, script);
+                spawned.set(true);
+                Ok(())
+            },
+        );
+
+        assert!(got.is_ok());
+        assert!(spawned.get(), "the helper must be handed off");
+
+        // The marker is the pessimistic form, verbatim.
+        let marker_text = std::fs::read_to_string(&marker).unwrap();
+        assert!(marker_text.contains("\"target\":\"1.6.0\""));
+        assert!(marker_text.contains("\"ok\":false"));
+        assert!(marker_text.contains("\"error\":\"installer\""));
+
+        // The script is the golden text for these exact paths.
+        let script_text = std::fs::read_to_string(&script).unwrap();
+        assert_eq!(
+            script_text,
+            helper_script(std::process::id(), &setup, &exe, &marker, &log, "1.6.0")
+        );
+        assert!(script_text.contains(&format!("set \"PID={}\"", std::process::id())));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A script that cannot be written is `installer` — and the pessimistic
+    /// marker still survives, which is the whole point of writing it first.
+    #[test]
+    fn a_failed_script_write_is_installer_and_leaves_the_marker() {
+        let dir = scratch_dir("nowrite");
+        let marker = dir.join("update-result.json");
+        // A path under a directory that does not exist.
+        let script = dir.join("absent").join("rc-update-test.cmd");
+
+        let got = begin_apply_with(
+            "1.6.0",
+            &dir.join("setup.exe"),
+            &marker,
+            &dir.join("update.log"),
+            &script,
+            &dir.join("RemoteControl.exe"),
+            |_: &Path| panic!("the spawn must not be reached when the write failed"),
+        );
+
+        assert_eq!(got.unwrap_err(), UpdateError::Installer);
+        assert!(
+            marker.exists(),
+            "an interrupted sequence must still leave an honest record (D-16)"
+        );
+        assert!(!script.exists());
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// A failed spawn is `installer` too, the marker stays pessimistic, and
+    /// the orphaned script is cleaned up rather than left in `%TEMP%`.
+    #[test]
+    fn a_failed_spawn_is_installer_and_cleans_up_the_script() {
+        let dir = scratch_dir("nospawn");
+        let marker = dir.join("update-result.json");
+        let script = dir.join("rc-update-test.cmd");
+
+        let got = begin_apply_with(
+            "1.6.0",
+            &dir.join("setup.exe"),
+            &marker,
+            &dir.join("update.log"),
+            &script,
+            &dir.join("RemoteControl.exe"),
+            |_: &Path| {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "C:\\a\\path\\that\\must\\not\\travel",
+                ))
+            },
+        );
+
+        assert_eq!(
+            got.unwrap_err(),
+            UpdateError::Installer,
+            "every failure path collapses to the closed-vocabulary code"
+        );
+        assert_eq!(got.unwrap_err().code(), "installer");
+        assert!(marker.exists());
+        assert!(!script.exists(), "an unspawned helper must not be left behind");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The relaunch target is `{app}\RemoteControl.exe`, rebuilt from the
+    /// running exe's directory — the same directory, and the same fixed name
+    /// the installer's `DestName` produces.
+    #[test]
+    fn installed_exe_is_the_installer_name_in_the_current_directory() {
+        let got = installed_exe();
+        assert_eq!(got.file_name().unwrap(), INSTALLED_EXE_NAME);
+        assert_eq!(
+            got.parent().unwrap(),
+            std::env::current_exe().unwrap().parent().unwrap()
+        );
+    }
+
+    /// The installer defines this name; a rename on one side only breaks the
+    /// relaunch silently (the `mutex_name_matches_the_installer_contract`
+    /// template).
+    #[test]
+    fn installed_exe_name_matches_the_installer_contract() {
+        assert_eq!(INSTALLED_EXE_NAME, "RemoteControl.exe");
+    }
+
+    /// The helper's own path is per-PID and under `%TEMP%`.
+    #[test]
+    fn helper_script_path_is_per_pid_under_temp() {
+        let p = helper_script_path();
+        assert_eq!(p.parent().unwrap(), std::env::temp_dir());
+        assert_eq!(
+            p.file_name().unwrap().to_str().unwrap(),
+            format!("rc-update-{}.cmd", std::process::id())
+        );
+    }
+
+    /// The two creation flags are the documented MS values, asserted rather
+    /// than trusted to a comment.
+    #[test]
+    fn creation_flags_are_the_documented_values() {
+        assert_eq!(DETACHED_PROCESS, 8);
+        assert_eq!(CREATE_NO_WINDOW, 134_217_728);
     }
 }

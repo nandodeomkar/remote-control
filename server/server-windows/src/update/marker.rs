@@ -112,9 +112,10 @@ pub fn write_pending(target: &str) {
     write_pending_at(&marker_path(), target);
 }
 
-/// [`write_pending`] against an explicit path, so tests never touch the real
+/// [`write_pending`] against an explicit path, so tests — and
+/// [`super::apply::begin_apply`]'s own seam — never touch the real
 /// `%APPDATA%`.
-fn write_pending_at(path: &Path, target: &str) {
+pub(super) fn write_pending_at(path: &Path, target: &str) {
     debug_assert!(
         is_valid_target(target),
         "write_pending called with an unvalidated target: {target:?} — \
