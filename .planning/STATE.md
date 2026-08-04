@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 12
-stopped_at: Completed 12-15-PLAN.md
+stopped_at: Completed 12-17-PLAN.md
 last_updated: "2026-08-04T15:20:00.000Z"
-last_activity: 2026-08-04 -- 12-15 complete; the Updates screen, the Settings entry and both badge placements render the whole state matrix
+last_activity: 2026-08-04 -- 12-17 complete, WAVE 6 CLOSED; the PC settings window has its own UPDATES section on the same update thread
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 105
-  percent: 97
+  completed_plans: 106
+  percent: 98
 ---
 
 # Project State
@@ -26,17 +26,57 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 15 of 18 (15 SUMMARY files on disk; the plain counter above is a
+Plan: 17 of 18 (16 SUMMARY files on disk; the plain counter above is a
 sequence number, not the completed count)
-Next: finish wave 6 — only `12-17` remains. Waves 1-5 are DONE and
-checkpoint 1 below is CLOSED: the mirror exists, is public, and carries a
-real release.
+Next: WAVE 7 — `12-16` (the ext.reload version-drift arm). It is
+`autonomous: false`, so it wants a review pass before it runs. Waves 1-6
+are DONE and checkpoint 1 below is CLOSED: the mirror exists, is public,
+and carries a real release.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) — DONE · W2
   `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` — DONE
   2026-08-04 · W4 `12-10,12-11` — DONE 2026-08-04 · W5 `12-12,12-14` — DONE
-  2026-08-04 · W6 `12-13,12-15` DONE / `12-17` PENDING · W7 `12-16` · W8
-  `12-18`.
+  2026-08-04 · W6 `12-13,12-15,12-17` — DONE 2026-08-04 · W7 `12-16` PENDING ·
+  W8 `12-18` PENDING.
+
+  WAVE 6 (12-17) RESULT — **THE PC CAN UPDATE ITSELF FROM ITS OWN
+  WINDOW.** `ShellCtx` gained `update_cmd` / `update_progress` /
+  `update_busy` — the SAME `UpdateCmd` sender, `UpdateProgress` watch and busy
+  flag the phone-driven path uses, cloned in `main.rs` before they move into
+  `WinUpdate` and `ServerDeps`. `settings.rs` gained an `UPDATES` section
+  composed exactly like its `GENERAL` / `PAIRED DEVICES` siblings: the
+  `env!("CARGO_PKG_VERSION")` version line, a status line, and one action that
+  is `Check for updates` until the server resolves something newer and then
+  `Update now`. `update_status()` is the pure D-10-stage / D-11-code map,
+  returning a sentence plus a colour ROLE. 5 new tests; server-windows 115
+  passed (was 110), workspace 305 passed / 0 failed / 2 ignored, `cargo build`
+  clean with zero warnings. The `settings.rs` diff is 537 insertions and ZERO
+  deletions — no shipped line moved. Commits `22bbb43`, `4b11d3f`.
+
+  CARRIED FROM 12-17 — things a later plan must not rediscover:
+
+  - **The PC surface quotes the seven sentences from `shell/settings.rs`'s
+    `UPDATE_*` consts.** `update_copy_matches_the_phone_vocabulary` asserts
+    them byte-for-byte. Re-wording either surface fails that test on
+    purpose — it is the alarm, not a flake.
+
+  - **`UpdateProgress` carries NO asset size**, so the PC available line is
+    `{installed} → {latest}` with no `· {size}` clause. Adding one means
+    amending SPEC §7, the schema and both codecs first. Do not "restore" it
+    with a second feed fetch.
+
+  - **`restarting` renders `Restarting…` on the PC**, not the phone's
+    `Restarting on your PC…` — the window IS the PC. The `installer` failure
+    keeps its "Your PC" verbatim, because there it names this machine's
+    installed version and it IS a failure sentence.
+
+  - **`cargo fmt` is unavailable on this toolchain** (`1.97.0-x86_64-pc-
+    windows-msvc` has no rustfmt component). Match formatting by hand; no CI
+    step or plan criterion invokes it.
+
+  - **A long `git commit -m @'...'@` here-string breaks PowerShell arg
+    parsing when the message contains double quotes.** Use `git commit -F
+    <file>`.
 
   WAVE 6 (12-15) RESULT — **THE UPDATES SCREEN RENDERS THE WHOLE MATRIX.**
   `lib/update/updates_screen.dart` carries the copy contract as four pure
