@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: Executing Phase 12
-stopped_at: Completed 12-13-PLAN.md
+stopped_at: Completed 12-15-PLAN.md
 last_updated: "2026-08-04T15:20:00.000Z"
-last_activity: 2026-08-04 -- 12-13 complete (wave 6 started); the update family is on the wire and protoVersion is 1.8
+last_activity: 2026-08-04 -- 12-15 complete; the Updates screen, the Settings entry and both badge placements render the whole state matrix
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 104
-  percent: 96
+  completed_plans: 105
+  percent: 97
 ---
 
 # Project State
@@ -26,17 +26,58 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 14 of 18 (14 SUMMARY files on disk; the plain counter above is a
+Plan: 15 of 18 (15 SUMMARY files on disk; the plain counter above is a
 sequence number, not the completed count)
-Next: finish wave 6 — `12-15` and `12-17` remain. Waves 1-5 are DONE and
+Next: finish wave 6 — only `12-17` remains. Waves 1-5 are DONE and
 checkpoint 1 below is CLOSED: the mirror exists, is public, and carries a
 real release.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) — DONE · W2
   `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` — DONE
   2026-08-04 · W4 `12-10,12-11` — DONE 2026-08-04 · W5 `12-12,12-14` — DONE
-  2026-08-04 · W6 `12-13` DONE / `12-15,12-17` PENDING · W7 `12-16` · W8
+  2026-08-04 · W6 `12-13,12-15` DONE / `12-17` PENDING · W7 `12-16` · W8
   `12-18`.
+
+  WAVE 6 (12-15) RESULT — **THE UPDATES SCREEN RENDERS THE WHOLE MATRIX.**
+  `lib/update/updates_screen.dart` carries the copy contract as four pure
+  functions plus `UpdatesScreen`, `UpdateRow`, `CheckFooter`,
+  `InstallPermissionSheet` and `UpdateBadgeDot`; `settings_screen.dart` gained
+  `UpdatesNavRow` as the FIRST child of the existing About group with the
+  shipped `Version` row unmoved, and `hub_screen.dart` gained a `Positioned`
+  dot overlay on the existing gear (its size, colour and icon untouched, so the
+  app bar cannot reflow). 49 new screen tests + 6 Settings tests: all 15
+  `UpdateRowKind` values and all 17 matrix rows asserted for exact subtitle and
+  exact trailing slot, three rows always, row height identical across
+  available/downloading/failed, exactly one `Retry` and it lives in the footer,
+  no `kError`/`SnackBar`/`Dialog` in any state, the row body inert, and the D-19
+  sheet on all three exits. `flutter test` 832 passed (was 777), `flutter
+  analyze` clean. Commits `f6c4bdc`, `eef00dd`, `f2bea22`, `f1f70a6`.
+
+  CARRIED FROM 12-15 — things a later plan must not rediscover:
+
+  - **`pumpAndSettle` cannot be used on any screen carrying
+    `ConnectionHeaderChip`.** Its 500ms `Timer.periodic` calls `setState`, so a
+    frame is always scheduled and settling never terminates. Use explicit
+    `pump(Duration)` and unmount at the end of each test so the ticker is
+    cancelled before the pending-timer check.
+
+  - **The Extension row's trailing slot is empty in EVERY state, spinner
+    included.** The UI-SPEC matrix lists `checking` as "applies to: all" with a
+    busy spinner, but its trailing-slot table says Empty is used "always on the
+    Extension row". The second rule governs and `UpdateRow.neverActs`
+    implements it. Do not "fix" the missing spinner.
+
+  - **The seven fixed failure sentences live in
+    `lib/update/updates_screen.dart` as `kFail*` / `kSubtitle*` consts.**
+    `12-17`'s PC settings section must quote these, not re-write them (D-11).
+
+  - **The row body has NO recognizer by design** (T-12-51). The trailing
+    `TextButton`'s own internal `InkWell` is the row's only one — a test that
+    asserts "no InkWell in the row" is wrong; scope it to the title/subtitle.
+
+  - **`quietLaunchCheck()` is still uncalled.** The screen calls
+    `ensureChecked()` on mount, which is a different trigger. Wiring the launch
+    path is `12-18`'s scope.
 
   WAVE 6 (12-13) RESULT — **THE UPDATE FAMILY IS ON THE WIRE AND
   protoVersion IS 1.8.** `router.rs`'s 12-02 placeholder is gone: `update.check`
