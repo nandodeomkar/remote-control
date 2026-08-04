@@ -11,8 +11,8 @@ use tokio::time::Instant;
 use crate::auth::AuthManager;
 use crate::codec::binary::MouseFrame;
 use crate::codec::json::{
-    AppsListPayload, BmListPayload, ClipSetPayload, Decoded, ErrPayload, Msg, PongPayload,
-    TabsListPayload,
+    AppsListPayload, BmListPayload, ClipSetPayload, Decoded, ErrPayload, LastUpdatePayload, Msg,
+    PongPayload, TabsListPayload, UpdateStatusPayload,
 };
 use crate::dispatch::AuthState;
 use crate::dispatch::held::HeldInput;
@@ -321,24 +321,46 @@ pub fn route(
         // drop them defensively (the session FSM owns them).
         Msg::Hello(_) | Msg::Pin(_) | Msg::Auth(_) => Vec::new(),
 
-        // ── update.* (protoVersion 1.8) — NOT YET ROUTED ───────────────
-        // Plan 12-04 landed the codecs and the `UpdateExecutor` trait but
-        // deliberately did NOT add `update` to the `Executors` bundle — that
-        // change ripples into server-windows/src/main.rs and every test
-        // harness, and it belongs to 12-12. Plan 12-13 then replaces this
-        // placeholder with the real arms: `update.check` calls
-        // `exec.update.info()` and replies with one `update.status`,
-        // `update.apply` calls `exec.update.apply(&p.target)` and replies with
-        // nothing (D-14 — the target string is the ONLY value that crosses),
-        // and both join `is_executor_bound` (D-13: `update.check` is a read
-        // that is deliberately NOT pause-exempt).
+        // ── in-app updates (protoVersion 1.8, phase 12) ────────────────
+        // `update.check` is a read-with-reply (the `bm.list` shape) but it is
+        // NOT pause-exempt — see `is_executor_bound`'s doc comment for why
+        // (D-13).
         //
-        // Until then these decode fine and route nowhere: the type IS known,
-        // so `err{unknownType}` would be a lie, and there is no executor to
-        // reach yet. A phone on a server built from this commit sees no reply
-        // to `update.check` — the 1.8 flip in 12-13 is what makes the family
-        // live, which is exactly why SPEC.md still declares 1.7.
-        Msg::UpdateCheck(_) | Msg::UpdateApply(_) => Vec::new(),
+        // **`info()` TAKES the pending marker**, so this arm is the one and
+        // only place `lastUpdate` can appear: a marker is reported on exactly
+        // one `update.status` and never again (D-12). Calling `info()` twice
+        // here — or calling it anywhere else on the request path — would
+        // silently consume the marker and the owner would never see that the
+        // previous install failed.
+        Msg::UpdateCheck(_) => {
+            let info = exec.update.info();
+            vec![Msg::UpdateStatus(UpdateStatusPayload {
+                server_version: info.server_version,
+                ext_connected: info.ext_connected,
+                ext_version: info.ext_version,
+                last_update: info.last_update.map(|lu| LastUpdatePayload {
+                    target: lu.target,
+                    ok: lu.ok,
+                    error: lu.error,
+                }),
+            })]
+        }
+        // Fire-and-forget (SPEC §7): no reply, no err code — the whole
+        // outcome, including every refusal, arrives as `update.progress`
+        // pushes on the executor's own thread.
+        //
+        // **D-14 (threat T-12-01): `&p.target` is the ONLY value that
+        // crosses this boundary, and it is a version string.** The executor
+        // resolves the asset's download URL and its sha256 ITSELF, from a
+        // repo constant compiled into `server-windows` — a crate the codec
+        // cannot see. There is no field here in which a URL, filename, asset
+        // id or hash could travel, which is why `forged_apply_is_refused`
+        // asserts the exact recorded argument and `tests/update_guard.rs`
+        // fails the build if such a field is ever added.
+        Msg::UpdateApply(p) => {
+            exec.update.apply(&p.target);
+            Vec::new()
+        }
 
         // S→C-only types arriving FROM a client are known-but-invalid
         // direction: ignored silently (no unknownType — the type IS known;
@@ -364,6 +386,19 @@ pub fn route(
 /// and the read-only queries (`apps.list`, `clip.get`, `tabs.list`,
 /// `bm.list`) are exempt — a paused PC still answers reads, so the phone
 /// renders an honest list instead of an empty lie (D-03).
+///
+/// **`update.check` is the ONE read that is deliberately NOT exempt
+/// (protoVersion 1.8, D-13).** The exemption above exists because answering a
+/// list while paused is harmless: it describes the machine and offers nothing.
+/// `update.check` is different — it reports the version state of a machine
+/// that is about to be REPLACED, and the only thing the phone does with that
+/// answer is offer an install. Answering it while paused would advertise an
+/// action the session has just been told it may not take, and `update.apply`
+/// (which is executor-bound for the obvious reason) would then be dropped
+/// after the owner had already tapped. Both halves of the family therefore
+/// stop at the same gate. Do NOT "fix" `update.check` back into the read
+/// exemption list on the grounds that it is a read — it is, and that is not
+/// the criterion.
 fn is_executor_bound(msg: &Msg) -> bool {
     matches!(
         msg,
@@ -383,6 +418,9 @@ fn is_executor_bound(msg: &Msg) -> bool {
             | Msg::TabsActivate(_)
             | Msg::TabsClose(_)
             | Msg::BmOpen(_) | Msg::BmStar(_) | Msg::BmUnstar(_) | Msg::BmRemove(_)
+            // protoVersion 1.8 (D-13): the check as well as the apply — see
+            // the doc comment above for why the read is not exempt.
+            | Msg::UpdateCheck(_) | Msg::UpdateApply(_)
     )
 }
 
@@ -480,11 +518,12 @@ mod tests {
         BrowserPayload, ClickPayload, ClipGetPayload, ClipSetPayload, ConfirmPayload, DragPayload,
         ErrPayload, KeyPayload, MediaPayload, PingPayload, PongPayload, PowerPayload,
         PresentPayload, TabsActivatePayload, TabsClosePayload, TabsListPayload, TextPayload,
+        UpdateApplyPayload, UpdateCheckPayload, UpdateProgressPayload,
     };
-    use crate::executors::mock::{Call, MockExecutors};
+    use crate::executors::mock::{Call, MockExecutors, MockUpdate};
     use crate::executors::{
-        Apps, BmNode, Bookmarks, BookmarksState, Button, Executors, GroupInfo, KeyCode, Modifier,
-        TabInfo, Tabs, TabsState, WindowInfo,
+        Apps, BmNode, Bookmarks, BookmarksState, Button, Executors, GroupInfo, KeyCode, LastUpdate,
+        Modifier, TabInfo, Tabs, TabsState, UpdateExecutor, UpdateInfo, WindowInfo,
     };
     use std::sync::Arc;
 
@@ -676,7 +715,17 @@ mod tests {
 
     #[tokio::test]
     async fn paused_drops_every_executor_bound_family_silently() {
-        let (exec, log) = MockExecutors::recording();
+        let (base, log) = MockExecutors::recording();
+        // The update slot is NOT the shared CallLog (see MockUpdate's doc), so
+        // it needs its own handle for the "reached NO executor" assertion.
+        let update = Arc::new(MockUpdate::new());
+        update.set_info(UpdateInfo {
+            server_version: "1.5.0".into(),
+            ext_connected: true,
+            ext_version: Some("1.5.0".into()),
+            last_update: None,
+        });
+        let exec = Executors { update: Arc::clone(&update) as Arc<dyn UpdateExecutor>, ..base };
         let auth = auth();
         let mut ctx = ctx(AuthState::Authed);
         for msg in [
@@ -701,11 +750,20 @@ mod tests {
             Msg::BmStar(BmStarPayload { tab_id: 7 }),
             Msg::BmUnstar(BmUnstarPayload { tab_id: 7 }),
             Msg::BmRemove(BmRemovePayload { node_id: "1234".into() }),
+            // protoVersion 1.8 (D-13): the update family stops here TOO —
+            // including `update.check`, which is a read and is deliberately
+            // NOT in the SPEC §11 read-exemption list (see is_executor_bound).
+            Msg::UpdateCheck(UpdateCheckPayload {}),
+            Msg::UpdateApply(UpdateApplyPayload { target: "1.6.0".into() }),
         ] {
             let reply = route(d(msg), &mut ctx, &exec, &auth, true);
             assert!(reply.is_empty(), "paused executor-bound traffic must produce NO reply");
         }
         assert!(log.calls().is_empty(), "paused traffic must reach NO executor");
+        assert!(
+            update.applies().is_empty(),
+            "a paused session must NOT be able to start an install (T-12-45)"
+        );
     }
 
     /// SPEC §11 read exemption (BROW-01): tabs.list still answers while
@@ -918,6 +976,109 @@ mod tests {
             ],
             "each command must record exactly one call with its id unswapped"
         );
+    }
+
+    // ── update.* routing (protoVersion 1.8, phase 12) ──────────────────
+
+    /// Routing (protoVersion 1.8): unpaused `update.check` produces EXACTLY
+    /// one `update.status` carrying everything `info()` reported, and
+    /// `update.apply` produces ZERO reply frames while the executor records
+    /// the target string verbatim (D-14).
+    ///
+    /// The `bm_commands_route_when_unpaused` shape, extended with the read
+    /// half because this family — unlike `bm.*` — has one.
+    #[tokio::test]
+    async fn update_commands_route_when_unpaused() {
+        let (base, log) = MockExecutors::recording();
+        let update = Arc::new(MockUpdate::new());
+        update.set_info(UpdateInfo {
+            server_version: "1.5.0".into(),
+            ext_connected: true,
+            ext_version: Some("1.4.0".into()),
+            last_update: Some(LastUpdate {
+                target: "1.4.9".into(),
+                ok: false,
+                error: Some("installer".into()),
+            }),
+        });
+        let exec = Executors { update: Arc::clone(&update) as Arc<dyn UpdateExecutor>, ..base };
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+
+        let reply = route(d(Msg::UpdateCheck(UpdateCheckPayload {})), &mut ctx, &exec, &auth, false);
+        assert_eq!(
+            reply,
+            vec![Msg::UpdateStatus(UpdateStatusPayload {
+                server_version: "1.5.0".into(),
+                ext_connected: true,
+                ext_version: Some("1.4.0".into()),
+                last_update: Some(LastUpdatePayload {
+                    target: "1.4.9".into(),
+                    ok: false,
+                    error: Some("installer".into()),
+                }),
+            })],
+            "update.check must reply EXACTLY one update.status mapping info() field-for-field"
+        );
+
+        assert!(
+            route(
+                d(Msg::UpdateApply(UpdateApplyPayload { target: "1.6.0".into() })),
+                &mut ctx, &exec, &auth, false,
+            )
+            .is_empty(),
+            "update.apply is fire-and-forget: no reply, ever — every outcome \
+             arrives as an update.progress push"
+        );
+        assert_eq!(
+            update.applies(),
+            vec!["1.6.0".to_string()],
+            "the target string must reach the executor exactly once, verbatim (D-14)"
+        );
+        assert!(log.calls().is_empty(), "no OTHER executor may be touched by the update family");
+    }
+
+    /// Direction rule (SPEC §7): `update.status` and `update.progress` are
+    /// S→C-ONLY. A client that sends one is ignored SILENTLY — specifically
+    /// NOT `err{unknownType}`, because the type IS known, only the direction
+    /// is wrong. This is the `client_sent_bm_changed_ignored_without_err`
+    /// contract applied to the 1.8 family.
+    #[tokio::test]
+    async fn client_sent_update_pushes_ignored_without_err() {
+        let (base, log) = MockExecutors::recording();
+        let update = Arc::new(MockUpdate::new());
+        let exec = Executors { update: Arc::clone(&update) as Arc<dyn UpdateExecutor>, ..base };
+        let auth = auth();
+        let mut ctx = ctx(AuthState::Authed);
+
+        for msg in [
+            Msg::UpdateStatus(UpdateStatusPayload {
+                server_version: "9.9.9".into(),
+                ext_connected: true,
+                ext_version: None,
+                last_update: None,
+            }),
+            Msg::UpdateProgress(UpdateProgressPayload {
+                stage: "installing".into(),
+                pct: None,
+                version: Some("9.9.9".into()),
+                error: None,
+            }),
+        ] {
+            let reply = route(d(msg), &mut ctx, &exec, &auth, false);
+            assert!(
+                reply.is_empty(),
+                "an S→C-only update push sent BY a client gets NO reply, and in \
+                 particular no err{{code:\"unknownType\"}} — the type is known, the \
+                 direction is not (got: {reply:?})"
+            );
+            assert!(
+                !reply.iter().any(|m| matches!(m, Msg::Err(_))),
+                "no err of any code may be emitted for a wrong-direction update push"
+            );
+        }
+        assert!(log.calls().is_empty(), "wrong-direction update pushes must reach NO executor");
+        assert!(update.applies().is_empty(), "and must never reach the update executor either");
     }
 
     #[tokio::test]
