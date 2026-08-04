@@ -35,12 +35,23 @@
 //! appear anywhere under `server/server-core/`.
 
 // The submodules land across several plans (12-06 feed+download, 12-09
-// apply+marker, 12-11 the thread + `WinUpdate`). `update_thread` now consumes
-// most of what the others expose, but NOTHING consumes `WinUpdate` itself
-// until 12-12 puts it in `Executors` — and this is a BINARY crate, where `pub`
-// buys no dead-code exemption. REMOVE this allow in 12-12, once the bundle
-// wiring gives every public item in this subtree a real caller; after that,
-// dead code here really is dead.
+// apply+marker, 12-11 the thread + `WinUpdate`). This is a BINARY crate, where
+// `pub` buys no dead-code exemption.
+//
+// 12-12 wired `WinUpdate` into `Executors`, which was supposed to be this
+// allow's removal point — it is not. Probed with the allow removed, FOUR items
+// in this subtree still have no caller:
+//
+//   - `UpdateCmd::Check`      — 12-17's settings-window "Check for updates"
+//   - `marker::write_pending` — 12-09's writer, called only from the apply
+//                               pipeline's hand-off, which no test drives
+//   - `download::download_to` — superseded by `download_to_with_progress`;
+//                               kept as the no-callback convenience form
+//   - `feed::APK_ASSET_PREFIX` — the phone's asset name, resolved by the
+//                                phone itself; the server never fetches it
+//
+// REMOVE this allow in 12-17, once the settings window constructs
+// `UpdateCmd::Check` — and re-probe the other three then rather than assuming.
 #![allow(dead_code)]
 
 pub mod apply;

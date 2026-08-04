@@ -31,7 +31,9 @@ use std::sync::{Arc, Mutex};
 use anyhow::Context;
 use server_core::auth::pin::PIN_TTL_SECS;
 use server_core::auth::AuthManager;
-use server_core::executors::{BookmarksState, Executors, TabsState, WindowInfo};
+use server_core::executors::{
+    BookmarksState, Executors, ExtInfo, TabsState, UpdateProgress, WindowInfo,
+};
 use server_core::transport::{ClipState, ServerDeps, VolumeState};
 use server_core::transport::beacon::{self, BeaconIdentity};
 use server_core::transport::ext::{self, BookmarksRelay, ExtCmd, TabsRelay};
@@ -47,6 +49,8 @@ use executors::power::WinPower;
 use firewall::{BindProblem, FirewallStatus};
 use input_thread::Cmd;
 use shell::ShellCtx;
+use update::WinUpdate;
+use update::update_thread::{self, UpdateCmd};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -161,6 +165,13 @@ async fn main() -> anyhow::Result<()> {
     //     `bm.list`) and moved into ServerDeps below, which drives the
     //     authed-gated `bm.changed` push — exactly how `tabs_rx` is split.
     let (bm_tx, bm_rx) = tokio::sync::watch::channel(BookmarksState::default());
+    //     The ext-info watch (protoVersion 1.8, phase 12) is the THIRD channel
+    //     the same ext task produces into — filled from `ext.hello`'s
+    //     extVersion (D-09/D-18). It is the odd one out: it drives NO session
+    //     push arm, so it is deliberately absent from ServerDeps. Its only
+    //     consumer is WinUpdate, which reads it to answer `update.status`'s
+    //     extConnected/extVersion, so the receiver goes straight there.
+    let (ext_info_tx, ext_info_rx) = tokio::sync::watch::channel(ExtInfo::default());
     let (ext_cmd_tx, ext_cmd_rx) = tokio::sync::mpsc::channel::<ExtCmd>(16);
     //     The shell's settings window holds its own clone (07-08): its
     //     clipboard-sync checkbox flips the gate LIVE — clone BEFORE the
@@ -168,6 +179,31 @@ async fn main() -> anyhow::Result<()> {
     let clip_sync_enabled = Arc::new(std::sync::atomic::AtomicBool::new(cfg.clipboard_sync));
     let clip_sync_for_shell = Arc::clone(&clip_sync_enabled);
     std::thread::spawn(move || clip_thread::run_clip_thread(clip_cmd_rx, clip_tx, clip_sync_enabled));
+
+    // 3e. Dedicated update thread (12-11, D-05): owns ALL blocking update I/O
+    //     — the release-feed fetch, the ~5 MB asset download, the sha256
+    //     verification and the installer hand-off — because `ureq` is blocking
+    //     and a download on the tokio runtime would stall a runtime worker for
+    //     the whole transfer. It is the REAL producer for the `update.progress`
+    //     watch seam (12-13's authed-gated session arm is the consumer);
+    //     `update_rx` feeds ServerDeps below.
+    //
+    //     Two departures from the 3a-3c three-line shape, both deliberate:
+    //     the watch Sender is wrapped in an `Arc` and CLONED rather than moved
+    //     onto the thread, because `WinUpdate` publishes the immediate
+    //     pre-fetch refusals itself (a second tap must be answered `busy` now,
+    //     not 30 seconds later when the first download ends); and the busy
+    //     flag is shared so the thread can clear it at its one exit site
+    //     whatever the outcome (T-12-37).
+    let (update_cmd_tx, update_cmd_rx) = std::sync::mpsc::channel::<UpdateCmd>();
+    let (update_progress_tx, update_rx) = tokio::sync::watch::channel(UpdateProgress::default());
+    let update_progress_tx = Arc::new(update_progress_tx);
+    let update_busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    {
+        let progress = Arc::clone(&update_progress_tx);
+        let busy = Arc::clone(&update_busy);
+        std::thread::spawn(move || update_thread::run_update_thread(update_cmd_rx, progress, busy));
+    }
 
     // 4. Executor bundle: real enigo mouse + real media/power (05-05) + real
     //    apps (06-02) + real clipboard (06-04) — every trait now has a Windows
@@ -185,6 +221,16 @@ async fn main() -> anyhow::Result<()> {
         clipboard: Arc::new(WinClipboard::new(clip_cmd_tx, clip_rx.clone())),
         tabs: Arc::new(TabsRelay::new(tabs_rx.clone(), ext_cmd_tx.clone())),
         bookmarks: Arc::new(BookmarksRelay::new(bm_rx.clone(), ext_cmd_tx)),
+        // WinUpdate holds the update-thread command sender, a clone of the
+        // shared progress Sender (refusals) and of the busy flag, plus the
+        // ext-info receiver (update.status reads). D-14: `apply` still takes
+        // ONE string — nothing constructed here can carry a locator.
+        update: Arc::new(WinUpdate::new(
+            update_cmd_tx,
+            Arc::clone(&update_progress_tx),
+            Arc::clone(&update_busy),
+            ext_info_rx,
+        )),
     };
 
     // 5. Auth (SRV-03 / D-01): seed the store from config.toml's paired
@@ -304,6 +350,7 @@ async fn main() -> anyhow::Result<()> {
         blocked: blocked_rx,
         tabs: tabs_rx,
         bookmarks: bm_rx,
+        update: update_rx,
     };
 
     // 7. Bind the LAN interface (tests bind 127.0.0.1:0; the real binary
@@ -401,7 +448,7 @@ async fn main() -> anyhow::Result<()> {
     match tokio::net::TcpListener::bind(("127.0.0.1", ext_port)).await {
         Ok(ext_listener) => {
             tracing::info!(port = ext_port, "extension listener on 127.0.0.1");
-            tokio::spawn(ext::run_ext(ext_listener, tabs_tx, bm_tx, ext_cmd_rx));
+            tokio::spawn(ext::run_ext(ext_listener, tabs_tx, bm_tx, ext_info_tx, ext_cmd_rx));
         }
         Err(e) => {
             tracing::warn!(
