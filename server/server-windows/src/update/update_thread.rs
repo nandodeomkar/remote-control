@@ -51,7 +51,11 @@ use super::{UpdateError, apply, download, feed};
 /// the phone's `pubspec.yaml` at `1.0.0+1` across four shipped releases, and
 /// on this side it would additionally break the downgrade refusal: a stale
 /// literal makes every version "newer".
-const RUNNING_VERSION: &str = env!("CARGO_PKG_VERSION");
+///
+/// `pub(super)` so [`super::WinUpdate`] answers `update.status` from the SAME
+/// constant the refusal ladder is anchored to. Two reads of `env!` would be
+/// two things to keep in step for no benefit.
+pub(super) const RUNNING_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// `^\d+\.\d+\.\d+$`, RE-EXPORTED rather than re-implemented.
 ///
@@ -217,7 +221,10 @@ fn downloading(target: &str, pct: u8) -> UpdateProgress {
 
 /// The ONLY constructor that sets `error`, and it takes an [`UpdateError`] —
 /// not a string — so the closed D-11 vocabulary is the only thing expressible.
-fn failed(target: &str, e: UpdateError) -> UpdateProgress {
+///
+/// `pub(super)` because [`super::WinUpdate`] publishes the pre-fetch refusals
+/// itself, without waking the thread. It must build them the same way.
+pub(super) fn failed(target: &str, e: UpdateError) -> UpdateProgress {
     UpdateProgress {
         stage: STAGE_FAILED.to_string(),
         pct: None,
