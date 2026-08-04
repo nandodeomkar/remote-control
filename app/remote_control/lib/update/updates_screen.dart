@@ -864,6 +864,11 @@ class CheckFooter extends StatelessWidget {
           style: TextButton.styleFrom(
             minimumSize: const Size(kUpdatesTouchTarget, kUpdatesTouchTarget),
             foregroundColor: foreground,
+            // The `checking` state is BOTH muted and non-pressable. Without
+            // this the disabled button would fall back to the theme's own
+            // disabled colour and the footer would not be the kMuted the
+            // contract specifies.
+            disabledForegroundColor: foreground,
           ),
           icon: const Icon(Symbols.refresh_rounded, size: 20),
           label: Text(label, style: _footerButtonLabel),
