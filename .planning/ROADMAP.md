@@ -401,7 +401,7 @@ Plans:
 **Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
 **Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
 **Depends on:** Phase 11
-**Plans:** 11/18 plans executed
+**Plans:** 12/18 plans executed
 
 **Success Criteria** (what must be TRUE):
 
@@ -440,7 +440,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 12-12-PLAN.md — server-core wiring: `Executors.update`, `ServerDeps.update`, the third relay watch capturing `ext.hello`'s `extVersion`, and the `main.rs` thread spawn (wave 5)
+- [x] 12-12-PLAN.md — server-core wiring: `Executors.update`, `ServerDeps.update`, the third relay watch capturing `ext.hello`'s `extVersion`, and the `main.rs` thread spawn (wave 5)
 - [ ] 12-14-PLAN.md — phone `update_providers.dart`: the row-state matrix, the badge truth rule, the connection-service update seam and a bare installed-version provider (wave 5)
 
 **Wave 6** *(blocked on Wave 5 completion)*

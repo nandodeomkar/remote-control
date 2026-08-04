@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Ready to execute
-stopped_at: Completed 12-11-PLAN.md
-last_updated: "2026-08-04T13:42:58.608Z"
+status: Executing Phase 12
+stopped_at: Completed 12-12-PLAN.md
+last_updated: "2026-08-04T14:04:03.589Z"
 last_activity: 2026-08-04 -- Phase 12 execution started
 progress:
   total_phases: 12
   completed_phases: 11
   total_plans: 108
-  completed_plans: 101
+  completed_plans: 102
   percent: 92
 ---
 
@@ -26,14 +26,65 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 ## Current Position
 
 Phase: 12 (in-app-updates) — EXECUTING
-Plan: 3 of 18
-Next: /gsd-execute-phase 12 --wave 4 (`12-10,12-11`). Wave 3 is DONE — checkpoint
-1 below is CLOSED: the mirror exists, is public, and now carries a real release.
+Plan: 12 of 18 (12 SUMMARY files on disk; the plain counter above is a
+sequence number, not the completed count)
+Next: finish wave 5 — `12-14` is the remaining plan in it. Waves 1-4 are DONE
+and checkpoint 1 below is CLOSED: the mirror exists, is public, and carries a
+real release.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) — DONE · W2
   `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` — DONE
-  2026-08-04 · W4 `12-10,12-11` · W5 `12-12,12-14` · W6 `12-13,12-15,12-17` ·
-  W7 `12-16` · W8 `12-18`.
+  2026-08-04 · W4 `12-10,12-11` — DONE 2026-08-04 · W5 `12-12` DONE / `12-14`
+  PENDING · W6 `12-13,12-15,12-17` · W7 `12-16` · W8 `12-18`.
+
+  WAVE 5 (12-12) RESULT — **THE UPDATE PATH IS WIRED.** `Executors.update` and
+  `ServerDeps.update` exist and every harness constructs them; `run_ext` gained
+  a THIRD relay watch that captures `ext.hello`'s `extVersion` (D-09/D-18); and
+  `main.rs` spawns the update thread as step 3e beside 3a-3c. Rust workspace
+  293 passed / 0 failed / 2 ignored (was 290), `cargo build -p server-windows`
+  exit 0, zero warnings. Commits `36d7670`, `af5c9e6`, `f742915`.
+
+  CARRIED FROM 12-12 — things a later plan must not rediscover:
+
+  - **`router.rs`'s `UpdateCheck`/`UpdateApply => Vec::new()` placeholder is
+    STILL there.** 12-12 deliberately added no router arm and no session arm;
+    both are 12-13's. `Executors.update` now exists, so 12-13 is unblocked.
+    Both variants must also join `is_executor_bound`'s `matches!` list, and
+    the doc comment at `router.rs:344` must be AMENDED (D-13 makes
+    `update.check` executor-bound, unlike every other `*.list` read).
+
+  - **The session push arm must SKIP the empty-stage sentinel.**
+    `UpdateProgress::default()` carries an empty `stage`, which the D-10
+    vocabulary cannot express and which is never legal on the wire.
+
+  - **`ExtInfo` is deliberately NOT a `ServerDeps` field** — it drives no
+    session push arm. Its only consumer is `WinUpdate`, which takes its own
+    `watch::Receiver` clone in `main.rs`. Do not "fix" this by adding it.
+
+  - **`listener.rs` binds `update: _update`** by name rather than adding a
+    `..` rest pattern. That exhaustive destructure is load-bearing: it is what
+    turns a `ServerDeps` change into a compile error at the one place 12-13
+    must edit. 12-13 threads it into `run_session` exactly as `bookmarks` is.
+
+  - **`integration.rs`'s `Harness._update_tx` must stay a STRUCT FIELD.** A
+    local would drop at `start_server`'s exit and silently disable the branch
+    under test (the `bm_tx` precedent). 12-13 just drops the `_` prefix.
+
+  - **`update/mod.rs`'s `#![allow(dead_code)]` was NOT removed in 12-12**,
+    despite 12-11's note saying it would be. Probed: four items still have no
+    caller — `UpdateCmd::Check` (12-17's), `marker::write_pending`,
+    `download::download_to`, `feed::APK_ASSET_PREFIX`. Removal point moved to
+    **12-17**; re-probe rather than assume.
+
+  - **`grep -c 'ExtCmd::Reload'` is still 0** — the reload command, the D-18
+    version comparison and the once-per-target-version guard are all 12-16's,
+    behind its Chrome file-locking observation checkpoint. The `extVersion`
+    input it needs is now live in the watch.
+
+  - Tooling note: an in-place Python rewrite of a source file converts the
+    whole file to CRLF on this repo (Python text-mode default). Use `sed -i`
+    or `newline=''` for source mutation experiments, or `diff` against a `cp`
+    backup will report every line changed.
 
   WAVE 3 RESULT — **v1.5.0 IS PUBLISHED AND D-21 IS SATISFIED.** The mirror
   `nandodeomkar/remote-control-releases` returns 200 anonymously with
@@ -418,6 +469,7 @@ Progress: [██████████] 100% (11 of 11 phases complete; 90 of
 | Phase 12 P03 | 45min | 3 tasks | 5 files |
 | Phase 12 P10 | 42min | 2 tasks | 7 files |
 | Phase 12 P11 | 32min | 3 tasks | 4 files |
+| Phase 12 P12 | 18min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -632,6 +684,8 @@ Recent decisions affecting current work:
 - [Phase 12]: 12-11: the update refusal ladder is three pure functions with zero I/O; a forged URL-shaped target refuses as stale with no network activity, and the ORDER is asserted by a test — SC6/T-12-01; is_valid_target is re-exported from download.rs and ordering uses server_core::version::compare_versions so there is only one version regex and one comparator
 - [Phase 12]: 12-11: the update thread exits via the crate's existing std::process::exit path after a 750 ms flush grace, not a plumbed graceful shutdown — the detached helper is already counting down its bounded 30-poll wait; the grace window lets the session loop flush the restarting stage before the socket drops (D-17)
 - [Phase 12]: 12-11: UpdateCmd::Check terminates on uptodate in BOTH outcomes, carrying the resolved version only when it is strictly newer — D-10 is a closed vocabulary with no available stage; version-present is therefore the available signal for 12-17, and inventing a stage would mean amending SPEC 7, the schema and both codecs first
+- [Phase ?]: 12-12: ExtInfo is NOT a ServerDeps field — those fields exist to drive session push arms and ExtInfo drives none; WinUpdate takes its own Receiver clone in main.rs
+- [Phase ?]: 12-12: the update.progress watch Sender is an Arc shared by the update thread AND WinUpdate, so a busy/downgrade/stale refusal reaches the phone without queueing behind an in-flight 5 MB download
 
 ### Pending Todos
 
@@ -696,6 +750,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-04T13:42:58.589Z
+Last session: 2026-08-04T14:03:34.819Z
 Stopped at: Completed 12-11-PLAN.md
 Resume file: None
