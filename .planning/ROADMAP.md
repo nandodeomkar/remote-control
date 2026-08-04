@@ -401,7 +401,7 @@ Plans:
 **Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
 **Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
 **Depends on:** Phase 11
-**Plans:** 9/18 plans executed
+**Plans:** 10/18 plans executed
 
 **Success Criteria** (what must be TRUE):
 
@@ -435,7 +435,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 12-10-PLAN.md — phone `release_feed.dart` and `apk_download.dart`: `crypto`, the feed fetch, streamed download with progress, chunked sha256 and delete-on-failure (wave 4)
+- [x] 12-10-PLAN.md — phone `release_feed.dart` and `apk_download.dart`: `crypto`, the feed fetch, streamed download with progress, chunked sha256 and delete-on-failure (wave 4)
 - [ ] 12-11-PLAN.md — server-windows `update_thread.rs` and `WinUpdate`: the D-15 refusal ladder, the ordered apply pipeline and the executor implementation (wave 4)
 
 **Wave 5** *(blocked on Wave 4 completion)*
