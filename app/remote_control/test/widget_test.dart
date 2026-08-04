@@ -9,6 +9,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:remote_protocol/remote_protocol.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import 'package:remote_control/hub/hub_screen.dart';
 import 'package:remote_control/main.dart';
@@ -50,6 +52,14 @@ class _StubDeviceList extends DeviceListNotifier {
 
 void main() {
   testWidgets('app shell homes on the dashboard', (tester) async {
+    // 12-15: the dashboard's settings gear now carries the update badge, which
+    // reads the update CACHE (shared_preferences) so it is correct offline and
+    // before the Updates screen has ever been opened. `SharedPreferencesAsync`
+    // throws from its CONSTRUCTOR when no platform instance is registered, so
+    // the in-memory platform is required here for the same reason
+    // hub_offline_test and settings_screen_test already install it.
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
     final store = DeviceStore(secure: _FakeSecureKv(), prefs: _FakePrefsKv());
     await tester.pumpWidget(
       ProviderScope(

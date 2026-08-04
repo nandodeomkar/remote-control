@@ -50,6 +50,8 @@ import '../settings/settings_screen.dart';
 import '../shortcuts/shortcuts_screen.dart';
 import '../theme/tokens.dart';
 import '../trackpad/trackpad_screen.dart';
+import '../update/update_providers.dart';
+import '../update/updates_screen.dart';
 import '../widgets/bubble_scaffold.dart';
 import '../widgets/connection_header.dart';
 
@@ -309,6 +311,10 @@ class _HubScreenState extends ConsumerState<HubScreen> {
     // null). Reconnecting keeps them tappable — tool screens gate their own
     // sends; the chip + banner carry the status.
     final offline = status.chip == ChipStatus.disconnected;
+    // 12-15: reads the update CACHE, so it is correct offline and before the
+    // Updates screen has ever been opened. Same provider as the Settings row —
+    // one source of truth, two placements.
+    final badge = ref.watch(updateBadgeProvider);
 
     return Scaffold(
       backgroundColor: kBg,
@@ -327,12 +333,33 @@ class _HubScreenState extends ConsumerState<HubScreen> {
         actions: [
           Center(child: ConnectionHeaderChip.forService(_service)),
           // D-11: the settings gear — ALWAYS tappable, offline included.
+          //
+          // 12-15: the update badge rides it as a Stack OVERLAY. The
+          // IconButton's size, colour, icon and geometry are untouched and the
+          // dot is never a layout participant, so the app bar cannot reflow
+          // when an update lands. The tooltip carries the state for a screen
+          // reader (IconButton surfaces tooltip as its semantics label, so
+          // this costs no extra node and cannot desync from the dot).
           Padding(
             padding: const EdgeInsets.only(right: 8),
-            child: IconButton(
-              tooltip: kSettingsTitle,
-              onPressed: _openSettings,
-              icon: const Icon(Symbols.settings_rounded, size: 24, color: kText),
+            child: Stack(
+              children: [
+                IconButton(
+                  tooltip: badge ? kSettingsWithUpdateTooltip : kSettingsTitle,
+                  onPressed: _openSettings,
+                  icon: const Icon(
+                    Symbols.settings_rounded,
+                    size: 24,
+                    color: kText,
+                  ),
+                ),
+                if (badge)
+                  const Positioned(
+                    right: 10,
+                    top: 10,
+                    child: UpdateBadgeDot(),
+                  ),
+              ],
             ),
           ),
         ],

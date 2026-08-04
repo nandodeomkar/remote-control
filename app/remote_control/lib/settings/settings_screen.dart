@@ -18,7 +18,8 @@
 ///      `hapticsEnabledProvider` (default ON).
 ///   5. Accent — a STATIC, non-interactive `#4C8DFF` "Blue" swatch chip
 ///      (D-12: no picker, ever).
-///   6. About — the running build's version, read from the installed package
+///   6. About — the Updates entry (12-15: pushes `UpdatesScreen`, carries the
+///      badge dot) above the running build's version, read from the package
 ///      via `app_version.dart`'s [appVersionProvider] (260729-42w). Display
 ///      only. Exists so a sideloaded build can be identified: every APK from
 ///      v1.0.0 through v1.3.0-rc1 reported itself as "1.0.0", which made
@@ -39,6 +40,8 @@ import '../screens/device_list_screen.dart';
 import '../store/device_list_store.dart';
 import '../theme/tokens.dart';
 import '../trackpad/tuning.dart';
+import '../update/update_providers.dart';
+import '../update/updates_screen.dart';
 import 'app_version.dart';
 import 'haptics.dart';
 import 'scroll_direction.dart';
@@ -344,6 +347,62 @@ class _AddSwitchPcRow extends StatelessWidget {
   }
 }
 
+/// The Updates entry (D-06): the [_AddSwitchPcRow] nav-row shape with a
+/// trailing run of the badge dot and a chevron.
+///
+/// The dot is inline in the trailing run, so its appearance shifts the chevron
+/// by 20px — acceptable inside a row the user is not mid-gesture on, and the
+/// reason the hub's placement (an app bar, which must never reflow) is an
+/// overlay instead.
+///
+/// The dot carries no visible text, so it is the one control in this phase that
+/// needs an explicit semantics label: without it the state would be drawn and
+/// never announced.
+class UpdatesNavRow extends StatelessWidget {
+  /// Whether at least one component with a KNOWN installed version is behind
+  /// the cached latest (the badge truth rule — one provider, two placements).
+  final bool badge;
+
+  /// Pushes the Updates screen.
+  final VoidCallback onTap;
+
+  /// Creates the Updates nav row.
+  const UpdatesNavRow({super.key, required this.badge, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: kSurface,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                const Icon(Symbols.system_update_rounded,
+                    color: kText, size: 20),
+                const SizedBox(width: 12),
+                const Expanded(child: Text(kUpdatesTitle, style: _rowTitle)),
+                if (badge) ...[
+                  Semantics(
+                    label: kUpdateBadgeSemantic,
+                    child: const UpdateBadgeDot(),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+                const Icon(Symbols.chevron_right_rounded,
+                    color: kMuted, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Group 2: Pointer sensitivity — the existing `sensitivity.dart` seam,
 /// verbatim (same slider bounds/provider the trackpad tune sheet edits).
 class _SensitivityGroup extends ConsumerWidget {
@@ -566,9 +625,15 @@ class _AccentGroup extends StatelessWidget {
   }
 }
 
-/// Group 6: About — the running build's version, read from the installed
-/// package. Display only, structurally a plain label/value row (the
-/// [_AccentGroup] shape without the chip).
+/// Group 6: About — the Updates entry (12-15) above the running build's
+/// version, read from the installed package. The version row is display only,
+/// structurally a plain label/value row (the [_AccentGroup] shape without the
+/// chip).
+///
+/// The Updates row lives HERE rather than in a seventh group because this
+/// group is already the version-identity home — "which version are you on?" is
+/// literally why it exists, and "am I current?" is the same question one step
+/// further. No shipped row moves.
 class _AboutGroup extends ConsumerWidget {
   const _AboutGroup();
 
@@ -582,10 +647,20 @@ class _AboutGroup extends ConsumerWidget {
           loading: () => '',
           error: (_, _) => kVersionUnavailable,
         );
+    final badge = ref.watch(updateBadgeProvider);
 
     return _GroupSurface(
       heading: kAboutHeading,
       children: [
+        UpdatesNavRow(
+          badge: badge,
+          onTap: () {
+            hapticTick();
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const UpdatesScreen()),
+            );
+          },
+        ),
         ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 48),
           child: Padding(
