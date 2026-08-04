@@ -34,17 +34,20 @@
 //! at all. That absence is asserted, not assumed: the repo string must not
 //! appear anywhere under `server/server-core/`.
 
-// The submodules land across several plans (12-06 feed+download, 12-08 the
-// thread, 12-09 apply+marker). Until the thread wires them into `main`, the
-// public functions here have no in-crate caller and every one would warn.
-// REMOVE this allow when `update_thread` lands — after that, dead code here
-// really is dead.
+// The submodules land across several plans (12-06 feed+download, 12-09
+// apply+marker, 12-11 the thread + `WinUpdate`). `update_thread` now consumes
+// most of what the others expose, but NOTHING consumes `WinUpdate` itself
+// until 12-12 puts it in `Executors` — and this is a BINARY crate, where `pub`
+// buys no dead-code exemption. REMOVE this allow in 12-12, once the bundle
+// wiring gives every public item in this subtree a real caller; after that,
+// dead code here really is dead.
 #![allow(dead_code)]
 
 pub mod apply;
 pub mod download;
 pub mod feed;
 pub mod marker;
+pub mod update_thread;
 
 /// The D-11 error vocabulary, as a Rust type.
 ///
