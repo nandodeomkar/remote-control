@@ -108,6 +108,28 @@ pub fn temp_path_for(target: &str) -> PathBuf {
 /// returning (D-23) — a half-downloaded installer must never outlive the
 /// attempt that created it.
 pub fn download_to(agent: &ureq::Agent, url: &str, dest: &Path) -> Result<(), UpdateError> {
+    download_to_with_progress(agent, url, dest, &mut |_| {})
+}
+
+/// [`download_to`] with a cumulative-bytes callback, for the caller that has a
+/// progress stage to publish.
+///
+/// `on_progress` receives the RUNNING TOTAL of bytes written, once per chunk.
+/// It is deliberately unthrottled: throttling is a policy decision about a
+/// `watch` channel that this module knows nothing about, so it belongs to the
+/// caller (`update_thread::should_emit_pct`). This function's only job is to
+/// report honestly and often.
+///
+/// The callback must not block — it runs inside the transfer loop, between a
+/// read and the next read.
+pub fn download_to_with_progress(
+    agent: &ureq::Agent,
+    url: &str,
+    dest: &Path,
+    on_progress: &mut dyn FnMut(u64),
+) -> Result<(), UpdateError> {
+    use io::{Read, Write};
+
     // browser_download_url 302s to a different host with a time-limited
     // signed query; ureq follows cross-host redirects and strips auth headers
     // on redirect by default. We send none anyway (D-01).
@@ -116,7 +138,25 @@ pub fn download_to(agent: &ureq::Agent, url: &str, dest: &Path) -> Result<(), Up
     let streamed = (|| -> Result<(), UpdateError> {
         // create() truncates any stale partial from an earlier attempt.
         let mut file = File::create(dest)?;
-        io::copy(&mut res.body_mut().as_reader(), &mut file).map_err(classify_io)?;
+        let mut reader = res.body_mut().as_reader();
+        // A chunked loop rather than io::copy, for the same reason
+        // file_sha256_hex uses one: the caller needs to see the transfer
+        // advance. Same 64 KiB chunk, so a ~5 MB asset is ~80 callbacks.
+        let mut buf = vec![0u8; HASH_CHUNK];
+        let mut written: u64 = 0;
+        loop {
+            // A read failure is the transport; a write failure is the disk.
+            // classify_io keeps that distinction, which is the difference
+            // between telling the owner to check their WiFi and telling them
+            // to check their free space (D-23).
+            let n = reader.read(&mut buf).map_err(classify_io)?;
+            if n == 0 {
+                break;
+            }
+            file.write_all(&buf[..n])?;
+            written += n as u64;
+            on_progress(written);
+        }
         // Flush to the device BEFORE anyone hashes this file: a tail left in
         // the OS buffer would hash differently from what the installer opens.
         file.sync_all()?;

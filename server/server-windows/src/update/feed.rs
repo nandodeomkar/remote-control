@@ -185,6 +185,17 @@ pub fn resolve_asset<'a>(rel: &'a Release, prefix: &str) -> Result<&'a Asset, Up
     Ok(found)
 }
 
+/// [`resolve_asset`] for THIS platform's installer.
+///
+/// Exists so the update thread never needs to see an asset-name prefix:
+/// [`SETUP_ASSET_PREFIX`] stays private to this module, which is the module
+/// D-14 designates as the server's only locator authority. A caller that could
+/// pass its own prefix would be a caller that could be talked into naming a
+/// different file.
+pub fn resolve_setup<'a>(rel: &'a Release) -> Result<&'a Asset, UpdateError> {
+    resolve_asset(rel, SETUP_ASSET_PREFIX)
+}
+
 /// The agent used for feed GETs.
 ///
 /// RESEARCH Pitfall 1: **every ureq timeout defaults to `None`.** Without
