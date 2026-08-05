@@ -977,10 +977,13 @@ Move it to `todos/done/` only when that re-run passes.
 
 ### Blockers/Concerns
 
-- [quick 260805-axr — SC5 DELIVERY OUTSTANDING]: the helper fix is in `master` but **unproven on
-  hardware**, and it cannot ship through the update path it repairs. To close SC5: bump to `1.6.2`,
-  build the installer, **install it by hand**, then publish `1.6.3` and tap Update PC. SC7 falls out
-  of the same run. Until then `1.6.0`/`1.6.1` remain the only installed builds and both still wedge.
+- [quick 260805-axr — SC5 DELIVERY IN PROGRESS]: the helper fix is in `master` and **v1.6.2 is
+  published** (2026-08-05, commit `6dc6e27`, tag `v1.6.2`), deliberately as a **PRE-RELEASE** so the
+  installed 1.6.1 is never offered an update it would wedge on — verified anonymously: clients still
+  read `latest = v1.6.1`. Remaining, in order: **(1) install `dist\RemoteControl-Setup-v1.6.2.exe`
+  by hand** (quit the tray server first so config.toml is written cleanly and the AppMutex is
+  released); **(2) publish `1.6.3` as a normal release**; **(3) tap Update PC and re-run 12-18
+  Task 4.** SC7 falls out of the same run. SC5 stays UNMET until step 3 passes.
 - [quick 260805-axr — ROOT CAUSE STILL INFERENTIAL]: the flag half is observed
   (`CREATE_NO_WINDOW` is ignored beside `DETACHED_PROCESS`; a visible `find "7556"` window proved it),
   but the causal link from that to the blocked `find` **did not reproduce in-harness**. Under

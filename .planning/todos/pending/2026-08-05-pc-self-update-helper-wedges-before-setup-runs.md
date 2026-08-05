@@ -7,6 +7,12 @@ files:
   - server/server-windows/src/update/apply.rs:104
 ---
 
+> **DELIVERY 2026-08-05 — `v1.6.2` PUBLISHED as a PRE-RELEASE** (commit `6dc6e27`, tag `v1.6.2`,
+> three digest-bearing assets on the mirror). Pre-release on purpose: `/releases/latest` excludes
+> pre-releases, so the installed `1.6.1` is never offered an update its own broken helper would
+> wedge on. Verified anonymously — clients still read `latest = v1.6.1`. Next: install
+> `dist\RemoteControl-Setup-v1.6.2.exe` by hand, then publish `1.6.3` normally as the tap target.
+>
 > **STATUS 2026-08-05 — CODE FIX LANDED, DELIVERY OUTSTANDING.** All four Solution items
 > below are implemented by quick task `260805-axr` (commits `fad11fe`, `e585784`, `65ddf91`;
 > see `.planning/quick/260805-axr-fix-the-pc-self-update-helper-wedge-spaw/`). This todo stays
