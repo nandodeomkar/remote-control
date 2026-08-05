@@ -7,6 +7,19 @@ files:
   - server/server-windows/src/update/apply.rs:104
 ---
 
+> **STATUS 2026-08-05 — CODE FIX LANDED, DELIVERY OUTSTANDING.** All four Solution items
+> below are implemented by quick task `260805-axr` (commits `fad11fe`, `e585784`, `65ddf91`;
+> see `.planning/quick/260805-axr-fix-the-pc-self-update-helper-wedge-spaw/`). This todo stays
+> **pending** because the *Delivery constraint* section is not discharged: the fix is only in
+> `master`, never in an installed build. Move to `todos/done/` once `1.6.2` has been installed
+> by hand, `1.6.3` published, and 12-18 Task 4 re-run green.
+>
+> One correction to the *Root cause* below: the flag half is observed, but the causal link from
+> the flag pair to the blocked `find` **did not reproduce under `cargo test`** — the full shipped
+> combination passes there in 0.82 s, because the parent process stays alive in that harness.
+> Both halves (the flag and the pipe) were fixed anyway, so the repair does not depend on which
+> one was load-bearing.
+
 ## Problem
 
 Found on real hardware during 12-18 Task 4 (the phase's on-hardware UAT). Tapping

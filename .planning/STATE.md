@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12 executed with a BLOCKING DEFECT — SC5 not met
-stopped_at: 12-18 executed; Task 4 FAILED — PC self-update helper defect, SC5 not met
-last_updated: "2026-08-05T02:13:42.072Z"
-last_activity: 2026-08-05 -- 12-18 DONE-WITH-FAILURE. v1.6.0 + v1.6.1 published and SC4 observed met on a real phone; the PC self-update wedges before Setup runs. SC5 NOT MET, SC7 unreachable. Fix needs its own plan.
+status: Phase 12 helper defect FIXED IN CODE — SC5 still unmet pending a hand-installed 1.6.2
+stopped_at: quick 260805-axr landed the helper fix; delivery (1.6.2 by hand, 1.6.3 as tap target) outstanding
+last_updated: "2026-08-05T03:05:00.000Z"
+last_activity: 2026-08-05 -- Quick 260805-axr fixed the PC self-update helper: CREATE_NO_WINDOW alone, a pipe-free exe-lock wait, a timeout that relaunches, a %TEMP% orphan sweep, and two real spawn_helper tests. SC5 stays UNMET until 1.6.2 is installed by hand and 1.6.3 published as the tap target — the fix cannot ship through the path it repairs.
 progress:
   total_phases: 12
   completed_phases: 12
@@ -17,6 +17,11 @@ progress:
 > ⚠ **The 100% above counts FILES, not outcomes.** All 108 plans have a
 > SUMMARY on disk, but `12-18-SUMMARY.md` carries `## Self-Check: FAILED`.
 > Phase 12 does not deliver its own success criteria — see below.
+>
+> **Update 2026-08-05:** the helper defect is FIXED IN CODE by quick
+> `260805-axr`. **SC5 is still unmet** — the fix cannot ship through the path
+> it repairs, so it stays unproven until `1.6.2` is installed by hand and
+> `1.6.3` is published as the tap target. See Blockers/Concerns.
 
 # Project State
 
@@ -948,8 +953,11 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-**0 pending** — `.planning/todos/pending/` is empty. (The previous "2 pending" line was stale: it
-still listed an item that had already moved to `todos/done/`.)
+**1 pending** — `2026-08-05-pc-self-update-helper-wedges-before-setup-runs.md`. Its four-part
+Solution is **implemented** (quick `260805-axr`, commits `fad11fe`/`e585784`/`65ddf91`); it stays
+in `todos/pending/` because its **Delivery constraint** is not discharged: `1.6.2` must be built
+and installed BY HAND and `1.6.3` published as the tap target before 12-18 Task 4 can be re-run.
+Move it to `todos/done/` only when that re-run passes.
 
 - ~~Absolute pointer injection~~ — DONE in 04-01 (raw SendInput ABSOLUTE|VIRTUALDESK; in todos/done/)
 - ~~Server supports ONE pairing per process run~~ — DONE; closed by Phase 7's persistent token
@@ -969,6 +977,17 @@ still listed an item that had already moved to `todos/done/`.)
 
 ### Blockers/Concerns
 
+- [quick 260805-axr — SC5 DELIVERY OUTSTANDING]: the helper fix is in `master` but **unproven on
+  hardware**, and it cannot ship through the update path it repairs. To close SC5: bump to `1.6.2`,
+  build the installer, **install it by hand**, then publish `1.6.3` and tap Update PC. SC7 falls out
+  of the same run. Until then `1.6.0`/`1.6.1` remain the only installed builds and both still wedge.
+- [quick 260805-axr — ROOT CAUSE STILL INFERENTIAL]: the flag half is observed
+  (`CREATE_NO_WINDOW` is ignored beside `DETACHED_PROCESS`; a visible `find "7556"` window proved it),
+  but the causal link from that to the blocked `find` **did not reproduce in-harness**. Under
+  `cargo test` the full shipped combination — flag pair AND `tasklist | find` — passes in 0.82 s,
+  because the parent process stays alive there; on hardware the parent exited immediately after the
+  spawn. Both halves were fixed regardless, so the repair does not depend on which one was
+  load-bearing, but the only real proof is the on-hardware re-run above.
 - [quick 260731-euq — SHIP-TOGETHER]: protoVersion is now **1.7** (binary opcode `0x03`, zoom). The next release MUST ship the server exe alongside the APK. An old server does NOT break — `UnknownOpcode` is dropped and counted per SPEC §9 rule 4, the handshake compares only the major component, so the session stays up and move/scroll/click keep working — but **pinch silently does nothing** until the server is updated. Same rule as the phase-10 keymap growth, same reason.
 - [quick 260731-euq — KNOWN EDGE, accepted]: a keyboard-panel sticky Ctrl held at the instant of a pinch is dropped by the zoom arm's `Direction::Release` without updating `dispatch/held.rs` bookkeeping. Self-corrects on the next modifier interaction; consulting held state from the input thread was out of scope.
 - [quick 260731-euq — STALE, unfixed]: `app/packages/remote_protocol/lib/src/version.dart` still declares `protoVersion = '1.1'` (stale since phase 1), aliased into `clientProtoVersion` at `handshake_fsm.dart:23`, so the phone advertises `"1.1"` in `hello` while the server is at `"1.7"`. Harmless (major-only comparison) but wrong. Left unfixed deliberately — changing what the client advertises is a handshake-path behaviour change with its own test surface.
@@ -998,6 +1017,7 @@ still listed an item that had already moved to `todos/done/`.)
 | 260731-d45 | Close 2 deferred items: `noPairing` gets its own copy (client-only, zero wire change); group titles trimmed of lone surrogates via a shared `capTitle(s, max)` | 2026-07-31 | 0cd5104, 081df65 | [260731-d45-close-deferred-nopairing-copy-and-group-title-cap](./quick/260731-d45-close-deferred-nopairing-copy-and-group-title-cap/) |
 | 260731-euq | Pinch-to-zoom: binary opcode `0x03` executed as a Ctrl-held wheel tick, spread-vs-translation gesture arbitration locked per episode (protoVersion 1.7) | 2026-07-31 | d2900af, 3a7b0c8 | [260731-euq-add-pinch-zoom-to-trackpad-binary-opcode](./quick/260731-euq-add-pinch-zoom-to-trackpad-binary-opcode/) |
 | 260801-r8x | Stage `server/Cargo.lock` in the release commit — Codex P1 on PR #1: cargo rewrites the lockfile during the installer build, so leaving it out made the tag name a stale tree (`cargo build --locked` fails) and left dirt that tripped the next run's preflight | 2026-08-01 | 8b875b1 | [260801-r8x-stage-server-cargo-lock-in-the-release-c](./quick/260801-r8x-stage-server-cargo-lock-in-the-release-c/) |
+| 260805-axr | Fix the PC self-update helper wedge — `CREATE_NO_WINDOW` alone (not the invalid `DETACHED_PROCESS` pair), a pipe-free exe-lock wait, a timeout that relaunches instead of jumping past it, a `%TEMP%` orphan sweep, and the first tests that actually execute `spawn_helper` | 2026-08-05 | fad11fe, e585784, 65ddf91 | [260805-axr-fix-the-pc-self-update-helper-wedge-spaw](./quick/260805-axr-fix-the-pc-self-update-helper-wedge-spaw/) |
 
 ## Deferred Items
 
