@@ -199,10 +199,25 @@ async fn main() -> anyhow::Result<()> {
     let (update_progress_tx, update_rx) = tokio::sync::watch::channel(UpdateProgress::default());
     let update_progress_tx = Arc::new(update_progress_tx);
     let update_busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    //
+    //     The thread's FIRST act is to sweep the `%TEMP%` files a wedged
+    //     1.6.0/1.6.1 update attempt leaked (a `.cmd` plus a ~5.9 MB setup exe
+    //     per attempt). It lives exactly here and nowhere else: a `read_dir`
+    //     over `%TEMP%` is unbounded work and must never sit between process
+    //     start and the input thread this app exists to keep instant. This
+    //     thread is already dedicated, is already spawned before the listener
+    //     binds, and then blocks on `recv()` doing nothing — so the sweep is
+    //     free here. Nothing has asked for an update yet, so there is nothing
+    //     to race, and the sweep skips this process's own script by name
+    //     regardless. NOT in `WinUpdate::new` (that runs on the main async task,
+    //     ahead of the bind) and NOT on a thread of its own.
     {
         let progress = Arc::clone(&update_progress_tx);
         let busy = Arc::clone(&update_busy);
-        std::thread::spawn(move || update_thread::run_update_thread(update_cmd_rx, progress, busy));
+        std::thread::spawn(move || {
+            update::apply::sweep_temp_orphans();
+            update_thread::run_update_thread(update_cmd_rx, progress, busy);
+        });
     }
     //     The shell's settings window holds its own clones (12-17, D-06): a
     //     broken, unpaired or absent phone must not leave this machine with no

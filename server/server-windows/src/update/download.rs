@@ -35,8 +35,12 @@ use super::UpdateError;
 
 /// Filename template for the downloaded Windows installer. Lives HERE,
 /// server-side, next to the code that builds the path — not on the wire.
-const SETUP_FILE_PREFIX: &str = "RemoteControl-Setup-v";
-const SETUP_FILE_SUFFIX: &str = ".exe";
+///
+/// `pub(super)` so [`super::apply::sweep_temp_orphans_in`] matches leftover
+/// setup exes on THESE constants rather than a re-typed literal: a matcher that
+/// can drift from [`temp_path_for`] is a matcher that silently stops matching.
+pub(super) const SETUP_FILE_PREFIX: &str = "RemoteControl-Setup-v";
+pub(super) const SETUP_FILE_SUFFIX: &str = ".exe";
 
 /// The agent used for asset downloads.
 ///

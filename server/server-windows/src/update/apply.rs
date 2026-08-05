@@ -40,8 +40,10 @@
 use std::os::windows::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::{Duration, SystemTime};
 
 use super::UpdateError;
+use super::download;
 use super::marker;
 
 /// **Deliberately NOT used. Never pass this flag from this module again.**
@@ -297,6 +299,12 @@ pub fn installed_exe() -> PathBuf {
     }
 }
 
+/// The helper script's filename parts, factored out of [`helper_script_path`]
+/// for the same anti-drift reason as [`download::SETUP_FILE_PREFIX`]:
+/// [`sweep_temp_orphans_in`] matches on THESE, never on a re-typed literal.
+const HELPER_SCRIPT_PREFIX: &str = "rc-update-";
+const HELPER_SCRIPT_SUFFIX: &str = ".cmd";
+
 /// `%TEMP%\rc-update-<pid>.cmd` — the helper's own path.
 ///
 /// Per-PID so two attempts (or a stale file from a previous run) can never
@@ -304,7 +312,119 @@ pub fn installed_exe() -> PathBuf {
 /// throwaway belongs. T-12-30 accepts the residual: a local process able to
 /// rewrite `%TEMP%` between the write and the spawn already owns the machine.
 pub fn helper_script_path() -> PathBuf {
-    std::env::temp_dir().join(format!("rc-update-{}.cmd", std::process::id()))
+    std::env::temp_dir().join(format!(
+        "{HELPER_SCRIPT_PREFIX}{}{HELPER_SCRIPT_SUFFIX}",
+        std::process::id()
+    ))
+}
+
+/// How old a `%TEMP%` leftover must be before [`sweep_temp_orphans`] removes it.
+///
+/// The ONLY thing an age guard protects is a helper from a PREVIOUS process
+/// that is still counting down its bounded wait — and that wait cannot exceed
+/// [`MAX_WAIT_POLLS`] roughly-one-second polls, about 30 seconds. An hour is
+/// therefore enormously generous, while the leftovers this exists to clear are
+/// hours or days old.
+///
+/// Nothing in the CURRENT process can be at risk either: the sweep runs once at
+/// startup, and this process's own script and setup exe are not created until
+/// the owner asks for an update, long afterwards.
+const MIN_ORPHAN_AGE: Duration = Duration::from_secs(60 * 60);
+
+/// Remove the `%TEMP%` files a wedged update attempt leaked.
+///
+/// Both `del "%SETUP%"` and the script's self-delete sit at the helper's `:end`
+/// label, which a wedged run never reaches — so every wedged attempt on
+/// 1.6.0/1.6.1 left `%TEMP%\rc-update-<pid>.cmd` plus a ~5.9 MB setup exe
+/// behind, and fixing the wedge does not retroactively remove them. Every
+/// machine that ran either version is already carrying orphans.
+///
+/// Failure posture is [`marker::truncate_update_log_if_large`]'s: an
+/// unsweepable `%TEMP%` is not a reason to do anything differently.
+pub fn sweep_temp_orphans() {
+    let _ = sweep_temp_orphans_in(
+        &std::env::temp_dir(),
+        &helper_script_path(),
+        MIN_ORPHAN_AGE,
+    );
+}
+
+/// [`sweep_temp_orphans`] with the directory, this process's own script and the
+/// age threshold injected — the `_at`/`_with` convention this module already
+/// uses ([`marker::write_pending_at`], [`begin_apply_with`]) — so no test ever
+/// sweeps the real `%TEMP%`.
+///
+/// Returns the number of files removed, so the log line and the tests can both
+/// assert it.
+fn sweep_temp_orphans_in(dir: &Path, own_script: &Path, min_age: Duration) -> u32 {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(e) => e,
+        // Debug, never warn: this is housekeeping, and a `%TEMP%` that cannot
+        // be listed changes nothing about the server's job.
+        Err(e) => {
+            tracing::debug!("update: could not scan the temp directory ({})", e.kind());
+            return 0;
+        }
+    };
+
+    let own_name = own_script.file_name();
+    let now = SystemTime::now();
+    let mut removed: u32 = 0;
+
+    for entry in entries.flatten() {
+        let raw_name = entry.file_name();
+        let Some(name) = raw_name.to_str() else {
+            continue;
+        };
+
+        // Anchored on BOTH ends, and built from the writers' own constants.
+        let is_helper =
+            name.starts_with(HELPER_SCRIPT_PREFIX) && name.ends_with(HELPER_SCRIPT_SUFFIX);
+        let is_setup = name.starts_with(download::SETUP_FILE_PREFIX)
+            && name.ends_with(download::SETUP_FILE_SUFFIX);
+        if !is_helper && !is_setup {
+            continue;
+        }
+
+        // The PID guard, expressed against the writer's own path rather than by
+        // re-deriving the PID: this process's own script is never a candidate.
+        if own_name.is_some_and(|own| own == raw_name.as_os_str()) {
+            continue;
+        }
+
+        // Directories are never touched, whatever they are called.
+        let Ok(md) = entry.metadata() else {
+            continue;
+        };
+        if !md.is_file() {
+            continue;
+        }
+
+        // An unreadable timestamp, or one in the future, counts as FRESH — the
+        // safe direction, since the cost of skipping is one more startup.
+        let is_fresh = md
+            .modified()
+            .ok()
+            .and_then(|m| now.duration_since(m).ok())
+            .is_none_or(|age| age < min_age);
+        if is_fresh {
+            continue;
+        }
+
+        if let Err(e) = std::fs::remove_file(entry.path()) {
+            // A file another process still holds open simply stays; the next
+            // startup gets it. Never retried here.
+            tracing::debug!("update: could not remove a stale temp file ({})", e.kind());
+            continue;
+        }
+        removed += 1;
+    }
+
+    // Counts and error kinds only — never a path (T-12-06).
+    if removed > 0 {
+        tracing::info!("update: removed {removed} stale update file(s) from the temp directory");
+    }
+    removed
 }
 
 /// Spawn the helper and walk away.
@@ -1012,6 +1132,124 @@ mod tests {
             p.file_name().unwrap().to_str().unwrap(),
             format!("rc-update-{}.cmd", std::process::id())
         );
+    }
+
+    /// The sweep's reason to exist: a wedged attempt's leaked script and its
+    /// ~5.9 MB setup exe are both removed.
+    #[test]
+    fn the_sweep_removes_a_foreign_script_and_a_stale_setup() {
+        let dir = scratch_dir("sweep-removes");
+        let script = dir.join("rc-update-999999.cmd");
+        let setup = dir.join("RemoteControl-Setup-v1.2.3.exe");
+        std::fs::write(&script, b"leftover").unwrap();
+        std::fs::write(&setup, b"leftover").unwrap();
+
+        let own = dir.join(helper_script_path().file_name().unwrap());
+        assert_eq!(sweep_temp_orphans_in(&dir, &own, Duration::ZERO), 2);
+        assert!(!script.exists(), "a foreign-PID helper script is an orphan");
+        assert!(!setup.exists(), "a leaked setup exe is an orphan");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The load-bearing safety assertion: this process's own script survives
+    /// even with the age guard disabled. A sweep that can delete the script it
+    /// is about to spawn would break the update it is cleaning up after.
+    #[test]
+    fn the_sweep_never_removes_this_process_own_script() {
+        let dir = scratch_dir("sweep-own");
+        let own = dir.join(helper_script_path().file_name().unwrap());
+        std::fs::write(&own, b"mine").unwrap();
+
+        assert_eq!(sweep_temp_orphans_in(&dir, &own, Duration::ZERO), 0);
+        assert!(
+            own.exists(),
+            "the sweep must never remove the current process's own script"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `%TEMP%` belongs to everyone. Nothing outside the two anchored patterns
+    /// is touched — and a DIRECTORY named like a candidate is not either.
+    #[test]
+    fn the_sweep_leaves_every_neighbour_alone() {
+        let dir = scratch_dir("sweep-neighbours");
+        let neighbours = [
+            "notes.txt",
+            "cleanup.cmd",
+            "RemoteControl-Setup-v1.2.3.exe.part",
+        ];
+        for n in neighbours {
+            std::fs::write(dir.join(n), b"not ours").unwrap();
+        }
+        let dir_like_a_candidate = dir.join("rc-update-123456.cmd");
+        std::fs::create_dir(&dir_like_a_candidate).unwrap();
+
+        let own = dir.join(helper_script_path().file_name().unwrap());
+        assert_eq!(sweep_temp_orphans_in(&dir, &own, Duration::ZERO), 0);
+        for n in neighbours {
+            assert!(dir.join(n).exists(), "{n} is not ours to delete");
+        }
+        assert!(
+            dir_like_a_candidate.is_dir(),
+            "a directory is never a candidate, whatever it is called"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// The age guard: a helper from a previous process could still be counting
+    /// down its bounded wait, so nothing recent is removed.
+    #[test]
+    fn the_sweep_leaves_a_fresh_orphan_alone() {
+        let dir = scratch_dir("sweep-fresh");
+        let fresh = dir.join("rc-update-999999.cmd");
+        std::fs::write(&fresh, b"just written").unwrap();
+
+        let own = dir.join(helper_script_path().file_name().unwrap());
+        assert_eq!(sweep_temp_orphans_in(&dir, &own, MIN_ORPHAN_AGE), 0);
+        assert!(fresh.exists(), "a fresh file may still be in use");
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// An unsweepable directory is not an error and above all not a panic —
+    /// the `truncate_update_log_if_large` posture.
+    #[test]
+    fn the_sweep_on_a_missing_directory_is_zero() {
+        let missing = std::env::temp_dir().join("rc-apply-test-definitely-absent-dir");
+        let _ = std::fs::remove_dir_all(&missing);
+
+        assert_eq!(
+            sweep_temp_orphans_in(&missing, &helper_script_path(), Duration::ZERO),
+            0
+        );
+    }
+
+    /// The anti-drift pin: the sweep is checked against the names its WRITERS
+    /// actually produce, not against hand-typed ones. This is the test that
+    /// fails if someone renames a constant on one side only.
+    #[test]
+    fn the_sweep_matches_the_names_its_writers_actually_produce() {
+        let dir = scratch_dir("sweep-drift");
+
+        let setup = dir.join(download::temp_path_for("1.2.3").file_name().unwrap());
+        let script = dir.join(helper_script_path().file_name().unwrap());
+        std::fs::write(&setup, b"written by temp_path_for's name").unwrap();
+        std::fs::write(&script, b"written by helper_script_path's name").unwrap();
+
+        // A DIFFERENT process's script name, so the real one is not skipped by
+        // the PID guard — the matcher itself is what is under test here.
+        let own = dir.join("rc-update-0.cmd");
+        assert_eq!(
+            sweep_temp_orphans_in(&dir, &own, Duration::ZERO),
+            2,
+            "the sweep must match download::temp_path_for and helper_script_path \
+             by construction — if this fails, a constant drifted on one side"
+        );
+
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// The creation flags are the documented MS values, asserted rather than
