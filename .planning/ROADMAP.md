@@ -401,7 +401,16 @@ Plans:
 **Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
 **Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
 **Depends on:** Phase 11
-**Plans:** 14/18 plans executed
+**Plans:** 18/18 plans executed — ⚠ **PHASE GOAL NOT MET**
+
+> **SC5 fails on real hardware.** 12-18's on-hardware UAT published `v1.6.0`
+> and `v1.6.1` and proved the APK self-update end to end (SC4 met), but the
+> PC self-update wedges: `spawn_helper` passes the invalid flag pair
+> `DETACHED_PROCESS | CREATE_NO_WINDOW`, the helper blocks on `tasklist | find`
+> without ever completing a poll, Setup never runs, and the server never comes
+> back. SC7 was unreachable as a consequence. Detail and root cause in
+> `12-18-SUMMARY.md` (`## Self-Check: FAILED`) and STATE.md. The fix needs its
+> own plan and cannot be delivered through the update path it repairs.
 
 **Success Criteria** (what must be TRUE):
 
@@ -446,13 +455,13 @@ Plans:
 **Wave 6** *(blocked on Wave 5 completion)*
 
 - [x] 12-13-PLAN.md — router arms, executor binding, the authed-gated progress push, the atomic 1.8 bump, and the SC6/SC8 integration tests (wave 6)
-- [ ] 12-15-PLAN.md — Updates screen, the Settings nav row, both badge placements, the install-permission sheet, and widget tests over the whole state matrix (wave 6)
-- [ ] 12-17-PLAN.md — PC settings `UPDATES` section: the D-06 fallback that performs its own feed check and shares the phone path's handles (wave 6)
+- [x] 12-15-PLAN.md — Updates screen, the Settings nav row, both badge placements, the install-permission sheet, and widget tests over the whole state matrix (wave 6)
+- [x] 12-17-PLAN.md — PC settings `UPDATES` section: the D-06 fallback that performs its own feed check and shares the phone path's handles (wave 6)
 
 **Wave 7** *(blocked on Wave 6 completion)*
 
-- [ ] 12-16-PLAN.md — extension reload: `ExtCmd::Reload`, the once-per-target-version guard, the `background.js` arm, the installer hardening, and the Chrome file-lock observation (wave 7, human-gated)
+- [x] 12-16-PLAN.md — extension reload: `ExtCmd::Reload`, the once-per-target-version guard, the `background.js` arm, the installer hardening, and the Chrome file-lock observation (wave 7, human-gated)
 
 **Wave 8** *(blocked on Wave 7 completion)*
 
-- [ ] 12-18-PLAN.md — publish `v1.6.0` and `v1.6.1` from the finished tree, then run the Manual-Only Verifications on real hardware: APK self-install, PC self-replace, extension reload and the failure marker (wave 8, human-gated)
+- [x] 12-18-PLAN.md — publish `v1.6.0` and `v1.6.1` from the finished tree, then run the Manual-Only Verifications on real hardware: APK self-install, PC self-replace, extension reload and the failure marker (wave 8, human-gated)

@@ -2,17 +2,21 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Executing Phase 12
-stopped_at: Completed 12-16-PLAN.md (Task 1 checkpoint CLOSED, SC7 observed met)
-last_updated: "2026-08-05T00:20:00.000Z"
-last_activity: 2026-08-05 -- 12-16 COMPLETE; the extension auto-updated itself after a real PC update with the browser open. SC7 OBSERVED MET. Only 12-18 remains.
+status: Phase 12 executed with a BLOCKING DEFECT — SC5 not met
+stopped_at: 12-18 executed; Task 4 FAILED — PC self-update helper defect, SC5 not met
+last_updated: "2026-08-05T02:13:42.072Z"
+last_activity: 2026-08-05 -- 12-18 DONE-WITH-FAILURE. v1.6.0 + v1.6.1 published and SC4 observed met on a real phone; the PC self-update wedges before Setup runs. SC5 NOT MET, SC7 unreachable. Fix needs its own plan.
 progress:
   total_phases: 12
-  completed_phases: 11
+  completed_phases: 12
   total_plans: 108
-  completed_plans: 107
-  percent: 99
+  completed_plans: 108
+  percent: 100
 ---
+
+> ⚠ **The 100% above counts FILES, not outcomes.** All 108 plans have a
+> SUMMARY on disk, but `12-18-SUMMARY.md` carries `## Self-Check: FAILED`.
+> Phase 12 does not deliver its own success criteria — see below.
 
 # Project State
 
@@ -25,11 +29,66 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 
 ## Current Position
 
-Phase: 12 (in-app-updates) — EXECUTING
-Plan: 16 of 18 (17 SUMMARY files on disk; the plain counter above is a
+Phase: 12 (in-app-updates) — ALL 18 PLANS EXECUTED, PHASE GOAL **NOT** MET
+Plan: 18 of 18 (18 SUMMARY files on disk; the plain counter above is a
 sequence number, not the completed count)
 
-**CHECKPOINT 2 IS CLOSED.** 12-16's Task 1 was observed on 2026-08-05: two
+**WAVE 8 (12-18) RESULT — TWO REAL RELEASES, SC4 MET, SC5 BROKEN.**
+
+`v1.6.0` and `v1.6.1` are published on the mirror from the finished tree,
+both with three digest-bearing assets, verified anonymously. All three
+suites were green at `1a45424` (cargo 312/0/2, flutter 832, dart 22).
+Bump commits `74b5d95` and `66ffd43`; version files at `1.6.1` /
+`1.6.1+11` / `1.6.1`.
+
+- **SC4 OBSERVED MET.** The APK updated itself on the physical phone.
+  Missing-grant explainer, the settings route, a declined system dialog
+  that returned the row once with no retry, then a real install landing
+  on `1.6.1`.
+- **SC5 IS NOT MET.** Tapping Update PC exits the server and it never
+  comes back. See the defect below.
+- **SC7 was UNREACHABLE here** (the PC update never completed). 12-16's
+  observation stands on its own and is not superseded.
+- **D-24 OBSERVED MET, by a real failure.** The restarted server read and
+  deleted the pessimistic marker and the phone showed "The installer
+  didn't finish" — no path, no code. Task 4 step 6's hand-written marker
+  was never needed.
+
+  🔴 **THE BLOCKING DEFECT — read before touching `update/apply.rs`.**
+  `spawn_helper` (`server/server-windows/src/update/apply.rs:260`) passes
+  `DETACHED_PROCESS | CREATE_NO_WINDOW`. **These are not a valid pair** —
+  `CREATE_NO_WINDOW` is ignored when `DETACHED_PROCESS` is set, which is
+  why a console window appeared on the owner's desktop. The helper then
+  **blocks** on `tasklist | find` — 0.03s CPU across four minutes, never
+  completing one poll, so the `MAX_WAIT_POLLS = 30` bound never arms and
+  it would wait forever. Setup never runs, the old exe is untouched, and
+  the server never returns. Present in shipped `1.6.0` AND `1.6.1`.
+
+  Ruled out by direct check, do not re-investigate: the batch logic (its
+  exact wait test run by hand against the dead PID correctly falls to
+  `goto gone`), the script generation (`__MAX_POLLS__` → `30`, all
+  substitutions clean, CRLF right), the download (correct file, correct
+  size), and the marker protocol (worked, and is the only reason this was
+  diagnosable).
+
+  **Why no test caught it:** `begin_apply_with` takes the spawn as an
+  injected closure so sequencing can be tested without starting a real
+  detached process. Correct test design — and exactly the seam the bug
+  lives behind. `spawn_helper` is the one function in this path no test
+  ever executes.
+
+  **The fix cannot ship through the path it fixes.** The broken helper is
+  inside `1.6.0`/`1.6.1`, so a follow-up needs `1.6.2` installed BY HAND
+  and `1.6.3` as the tap target before Task 4 can be re-run.
+
+  Also worth fixing while in there: the 30-poll bound only guards a server
+  that refuses to die, not a helper that never completes a poll — a
+  wall-clock deadline would have relaunched the old server instead of
+  leaving the owner with none. And a wedged helper leaks both
+  `%TEMP%\rc-update-<pid>.cmd` and the downloaded setup exe, since
+  `del` sits at `:end`.
+
+  **CHECKPOINT 2 IS CLOSED.** 12-16's Task 1 was observed on 2026-08-05: two
 back-to-back silent upgrades (1.5.0→1.5.1→1.5.2) with Chrome holding the
 unpacked extension. Exit code 0 both times, no `ErrorReplacingExistingFile`,
 no Abort/Retry/Ignore, "Need to restart Windows? No" — so the Chrome write
@@ -667,6 +726,7 @@ Progress: [██████████] 100% (11 of 11 phases complete; 90 of
 | Phase 12 P11 | 32min | 3 tasks | 4 files |
 | Phase 12 P12 | 18min | 3 tasks | 9 files |
 | Phase 12 P14 | 35min | 3 tasks | 5 files |
+| Phase 12 P18 | 7h 15m | 4 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -949,6 +1009,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-04T14:28:51.973Z
-Stopped at: Completed 12-11-PLAN.md
+Last session: 2026-08-05T02:13:42.052Z
+Stopped at: 12-18 executed; Task 4 FAILED — PC self-update helper defect, SC5 not met
 Resume file: None
