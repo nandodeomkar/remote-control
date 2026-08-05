@@ -8,11 +8,14 @@
 //! knows an update is happening cannot be the process that performs it — only
 //! something outside the server can sequence wait, install and relaunch.
 //!
-//! That something is a `.cmd` written to `%TEMP%` and spawned
-//! `DETACHED_PROCESS | CREATE_NO_WINDOW`. `.cmd` and not `.ps1` because
-//! PowerShell script execution is subject to a machine-configurable
-//! `ExecutionPolicy` that can be `Restricted`, and `cmd.exe` has no equivalent
-//! gate. The helper is six commands; robustness beats ergonomics.
+//! That something is a `.cmd` written to `%TEMP%` and spawned with
+//! [`HELPER_CREATION_FLAGS`] — `CREATE_NO_WINDOW` **alone**, and emphatically
+//! NOT `DETACHED_PROCESS | CREATE_NO_WINDOW`, which is not a valid pair and is
+//! what wedged the shipped 1.6.0/1.6.1 helper (see [`DETACHED_PROCESS`] for the
+//! full account). `.cmd` and not `.ps1` because PowerShell script execution is
+//! subject to a machine-configurable `ExecutionPolicy` that can be
+//! `Restricted`, and `cmd.exe` has no equivalent gate. The helper is six
+//! commands; robustness beats ergonomics.
 //!
 //! # The correction that supersedes the design spec
 //!
@@ -41,14 +44,41 @@ use std::process::{Command, Stdio};
 use super::UpdateError;
 use super::marker;
 
-/// The child gets no console and is not attached to this process's console
-/// (MS "Process Creation Flags"). Together with the null stdio below, this is
-/// what lets the helper outlive the process that spawned it without flashing
-/// a window on the owner's desktop mid-update.
+/// **Deliberately NOT used. Never pass this flag from this module again.**
+///
+/// It is kept only so the reader meets this explanation before the value, and
+/// so [`creation_flags_are_the_documented_values`] can assert its ABSENCE from
+/// [`HELPER_CREATION_FLAGS`].
+///
+/// MS "Process Creation Flags" specifies that `CREATE_NO_WINDOW` is **IGNORED
+/// when `DETACHED_PROCESS` is set**. The two together therefore left the child
+/// `cmd.exe` with no console *at all* rather than with a hidden one — and a
+/// console-less `cmd` running a pipeline (`tasklist ... | find ...`) re-spawns
+/// itself once per pipe side, so Windows allocated the grandchildren fresh,
+/// **VISIBLE** consoles, and `find` then blocked forever on its pipe read.
+/// Observed on hardware (12-18 Task 4): a window titled `find "7556"` on the
+/// owner's desktop, 0.03 s of CPU across four minutes — blocked, not spinning —
+/// so not one poll ever completed, `MAX_WAIT_POLLS` never armed, and Setup
+/// never ran. That is the whole of the 1.6.0/1.6.1 self-update defect.
+///
+/// Helper survival never depended on this flag: Windows has no parent-child
+/// process lifetime link, and `std::process::Child` has no kill-on-drop, which
+/// is what [`spawn_helper`]'s own doc comment already said. The pipe is gone
+/// too (see [`HELPER_TEMPLATE`]'s `:wait` block), but both halves stay fixed —
+/// neither one alone should be trusted to keep this path working.
+#[allow(dead_code, reason = "kept as documentation and asserted against by tests")]
 const DETACHED_PROCESS: u32 = 0x0000_0008;
-/// Second half of the same pair (MS "Process Creation Flags") — a console
-/// application started without a console window at all.
+/// (MS "Process Creation Flags") — the child gets its own console which is
+/// never displayed. That is the property that matters: any console-application
+/// grandchild inherits this invisible console instead of having a fresh,
+/// visible one allocated for it.
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
+/// The flags [`spawn_helper`] passes: `CREATE_NO_WINDOW` **alone**.
+///
+/// Named rather than inlined so a test can assert both what it is and — the
+/// assertion that matters — that [`DETACHED_PROCESS`] is not part of it.
+const HELPER_CREATION_FLAGS: u32 = CREATE_NO_WINDOW;
 
 /// The installed exe's fixed name, shared VERBATIM with the installer.
 ///
@@ -99,21 +129,53 @@ set "MARKER=__MARKER__"
 set "LOG=__LOG__"
 set "TARGET=__TARGET__"
 
-REM 1. Wait for the server PID to exit, which releases the AppMutex Setup
-REM    checks. The sleep is `ping` and deliberately NOT the timeout command:
-REM    timeout fails when stdin is not a console, and a DETACHED_PROCESS child
-REM    has no console at all.
+REM 1. Wait until the server's own exe is WRITABLE, which is the same event
+REM    that releases the AppMutex Setup checks: a running process holds a write
+REM    lock on its own image (Windows shares only READ and DELETE on a mapped
+REM    image), so a successful append means that process is gone and its mutex
+REM    handle with it. It is at least as strong a gate as PID death and
+REM    strictly stronger against a third party holding the file - and it tests
+REM    exactly what Setup needs, that {app}\RemoteControl.exe is replaceable.
+REM
+REM    The check is deliberately PIPE-FREE and spawns NO child process. The
+REM    check it replaces was a tasklist piped into find, and that pipeline is
+REM    what wedged the shipped 1.6.0/1.6.1 helper: cmd re-spawns itself once per
+REM    pipe side and find then blocked forever on its pipe read, so not one poll
+REM    ever completed.
+REM
+REM    The if-not-exist line is a guard, not an optimisation: an append
+REM    redirection to a MISSING file CREATES it, and EXE degrades to the bare
+REM    name RemoteControl.exe when current_exe fails, which would otherwise
+REM    conjure a stray file into this script's working directory. If the exe is
+REM    genuinely absent there is nothing to wait for and nothing to protect.
+REM    The call with a trailing space is the no-op that sets ERRORLEVEL 0, so
+REM    the conditional runs only when the redirection itself succeeded - and
+REM    the append writes ZERO bytes, so the exe's contents cannot change.
+REM
+REM    The sleep is `ping` and deliberately NOT the timeout command: timeout
+REM    reads stdin, and this child's stdin is NUL.
 set /a N=0
 :wait
-tasklist /FI "PID eq %PID%" /NH 2>nul | find "%PID%" >nul || goto gone
+if not exist "%EXE%" goto gone
+2>nul (
+  >>"%EXE%" (call )
+) && goto gone
 set /a N+=1
-REM    Bounded (T-12-28): a server that refuses to die must not leave this
-REM    helper spinning forever, and firing the install into a held mutex would
-REM    abort anyway. On timeout: log, and exit WITHOUT running setup - the
-REM    still-installed old server keeps working and the marker stays ok:false.
+REM    Bounded (T-12-28): an exe that stays locked must not leave this helper
+REM    polling forever, and firing the install into a held mutex would abort
+REM    anyway. So the INSTALL is skipped on timeout - but the RELAUNCH is NOT.
+REM    The shipped helper jumped straight to the cleanup label, PAST the
+REM    relaunch, so a timeout for ANY reason - including a stuck lock held by
+REM    something that is not the server - left the owner with no server running
+REM    at all, the exact outcome this bound exists to prevent. Routing through
+REM    :relaunch also reaches the cleanup label, which is what deletes the
+REM    leaked setup exe on the abort path.
+REM    Accepted cost: if the server really is still alive, the relaunch is
+REM    refused by the single-instance mutex and the owner sees the "already
+REM    running" toast. Strictly better than no server.
 if %N% GEQ __MAX_POLLS__ (
-  echo [%DATE% %TIME%] server pid %PID% still alive after __MAX_POLLS__ polls; aborting without installing >> "%LOG%"
-  goto end
+  echo [%DATE% %TIME%] server exe still locked after __MAX_POLLS__ polls, pid %PID%; skipping the install and relaunching >> "%LOG%"
+  goto relaunch
 )
 ping -n 2 127.0.0.1 >nul
 goto wait
@@ -245,11 +307,18 @@ pub fn helper_script_path() -> PathBuf {
     std::env::temp_dir().join(format!("rc-update-{}.cmd", std::process::id()))
 }
 
-/// Spawn the helper DETACHED and walk away.
+/// Spawn the helper and walk away.
 ///
 /// Three deliberate choices:
-/// - `DETACHED_PROCESS | CREATE_NO_WINDOW` so the child survives this
-///   process's exit with no console window;
+/// - [`HELPER_CREATION_FLAGS`] — `CREATE_NO_WINDOW` **alone**, so the child
+///   gets its OWN console which is never displayed, and any console-app
+///   grandchild inherits that invisible console instead of having a fresh,
+///   visible one allocated for it. `DETACHED_PROCESS` is NOT passed and must
+///   never be re-added: MS "Process Creation Flags" makes `CREATE_NO_WINDOW`
+///   ignored when it is set, which left the shipped 1.6.0/1.6.1 helper with no
+///   console at all and wedged it (the full account is on
+///   [`DETACHED_PROCESS`]). Nothing about the child's survival ever depended on
+///   that flag — see the third bullet, which is the actual mechanism;
 /// - all three stdio handles null — an inherited handle would keep this
 ///   process's pipes alive and can block the child's writes;
 /// - **the child is never waited on.** This process is about to exit, and
@@ -260,7 +329,7 @@ pub fn helper_script_path() -> PathBuf {
 fn spawn_helper(script: &Path) -> std::io::Result<()> {
     Command::new("cmd.exe")
         .args(["/c", &script.to_string_lossy()])
-        .creation_flags(DETACHED_PROCESS | CREATE_NO_WINDOW)
+        .creation_flags(HELPER_CREATION_FLAGS)
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -387,12 +456,32 @@ mod tests {
         );
         assert!(s.contains("/LOG="), "an installer failure must be diagnosable");
 
-        // The bounded PID wait, with the console-free sleep.
-        assert!(s.contains("tasklist /FI"));
+        // The bounded wait. The load-bearing assertion is the ABSENCE of a
+        // pipe: a pipeline makes cmd re-spawn itself per side, which is what
+        // wedged the shipped 1.6.0/1.6.1 helper (see DETACHED_PROCESS).
+        assert!(
+            !s.contains('|'),
+            "the helper must contain NO pipe anywhere: a pipeline makes cmd \
+             re-spawn itself per side, which is the 1.6.0/1.6.1 wedge. If this \
+             fires on a REM comment, reword the comment — the assertion is the \
+             point:\n{s}"
+        );
+        assert!(
+            s.contains("if not exist \"%EXE%\" goto gone"),
+            "an append to a MISSING file would CREATE it; the guard is required"
+        );
+        assert!(
+            s.contains(">>\"%EXE%\" (call )"),
+            "the wait is the zero-child-process exe-lock test (D-B)"
+        );
+        assert!(
+            s.contains(") && goto gone"),
+            "the lock test proceeds only when the append itself succeeded"
+        );
         assert!(s.contains("ping -n 2 127.0.0.1"));
         assert!(
             !s.contains("timeout /t"),
-            "timeout needs a console a DETACHED_PROCESS child does not have"
+            "timeout reads stdin and this child's stdin is NUL"
         );
         assert!(s.contains(&format!("if %N% GEQ {MAX_WAIT_POLLS}")));
 
@@ -430,7 +519,14 @@ mod tests {
             "no second ok:true write may exist anywhere in the script"
         );
 
-        let jump = s.find("goto relaunch").expect("the failure path jumps");
+        // There are now TWO `goto relaunch` jumps — the wait timeout's and this
+        // one — so the failure branch's is located from its own log line rather
+        // than by taking the first occurrence in the file.
+        let log_line = s.find("setup exited %ERRORLEVEL%").expect("failure logged");
+        let jump = log_line
+            + s[log_line..]
+                .find("goto relaunch")
+                .expect("the failure path jumps");
         let promote = s.find(rewrite).expect("the promotion exists");
         let label = s.find("\r\n:relaunch").expect("the relaunch label exists");
         assert!(
@@ -439,24 +535,48 @@ mod tests {
         );
 
         // And the failure path logs before it jumps (D-24).
-        let log_line = s.find("setup exited %ERRORLEVEL%").expect("failure logged");
         assert!(log_line < jump);
     }
 
     /// The timeout path leaves the marker alone and never reaches the setup
-    /// invocation — it jumps to `:end`, past both the install and the
-    /// relaunch.
+    /// invocation — but it DOES reach the relaunch. Both halves are asserted
+    /// because the shipped helper only had the first: it jumped to `:end`,
+    /// past the relaunch, so a timeout left the owner with no server at all.
     #[test]
-    fn the_wait_timeout_skips_the_installer_entirely() {
+    fn the_wait_timeout_skips_the_installer_but_still_relaunches() {
         let s = sample();
-        let timeout_jump = s.find("aborting without installing").expect("timeout logged");
+        let timeout_log = s
+            .find("skipping the install and relaunching")
+            .expect("timeout logged");
         let setup_call = s.find("\"%SETUP%\" /VERYSILENT").expect("setup invoked");
         assert!(
-            timeout_jump < setup_call,
+            timeout_log < setup_call,
             "the timeout branch precedes the install and jumps past it"
         );
-        assert!(s.contains("goto end"));
-        assert!(s.contains("\r\n:end\r\n"));
+
+        // The jump target on the line after the timeout log is `relaunch`, not
+        // the cleanup label — this is the half the shipped helper got wrong.
+        let after_log = &s[timeout_log..];
+        let jump = after_log.find("goto ").expect("the timeout branch jumps");
+        assert!(
+            after_log[jump..].starts_with("goto relaunch"),
+            "the timeout must jump to :relaunch so the old server comes back"
+        );
+        assert!(
+            !s.contains("goto end"),
+            "REGRESSION PIN: nothing may ever jump past the relaunch again. A \
+             `goto end` is the shipped 1.6.0/1.6.1 defect — a wait timeout that \
+             leaves the owner with no server running."
+        );
+
+        // `:end` itself stays: it is where the leaked setup exe is deleted, and
+        // the relaunch falls through into it.
+        let relaunch = s.find("start \"\" \"%EXE%\"").expect("the relaunch exists");
+        let end_label = s.find("\r\n:end\r\n").expect("the cleanup label exists");
+        assert!(
+            relaunch < end_label,
+            ":end must sit AFTER the relaunch, so reaching it relaunches first"
+        );
     }
 
     /// A target carrying `cmd` metacharacters is refused before it can be
@@ -676,11 +796,25 @@ mod tests {
         );
     }
 
-    /// The two creation flags are the documented MS values, asserted rather
-    /// than trusted to a comment.
+    /// The creation flags are the documented MS values, asserted rather than
+    /// trusted to a comment — and, the assertion that would have caught the
+    /// shipped defect, `DETACHED_PROCESS` is NOT among the flags we pass.
     #[test]
     fn creation_flags_are_the_documented_values() {
         assert_eq!(DETACHED_PROCESS, 8);
         assert_eq!(CREATE_NO_WINDOW, 134_217_728);
+
+        assert_eq!(
+            HELPER_CREATION_FLAGS, CREATE_NO_WINDOW,
+            "the helper is spawned with CREATE_NO_WINDOW alone"
+        );
+        assert_eq!(
+            HELPER_CREATION_FLAGS & DETACHED_PROCESS,
+            0,
+            "DETACHED_PROCESS | CREATE_NO_WINDOW is NOT a valid pair — MS makes \
+             CREATE_NO_WINDOW ignored when DETACHED_PROCESS is set, leaving the \
+             child with no console at all. Shipping that pair IS the 1.6.0/1.6.1 \
+             self-update defect; never re-add it."
+        );
     }
 }
