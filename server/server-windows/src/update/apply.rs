@@ -635,15 +635,233 @@ mod tests {
     }
 
     /// A unique scratch directory per test — the suite runs threaded.
+    ///
+    /// The thread id is reduced to its digits rather than used as `{:?}`
+    /// renders it: `ThreadId(13)` carries `cmd` metacharacters, and the
+    /// real-spawn tests below hand this path to `cmd.exe /c`. `Command` quotes
+    /// an argument only when it contains a space or a quote, so an unquoted
+    /// `(` would end the command line and the helper would never run.
     fn scratch_dir(tag: &str) -> PathBuf {
+        let raw = format!("{:?}", std::thread::current().id());
+        let tid: String = raw.chars().filter(char::is_ascii_digit).collect();
         let dir = std::env::temp_dir().join(format!(
-            "rc-apply-test-{}-{tag}-{:?}",
+            "rc-apply-test-{}-{tag}-{tid}",
             std::process::id(),
-            std::thread::current().id()
         ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("create scratch dir");
         dir
+    }
+
+    /// Everything a REAL `spawn_helper` run needs on disk.
+    ///
+    /// The two tests below are the only ones that execute [`spawn_helper`] —
+    /// the one function in this path that no test used to run, which is exactly
+    /// the seam the shipped 1.6.0/1.6.1 wedge lived behind.
+    ///
+    /// Three fixture choices are load-bearing:
+    ///
+    /// - **`stub-exe.cmd` is a `.cmd`.** `start "" "%EXE%"` has ShellExecute
+    ///   semantics and always SPAWNS, so a batch file is a fine relaunch
+    ///   target. It briefly FLASHES A CONSOLE WINDOW when it fires. That is the
+    ///   honest price of covering this seam, and it is far cheaper than the
+    ///   shipped defect it catches.
+    /// - **`stub-setup.exe` is deliberately NOT a valid PE.** `cmd` therefore
+    ///   cannot execute it and `if errorlevel 1` fires deterministically. The
+    ///   zero-exit branch is NOT covered here on purpose (D-D): the setup
+    ///   invocation carries no `call`, so a `.cmd` stub would CHAIN and the
+    ///   helper's remaining lines would never run, and no stock console exe
+    ///   exits 0 when handed `/VERYSILENT /NORESTART /SUPPRESSMSGBOXES /LOG=`.
+    ///   The `ok:true` rewrite stays pinned by the golden text test plus
+    ///   `marker::tests::helper_written_success_marker_parses_without_an_error_field`,
+    ///   which parses the exact bytes the `echo` emits.
+    /// - **the marker starts pessimistic**, written through the real
+    ///   `marker::write_pending_at`, so the helper begins from the exact state
+    ///   `begin_apply_with` leaves behind.
+    struct HelperFixture {
+        dir: PathBuf,
+        script: PathBuf,
+        setup: PathBuf,
+        exe: PathBuf,
+        marker: PathBuf,
+        log: PathBuf,
+        relaunched: PathBuf,
+    }
+
+    fn helper_fixture(tag: &str) -> HelperFixture {
+        let dir = scratch_dir(tag);
+
+        // The relaunch target. `%~dp0` already ends in a backslash.
+        //
+        // The trailing `exit` is REQUIRED and is not `exit /b`: `start` launches
+        // a batch target through `cmd /K`, which keeps the console — and the
+        // process — alive after the script ends. Without it every run of these
+        // two tests leaves a live `cmd.exe` and an open console window on the
+        // desktop. A bare `exit` ends the `cmd` itself.
+        //
+        // It shares ONE LINE with the write, deliberately: `cmd` reads a batch
+        // file line by line, re-opening it each time, so an `exit` on its own
+        // line can be lost when the test removes this directory the moment
+        // `relaunched.txt` appears — leaving exactly the orphan the `exit` is
+        // there to prevent. On one line the `exit` is already in hand.
+        let exe = dir.join("stub-exe.cmd");
+        std::fs::write(
+            &exe,
+            "@echo off\r\n> \"%~dp0relaunched.txt\" echo relaunched & exit\r\n",
+        )
+        .expect("write stub exe");
+
+        let setup = dir.join("stub-setup.exe");
+        std::fs::write(&setup, b"this is not a PE").expect("write stub setup");
+
+        let marker = dir.join("update-result.json");
+        marker::write_pending_at(&marker, "1.6.0");
+
+        let log = dir.join("update.log");
+        let script = dir.join("rc-update-test.cmd");
+
+        // The PID reaches the timeout LOG LINE and nothing else — the wait is
+        // now the exe-lock test, so this test is NOT waiting on itself.
+        let text = helper_script(std::process::id(), &setup, &exe, &marker, &log, "1.6.0");
+        std::fs::write(&script, text).expect("write helper script");
+
+        HelperFixture {
+            relaunched: dir.join("relaunched.txt"),
+            dir,
+            script,
+            setup,
+            exe,
+            marker,
+            log,
+        }
+    }
+
+    /// The hard deadline that makes running a real spawn by default SAFE: if
+    /// the helper ever wedges again this returns `false` and the test fails
+    /// with a message that names the wedge, instead of hanging the suite (D-E).
+    fn poll_until(deadline: std::time::Duration, mut done: impl FnMut() -> bool) -> bool {
+        let start = std::time::Instant::now();
+        loop {
+            if done() {
+                return true;
+            }
+            if start.elapsed() >= deadline {
+                return false;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+    }
+
+    const SPAWN_DEADLINE: std::time::Duration = std::time::Duration::from_secs(30);
+
+    /// The test that would have caught the shipped defect: a REAL
+    /// [`spawn_helper`] against a REAL generated script, asserted on disk.
+    ///
+    /// Nothing holds a lock on `stub-exe.cmd`, so the first poll's append
+    /// succeeds and the helper falls straight through `:gone`. Every assertion
+    /// below is something the wedge prevented.
+    #[test]
+    fn spawn_helper_runs_the_whole_helper_to_completion() {
+        let f = helper_fixture("realspawn");
+
+        spawn_helper(&f.script).expect("the helper must spawn");
+
+        let finished = poll_until(SPAWN_DEADLINE, || !f.script.exists());
+        assert!(
+            finished,
+            "the helper never reached its self-delete within {SPAWN_DEADLINE:?}. \
+             THIS IS THE 1.6.0/1.6.1 WEDGE: check the creation flags \
+             (DETACHED_PROCESS must NOT be set) and that the script contains no \
+             pipe. A stray console window on the desktop is the same symptom."
+        );
+
+        assert!(
+            !f.setup.exists(),
+            "`del \"%SETUP%\"` at :end must remove the downloaded installer"
+        );
+
+        let log = std::fs::read_to_string(&f.log).expect("the helper must have written update.log");
+        assert!(
+            log.contains("setup exited"),
+            "Setup must actually be INVOKED — that is the single thing the wedge \
+             prevented. update.log said:\n{log}"
+        );
+
+        let marker = std::fs::read_to_string(&f.marker).expect("the marker must survive");
+        assert!(
+            marker.contains("\"ok\":false"),
+            "a non-zero installer exit must leave the marker honest (D-24); got:\n{marker}"
+        );
+
+        // `start` returns before the spawned stub has written, so this gets its
+        // own short deadline rather than being asserted immediately.
+        assert!(
+            poll_until(std::time::Duration::from_secs(10), || f.relaunched.exists()),
+            "the relaunch must fire even after a failed install — the old exe is \
+             still installed and still works"
+        );
+
+        let _ = std::fs::remove_dir_all(&f.dir);
+    }
+
+    /// The regression test for the wait ITSELF: it must actually loop while the
+    /// exe is locked, which the golden text test cannot prove.
+    ///
+    /// `share_mode(0)` denies all sharing, which is how a running server's own
+    /// image behaves against an append — so the helper's `>>"%EXE%" (call )`
+    /// fails exactly as it does in production, and cannot proceed until the
+    /// handle is dropped.
+    #[test]
+    fn spawn_helper_waits_while_the_exe_is_locked() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let f = helper_fixture("realwait");
+
+        let lock = std::fs::OpenOptions::new()
+            .write(true)
+            .share_mode(0)
+            .open(&f.exe)
+            .expect("lock the stub exe");
+
+        spawn_helper(&f.script).expect("the helper must spawn");
+
+        // Two-plus poll intervals (the sleep is `ping -n 2`, ~1 s).
+        std::thread::sleep(std::time::Duration::from_millis(2500));
+        assert!(
+            f.script.exists(),
+            "the helper must still be waiting while the exe is locked"
+        );
+        assert!(
+            f.setup.exists(),
+            "the installer must not have been touched while the exe is locked"
+        );
+        assert!(
+            !std::fs::read_to_string(&f.log).is_ok_and(|l| l.contains("setup exited")),
+            "Setup must NOT have been invoked while the exe is locked"
+        );
+
+        drop(lock);
+
+        let finished = poll_until(SPAWN_DEADLINE, || !f.script.exists());
+        assert!(
+            finished,
+            "the helper must complete once the exe lock is released, but it did \
+             not within {SPAWN_DEADLINE:?}"
+        );
+        let log = std::fs::read_to_string(&f.log).expect("the helper must have written update.log");
+        assert!(
+            log.contains("setup exited"),
+            "the wait released and the helper ran on; update.log said:\n{log}"
+        );
+        // Waited on for the same reason as in the test above, and for one more:
+        // removing this directory before the relaunched stub has read its
+        // `exit` would strand a `cmd /K` on the owner's desktop.
+        assert!(
+            poll_until(std::time::Duration::from_secs(10), || f.relaunched.exists()),
+            "the relaunch must fire once the wait releases"
+        );
+
+        let _ = std::fs::remove_dir_all(&f.dir);
     }
 
     /// The full sequence with the spawn stubbed out: the marker is written
