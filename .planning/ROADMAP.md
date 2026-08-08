@@ -401,16 +401,23 @@ Plans:
 **Design spec:** `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (approved 2026-08-01, commit 3e0135f) — source of truth for scope, protocol shape, and error vocabulary
 **Requirements**: none mapped — the acceptance surface is the design spec's Decisions table
 **Depends on:** Phase 11
-**Plans:** 18/18 plans executed — ⚠ **PHASE GOAL NOT MET**
+**Plans:** 18/18 plans executed — ✅ **PHASE GOAL MET** (closed 2026-08-08)
 
-> **SC5 fails on real hardware.** 12-18's on-hardware UAT published `v1.6.0`
-> and `v1.6.1` and proved the APK self-update end to end (SC4 met), but the
-> PC self-update wedges: `spawn_helper` passes the invalid flag pair
-> `DETACHED_PROCESS | CREATE_NO_WINDOW`, the helper blocks on `tasklist | find`
-> without ever completing a poll, Setup never runs, and the server never comes
-> back. SC7 was unreachable as a consequence. Detail and root cause in
-> `12-18-SUMMARY.md` (`## Self-Check: FAILED`) and STATE.md. The fix needs its
-> own plan and cannot be delivered through the update path it repairs.
+> **SC5 and SC7 observed met on hardware 2026-08-08.** 12-18's UAT (2026-08-05)
+> published `v1.6.0`/`v1.6.1` and proved the APK self-update (SC4), but the PC
+> self-update wedged: `spawn_helper` passed the invalid flag pair
+> `DETACHED_PROCESS | CREATE_NO_WINDOW` and the helper blocked on
+> `tasklist | find` without ever completing a poll, so Setup never ran and the
+> server never came back. Quick `260805-axr` fixed it; quick `260808-waa`
+> proved it — `1.6.2` shipped as a pre-release and installed by hand, `1.6.3`
+> published as the tap target, and Update PC then completed in three seconds
+> with the extension self-reloading and the phone reconnecting on its own.
+> Verbatim evidence in the Addendum to `12-18-SUMMARY.md` and in STATE.md.
+>
+> Still open, and not closed by this: RESEARCH OQ-1 (the Chrome extension file
+> lock) has never reproduced, so the `.iss` deferred-replacement path has never
+> run; and the helper root cause stays inferential — the repair is proven,
+> which half was load-bearing is not.
 
 **Success Criteria** (what must be TRUE):
 

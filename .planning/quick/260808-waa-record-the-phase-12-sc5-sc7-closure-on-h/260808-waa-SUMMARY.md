@@ -86,7 +86,22 @@ motivated it.
 | — | `c728a30` | the plan |
 | 1 | `0858013` | `12-18-SUMMARY.md`: addendum, criteria table, frontmatter |
 | 2 | `096cef5` | the helper todo closed and moved to `todos/done/` |
-| 3 | *(this commit)* | `STATE.md` and this summary |
+| 3 | `74ff212` | `STATE.md` and this summary |
+| 3b | *(this commit)* | `ROADMAP.md` phase 12 header — see Deviations |
+
+## Deviations from Plan
+
+**`.planning/ROADMAP.md` was edited, which the quick workflow tells executors not to
+do.** That rule exists so quick tasks do not insert themselves into the phase roadmap —
+this edit does the opposite. ROADMAP.md's Phase 12 header carried its own copy of the
+`⚠ PHASE GOAL NOT MET / SC5 fails on real hardware` warning, which was now false, and
+leaving a wrong verdict in the roadmap because a quick task is not supposed to touch it
+would defeat the entire point of the task. No quick-task row was added; only the phase
+verdict was corrected, with the same two open items carried forward.
+
+The plan also did not anticipate the two memory files
+(`v1-dogfood-refine-hold.md`, `MEMORY.md`) asserting SC5 unmet. Both were corrected —
+they live outside the repo, so they carry no commit.
 
 ## What this does NOT close
 
