@@ -47,10 +47,11 @@ key-decisions:
   - "Task 4 step 6's hand-written ok:false marker was NOT needed: the real failure produced a genuine pessimistic marker, which is strictly better evidence than a fabricated one. The stand-in was skipped as superseded, not skipped as unrun."
   - "On finding the D-16 defect the plan was STOPPED rather than extended into a fix. Fixing it requires a 1.6.2 installed by hand plus a 1.6.3 to test against — several release cycles, and a verification plan is the wrong container for that work. Owner chose this explicitly."
   - "requirements-completed lists only what was actually observed. Copying the plan's full requirements array verbatim, as the summary template instructs, would have marked D-16/D-17/D-18/SC5/SC7 complete when they are not."
+  - "AMENDED 2026-08-08 by quick 260808-waa: D-16/D-17/D-18/SC5/SC7 moved from requirements-not-met to requirements-completed after the PC self-update was observed working on hardware (1.6.2 -> 1.6.3). The amendment touches the frontmatter arrays, the criteria table and an addendum ONLY — the 2026-08-05 observations of the wedge are left verbatim, because they are the evidence the defect was real."
 
-requirements-completed: [D-04, D-07, D-19, D-20, D-21, D-24, SC1, SC3, SC4]
+requirements-completed: [D-04, D-07, D-16, D-17, D-18, D-19, D-20, D-21, D-24, SC1, SC3, SC4, SC5, SC7]
 requirements-partial: [D-06, D-08, D-12, D-25, D-26, SC2]
-requirements-not-met: [D-16, D-17, D-18, SC5, SC7]
+requirements-not-met: []
 
 # Metrics
 duration: 7h 15m (mostly blocking human checkpoints; ~35 min of machine work)
@@ -288,11 +289,11 @@ rather than a test-environment problem.
 | Criterion | Verdict |
 |---|---|
 | **SC1** — two releases no hand could have produced inconsistently | **MET** |
-| **SC2** — every surface reports the version of the package it runs, at three versions | **PARTIAL** — phone did `1.6.0` → `1.6.1` on real hardware; the PC never left `1.6.0` |
+| **SC2** — every surface reports the version of the package it runs, at three versions | **PARTIAL as of 2026-08-05** — phone did `1.6.0` → `1.6.1`; the PC never left `1.6.0`. **MET 2026-08-08** — the PC went `1.6.2` → `1.6.3` and the extension with it; see the Addendum |
 | **SC3** — row-state matrix exercised against a live feed | **MET** |
 | **SC4** — APK updated itself on a physical phone, grant and decline paths included | **OBSERVED MET** |
-| **SC5** — the PC replaces itself and comes back | **NOT MET** — the helper wedges; Setup never runs |
-| **SC7** — extension reaches the new version, or degrades as D-18 documents | **NOT TESTED HERE** — unreachable, since the PC update never completed. (12-16 Task 1 observed SC7 met against fabricated 1.5.1/1.5.2 builds; that observation stands and is *not* superseded by this one) |
+| **SC5** — the PC replaces itself and comes back | **NOT MET as of 2026-08-05** — the helper wedges; Setup never runs. **OBSERVED MET 2026-08-08** after the `260805-axr` fix shipped in `1.6.2`; see the Addendum |
+| **SC7** — extension reaches the new version, or degrades as D-18 documents | **NOT TESTED as of 2026-08-05** — unreachable, since the PC update never completed. (12-16 Task 1 observed SC7 met against fabricated 1.5.1/1.5.2 builds; that observation stands and is *not* superseded by this one.) **OBSERVED MET 2026-08-08** on a real release pair — see the Addendum |
 | **D-21** — a release postdating the implementation exists | **CLOSED** |
 
 **D-24 is observed met on real hardware, and by a genuine failure rather than a simulated
@@ -325,6 +326,10 @@ setup still required.
 **Phase 12 is NOT complete.** It is 18/18 plans executed but one success criterion is
 demonstrably false.
 
+> **SUPERSEDED 2026-08-08.** All four items below were done — 1–3 by quick
+> `260805-axr`, item 4 by quick `260808-waa`. Phase 12 now meets its goal. The list is
+> kept because it is the record of what was owed; see the Addendum for what discharged it.
+
 What a follow-up plan must do, in order:
 
 1. **Fix `spawn_helper`.** Drop the invalid flag pair. Whatever replaces it must be
@@ -352,7 +357,81 @@ Carried forward for whoever picks this up:
 - **A killed helper also leaves the downloaded setup exe in `%TEMP%`** — `del "%SETUP%"`
   is at `:end`, which a wedge never reaches.
 
-## Self-Check: FAILED
+## Addendum 2026-08-08 — Task 4 re-run, SC5 and SC7 OBSERVED MET
+
+Recorded by quick `260808-waa`. **Everything above this heading is the 2026-08-05 record
+and has not been edited** — the wedge was real, and its evidence is why the fix exists.
+
+### What shipped between the two runs
+
+| Step | Result |
+|---|---|
+| `spawn_helper` fixed | quick `260805-axr` — commits `fad11fe`, `e585784`, `65ddf91` |
+| `v1.6.2` published as a **pre-release** | commit `6dc6e27`, tag `v1.6.2`. Pre-release on purpose: `/releases/latest` excludes them, so the installed `1.6.1` was never offered an update its own broken helper would wedge on |
+| `v1.6.2` installed **by hand** | `/VERYSILENT /NORESTART /SUPPRESSMSGBOXES`, exit 0. Local file digest `35edc37c…a0ef22`… equalled the published asset digest byte-for-byte, so the hand-install and the feed agree on what `1.6.2` is |
+| `v1.6.3` published as a **normal** release | commit `f0d1aaa`, tag `v1.6.3`, three digest-bearing assets, anonymous `latest` = `v1.6.3` |
+
+This is the delivery shape the 2026-08-05 record predicted was necessary: the fix could
+not ship through the path it repairs.
+
+### The run, verbatim
+
+`%APPDATA%\RemoteControl\logs\server.log.2026-08-08` (UTC) interleaved with
+`%TEMP%\rc-setup.log` (local, UTC+05:30 — the same instants):
+
+```
+17:41:36.065972Z  update: helper spawned; exiting to let the installer replace this exe
+23:11:37.582      Log opened.  Original Setup EXE: %TEMP%\RemoteControl-Setup-v1.6.3.exe
+23:11:37.582      Setup command line: /SL5="..." /VERYSILENT /NORESTART /SUPPRESSMSGBOXES /LOG="...\rc-setup.log"
+23:11:38.086      Successfully installed the file.
+23:11:38.090      Successfully installed the file.
+23:11:38.093      Successfully installed the file.
+23:11:38.096      Successfully installed the file.
+23:11:38.594      Need to restart Windows? No
+17:41:39.041889Z  server-windows listening port=17777
+```
+
+**Three seconds, helper spawn to server back up.** The same call wedged indefinitely on
+`1.6.0`/`1.6.1`.
+
+Owner-observed in the same run, the two legs no log can show:
+
+- **The browser extension reloaded itself**, no manual action. SC7.
+- **The phone reconnected on its own.** No `pcDidNotReturn`, no error state.
+
+### Machine state confirmed afterwards
+
+| Check | Result |
+|---|---|
+| `{app}\RemoteControl.exe` VERSIONINFO | `1.6.3` |
+| Uninstall registry `DisplayVersion` | `1.6.3` |
+| `{app}\extension\manifest.json` | `1.6.3` |
+| Server process | PID 14644, up since 23:11:38 |
+| Console window | none — `CREATE_NO_WINDOW` alone is honored |
+| `ErrorReplacingExistingFile` / Abort / Retry / Ignore | none |
+| Marker file in `%APPDATA%\RemoteControl` | absent — written, consumed, deleted |
+| `%TEMP%\rc-update-*.cmd` and setup exe | both gone — the `:end` `del` ran |
+| UAC | none (`User privileges: None`, per-user install) |
+
+All four `260805-axr` remedies are now proven on hardware, including one that proved
+itself before the update even ran: the `1.6.2` server's startup sweep logged
+`update: removed 2 stale update file(s) from the temp directory`, clearing exactly the
+`rc-update-7556.cmd` and `RemoteControl-Setup-v1.6.1.exe` that the 2026-08-05 wedge had
+leaked — PID 7556 is the dead server named in the original defect record.
+
+### What this does NOT close
+
+- **The root cause stays inferential.** The flag half was observed; the causal link from
+  the flag pair to the blocked `find` never reproduced in-harness. Both halves were
+  fixed, so the repair does not depend on which one was load-bearing — but nobody
+  isolated it, and nobody should later claim otherwise.
+- **RESEARCH OQ-1, the Chrome file-lock question, is still open.** The `1.6.3` install
+  scheduled no `restartreplace` and hit no `ErrorReplacingExistingFile`, so the deferred-
+  replacement path in `RemoteControl.iss` remains unexercised — same outcome as 12-16
+  Task 1. Not a defect; still unproven.
+- **D-12's "exactly once" clause** is still unconfirmed, unchanged from the original run.
+
+## Self-Check: FAILED (2026-08-05) — Task 4 line superseded 2026-08-08
 
 - `.planning/phases/12-in-app-updates/12-18-SUMMARY.md` — FOUND
 - commit `74b5d95` — FOUND
@@ -364,6 +443,9 @@ Carried forward for whoever picks this up:
 - **Task 4 acceptance criteria — FAILED.** The PC row never reached `1.6.1`, the two
   surfaces could not be compared, the extension leg never ran, and the post-hardening
   file-lock question (RESEARCH OQ-1) is still open at the `1.6.x` installer.
+  **SUPERSEDED 2026-08-08 (quick `260808-waa`):** re-run on `1.6.2` → `1.6.3` passed —
+  the PC row reached `1.6.3`, both surfaces agree, and the extension leg ran and
+  self-reloaded. RESEARCH OQ-1 alone remains open. See the Addendum above.
 
 ---
 *Phase: 12-in-app-updates*
