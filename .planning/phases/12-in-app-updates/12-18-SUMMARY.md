@@ -49,8 +49,8 @@ key-decisions:
   - "requirements-completed lists only what was actually observed. Copying the plan's full requirements array verbatim, as the summary template instructs, would have marked D-16/D-17/D-18/SC5/SC7 complete when they are not."
   - "AMENDED 2026-08-08 by quick 260808-waa: D-16/D-17/D-18/SC5/SC7 moved from requirements-not-met to requirements-completed after the PC self-update was observed working on hardware (1.6.2 -> 1.6.3). The amendment touches the frontmatter arrays, the criteria table and an addendum ONLY — the 2026-08-05 observations of the wedge are left verbatim, because they are the evidence the defect was real."
 
-requirements-completed: [D-04, D-07, D-16, D-17, D-18, D-19, D-20, D-21, D-24, SC1, SC3, SC4, SC5, SC7]
-requirements-partial: [D-06, D-08, D-12, D-25, D-26, SC2]
+requirements-completed: [D-04, D-07, D-16, D-17, D-18, D-19, D-20, D-21, D-24, SC1, SC2, SC3, SC4, SC5, SC7]
+requirements-partial: [D-06, D-08, D-12, D-25, D-26]
 requirements-not-met: []
 
 # Metrics
