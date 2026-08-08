@@ -7,6 +7,38 @@ files:
   - server/server-windows/src/update/apply.rs:104
 ---
 
+> ## RESOLVED 2026-08-08 — proven on hardware, closed by quick `260808-waa`
+>
+> The delivery constraint below is discharged. `v1.6.2` was installed by hand (exit 0;
+> local digest equalled the published asset byte-for-byte), `v1.6.3` was published as a
+> normal release (commit `f0d1aaa`, tag `v1.6.3`, anonymous `latest` = `v1.6.3`), and
+> tapping **Update PC** completed:
+>
+> ```
+> 17:41:36.065972Z  update: helper spawned; exiting to let the installer replace this exe
+> 23:11:37.582      Log opened.  Original Setup EXE: %TEMP%\RemoteControl-Setup-v1.6.3.exe
+> 23:11:38.086-096  Successfully installed the file.   (x4)
+> 23:11:38.594      Need to restart Windows? No
+> 17:41:39.041889Z  server-windows listening port=17777
+> ```
+>
+> Three seconds. No console window, no `ErrorReplacingExistingFile`, no leftover
+> `rc-update-*.cmd` or setup exe, no marker left behind. Installed exe, registry and
+> extension manifest all at `1.6.3`. The extension reloaded itself and the phone
+> reconnected on its own, so **SC5 and SC7 are both observed met**.
+>
+> All four Solution items are proven, including the sweep: the `1.6.2` server logged
+> `update: removed 2 stale update file(s) from the temp directory` at startup, clearing
+> the very `rc-update-7556.cmd` and `RemoteControl-Setup-v1.6.1.exe` this todo's
+> *Directly observed* table records PID 7556 leaking.
+>
+> **Still inferential, deliberately:** which half of the fix was load-bearing. The flag
+> pair was observed wrong; its causal link to the blocked `find` never reproduced
+> in-harness. Both were fixed, so the repair does not depend on the answer.
+>
+> Full record: `.planning/quick/260808-waa-record-the-phase-12-sc5-sc7-closure-on-h/`
+> and the Addendum in `12-18-SUMMARY.md`.
+
 > **DELIVERY 2026-08-05 — `v1.6.2` PUBLISHED as a PRE-RELEASE** (commit `6dc6e27`, tag `v1.6.2`,
 > three digest-bearing assets on the mirror). Pre-release on purpose: `/releases/latest` excludes
 > pre-releases, so the installed `1.6.1` is never offered an update its own broken helper would
