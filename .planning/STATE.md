@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12 helper defect FIXED IN CODE — SC5 still unmet pending a hand-installed 1.6.2
-stopped_at: quick 260805-axr landed the helper fix; delivery (1.6.2 by hand, 1.6.3 as tap target) outstanding
-last_updated: "2026-08-05T03:05:00.000Z"
-last_activity: 2026-08-05 -- Quick 260805-axr fixed the PC self-update helper: CREATE_NO_WINDOW alone, a pipe-free exe-lock wait, a timeout that relaunches, a %TEMP% orphan sweep, and two real spawn_helper tests. SC5 stays UNMET until 1.6.2 is installed by hand and 1.6.3 published as the tap target — the fix cannot ship through the path it repairs.
+status: Phase 12 COMPLETE — SC5 and SC7 observed met on hardware 2026-08-08; all 12 phases done
+stopped_at: quick 260808-waa recorded the closure; milestone v1.0 is a candidate for /gsd-audit-milestone
+last_updated: "2026-08-08T17:44:45.256Z"
+last_activity: 2026-08-08 -- Quick 260808-waa recorded the phase 12 closure. v1.6.2 (the 260805-axr helper fix) was installed BY HAND, v1.6.3 published as a normal release, and tapping Update PC completed in THREE SECONDS: helper spawned 17:41:36.065972Z, Setup ran, server listening again 17:41:39.041889Z. Extension self-reloaded, phone reconnected on its own. SC5 and SC7 OBSERVED MET; requirements-not-met in 12-18-SUMMARY.md is now empty.
 progress:
   total_phases: 12
   completed_phases: 12
@@ -14,14 +14,16 @@ progress:
   percent: 100
 ---
 
-> ⚠ **The 100% above counts FILES, not outcomes.** All 108 plans have a
-> SUMMARY on disk, but `12-18-SUMMARY.md` carries `## Self-Check: FAILED`.
-> Phase 12 does not deliver its own success criteria — see below.
+> ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
+> 2026-08-08: the PC self-update was observed working end to end on hardware
+> (`1.6.2` → `1.6.3`, three seconds spawn-to-back-up), the extension reloaded
+> itself and the phone reconnected on its own. **SC5 and SC7 are observed met**,
+> `12-18-SUMMARY.md`'s `requirements-not-met` is empty, and `todos/pending/` is
+> empty. Recorded by quick `260808-waa`.
 >
-> **Update 2026-08-05:** the helper defect is FIXED IN CODE by quick
-> `260805-axr`. **SC5 is still unmet** — the fix cannot ship through the path
-> it repairs, so it stays unproven until `1.6.2` is installed by hand and
-> `1.6.3` is published as the tap target. See Blockers/Concerns.
+> The history is kept below deliberately. For eight weeks this counter read 100%
+> while `12-18-SUMMARY.md` carried `## Self-Check: FAILED` — **a SUMMARY on disk
+> is not an outcome**, and the lesson survives the defect that taught it.
 
 # Project State
 
@@ -34,11 +36,49 @@ See: .planning/PROJECT.md (updated 2026-07-11)
 
 ## Current Position
 
-Phase: 12 (in-app-updates) — ALL 18 PLANS EXECUTED, PHASE GOAL **NOT** MET
+Phase: 12 (in-app-updates) — ALL 18 PLANS EXECUTED, **PHASE GOAL MET 2026-08-08**
 Plan: 18 of 18 (18 SUMMARY files on disk; the plain counter above is a
 sequence number, not the completed count)
 
-**WAVE 8 (12-18) RESULT — TWO REAL RELEASES, SC4 MET, SC5 BROKEN.**
+**CLOSURE 2026-08-08 (quick `260808-waa`) — THE PC UPDATES ITSELF.**
+
+`v1.6.2` carried the `260805-axr` helper fix and was installed BY HAND (exit 0,
+local digest equal to the published asset byte-for-byte). `v1.6.3` was then
+published as a normal release — commit `f0d1aaa`, tag `v1.6.3`, three
+digest-bearing assets, anonymous `latest` = `v1.6.3`. Tapping Update PC:
+
+```
+17:41:36.065972Z  update: helper spawned; exiting to let the installer replace this exe
+23:11:37.582      Log opened.  Original Setup EXE: %TEMP%\RemoteControl-Setup-v1.6.3.exe
+23:11:38.086-096  Successfully installed the file.   (x4)
+23:11:38.594      Need to restart Windows? No
+17:41:39.041889Z  server-windows listening port=17777
+```
+
+**Three seconds**, spawn to back-up (the two clocks are the same instants —
+`server.log` is UTC, Inno is local UTC+05:30). Installed exe, uninstall registry
+and installed `extension\manifest.json` all `1.6.3`. No console window, no
+`ErrorReplacingExistingFile`, no marker left behind, no `rc-update-*.cmd` or
+setup exe left in `%TEMP%`. The extension **reloaded itself** and the phone
+**reconnected on its own**.
+
+- **SC5 OBSERVED MET.** The PC replaces itself and comes back.
+- **SC7 OBSERVED MET** on a real release pair, not fabricated builds.
+- **SC2 MET** — three surfaces, three versions, all agreeing.
+
+Two things this did NOT close, do not let them quietly disappear:
+
+- **The root cause stays inferential.** The flag pair was observed wrong; its
+  causal link to the blocked `find` never reproduced in-harness. Both halves
+  were fixed, so the repair does not depend on which was load-bearing.
+- **RESEARCH OQ-1 (the Chrome file lock) is still unexercised.** The `1.6.3`
+  install scheduled no `restartreplace` — same as 12-16 Task 1. Not a defect;
+  still unproven.
+
+---
+
+**HISTORY — WAVE 8 (12-18) RESULT, 2026-08-05: TWO REAL RELEASES, SC4 MET, SC5
+BROKEN.** Kept because it is the evidence the defect was real.
 
 `v1.6.0` and `v1.6.1` are published on the mirror from the finished tree,
 both with three digest-bearing assets, verified anonymously. All three
@@ -51,16 +91,19 @@ Bump commits `74b5d95` and `66ffd43`; version files at `1.6.1` /
   that returned the row once with no retry, then a real install landing
   on `1.6.1`.
 - **SC5 IS NOT MET.** Tapping Update PC exits the server and it never
-  comes back. See the defect below.
+  comes back. See the defect below. *(Superseded 2026-08-08 — see CLOSURE
+  at the top of this section.)*
 - **SC7 was UNREACHABLE here** (the PC update never completed). 12-16's
-  observation stands on its own and is not superseded.
+  observation stands on its own and is not superseded. *(SC7 was observed
+  on a real release pair 2026-08-08.)*
 - **D-24 OBSERVED MET, by a real failure.** The restarted server read and
   deleted the pessimistic marker and the phone showed "The installer
   didn't finish" — no path, no code. Task 4 step 6's hand-written marker
   was never needed.
 
-  🔴 **THE BLOCKING DEFECT — read before touching `update/apply.rs`.**
-  `spawn_helper` (`server/server-windows/src/update/apply.rs:260`) passes
+  ✅ **THE (FORMER) BLOCKING DEFECT — FIXED in `260805-axr`, PROVEN
+  2026-08-08.** Kept as the record of what was wrong and why no test caught it.
+  `spawn_helper` (`server/server-windows/src/update/apply.rs:260`) passed
   `DETACHED_PROCESS | CREATE_NO_WINDOW`. **These are not a valid pair** —
   `CREATE_NO_WINDOW` is ignored when `DETACHED_PROCESS` is set, which is
   why a console window appeared on the owner's desktop. The helper then
@@ -85,6 +128,7 @@ Bump commits `74b5d95` and `66ffd43`; version files at `1.6.1` /
   **The fix cannot ship through the path it fixes.** The broken helper is
   inside `1.6.0`/`1.6.1`, so a follow-up needs `1.6.2` installed BY HAND
   and `1.6.3` as the tap target before Task 4 can be re-run.
+  ↳ **Done exactly that way on 2026-08-08.** The prediction held.
 
   Also worth fixing while in there: the 30-poll bound only guards a server
   that refuses to die, not a helper that never completes a poll — a
@@ -92,6 +136,11 @@ Bump commits `74b5d95` and `66ffd43`; version files at `1.6.1` /
   leaving the owner with none. And a wedged helper leaks both
   `%TEMP%\rc-update-<pid>.cmd` and the downloaded setup exe, since
   `del` sits at `:end`.
+  ↳ **Both fixed in `260805-axr` and both proven.** The leak fix proved
+  itself before the update even ran: the freshly installed `1.6.2` server
+  logged `update: removed 2 stale update file(s) from the temp directory`
+  at startup, sweeping the exact `rc-update-7556.cmd` and
+  `RemoteControl-Setup-v1.6.1.exe` that PID 7556 leaked when it wedged.
 
   **CHECKPOINT 2 IS CLOSED.** 12-16's Task 1 was observed on 2026-08-05: two
 back-to-back silent upgrades (1.5.0→1.5.1→1.5.2) with Chrome holding the
@@ -102,23 +151,26 @@ path. The server exe WAS replaced (1.5.1 then 1.5.2), and the extension card
 flipped 1.5.1 → 1.5.2 **on its own**. **SC7 IS OBSERVED MET.** Facts verbatim
 in `12-16-SUMMARY.md`.
 
-Next: WAVE 8 — `12-18` (the version bumps and the full UAT), the LAST plan of
-the phase. `autonomous: false`; needs a physical Android phone on the LAN with
-the install-unknown-apps grant DECLINED once.
+Next: nothing inside phase 12 — all 18 plans executed and the goal is met. The
+v1.0 milestone (12/12 phases, 108/108 plans) is a candidate for
+`/gsd-audit-milestone` before archival. The dogfood/refine hold still applies.
 
   Waves: W1 `12-01,12-02` (release.ps1 + protoVersion 1.8 contract) — DONE · W2
   `12-04,12-05,12-06,12-07,12-08` — DONE 2026-08-01 · W3 `12-03,12-09` — DONE
   2026-08-04 · W4 `12-10,12-11` — DONE 2026-08-04 · W5 `12-12,12-14` — DONE
   2026-08-04 · W6 `12-13,12-15,12-17` — DONE 2026-08-04 · W7 `12-16` — DONE
-  2026-08-05 · W8 `12-18` PENDING.
+  2026-08-05 · W8 `12-18` — DONE 2026-08-05, goal closed 2026-08-08 by quick
+  `260808-waa`.
 
-  ⚠ **BEFORE 12-18's UAT: this PC has a throwaway 1.5.2 test build
-  installed.** The Task 1 procedure installed fabricated 1.5.1 then 1.5.2
-  builds (`dist/` only, gitignored; the tree was reverted to 1.5.0
-  immediately). `pre_fetch_refusal` refuses anything not strictly newer than
-  what is installed, so a real 1.5.x release will be REFUSED as `Downgrade` on
-  this machine until it is uninstalled or the release exceeds 1.5.2. It will
-  look like a bug during UAT if nobody remembers.
+  ⚠ **~~BEFORE 12-18's UAT: this PC has a throwaway 1.5.2 test build
+  installed.~~ MOOT since 2026-08-08** — this PC now has a real `1.6.3`.
+  Historical: the Task 1 procedure installed fabricated 1.5.1 then 1.5.2 builds
+  (`dist/` only, gitignored; the tree was reverted to 1.5.0 immediately), and
+  `pre_fetch_refusal` refuses anything not strictly newer than what is
+  installed, so a 1.5.x release would have been REFUSED as `Downgrade` here.
+  **The general trap is still live:** fabricated local builds raise this
+  machine's version floor, and the next release under that floor looks like a
+  bug during UAT.
 
   WAVE 7 (12-16) RESULT — **THE EXTENSION RELOADS ITSELF, EXACTLY ONCE.**
   `ExtCmd::Reload` + `reload_frame()` + the pure `should_nudge()` land in
@@ -953,11 +1005,12 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-**1 pending** — `2026-08-05-pc-self-update-helper-wedges-before-setup-runs.md`. Its four-part
-Solution is **implemented** (quick `260805-axr`, commits `fad11fe`/`e585784`/`65ddf91`); it stays
-in `todos/pending/` because its **Delivery constraint** is not discharged: `1.6.2` must be built
-and installed BY HAND and `1.6.3` published as the tap target before 12-18 Task 4 can be re-run.
-Move it to `todos/done/` only when that re-run passes.
+**0 pending.** `todos/pending/` is empty.
+
+- ~~PC self-update helper wedges before Setup runs~~ — DONE 2026-08-08 (in `todos/done/`).
+  Fixed in code by quick `260805-axr` (`fad11fe`/`e585784`/`65ddf91`), then its **Delivery
+  constraint** discharged by quick `260808-waa`: `1.6.2` installed by hand, `1.6.3` published,
+  12-18 Task 4 re-run green. All four Solution items proven on hardware.
 
 - ~~Absolute pointer injection~~ — DONE in 04-01 (raw SendInput ABSOLUTE|VIRTUALDESK; in todos/done/)
 - ~~Server supports ONE pairing per process run~~ — DONE; closed by Phase 7's persistent token
@@ -977,20 +1030,24 @@ Move it to `todos/done/` only when that re-run passes.
 
 ### Blockers/Concerns
 
-- [quick 260805-axr — SC5 DELIVERY IN PROGRESS]: the helper fix is in `master` and **v1.6.2 is
-  published** (2026-08-05, commit `6dc6e27`, tag `v1.6.2`), deliberately as a **PRE-RELEASE** so the
-  installed 1.6.1 is never offered an update it would wedge on — verified anonymously: clients still
-  read `latest = v1.6.1`. Remaining, in order: **(1) install `dist\RemoteControl-Setup-v1.6.2.exe`
-  by hand** (quit the tray server first so config.toml is written cleanly and the AppMutex is
-  released); **(2) publish `1.6.3` as a normal release**; **(3) tap Update PC and re-run 12-18
-  Task 4.** SC7 falls out of the same run. SC5 stays UNMET until step 3 passes.
-- [quick 260805-axr — ROOT CAUSE STILL INFERENTIAL]: the flag half is observed
+- [quick 260805-axr — SC5 DELIVERY ✅ RESOLVED 2026-08-08]: all three steps ran. `v1.6.2` was
+  installed by hand (exit 0; local digest equal to the published asset byte-for-byte), `v1.6.3` was
+  published as a normal release (`f0d1aaa`, tag `v1.6.3`, anonymous `latest` = `v1.6.3`), and
+  Update PC completed in three seconds. **SC5 and SC7 observed met**; todo moved to `todos/done/`.
+  Recorded by quick `260808-waa`.
+- [quick 260805-axr — ROOT CAUSE STILL INFERENTIAL, and STAYS THAT WAY]: the flag half is observed
   (`CREATE_NO_WINDOW` is ignored beside `DETACHED_PROCESS`; a visible `find "7556"` window proved it),
   but the causal link from that to the blocked `find` **did not reproduce in-harness**. Under
   `cargo test` the full shipped combination — flag pair AND `tasklist | find` — passes in 0.82 s,
   because the parent process stays alive there; on hardware the parent exited immediately after the
   spawn. Both halves were fixed regardless, so the repair does not depend on which one was
-  load-bearing, but the only real proof is the on-hardware re-run above.
+  load-bearing. **The 2026-08-08 re-run proves the REPAIR, not the mechanism** — it did not isolate
+  which half mattered, and nobody should later read it as having done so.
+- [Phase 12 — RESEARCH OQ-1 STILL OPEN]: the Chrome extension file-lock question is unexercised at
+  every version tried. Neither 12-16 Task 1 (1.5.1/1.5.2) nor the 2026-08-08 `1.6.3` install
+  scheduled a `restartreplace` or hit `ErrorReplacingExistingFile`, so `RemoteControl.iss`'s
+  deferred-replacement path has never actually run. Not a defect — untested code on a path that only
+  arms when Chrome holds the file, which has never reproduced on this machine.
 - [quick 260731-euq — SHIP-TOGETHER]: protoVersion is now **1.7** (binary opcode `0x03`, zoom). The next release MUST ship the server exe alongside the APK. An old server does NOT break — `UnknownOpcode` is dropped and counted per SPEC §9 rule 4, the handshake compares only the major component, so the session stays up and move/scroll/click keep working — but **pinch silently does nothing** until the server is updated. Same rule as the phase-10 keymap growth, same reason.
 - [quick 260731-euq — KNOWN EDGE, accepted]: a keyboard-panel sticky Ctrl held at the instant of a pinch is dropped by the zoom arm's `Direction::Release` without updating `dispatch/held.rs` bookkeeping. Self-corrects on the next modifier interaction; consulting held state from the input thread was out of scope.
 - [quick 260731-euq — STALE, unfixed]: `app/packages/remote_protocol/lib/src/version.dart` still declares `protoVersion = '1.1'` (stale since phase 1), aliased into `clientProtoVersion` at `handshake_fsm.dart:23`, so the phone advertises `"1.1"` in `hello` while the server is at `"1.7"`. Harmless (major-only comparison) but wrong. Left unfixed deliberately — changing what the client advertises is a handshake-path behaviour change with its own test surface.
@@ -1021,6 +1078,7 @@ Move it to `todos/done/` only when that re-run passes.
 | 260731-euq | Pinch-to-zoom: binary opcode `0x03` executed as a Ctrl-held wheel tick, spread-vs-translation gesture arbitration locked per episode (protoVersion 1.7) | 2026-07-31 | d2900af, 3a7b0c8 | [260731-euq-add-pinch-zoom-to-trackpad-binary-opcode](./quick/260731-euq-add-pinch-zoom-to-trackpad-binary-opcode/) |
 | 260801-r8x | Stage `server/Cargo.lock` in the release commit — Codex P1 on PR #1: cargo rewrites the lockfile during the installer build, so leaving it out made the tag name a stale tree (`cargo build --locked` fails) and left dirt that tripped the next run's preflight | 2026-08-01 | 8b875b1 | [260801-r8x-stage-server-cargo-lock-in-the-release-c](./quick/260801-r8x-stage-server-cargo-lock-in-the-release-c/) |
 | 260805-axr | Fix the PC self-update helper wedge — `CREATE_NO_WINDOW` alone (not the invalid `DETACHED_PROCESS` pair), a pipe-free exe-lock wait, a timeout that relaunches instead of jumping past it, a `%TEMP%` orphan sweep, and the first tests that actually execute `spawn_helper` | 2026-08-05 | fad11fe, e585784, 65ddf91 | [260805-axr-fix-the-pc-self-update-helper-wedge-spaw](./quick/260805-axr-fix-the-pc-self-update-helper-wedge-spaw/) |
+| 260808-waa | Record the phase 12 SC5/SC7 closure — `1.6.2` hand-installed, `1.6.3` published, PC self-update observed working on hardware in three seconds; 12-18's `requirements-not-met` emptied and the helper todo closed | 2026-08-08 | c728a30, 0858013, 096cef5 | [260808-waa-record-the-phase-12-sc5-sc7-closure-on-h](./quick/260808-waa-record-the-phase-12-sc5-sc7-closure-on-h/) |
 
 ## Deferred Items
 
@@ -1032,6 +1090,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-05T02:13:42.052Z
-Stopped at: 12-18 executed; Task 4 FAILED — PC self-update helper defect, SC5 not met
+Last session: 2026-08-08T17:44:45.256Z
+Stopped at: Phase 12 goal CLOSED — 1.6.2 hand-installed, 1.6.3 published, PC self-update observed working; SC5 and SC7 met, todos/pending/ empty
 Resume file: None
