@@ -153,10 +153,29 @@ const double _kPanelNumpadRowTarget = 64;
 /// (two cells + one 8px gap = the 160px cluster).
 const double _kPanelArrowCellTarget = 76;
 
-/// The panel's constant chrome height: hairline + chip row + tab bar
-/// (1 + 64 + 56 = 121). Everything except the animating pad viewport.
+/// The panel's constant VISIBLE chrome height: hairline + chip row + tab bar
+/// (1 + 64 + 56 = 121). Everything inside the animating box except the pad
+/// viewport, so a rendered panel measures `kPanelChromeHeight + viewport`.
 const double kPanelChromeHeight =
     _kPanelHairline + _kPanelChipRowHeight + _kTabBarHeight;
+
+/// The always-mounted hidden IME sliver, which lives OUTSIDE the animating
+/// chrome (Pitfall 6 — its input connection must survive both the collapse
+/// toggle and every page switch) and is therefore invisible to a measurement
+/// of the panel's animating box.
+const double _kPanelImeSliverHeight = 1;
+
+/// What the docked panel costs the column it shares with the trackpad:
+/// the visible chrome PLUS the hidden IME sliver.
+///
+/// This — not [kPanelChromeHeight] — is what the clamp must subtract. The
+/// sliver is 1px, unconditional and easy to forget, and forgetting it makes
+/// the live-trackpad guarantee below false by exactly that pixel at both
+/// clamped extremes (verified: it is the difference between 194.65 and the
+/// 195.65 floor on a raised IME, and between 201.4 and 202.4 on a short
+/// viewport).
+const double kPanelColumnOverhead =
+    kPanelChromeHeight + _kPanelImeSliverHeight;
 
 /// The unclamped viewport height each pad asks for inside the docked panel —
 /// the height of the animating box around the panel's `PageView`.
@@ -201,9 +220,9 @@ const double kPanelMinPadHeight = 96;
 /// > live trackpad height >= 0.45 × columnHeight − 64
 ///
 /// with ONE documented exception: when [kPanelMinPadHeight] binds (a column
-/// below ~290dp, reachable only with the IME raised on a very short device)
-/// the fraction yields to the 96px floor. Even then the panel totals 217 and
-/// the trackpad keeps `columnHeight − 281`, which stays positive on every
+/// below ~280dp, reachable only with the IME raised on a very short device)
+/// the fraction yields to the 96px floor. Even then the panel costs only 218
+/// and the trackpad keeps `columnHeight − 282`, which stays positive on every
 /// plausible device.
 ///
 /// When the ceiling binds, caps flex below their target height rather than
@@ -221,7 +240,8 @@ const double kPanelMinPadHeight = 96;
 /// for — Type's 80px strip stays 80px on every device — while a ceiling that
 /// has collapsed below the floor is lifted back to it.
 double panelPadHeight(KeyboardPad pad, double columnHeight) {
-  final ceiling = columnHeight * kPanelMaxHeightFraction - kPanelChromeHeight;
+  final ceiling =
+      columnHeight * kPanelMaxHeightFraction - kPanelColumnOverhead;
   return math.min(
     kPanelPadHeights[pad]!,
     math.max(kPanelMinPadHeight, ceiling),

@@ -89,7 +89,7 @@ void main() {
   group('panelPadHeight — the docked panel sizing contract (D-93)', () {
     // A column tall enough that no pad is clamped: the reference device
     // (411x891, 24dp status + 24dp gesture-nav insets) leaves 843, whose
-    // ceiling is 843 * 0.55 - 121 = 342.65 — above every table value.
+    // ceiling is 843 * 0.55 - 122 = 341.65 — above every table value.
     const roomy = 843.0;
 
     test('each pad returns its table height on an unclamped column', () {
@@ -110,8 +110,10 @@ void main() {
       expect(fn, lessThan(numpad));
     });
 
-    test('kPanelChromeHeight is the hairline + chip row + tab bar (121)', () {
+    test('kPanelChromeHeight is the visible hairline + chip row + tab bar '
+        '(121); the clamp subtracts one more for the hidden IME sliver', () {
       expect(kPanelChromeHeight, 121);
+      expect(kPanelColumnOverhead, 122);
     });
 
     test('a short column clamps to the ceiling, and the whole panel still '
@@ -124,9 +126,9 @@ void main() {
       expect(viewport, lessThan(kPanelPadHeights[KeyboardPad.numpad]!),
           reason: 'the ceiling must bind here');
       expect(viewport, closeTo(column * kPanelMaxHeightFraction -
-          kPanelChromeHeight, 0.001));
+          kPanelColumnOverhead, 0.001));
 
-      final trackpad = column - (viewport + kPanelChromeHeight);
+      final trackpad = column - (viewport + kPanelColumnOverhead);
       expect(trackpad, greaterThanOrEqualTo(0.45 * column - 64),
           reason: 'the live-trackpad guarantee, computed not hard-coded');
     });
@@ -134,7 +136,7 @@ void main() {
     test('the guarantee holds for every pad across a sweep of columns', () {
       for (var column = 320.0; column <= 1000.0; column += 7) {
         for (final pad in KeyboardPad.values) {
-          final total = panelPadHeight(pad, column) + kPanelChromeHeight;
+          final total = panelPadHeight(pad, column) + kPanelColumnOverhead;
           expect(column - total, greaterThanOrEqualTo(0.45 * column - 64),
               reason: '$pad at column $column');
         }
@@ -142,16 +144,16 @@ void main() {
     });
 
     test('an extreme column floors at kPanelMinPadHeight — the one documented '
-        'exception, and the trackpad still keeps column - 281', () {
-      const column = 200.0; // ceiling would be -11
+        'exception, and the trackpad still keeps column - 282', () {
+      const column = 200.0; // ceiling would be -12
       final viewport = panelPadHeight(KeyboardPad.numpad, column);
       expect(viewport, kPanelMinPadHeight);
-      expect(viewport + kPanelChromeHeight, 217);
+      expect(viewport + kPanelColumnOverhead, 218);
     });
 
     test('a pad never grows PAST its own request: Type stays the 80px strip '
         'even where the floor exceeds it', () {
-      // ceiling here is 209 - 121 = 88, i.e. below the 96px floor. The floor
+      // ceiling here is 209 - 122 = 87, i.e. below the 96px floor. The floor
       // lifts the CEILING, never the pad's request — otherwise the slim Type
       // strip would silently become 96 and D-93's "Type stays a slim strip"
       // would be false on short viewports.

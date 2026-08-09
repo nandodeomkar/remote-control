@@ -23,11 +23,12 @@ import 'package:remote_protocol/remote_protocol.dart';
 
 import 'package:remote_control/keyboard/diff_ops.dart';
 import 'package:remote_control/keyboard/hidden_text_input.dart';
+import 'package:remote_control/keyboard/key_pads.dart';
 import 'package:remote_control/keyboard/key_rows.dart';
 import 'package:remote_control/keyboard/keyboard_panel.dart';
 import 'package:remote_control/store/device_store.dart';
 
-/// In-memory [PrefsKv] so the row-group store never touches the platform.
+/// In-memory [PrefsKv] so the pad store never touches the platform.
 class _FakePrefsKv implements PrefsKv {
   final Map<String, String> map = {};
 
@@ -47,6 +48,8 @@ void main() {
   late List<RemoteMessage> sent;
   late StreamController<void> changes;
   late bool disconnected;
+  late _FakePrefsKv padPrefs;
+  late KeyboardPadStore padStore;
 
   setUp(() {
     focusNode = FocusNode(debugLabel: 'test-ime');
@@ -55,6 +58,15 @@ void main() {
     sent = <RemoteMessage>[];
     changes = StreamController<void>.broadcast();
     disconnected = false;
+    // Hoisted into setUp on purpose: successive host(...) pumps must share
+    // ONE store value, or the persistence test would face a fresh (empty)
+    // backing map on every rebuild.
+    padPrefs = _FakePrefsKv();
+    padStore = KeyboardPadStore(
+      prefs: padPrefs,
+      key: kPanelPadPrefsKey,
+      migrateRetiredPanelKey: true,
+    );
   });
 
   tearDown(() {
@@ -64,25 +76,31 @@ void main() {
 
   Widget host({required bool expanded, bool enabled = true}) => ProviderScope(
         overrides: [
-          keyRowGroupStoreProvider.overrideWithValue(
-            KeyRowGroupStore(prefs: _FakePrefsKv()),
-          ),
+          panelPadStoreProvider.overrideWithValue(padStore),
         ],
         child: MaterialApp(
           home: Scaffold(
-            body: SingleChildScrollView(
-              child: Column(
-                children: [
-                  KeyboardPanel(
-                    expanded: expanded,
-                    imeFocusNode: focusNode,
-                    producer: producer,
-                    enabled: enabled,
-                    send: sent.add,
-                    changes: changes.stream,
-                    isDisconnected: () => disconnected,
-                  ),
-                ],
+            // Mirrors trackpad_screen.dart: resizeToAvoidBottomInset + an
+            // outer SafeArea. Both matter — the Scaffold strips the body's
+            // bottom view insets and the SafeArea strips its padding, which
+            // is exactly why the panel reads the RAW view for its column
+            // height, and why KeyboardTabBar's inner SafeArea contributes 0.
+            resizeToAvoidBottomInset: true,
+            body: SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    KeyboardPanel(
+                      expanded: expanded,
+                      imeFocusNode: focusNode,
+                      producer: producer,
+                      enabled: enabled,
+                      send: sent.add,
+                      changes: changes.stream,
+                      isDisconnected: () => disconnected,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -148,18 +166,24 @@ void main() {
   });
 
   testWidgets(
-      'expanded panel renders chips row + switcher + Nav rows '
-      '(UI-SPEC order)', (tester) async {
+      'expanded panel renders the SAME four-pad deck as the full-screen '
+      'keyboard: chips + tab bar with the shared labels and icons (D-92)',
+      (tester) async {
     await tester.pumpWidget(host(expanded: true));
     await tester.pumpAndSettle();
 
     for (final label in ['Ctrl', 'Alt', 'Shift', 'Win']) {
       expect(find.text(label), findsOneWidget);
     }
-    for (final segment in ['Nav', 'Fn', 'Num']) {
-      expect(find.text(segment), findsOneWidget);
+    // The shared vocabulary, by reference — not a second copy of it.
+    expect(find.byType(KeyboardTabBar), findsOneWidget);
+    for (final pad in KeyboardPad.values) {
+      expect(find.text(kKeyboardTabLabels[pad]!), findsOneWidget);
+      expect(find.byIcon(kKeyboardTabIcons[pad]!), findsOneWidget);
     }
-    // Nav is the D-09 default group.
+    // Type is the default landing pad: its slim extras row, no hint.
+    expect(find.byType(TypePad), findsOneWidget);
+    expect(find.text(kKeyboardHint), findsNothing);
     expect(find.text('Esc'), findsOneWidget);
     expect(find.byIcon(Symbols.arrow_forward_rounded), findsOneWidget);
   });
@@ -527,6 +551,175 @@ void main() {
     await gesture.up();
     await tester.pump();
     expect(wire(), ['down:Esc', 'up:Esc']);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  // ── The four-pad deck: height, IME and persistence (D-92 / D-93 / D-94) ──
+
+  /// Drives the raw view metrics the panel measures. `devicePixelRatio = 1`
+  /// keeps FakeViewPadding values 1:1 with logical pixels.
+  void driveView(
+    WidgetTester tester, {
+    Size size = const Size(411, 891),
+    double top = 24,
+    double bottom = 24,
+  }) {
+    tester.view.devicePixelRatio = 1.0;
+    tester.view.physicalSize = size;
+    tester.view.viewPadding = FakeViewPadding(top: top, bottom: bottom);
+    tester.view.padding = FakeViewPadding(top: top, bottom: bottom);
+    tester.view.viewInsets = FakeViewPadding.zero;
+    addTearDown(tester.view.reset);
+  }
+
+  /// Taps [pad]'s tab and pumps through the 200ms page animation plus a
+  /// settle frame (the outgoing page disposes after the settle). The
+  /// zero-duration pump starts the ticker; the 250ms pump runs it out.
+  Future<void> goToTab(WidgetTester tester, KeyboardPad pad) async {
+    await tester.tap(find.text(kKeyboardTabLabels[pad]!));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump();
+    // ...then let the pad-height AnimatedSize run out too.
+    await tester.pump(const Duration(milliseconds: 250));
+  }
+
+  double deckHeight(WidgetTester tester) =>
+      tester.getSize(find.byType(PageView)).height;
+
+  double panelHeight(WidgetTester tester) =>
+      tester.getSize(find.byType(AnimatedSize)).height;
+
+  testWidgets(
+      'each pad gets its sizing-contract height, and Type < Arrows < Fn < '
+      'Numpad (D-93)', (tester) async {
+    // 411x891 with 24dp top and 24dp gesture-nav insets: columnHeight 843,
+    // ceiling 342.65 — above every table value, so nothing clamps here.
+    driveView(tester);
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    final measured = <KeyboardPad, double>{};
+    for (final pad in KeyboardPad.values) {
+      if (pad != KeyboardPad.type) await goToTab(tester, pad);
+      expect(deckHeight(tester), kPanelPadHeights[pad],
+          reason: '${pad.name} pad viewport');
+      expect(panelHeight(tester), kPanelPadHeights[pad]! + kPanelChromeHeight,
+          reason: '${pad.name} panel total (viewport + 121 chrome)');
+      measured[pad] = panelHeight(tester);
+    }
+
+    expect(measured[KeyboardPad.type], 201);
+    expect(measured[KeyboardPad.arrows], 393);
+    expect(measured[KeyboardPad.fn], 425);
+    expect(measured[KeyboardPad.numpad], 433);
+
+    expect(measured[KeyboardPad.type]!, lessThan(measured[KeyboardPad.arrows]!));
+    expect(measured[KeyboardPad.arrows]!, lessThan(measured[KeyboardPad.fn]!));
+    expect(measured[KeyboardPad.fn]!, lessThan(measured[KeyboardPad.numpad]!));
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('the pad height change ANIMATES over the existing 200ms ease',
+      (tester) async {
+    driveView(tester);
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+    expect(panelHeight(tester), 201);
+
+    // Page to Numpad; the height only starts moving once the page settles.
+    await tester.tap(find.text(kKeyboardTabLabels[KeyboardPad.numpad]!));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 250));
+    await tester.pump();
+
+    // Mid-tween: strictly between the two totals, i.e. not a jump cut.
+    await tester.pump(const Duration(milliseconds: 100));
+    final mid = panelHeight(tester);
+    expect(mid, greaterThan(201));
+    expect(mid, lessThan(433));
+
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(panelHeight(tester), 433);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+      'the system IME rises on the Type pad only: paging to Numpad lowers it, '
+      'paging back raises it', (tester) async {
+    driveView(tester);
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+    expect(focusNode.hasFocus, isTrue, reason: 'landing on Type raises it');
+
+    await goToTab(tester, KeyboardPad.numpad);
+    expect(find.byType(NumpadPad), findsOneWidget);
+    expect(focusNode.hasFocus, isFalse,
+        reason: 'a non-Type pad wants the height, not the IME');
+
+    await goToTab(tester, KeyboardPad.type);
+    expect(focusNode.hasFocus, isTrue);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+      'persistence: a page change writes keyboard.panelPad; a fresh mount '
+      'over the same prefs lands on the persisted pad (D-94)', (tester) async {
+    driveView(tester);
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+    expect(find.byType(TypePad), findsOneWidget);
+
+    await goToTab(tester, KeyboardPad.numpad);
+    expect(padPrefs.map[kPanelPadPrefsKey], 'numpad');
+    expect(padPrefs.map.containsKey(kKeyboardPadPrefsKey), isFalse,
+        reason: "the panel must never write the full-screen keyboard's key");
+
+    // Unmount, then remount over the SAME store — a cold panel open.
+    await tester.pumpWidget(const SizedBox());
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pump(); // async prefs load lands + restore jump
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NumpadPad), findsOneWidget,
+        reason: 'the landing pad must be the persisted one');
+    expect(find.byType(TypePad), findsNothing);
+    expect(focusNode.hasFocus, isFalse,
+        reason: 'a non-Type landing must not raise the IME');
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets(
+      'persistence survives the REAL open path: the panel mounts COLLAPSED, '
+      'the prefs load lands with no deck to jump, and expanding still arrives '
+      'on the persisted pad', (tester) async {
+    // The production sequence — trackpad_screen.dart mounts the panel
+    // collapsed and it stays that way until the keyboard toggle is tapped.
+    // A restore that gave up on finding a PageView here would make the
+    // persisted pad unreachable on every real open.
+    driveView(tester);
+    padPrefs.map[kPanelPadPrefsKey] = 'numpad';
+
+    await tester.pumpWidget(host(expanded: false));
+    await tester.pump(); // the async prefs load lands while collapsed
+    await tester.pump();
+
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(NumpadPad), findsOneWidget,
+        reason: 'the owed restore must land as soon as the deck exists');
+    expect(find.byType(TypePad), findsNothing);
+    expect(focusNode.hasFocus, isFalse,
+        reason: 'expanding onto a non-Type pad must not raise the IME at all '
+            '— not even for a frame');
+    expect(panelHeight(tester), 433);
 
     await tester.pumpWidget(const SizedBox());
   });
