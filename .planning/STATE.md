@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: Phase 12 COMPLETE — SC5 and SC7 observed met on hardware 2026-08-08; all 12 phases done
-stopped_at: quick 260808-waa recorded the closure; milestone v1.0 is a candidate for /gsd-audit-milestone
-last_updated: "2026-08-08T17:44:45.256Z"
-last_activity: 2026-08-08 -- Quick 260808-waa recorded the phase 12 closure. v1.6.2 (the 260805-axr helper fix) was installed BY HAND, v1.6.3 published as a normal release, and tapping Update PC completed in THREE SECONDS: helper spawned 17:41:36.065972Z, Setup ran, server listening again 17:41:39.041889Z. Extension self-reloaded, phone reconnected on its own. SC5 and SC7 OBSERVED MET; requirements-not-met in 12-18-SUMMARY.md is now empty.
+status: Phase 12 COMPLETE — SC5 and SC7 observed met on hardware 2026-08-08; all 12 phases done. Post-milestone refinement in progress via quick tasks.
+stopped_at: quick 260809-ipc unified the docked keyboard panel; milestone v1.0 is still a candidate for /gsd-audit-milestone
+last_updated: "2026-08-09T11:21:38.027Z"
+last_activity: 2026-08-09 -- Quick 260809-ipc unified the trackpad's docked keyboard panel with the full keyboard. One KeyboardInputController now owns the stuck-key model for BOTH surfaces; the panel is the same four swipeable pads with the shared tab bar and a per-pad height clamped off RAW view metrics so the trackpad stays live at every pad height; the Nav/Fn/Num row-group surface is deleted. flutter test 863 passed (was 832), flutter analyze clean, trackpad_screen.dart byte-unchanged. Commits 5c544f5, af8dec4, 9838bdf, da105c6. PRIOR: Quick 260808-waa recorded the phase 12 closure. v1.6.2 (the 260805-axr helper fix) was installed BY HAND, v1.6.3 published as a normal release, and tapping Update PC completed in THREE SECONDS: helper spawned 17:41:36.065972Z, Setup ran, server listening again 17:41:39.041889Z. Extension self-reloaded, phone reconnected on its own. SC5 and SC7 OBSERVED MET; requirements-not-met in 12-18-SUMMARY.md is now empty.
 progress:
   total_phases: 12
   completed_phases: 12
@@ -1079,6 +1079,7 @@ Recent decisions affecting current work:
 | 260801-r8x | Stage `server/Cargo.lock` in the release commit — Codex P1 on PR #1: cargo rewrites the lockfile during the installer build, so leaving it out made the tag name a stale tree (`cargo build --locked` fails) and left dirt that tripped the next run's preflight | 2026-08-01 | 8b875b1 | [260801-r8x-stage-server-cargo-lock-in-the-release-c](./quick/260801-r8x-stage-server-cargo-lock-in-the-release-c/) |
 | 260805-axr | Fix the PC self-update helper wedge — `CREATE_NO_WINDOW` alone (not the invalid `DETACHED_PROCESS` pair), a pipe-free exe-lock wait, a timeout that relaunches instead of jumping past it, a `%TEMP%` orphan sweep, and the first tests that actually execute `spawn_helper` | 2026-08-05 | fad11fe, e585784, 65ddf91 | [260805-axr-fix-the-pc-self-update-helper-wedge-spaw](./quick/260805-axr-fix-the-pc-self-update-helper-wedge-spaw/) |
 | 260808-waa | Record the phase 12 SC5/SC7 closure — `1.6.2` hand-installed, `1.6.3` published, PC self-update observed working on hardware in three seconds; 12-18's `requirements-not-met` emptied and the helper todo closed | 2026-08-08 | c728a30, 0858013, 096cef5 | [260808-waa-record-the-phase-12-sc5-sc7-closure-on-h](./quick/260808-waa-record-the-phase-12-sc5-sc7-closure-on-h/) |
+| 260809-ipc | Unify the trackpad's docked keyboard panel with the full keyboard — ONE `KeyboardInputController` owns the stuck-key model for both surfaces, the panel becomes the same four swipeable pads with the shared tab bar and an inset-correct per-pad height that keeps the trackpad live, and the Nav/Fn/Num row-group surface is retired (863 tests, was 832; analyze clean) | 2026-08-09 | 5c544f5, af8dec4, 9838bdf, da105c6 | [260809-ipc-unify-the-trackpad-docked-keyboard-panel](./quick/260809-ipc-unify-the-trackpad-docked-keyboard-panel/) |
 
 ## Deferred Items
 
@@ -1090,6 +1091,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-08-08T17:44:45.256Z
-Stopped at: Phase 12 goal CLOSED — 1.6.2 hand-installed, 1.6.3 published, PC self-update observed working; SC5 and SC7 met, todos/pending/ empty
+Last session: 2026-08-09T11:21:38.027Z
+Stopped at: Quick 260809-ipc executed — the docked panel is now the same keyboard as the full screen, on one shared input owner. Two deferred items logged, neither caused by this task.
 Resume file: None
