@@ -8,8 +8,8 @@
 /// (b) capsForPad covers all four KeyboardPad values with a non-empty set;
 /// (c) the pads render the layouts 10-UI-SPEC §Pad layouts names.
 ///
-/// The docked-panel groups (capsForGroup) are a separate surface with its
-/// own gate in key_rows_test.dart — this file must not touch them.
+/// Both keyboard surfaces mount these same four pads since 260809-ipc, so
+/// this file is the ONE cap-table gate — there is no second vocabulary.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -160,15 +160,5 @@ void main() {
       expect(panelPadHeight(KeyboardPad.type, 380), 80);
       expect(panelPadHeight(KeyboardPad.type, 200), 80);
     });
-  });
-
-  test('exposing KeyCap did not disturb the docked panel groups (D-07)', () {
-    // capsForGroup stays the docked panel's seam — the pads must not have
-    // rewritten it.
-    expect(capsForGroup(KeyRowGroup.nav).map((d) => d.code),
-        ['Esc', 'Tab', 'Home', 'End', 'PgUp', 'PgDn', 'Del',
-         'Up', 'Left', 'Down', 'Right']);
-    expect(capsForGroup(KeyRowGroup.num), same(kNumCaps));
-    expect(capsForGroup(KeyRowGroup.fn), same(kFnCaps));
   });
 }

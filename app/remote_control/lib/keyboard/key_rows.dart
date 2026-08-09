@@ -1,21 +1,28 @@
-/// Toggleable special-key rows (KEY-02/KEY-04, D-09/D-11) + the group
-/// switcher + the client half of the locked `key.code` vocabulary.
+/// The shared key-cap layer (KEY-02/KEY-04, D-10/D-11): the client half of
+/// the locked `key.code` vocabulary, the [KeyCapDef] tables both keyboard
+/// surfaces lay out, the shared [KeyCap] widget that owns the press model,
+/// and the two mount-point pad stores.
+///
+/// The filename is a historical artifact — it named a widget that is gone
+/// since 260809-ipc, when the trackpad-docked panel adopted the same four
+/// pads as the full-screen keyboard. What remains is the vocabulary and the
+/// press model, both shared BY REFERENCE by both surfaces.
 ///
 /// Widget-only and service-agnostic (mouse_buttons house style): key presses
-/// surface through injected callbacks, so the widget test needs no service
-/// fake. The keyboard panel (04-06 Task 3) wires the callbacks to
-/// `service.sendReliable(KeyMsg(...))` and the haptic tick.
+/// surface through injected callbacks, so the widget tests need no service
+/// fake. Each surface wires those callbacks to its shared
+/// `KeyboardInputController`, which sends on the reliable path.
 ///
 /// # Key-cap emission model (D-11 + D-10 interplay, plan-locked)
 ///
 /// On press-down — if NO armed modifiers are pending — the cap emits
-/// [KeyRows.onKeyDown] immediately; release emits [KeyRows.onKeyUp]. A quick
+/// [KeyCap.onKeyDown] immediately; release emits [KeyCap.onKeyUp]. A quick
 /// press is a down/up pair (≈ tap); a HOLD leaves the key down so WINDOWS
 /// autorepeats until the up (KEY-04 — server-side repeat, never client
 /// tap-spam). If armed mods ARE pending at press-down, the cap defers and
-/// emits [KeyRows.onKeyTapWithMods] on release instead — the combo path
-/// (`key {action: tap, mods: [...]}`), after which the panel auto-resets the
-/// armed chips (D-10).
+/// emits [KeyCap.onKeyTapWithMods] on release instead — the combo path
+/// (`key {action: tap, mods: [...]}`), after which the surface auto-resets
+/// the armed chips (D-10).
 library;
 
 import 'dart:async';
@@ -56,85 +63,6 @@ const List<String> kClientKeyCodes = [
   '0', 'PrintScreen', 'T', 'W', 'Plus', 'Minus',
 ];
 
-/// The visible special-key row group (D-09 — toggleable, default Nav).
-enum KeyRowGroup {
-  /// Esc/Tab/Home/End/PgUp/PgDn/Del + the inverted-T arrows (default).
-  nav,
-
-  /// F1..F12.
-  fn,
-
-  /// The 3-column numpad + Enter + decimal.
-  num,
-}
-
-/// The shared_preferences key holding the selected row group (D-09).
-const String kKeyRowGroupPrefsKey = 'keyboard.rowGroup';
-
-/// Typed store for the row-group selection over the [PrefsKv] seam
-/// (non-secret by rule — never secure storage; sensitivity house pattern).
-class KeyRowGroupStore {
-  final PrefsKv _prefs;
-
-  /// Creates the store over [prefs], defaulting to the real adapter. An
-  /// instance may be injected for tests.
-  KeyRowGroupStore({PrefsKv? prefs}) : _prefs = prefs ?? SharedPrefsKv();
-
-  /// The persisted group; [KeyRowGroup.nav] when unset, unknown, or when
-  /// the platform read fails (a broken prefs read must never take the
-  /// keyboard down — the default group is always available).
-  Future<KeyRowGroup> load() async {
-    try {
-      final stored = await _prefs.getString(kKeyRowGroupPrefsKey);
-      return KeyRowGroup.values.firstWhere(
-        (group) => group.name == stored,
-        orElse: () => KeyRowGroup.nav,
-      );
-    } on Object {
-      return KeyRowGroup.nav;
-    }
-  }
-
-  /// Persists [group] (its enum name: 'nav' | 'fn' | 'num') under
-  /// [kKeyRowGroupPrefsKey].
-  Future<void> save(KeyRowGroup group) =>
-      _prefs.setString(kKeyRowGroupPrefsKey, group.name);
-}
-
-/// The [KeyRowGroupStore] singleton (overridable in tests).
-final keyRowGroupStoreProvider = Provider<KeyRowGroupStore>(
-  (ref) => KeyRowGroupStore(),
-);
-
-/// Riverpod 3 unified [Notifier] over the selection: synchronous
-/// [KeyRowGroup.nav] seed (D-09 default), async load on build,
-/// persist-through on [set].
-class KeyRowGroupNotifier extends Notifier<KeyRowGroup> {
-  @override
-  KeyRowGroup build() {
-    // Seed synchronously with the D-09 default so the first frame renders;
-    // replace with the persisted value as soon as it loads.
-    unawaited(_load(ref.watch(keyRowGroupStoreProvider)));
-    return KeyRowGroup.nav;
-  }
-
-  Future<void> _load(KeyRowGroupStore store) async {
-    state = await store.load();
-  }
-
-  /// Selects [group], applying live and persisting immediately
-  /// (fire-and-forget — a failed prefs write costs persistence only).
-  void set(KeyRowGroup group) {
-    state = group;
-    unawaited(ref.read(keyRowGroupStoreProvider).save(group));
-  }
-}
-
-/// The persisted row-group selection the panel's switcher edits.
-final keyRowGroupProvider = NotifierProvider<KeyRowGroupNotifier, KeyRowGroup>(
-  KeyRowGroupNotifier.new,
-);
-
 // ── Cap definitions (the test seam: iterate THESE, not the screen) ─────────
 
 /// One key cap: the wire code it emits + its face (label or icon).
@@ -154,18 +82,6 @@ class KeyCapDef {
   /// Creates a cap definition.
   const KeyCapDef(this.code, {this.label, this.icon, this.tooltip});
 }
-
-/// Nav cluster caps (wrapping grid — the arrows render separately as the
-/// inverted-T via [kNavArrowCaps]).
-const List<KeyCapDef> kNavClusterCaps = [
-  KeyCapDef('Esc', label: 'Esc'),
-  KeyCapDef('Tab', label: 'Tab'),
-  KeyCapDef('Home', label: 'Home'),
-  KeyCapDef('End', label: 'End'),
-  KeyCapDef('PgUp', label: 'PgUp'),
-  KeyCapDef('PgDn', label: 'PgDn'),
-  KeyCapDef('Del', label: 'Del'),
-];
 
 /// The four arrow caps (inverted-T: Up above Left/Down/Right).
 const List<KeyCapDef> kNavArrowCaps = [
@@ -208,25 +124,18 @@ const List<KeyCapDef> kNumCaps = [
   KeyCapDef('NumDot', label: '.'),
 ];
 
-/// Every cap definition a [group] renders (the widget-test coverage seam).
-List<KeyCapDef> capsForGroup(KeyRowGroup group) => switch (group) {
-      KeyRowGroup.nav => [...kNavClusterCaps, ...kNavArrowCaps],
-      KeyRowGroup.fn => kFnCaps,
-      KeyRowGroup.num => kNumCaps,
-    };
-
-// ── Pad cap definitions (10-03 — the full-screen keyboard's four pads) ─────
+// ── Pad cap definitions (10-03; both surfaces since 260809-ipc) ───────────
 //
-// The pads are a SEPARATE surface from the D-07 trackpad-docked panel's row
-// groups above: these tables + [capsForPad] + [KeyboardPad] serve the
-// full-screen swipeable keyboard (10-04/10-05). The group tables/switcher/
-// store above stay owned by the docked panel and are untouched.
+// These tables + [capsForPad] + [KeyboardPad] serve BOTH keyboards: the
+// full-screen swipeable one (10-04/10-05) and the trackpad-docked panel,
+// which adopted the same four pads in 260809-ipc. There is no second cap
+// vocabulary anywhere.
 
 /// The Type pad's slim extras row (UI-SPEC §Pad layouts — Type pad):
 /// `Esc | Tab | ← | ↑ | ↓ | → | Del`, docked under the IME canvas.
 ///
-/// Reuses the [kNavClusterCaps] / [kNavArrowCaps] codes and faces — the
-/// arrows carry their icon + tooltip.
+/// Reuses the [kNavArrowCaps] codes and faces — the arrows carry their icon
+/// + tooltip.
 const List<KeyCapDef> kTypeExtrasCaps = [
   KeyCapDef('Esc', label: 'Esc'),
   KeyCapDef('Tab', label: 'Tab'),
@@ -276,12 +185,12 @@ List<KeyCapDef> capsForPad(KeyboardPad pad) => switch (pad) {
       KeyboardPad.fn => [kFnEscCap, ...kFnCaps],
     };
 
-// ── Pad persistence (10-03 — a NEW key, NOT a mutation of rowGroup) ────────
+// ── Pad persistence (10-03 + 260809-ipc: one model, two mount-point keys) ─
 
 /// The shared_preferences key holding the last-open pad (10-UI-SPEC §Pad
-/// persistence). Deliberately DISTINCT from [kKeyRowGroupPrefsKey]: the
+/// persistence). Deliberately DISTINCT from [kPanelPadPrefsKey]: the
 /// full-screen keyboard and the D-07 trackpad-docked panel persist their
-/// surfaces independently.
+/// landing pads independently — see that constant for why.
 const String kKeyboardPadPrefsKey = 'keyboard.pad';
 
 /// The shared_preferences key holding the trackpad-docked panel's last-open
@@ -445,124 +354,13 @@ final panelPadProvider = NotifierProvider<PanelPadNotifier, KeyboardPad>(
 
 // ── Widgets ────────────────────────────────────────────────────────────────
 
-/// The active group's key caps. See the library doc for the emission model.
-class KeyRows extends StatelessWidget {
-  /// Which row group renders.
-  final KeyRowGroup group;
-
-  /// False renders the gated all-muted, non-interactive state.
-  final bool enabled;
-
-  /// Press-down with no armed mods: `key {action: down}` (KEY-04 hold).
-  final void Function(String code) onKeyDown;
-
-  /// Release of a non-deferred press: `key {action: up}` (stops autorepeat).
-  final void Function(String code) onKeyUp;
-
-  /// Release of a DEFERRED press (armed mods were pending at press-down):
-  /// the combo path — `key {action: tap, mods: [...]}` (D-10).
-  final void Function(String code) onKeyTapWithMods;
-
-  /// Whether armed modifiers are pending — polled at press-down to pick the
-  /// down/up vs tap+mods branch (the panel wires this to the FSM).
-  final bool Function() hasArmedMods;
-
-  /// Fired on every press-down (the panel wires the haptic tick here —
-  /// UI-SPEC: tick on key-down, not release).
-  final VoidCallback? onPressHaptic;
-
-  /// Creates the rows.
-  const KeyRows({
-    super.key,
-    required this.group,
-    required this.enabled,
-    required this.onKeyDown,
-    required this.onKeyUp,
-    required this.onKeyTapWithMods,
-    required this.hasArmedMods,
-    this.onPressHaptic,
-  });
-
-  Widget _cap(KeyCapDef def, {double? width}) => KeyCap(
-        def: def,
-        enabled: enabled,
-        width: width,
-        onKeyDown: onKeyDown,
-        onKeyUp: onKeyUp,
-        onKeyTapWithMods: onKeyTapWithMods,
-        hasArmedMods: hasArmedMods,
-        onPressHaptic: onPressHaptic,
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    switch (group) {
-      case KeyRowGroup.nav:
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              alignment: WrapAlignment.center,
-              children: [for (final def in kNavClusterCaps) _cap(def)],
-            ),
-            const SizedBox(height: 8),
-            // Inverted-T: Up above Left/Down/Right (muscle memory).
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _cap(kNavArrowCaps[0], width: 64), // Up
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _cap(kNavArrowCaps[1], width: 64), // Left
-                    const SizedBox(width: 8),
-                    _cap(kNavArrowCaps[2], width: 64), // Down
-                    const SizedBox(width: 8),
-                    _cap(kNavArrowCaps[3], width: 64), // Right
-                  ],
-                ),
-              ],
-            ),
-          ],
-        );
-      case KeyRowGroup.fn:
-        return Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          alignment: WrapAlignment.center,
-          children: [for (final def in kFnCaps) _cap(def, width: 56)],
-        );
-      case KeyRowGroup.num:
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (var row = 0; row < 4; row++) ...[
-              if (row > 0) const SizedBox(height: 8),
-              Row(
-                children: [
-                  for (var col = 0; col < 3; col++) ...[
-                    if (col > 0) const SizedBox(width: 8),
-                    Expanded(child: _cap(kNumCaps[row * 3 + col])),
-                  ],
-                ],
-              ),
-            ],
-          ],
-        );
-    }
-  }
-}
-
 /// One key cap: press-down branch capture + pressed accent state
 /// (UI-SPEC key-cap state table).
 ///
-/// PUBLIC and SHARED (10-03): the D-07 docked panel's [KeyRows] and the
-/// full-screen keyboard's pads (10-04/10-05) mount the SAME widget, so the
-/// emission model documented at the library top — D-11 hold, D-10 deferred
-/// combo, IN-04 always-wired releases, CR-01 dispose release — is shared by
+/// PUBLIC and SHARED (10-03): the D-07 docked panel and the full-screen
+/// keyboard mount the SAME widget through the SAME four pads, so the emission
+/// model documented at the library top — D-11 hold, D-10 deferred combo,
+/// IN-04 always-wired releases, CR-01 dispose release — is shared by
 /// reference and can never drift between the two surfaces. Reuse it; do not
 /// clone its press logic.
 class KeyCap extends StatefulWidget {
@@ -694,13 +492,13 @@ class KeyCapState extends State<KeyCap> {
 
   @override
   void dispose() {
-    // CR-01: a cap disposed mid-hold — a screen pop with a key held, or a
-    // Nav/Fn/Num group switch that rebuilds KeyRows with different caps while
-    // a key is down — must still release its held key, else the server key
-    // stays down and Windows autorepeats it forever. A deferred press owes a
-    // combo (fired only on a real release), not an up, so it releases nothing.
-    // The panel's _onKeyUp remove() guard makes this idempotent with the
-    // panel-level flush and the D-12 disconnect wipe.
+    // CR-01: a cap disposed mid-hold — a screen pop with a key held, a swipe
+    // to another pad, or the docked panel collapsing while a key is down —
+    // must still release its held key, else the server key stays down and
+    // Windows autorepeats it forever. A deferred press owes a combo (fired
+    // only on a real release), not an up, so it releases nothing. The shared
+    // owner's keyUp() remove() guard makes this idempotent with the
+    // surface-level flush and the D-12 disconnect wipe.
     if (_live && !_deferred) widget.onKeyUp(widget.def.code);
     super.dispose();
   }
@@ -759,60 +557,3 @@ class KeyCapState extends State<KeyCap> {
   }
 }
 
-/// The 3-segment Nav/Fn/Num group switcher (UI-SPEC: selected = accent label
-/// + accent underline, unselected muted, 12/400, ≥48px tall). Persistence is
-/// the caller's job ([keyRowGroupProvider] in the panel).
-class KeyRowGroupSwitcher extends StatelessWidget {
-  /// The selected group.
-  final KeyRowGroup group;
-
-  /// Fired with the newly selected group.
-  final ValueChanged<KeyRowGroup> onChanged;
-
-  /// Creates the switcher.
-  const KeyRowGroupSwitcher({
-    super.key,
-    required this.group,
-    required this.onChanged,
-  });
-
-  static const _labels = {
-    KeyRowGroup.nav: 'Nav',
-    KeyRowGroup.fn: 'Fn',
-    KeyRowGroup.num: 'Num',
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        for (final g in KeyRowGroup.values)
-          Expanded(
-            child: InkWell(
-              onTap: () => onChanged(g),
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 48),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(
-                      color: g == group ? kAccent : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                ),
-                child: Text(
-                  _labels[g]!,
-                  style: TextStyle(
-                    color: g == group ? kAccent : kMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                  ),
-                ),
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}

@@ -1,19 +1,21 @@
 /// The full-screen keyboard's four pads (Type / Arrows / Numpad / Fn) and its
 /// bottom tab bar (KEY-02/KEY-04, 10-UI-SPEC §Pad layouts + §Bottom tab bar).
 ///
-/// Widget-only and service-agnostic (mouse_buttons / [KeyRows] house style):
-/// every pad takes the SAME injected-callback contract as [KeyRows], so their
-/// widget tests need no service fake. The screen owner (10-05) mounts these in
-/// a `PageView`, owns the one `ModifierFsm` + held-set, and wires the
-/// callbacks to `service.sendReliable(KeyMsg(...))` + the haptic tick.
+/// Widget-only and service-agnostic (mouse_buttons house style): every pad
+/// takes the SAME six-field injected cap-callback contract, so their widget
+/// tests need no service fake. BOTH surfaces mount these in a `PageView` —
+/// the full-screen keyboard (10-05) and, since 260809-ipc, the trackpad-docked
+/// panel — and each wires the callbacks to its shared
+/// `KeyboardInputController` + the haptic tick.
 ///
 /// # These pads do not own the emission model
 ///
 /// Every interactive cap here is the shared [KeyCap] from `key_rows.dart` —
 /// the sacred press model (D-11 hold, D-10 deferred combo, IN-04 always-wired
-/// releases, CR-01 dispose release) is shared BY REFERENCE with the D-07
-/// trackpad-docked panel and can never drift between the two surfaces. This
-/// file only lays caps out; it re-implements none of their press logic.
+/// releases, CR-01 dispose release) is shared BY REFERENCE by both the
+/// full-screen keyboard and the D-07 trackpad-docked panel, and can never
+/// drift between them. This file only lays caps out; it re-implements none of
+/// their press logic.
 ///
 /// # No keep-alive, deliberately
 ///
@@ -250,8 +252,8 @@ double panelPadHeight(KeyboardPad pad, double columnHeight) {
 
 // ── Pads ──────────────────────────────────────────────────────────────────
 
-/// Shared plumbing for the four pads: the [KeyRows] callback contract plus
-/// the [cap] factory that binds it to a [KeyCap].
+/// Shared plumbing for the four pads: the six-field cap-callback contract
+/// plus the [cap] factory that binds it to a [KeyCap].
 ///
 /// Private on purpose — the pads are the API; this only spares each of them
 /// six identical fields and keeps every cap on the one shared press model.
@@ -310,8 +312,9 @@ abstract class _KeyPad extends StatelessWidget {
 }
 
 /// The bottom pad selector: icon over label, accent top-edge underline on the
-/// selected tab (UI-SPEC §Bottom tab bar). The [KeyRowGroupSwitcher] idiom,
-/// re-shaped from segment to tab.
+/// selected tab (UI-SPEC §Bottom tab bar). The segmented-selector idiom the
+/// docked panel used to carry, re-shaped from segment to tab — and now shared
+/// by both surfaces rather than duplicated.
 ///
 /// # Always interactive — there is deliberately no `enabled` parameter
 ///

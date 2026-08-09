@@ -5,8 +5,9 @@
 /// to Type on a corrupt/unknown read — a broken pref must never take the
 /// keyboard down (T-10-04).
 ///
-/// The trackpad-docked panel's `keyboard.rowGroup` key is a SEPARATE store
-/// (D-07, out of scope) — the distinctness of the two keys is asserted here.
+/// The trackpad-docked panel persists the SAME model under its own key —
+/// the distinctness of the two, and the one-time migration of the retired
+/// preference into the panel's key, are asserted in the second group.
 library;
 
 import 'package:flutter_test/flutter_test.dart';
@@ -39,11 +40,8 @@ class _ThrowingPrefsKv implements PrefsKv {
 }
 
 void main() {
-  test('kKeyboardPadPrefsKey is "keyboard.pad", distinct from the docked '
-      "panel's keyboard.rowGroup (D-07 untouched)", () {
+  test('kKeyboardPadPrefsKey is "keyboard.pad"', () {
     expect(kKeyboardPadPrefsKey, 'keyboard.pad');
-    expect(kKeyRowGroupPrefsKey, 'keyboard.rowGroup');
-    expect(kKeyboardPadPrefsKey, isNot(kKeyRowGroupPrefsKey));
   });
 
   group('KeyboardPadStore', () {

@@ -6,11 +6,14 @@
 /// the HiddenTextInput stays mounted — SAME State — across the toggle so the
 /// Android input connection survives (Pitfall 6).
 ///
-/// Rows contract (04-06): chips row + switcher + active KeyRows in UI-SPEC
-/// order; all three KeyMsg emission paths (modifier hold down/up, key-cap
-/// down/up, tap+mods with auto-reset) ride the injected send seam; and the
-/// D-12 disconnected transition — driven here by a FAKE changes stream —
-/// provably resets the FSM with zero wire sends.
+/// Deck contract (04-06 rows, rebuilt by 260809-ipc): the same four pads,
+/// tab bar, labels and icons as the full-screen keyboard, with the chips
+/// below the pad; all three KeyMsg emission paths (modifier hold down/up,
+/// key-cap down/up, tap+mods with auto-reset) ride the injected send seam;
+/// the D-12 disconnected transition — driven here by a FAKE changes stream —
+/// provably resets the shared owner with zero wire sends; and the per-pad
+/// height, the IME-on-Type-only rule and `keyboard.panelPad` persistence are
+/// pinned on a driven viewport.
 library;
 
 import 'dart:async';

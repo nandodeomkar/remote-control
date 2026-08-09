@@ -39,7 +39,8 @@
 ///
 /// The last-open pad persists under `keyboard.pad` (10-03 store); entry seeds
 /// the landing page from the persisted value (a one-shot restore jump covers
-/// the async prefs load). `keyboard.rowGroup` stays owned by the docked panel.
+/// the async prefs load). The trackpad-docked panel persists the SAME model
+/// under its own mount-point key — see [kPanelPadPrefsKey].
 library;
 
 import 'package:flutter/material.dart';
@@ -237,8 +238,8 @@ class _KeyboardScreenState extends ConsumerState<KeyboardScreen> {
     final status = ref.watch(connectionStatusProvider);
     final authed = status.chip == ChipStatus.connected;
 
-    // Every pad takes the same six-field KeyRows contract, closing over the
-    // one shared owner.
+    // Every pad takes the same six-field cap-callback contract, closing over
+    // the one shared owner.
     final hasArmedMods = _controller.hasArmedMods;
 
     return Scaffold(
