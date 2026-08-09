@@ -2,17 +2,19 @@
 /// keyboard: a [PageView] of four pads (Type | Arrows | Numpad | Fn) with a
 /// persistent modifier chip row and a bottom [KeyboardTabBar].
 ///
-/// # The screen-level owner (the auditable stuck-key migration)
+/// # The shared stuck-key owner (D-95)
 ///
-/// The sacred FSM / held-set / D-12 / dispose-flush logic is LIFTED — copied
-/// intact, not re-derived — from the trackpad-docked `keyboard_panel.dart`
-/// (which stays byte-untouched for the D-07 surface). This State owns:
+/// The sacred FSM / held-set / D-12 / dispose-flush logic is not written here
+/// and is not written twice: it lives in [KeyboardInputController], which this
+/// State constructs in `initState` and disposes in `dispose()`. The
+/// trackpad-docked panel constructs the SAME class, so the two surfaces cannot
+/// drift. That owner holds:
 ///
-/// - ONE [ModifierFsm] serving every pad (chips are persistent across pads,
+/// - ONE modifier FSM serving every pad (chips are persistent across pads,
 ///   so combos like Ctrl+F5 or Win+D work from any pad);
-/// - the [_heldCodes] set (CR-02 rollover tracking; `up` sends only when
+/// - the held-code set (CR-02 rollover tracking; `up` sends only when
 ///   `remove()` succeeds — idempotent with each cap's own dispose release);
-/// - the [_imeResetTick] CR-01 atomic-IME-wipe trigger (T-04-03);
+/// - the CR-01 atomic-IME-wipe trigger (T-04-03);
 /// - the D-12 disconnect transition off the service `changes` ping stream;
 /// - the dispose() LIVE-only flush (owed cap ups + `releaseAll()` modifier
 ///   ups on a live socket; zero sends when disconnected — CONN-07
@@ -40,12 +42,8 @@
 /// the async prefs load). `keyboard.rowGroup` stays owned by the docked panel.
 library;
 
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import 'package:remote_protocol/remote_protocol.dart';
 
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
@@ -56,6 +54,7 @@ import 'diff_ops.dart';
 import 'hidden_text_input.dart';
 import 'key_pads.dart';
 import 'key_rows.dart';
+import 'keyboard_input_controller.dart';
 import 'modifier_chip.dart';
 import 'modifier_fsm.dart';
 
@@ -81,29 +80,12 @@ class _KeyboardScreenState extends ConsumerState<KeyboardScreen> {
   /// KEY-01 committed-text diff producer (emit -> reliable path).
   late final ImeDiffProducer _imeProducer;
 
-  // ── The sacred owners, lifted from keyboard_panel.dart ───────────────────
+  // ── The shared stuck-key owner (D-95) ────────────────────────────────────
 
-  /// The ONE sticky-modifier FSM (chips poll stateOf after each event).
-  final ModifierFsm _fsm = ModifierFsm();
-
-  /// The key caps currently held down server-side (each sent a `down` whose
-  /// `up` is still owed). Multiple caps can be concurrently held — rollover
-  /// between arrow keys is the normal pattern (CR-02): each KeyCap has its
-  /// own GestureDetector and pointers are tracked independently. Cleared
-  /// WITHOUT ups on disconnect (D-12) — CONN-07 release_all already freed
-  /// the real keys and queued stale ups must never leak into a new session.
-  final Set<String> _heldCodes = <String>{};
-
-  /// The CR-01 atomic-IME-wipe trigger: incrementing it makes the
-  /// [HiddenTextInput] purge pre-disconnect typed text (potentially a
-  /// password) from BOTH the diff baseline and the controller buffer in one
-  /// synchronous callback, so no post-reconnect diff can replay it through
-  /// sendReliable (T-04-03).
-  final ValueNotifier<int> _imeResetTick = ValueNotifier<int>(0);
-
-  /// D-12 transition detection off the changes pings.
-  StreamSubscription<void>? _changesSub;
-  bool _wasDisconnected = false;
+  /// The one owner of the FSM, the held set, the CR-01 IME reset tick, the
+  /// D-12 transition and the LIVE-only dispose flush — the SAME class the
+  /// trackpad-docked panel constructs.
+  late final KeyboardInputController _controller;
 
   // ── Pad paging state ──────────────────────────────────────────────────────
 
@@ -137,14 +119,16 @@ class _KeyboardScreenState extends ConsumerState<KeyboardScreen> {
       _restorePad(next);
     });
 
-    // D-12 transition detection — exactly the panel's wiring, with the
-    // service seams read directly (this screen owns the service reference).
-    _wasDisconnected = _isDisconnected;
-    _changesSub = _service.changes.listen((_) {
-      final disconnected = _isDisconnected;
-      if (disconnected && !_wasDisconnected) _onDisconnected();
-      _wasDisconnected = disconnected;
-    });
+    // The shared owner, with the service seams read directly (this screen
+    // owns the service reference).
+    _controller = KeyboardInputController(
+      send: _service.sendReliable,
+      changes: _service.changes,
+      isDisconnected: () => _isDisconnected,
+      onChanged: () {
+        if (mounted) setState(() {});
+      },
+    );
 
     // IME raised only when the landing pad is Type (post-frame: the hidden
     // field must be attached before it can take focus).
@@ -176,87 +160,16 @@ class _KeyboardScreenState extends ConsumerState<KeyboardScreen> {
     }
   }
 
-  /// D-12: reset all armed/locked chips (zero send effects — the FSM
-  /// guarantees it), forget ALL held caps so their ups are skipped, and fire
-  /// the CR-01 IME wipe so the hidden field's producer + controller both
-  /// return to the sentinel atomically.
-  void _onDisconnected() {
-    _fsm.disconnected();
-    _heldCodes.clear();
-    _imeResetTick.value++;
-    if (mounted) setState(() {});
-  }
-
   @override
   void dispose() {
     _padSub?.close();
-    _changesSub?.cancel();
-    // CR-01: the session may still be authed (the screen was popped
-    // mid-hold). Flush every owed release before going away — otherwise the
-    // server holds the input indefinitely (Windows autorepeats a held key; a
-    // locked modifier stays physically held). On a LIVE socket only: a
-    // disconnected session already had its held input freed by CONN-07
-    // release_all, and sending into a NEW session would be wrong (mirrors
-    // the D-12 zero-effect path). _onKeyUp's remove() guard keeps this
-    // idempotent with each cap's own dispose-time release.
-    if (!_isDisconnected) {
-      for (final code in _heldCodes.toList()) {
-        _service.sendReliable(KeyMsg(code: code, action: 'up'));
-      }
-      _sendEffects(_fsm.releaseAll()); // ups for any locked-modifier holds
-    }
-    _heldCodes.clear();
-    _imeResetTick.dispose();
+    // The owner cancels its subscription and runs the LIVE-only flush at
+    // exactly the position the inline flush block occupied — see
+    // KeyboardInputController.dispose.
+    _controller.dispose();
     _pageController.dispose();
     _imeFocusNode.dispose();
     super.dispose();
-  }
-
-  // ── Wiring: FSM effects + key-cap emissions -> the reliable path ─────────
-
-  void _sendEffects(List<ModifierEffect> effects) {
-    for (final effect in effects) {
-      switch (effect) {
-        case SendModifierDown(:final holdCode):
-          _service.sendReliable(KeyMsg(code: holdCode, action: 'down'));
-        case SendModifierUp(:final holdCode):
-          _service.sendReliable(KeyMsg(code: holdCode, action: 'up'));
-      }
-    }
-  }
-
-  void _onChipTap(Mod mod) {
-    hapticTick();
-    _sendEffects(_fsm.tap(mod));
-    setState(() {});
-  }
-
-  void _onChipLongPress(Mod mod) {
-    hapticTick();
-    _sendEffects(_fsm.longPress(mod));
-    setState(() {});
-  }
-
-  void _onKeyDown(String code) {
-    _heldCodes.add(code);
-    _service.sendReliable(KeyMsg(code: code, action: 'down'));
-  }
-
-  void _onKeyUp(String code) {
-    // Only release a key whose down survived: remove() returning false
-    // covers both the D-12 disconnect wipe (the server already released)
-    // AND releases forwarded by the always-wired cap handlers when no down
-    // ever fired (IN-04).
-    if (!_heldCodes.remove(code)) return;
-    _service.sendReliable(KeyMsg(code: code, action: 'up'));
-  }
-
-  void _onKeyTapWithMods(String code) {
-    _service.sendReliable(
-      KeyMsg(code: code, action: 'tap', mods: _fsm.modsForTap()),
-    );
-    _fsm.onNonModifierTap();
-    setState(() {}); // armed chips visually auto-reset (D-10)
   }
 
   // ── Paging ────────────────────────────────────────────────────────────────
@@ -306,10 +219,10 @@ class _KeyboardScreenState extends ConsumerState<KeyboardScreen> {
             Expanded(
               child: ModifierChip(
                 label: label,
-                state: _fsm.stateOf(mod),
+                state: _controller.stateOf(mod),
                 enabled: authed,
-                onTap: () => _onChipTap(mod),
-                onLongPress: () => _onChipLongPress(mod),
+                onTap: () => _controller.chipTap(mod),
+                onLongPress: () => _controller.chipLongPress(mod),
               ),
             ),
           ],
@@ -325,8 +238,8 @@ class _KeyboardScreenState extends ConsumerState<KeyboardScreen> {
     final authed = status.chip == ChipStatus.connected;
 
     // Every pad takes the same six-field KeyRows contract, closing over the
-    // one screen-level FSM + held set.
-    bool hasArmedMods() => _fsm.modsForTap().isNotEmpty;
+    // one shared owner.
+    final hasArmedMods = _controller.hasArmedMods;
 
     return Scaffold(
       // The raised system IME pushes the whole column up, so the chip row
@@ -369,33 +282,33 @@ class _KeyboardScreenState extends ConsumerState<KeyboardScreen> {
                 children: [
                   TypePad(
                     enabled: authed,
-                    onKeyDown: _onKeyDown,
-                    onKeyUp: _onKeyUp,
-                    onKeyTapWithMods: _onKeyTapWithMods,
+                    onKeyDown: _controller.keyDown,
+                    onKeyUp: _controller.keyUp,
+                    onKeyTapWithMods: _controller.keyTapWithMods,
                     hasArmedMods: hasArmedMods,
                     onPressHaptic: hapticTick,
                   ),
                   ArrowsPad(
                     enabled: authed,
-                    onKeyDown: _onKeyDown,
-                    onKeyUp: _onKeyUp,
-                    onKeyTapWithMods: _onKeyTapWithMods,
+                    onKeyDown: _controller.keyDown,
+                    onKeyUp: _controller.keyUp,
+                    onKeyTapWithMods: _controller.keyTapWithMods,
                     hasArmedMods: hasArmedMods,
                     onPressHaptic: hapticTick,
                   ),
                   NumpadPad(
                     enabled: authed,
-                    onKeyDown: _onKeyDown,
-                    onKeyUp: _onKeyUp,
-                    onKeyTapWithMods: _onKeyTapWithMods,
+                    onKeyDown: _controller.keyDown,
+                    onKeyUp: _controller.keyUp,
+                    onKeyTapWithMods: _controller.keyTapWithMods,
                     hasArmedMods: hasArmedMods,
                     onPressHaptic: hapticTick,
                   ),
                   FnPad(
                     enabled: authed,
-                    onKeyDown: _onKeyDown,
-                    onKeyUp: _onKeyUp,
-                    onKeyTapWithMods: _onKeyTapWithMods,
+                    onKeyDown: _controller.keyDown,
+                    onKeyUp: _controller.keyUp,
+                    onKeyTapWithMods: _controller.keyTapWithMods,
                     hasArmedMods: hasArmedMods,
                     onPressHaptic: hapticTick,
                   ),
@@ -407,7 +320,7 @@ class _KeyboardScreenState extends ConsumerState<KeyboardScreen> {
             HiddenTextInput(
               producer: _imeProducer,
               focusNode: _imeFocusNode,
-              resetSignal: _imeResetTick,
+              resetSignal: _controller.imeResetTick,
             ),
             // Persistent modifier chips — on every pad, gated on auth.
             _chipRow(authed),

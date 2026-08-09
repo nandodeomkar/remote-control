@@ -413,4 +413,121 @@ void main() {
     expect(sent, isEmpty);
     expect(find.byIcon(Symbols.lock_rounded), findsNothing);
   });
+
+  // ── The panel surface's own dispose / IN-04 / collapse proofs ────────────
+  //
+  // Added by 260809-ipc Task 1. The full-screen keyboard has had these since
+  // 10-05; the docked panel had none of them, so "proven on both surfaces"
+  // was a claim rather than a fact. The collapse case is a path this surface
+  // has shipped since 04-05 and that no test has ever covered: collapsing
+  // swaps the chrome for a zero-height box, which unmounts the caps while the
+  // panel State itself survives.
+
+  /// Presses and holds the cap keyed `cap-[code]`, pumping past the 100ms
+  /// press deadline so onTapDown fires eagerly (the host scrollable's drag
+  /// recognizer shares the arena and would otherwise defer it to release).
+  Future<TestGesture> holdCap(WidgetTester tester, String code) async {
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byKey(ValueKey('cap-$code'))),
+    );
+    await tester.pump(const Duration(milliseconds: 150));
+    return gesture;
+  }
+
+  List<String> wire() =>
+      sentKeys().map((k) => '${k.action}:${k.code}').toList();
+
+  testWidgets(
+      'panel-dispose LIVE flush: a held cap AND a locked modifier both get '
+      'their ups when the host unmounts on a live socket', (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    final gesture = await holdCap(tester, 'Esc');
+    await tester.longPress(find.text('Win'));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(wire(), ['down:Esc', 'down:WinLeft']);
+
+    // Unmount the whole host mid-hold. The cap-level dispose release and the
+    // owner's flush are idempotent through the remove() guard — each owed up
+    // fires exactly ONCE.
+    await tester.pumpWidget(const SizedBox());
+
+    final ups = wire().skip(2).toList();
+    expect(ups.toSet(), {'up:Esc', 'up:WinLeft'},
+        reason: 'every owed cap up + the releaseAll modifier up must flush');
+    expect(ups.length, 2, reason: 'exactly once each — no duplicates');
+
+    await gesture.up();
+    expect(wire().length, 4);
+  });
+
+  testWidgets(
+      'panel-dispose on a DISCONNECTED socket sends NOTHING — stale ups must '
+      'never leak into a new session', (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    final gesture = await holdCap(tester, 'Esc');
+    await tester.longPress(find.text('Win'));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(wire(), ['down:Esc', 'down:WinLeft']);
+
+    disconnected = true;
+    changes.add(null);
+    await tester.pump();
+    await tester.pump();
+    final before = sent.length;
+
+    await tester.pumpWidget(const SizedBox());
+    await gesture.up();
+
+    expect(sent.length, before,
+        reason: 'a disconnected dispose flushes NOTHING (CONN-07 already '
+            'freed the real keys)');
+  });
+
+  testWidgets(
+      'IN-04: a cancelled press on the panel still emits the up',
+      (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    final gesture = await holdCap(tester, 'Esc');
+    expect(wire(), ['down:Esc']);
+
+    // What a scroll/drag recognizer claiming the pointer does to the cap.
+    await gesture.cancel();
+    await tester.pump();
+
+    expect(wire(), ['down:Esc', 'up:Esc'],
+        reason: 'release handlers are always wired — a cancelled press must '
+            'still free the held key');
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
+  testWidgets('collapsing the panel mid-hold releases the held key exactly '
+      'once', (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    final gesture = await holdCap(tester, 'Esc');
+    expect(wire(), ['down:Esc']);
+
+    // Collapse (NOT unmount): the chrome becomes a zero-height box, so the
+    // caps dispose while the panel State — and the owner — live on.
+    await tester.pumpWidget(host(expanded: false));
+    await tester.pump();
+
+    expect(wire(), ['down:Esc', 'up:Esc'],
+        reason: 'the cap dispose must free the key when the panel collapses');
+
+    // The later pointer release finds remove() false — no duplicate up.
+    await gesture.up();
+    await tester.pump();
+    expect(wire(), ['down:Esc', 'up:Esc']);
+
+    await tester.pumpWidget(const SizedBox());
+  });
 }
