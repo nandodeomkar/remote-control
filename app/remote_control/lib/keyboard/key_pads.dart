@@ -29,6 +29,8 @@
 /// not fixed heights.
 library;
 
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:material_symbols_icons/symbols.dart';
 
@@ -119,6 +121,112 @@ const double _kTabGap = 4;
 /// the bar's 1px hairline top border instead (UI-SPEC §Bottom tab bar).
 const double _kTabUnderlineWidth = 2;
 const double _kTabHairlineWidth = 1;
+
+// ── The docked panel's sizing contract (260809-ipc, D-93) ─────────────────
+//
+// The same four pads also mount INSIDE the trackpad-docked panel, where they
+// share a fixed column with a trackpad that must stay LIVE. So the panel needs
+// per-pad heights the full-screen surface never did (there, `Expanded` takes
+// whatever is left).
+//
+// HONESTY ABOUT THE NUMBERS: the padding / gap / row consts above are REAL —
+// they are what the pads actually lay out with. The 64px numpad row and the
+// 76px arrows inverted-T cell below are CHOSEN TARGETS, not constants read
+// back from the pads: the pads size their caps by `Expanded` flex, so a pad
+// has no intrinsic height at all. The targets come from 10-UI-SPEC §Spacing
+// ("64px minimum large-cap height") and are picked so a docked panel still
+// yields finger-sized caps. They YIELD on short devices — the hard contract is
+// only "never overflows", which KeyCap's `minHeight: 48` enforced against
+// incoming constraints (BoxConstraints.enforce) guarantees.
+
+/// The panel's 1px top hairline (continuous with the trackpad above).
+const double _kPanelHairline = 1;
+
+/// The panel's modifier-chip row: ModifierChip's 48px floor + 8px top and
+/// bottom padding.
+const double _kPanelChipRowHeight = 64;
+
+/// Chosen target — the Numpad pad's row height inside the docked panel.
+const double _kPanelNumpadRowTarget = 64;
+
+/// Chosen target — one cell of the Arrows pad's inverted-T inside the panel
+/// (two cells + one 8px gap = the 160px cluster).
+const double _kPanelArrowCellTarget = 76;
+
+/// The panel's constant chrome height: hairline + chip row + tab bar
+/// (1 + 64 + 56 = 121). Everything except the animating pad viewport.
+const double kPanelChromeHeight =
+    _kPanelHairline + _kPanelChipRowHeight + _kTabBarHeight;
+
+/// The unclamped viewport height each pad asks for inside the docked panel —
+/// the height of the animating box around the panel's `PageView`.
+///
+/// Arithmetic, per pad (all four carry the pad's own 2 × 16px padding):
+///
+/// - **type** 32 + 48 extras row = **80** (D-93: Type stays a slim strip,
+///   ≈ the ~200px panel this replaced, since chrome adds 121);
+/// - **arrows** 32 + 56 top row + 24 lg gap + 160 inverted-T
+///   (2 × 76 + 8) = **272**;
+/// - **numpad** 32 + 4 × 64 rows + 3 × 8 gaps = **312** (the tallest);
+/// - **fn** 32 + 56 Esc + 8 + 3 × 64 rows + 2 × 8 gaps = **304**.
+const Map<KeyboardPad, double> kPanelPadHeights = {
+  KeyboardPad.type: 2 * _kPadPadding + _kTypeRowHeight,
+  KeyboardPad.arrows: 2 * _kPadPadding +
+      _kShortRowHeight +
+      _kGapLg +
+      (2 * _kPanelArrowCellTarget + _kGap),
+  KeyboardPad.numpad:
+      2 * _kPadPadding + 4 * _kPanelNumpadRowTarget + 3 * _kGap,
+  KeyboardPad.fn: 2 * _kPadPadding +
+      _kShortRowHeight +
+      _kGap +
+      3 * _kPanelNumpadRowTarget +
+      2 * _kGap,
+};
+
+/// The share of the shared column the docked panel may ever take, chrome
+/// included. The trackpad keeps the rest — and the rest is what makes D-07
+/// (type while the cursor stays live) true rather than nominal.
+const double kPanelMaxHeightFraction = 0.55;
+
+/// The pad viewport's absolute floor. Below this a pad stops being a keyboard,
+/// so the fraction yields to it (see the guarantee below).
+const double kPanelMinPadHeight = 96;
+
+/// The docked panel's pad viewport height for [pad] inside a column of
+/// [columnHeight] logical pixels.
+///
+/// GUARANTEE, at any window size:
+///
+/// > live trackpad height >= 0.45 × columnHeight − 64
+///
+/// with ONE documented exception: when [kPanelMinPadHeight] binds (a column
+/// below ~290dp, reachable only with the IME raised on a very short device)
+/// the fraction yields to the 96px floor. Even then the panel totals 217 and
+/// the trackpad keeps `columnHeight − 281`, which stays positive on every
+/// plausible device.
+///
+/// When the ceiling binds, caps flex below their target height rather than
+/// overflowing: KeyCap's fixed 48px height floor is enforced against the
+/// incoming constraints, so a tight cell wins and there is no RenderFlex
+/// overflow.
+///
+/// [columnHeight] is the height of the column the panel SHARES with the
+/// trackpad — see `keyboard_panel.dart`, which must read it from the raw view
+/// metrics because the ancestor MediaQuery in that tree has had both the
+/// padding and the IME inset stripped out from under it.
+///
+/// The floor is applied to the CEILING, not to the pad's own request:
+/// `min(request, max(floor, ceiling))`. A pad never grows past what it asked
+/// for — Type's 80px strip stays 80px on every device — while a ceiling that
+/// has collapsed below the floor is lifted back to it.
+double panelPadHeight(KeyboardPad pad, double columnHeight) {
+  final ceiling = columnHeight * kPanelMaxHeightFraction - kPanelChromeHeight;
+  return math.min(
+    kPanelPadHeights[pad]!,
+    math.max(kPanelMinPadHeight, ceiling),
+  );
+}
 
 // ── Pads ──────────────────────────────────────────────────────────────────
 
@@ -276,6 +384,15 @@ class KeyboardTabBar extends StatelessWidget {
 /// OUTSIDE the PageView so its input connection survives page switches
 /// (UI-SPEC §Structure). This pad renders the hint and the extras row only.
 class TypePad extends _KeyPad {
+  /// Whether the centered hint canvas renders above the extras row.
+  ///
+  /// False in the trackpad-docked panel (260809-ipc): an 80px strip under a
+  /// live trackpad has no room for a centered paragraph, and the hint's job —
+  /// explaining that the system keyboard does the typing — is already obvious
+  /// there, where the IME sits directly below. With it off the Column docks
+  /// the extras row at the bottom instead of reserving flex for the canvas.
+  final bool showHint;
+
   /// Creates the Type pad.
   const TypePad({
     super.key,
@@ -285,6 +402,7 @@ class TypePad extends _KeyPad {
     required super.onKeyTapWithMods,
     required super.hasArmedMods,
     super.onPressHaptic,
+    this.showHint = true,
   });
 
   @override
@@ -292,21 +410,24 @@ class TypePad extends _KeyPad {
     return Padding(
       padding: const EdgeInsets.all(_kPadPadding),
       child: Column(
+        mainAxisAlignment:
+            showHint ? MainAxisAlignment.start : MainAxisAlignment.end,
         children: [
-          const Expanded(
-            child: Center(
-              child: Text(
-                kKeyboardHint,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: _kKeyboardHintColor,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w400,
-                  height: 1.7,
+          if (showHint)
+            const Expanded(
+              child: Center(
+                child: Text(
+                  kKeyboardHint,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: _kKeyboardHintColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w400,
+                    height: 1.7,
+                  ),
                 ),
               ),
             ),
-          ),
           // Esc | Tab | ← | ↑ | ↓ | → | Del — 7 equal caps in one row
           // (user-locked). Width relaxes below the 48px floor on narrow
           // phones; the 48px HEIGHT floor is what keeps them tappable.

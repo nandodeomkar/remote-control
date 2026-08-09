@@ -284,35 +284,92 @@ List<KeyCapDef> capsForPad(KeyboardPad pad) => switch (pad) {
 /// surfaces independently.
 const String kKeyboardPadPrefsKey = 'keyboard.pad';
 
-/// Typed store for the last-open pad over the [PrefsKv] seam — the
-/// [KeyRowGroupStore] pattern under the new key (non-secret by rule; never
-/// secure storage).
+/// The shared_preferences key holding the trackpad-docked panel's last-open
+/// pad (260809-ipc, D-94). Deliberately DISTINCT from [kKeyboardPadPrefsKey]:
+/// ONE model, TWO mount-point keys.
+///
+/// The two surfaces persist separately because the panel's pad choice has a
+/// physical consequence the screen's does not — it resizes the live trackpad
+/// beside it. A shared key would let a tap on the full-screen keyboard
+/// silently shrink the trackpad the next time the panel opens, for a reason
+/// the user cannot see. The panel is also dominated by Type and Arrows (it
+/// exists to type WHILE the cursor is live) where the full screen is where
+/// Numpad and Fn get real use, so a shared key would have each surface
+/// continually yanking the other's landing pad.
+const String kPanelPadPrefsKey = 'keyboard.panelPad';
+
+/// The retired docked-panel preference, read exactly once by the panel store
+/// and never written. Private, and the ONLY surviving reference to it
+/// anywhere: the migration below maps it into [kPanelPadPrefsKey] on first
+/// load, so the legacy read never happens a second time.
+const String _kRetiredPanelPrefsKey = 'keyboard.rowGroup';
+
+/// How a retired docked-panel selection becomes a pad.
+///
+/// The two deliberate choices have exact successors. Everything else — the
+/// old default nobody chose, an unset key, an unknown string — lands on
+/// [KeyboardPad.type]: that value's caps split across Type and Arrows so it
+/// has no single successor, and the slim Type strip is the least disruptive
+/// first open for an upgrading user.
+const Map<String, KeyboardPad> _kRetiredPanelPads = {
+  'fn': KeyboardPad.fn,
+  'num': KeyboardPad.numpad,
+};
+
+/// Typed store for a last-open pad over the [PrefsKv] seam (non-secret by
+/// rule; never secure storage).
+///
+/// Parameterised by [key] so ONE model serves both mount points: the
+/// full-screen keyboard on [kKeyboardPadPrefsKey], the trackpad-docked panel
+/// on [kPanelPadPrefsKey].
 class KeyboardPadStore {
   final PrefsKv _prefs;
 
+  /// Which prefs key this store reads and writes.
+  final String key;
+
+  /// Whether an unset [key] falls back to a ONE-TIME read of the retired
+  /// docked-panel preference (the panel store only). See [load].
+  final bool migrateRetiredPanelKey;
+
   /// Creates the store over [prefs], defaulting to the real adapter. An
   /// instance may be injected for tests.
-  KeyboardPadStore({PrefsKv? prefs}) : _prefs = prefs ?? SharedPrefsKv();
+  KeyboardPadStore({
+    PrefsKv? prefs,
+    this.key = kKeyboardPadPrefsKey,
+    this.migrateRetiredPanelKey = false,
+  }) : _prefs = prefs ?? SharedPrefsKv();
 
   /// The persisted pad; [KeyboardPad.type] when unset, unknown, or when the
-  /// platform read fails — a broken prefs read must never take the keyboard
-  /// down (T-10-04); the default pad is always available.
+  /// platform read fails — a broken pref must never take the keyboard down
+  /// (T-10-04); the default pad is always available.
+  ///
+  /// When [migrateRetiredPanelKey] is set and [key] is UNSET, the retired
+  /// docked-panel preference is read once, mapped per [_kRetiredPanelPads]
+  /// and written straight back under [key] — so the legacy read happens on
+  /// exactly one load, ever, and no upgrading user loses their choice.
   Future<KeyboardPad> load() async {
     try {
-      final stored = await _prefs.getString(kKeyboardPadPrefsKey);
-      return KeyboardPad.values.firstWhere(
-        (pad) => pad.name == stored,
-        orElse: () => KeyboardPad.type,
-      );
+      final stored = await _prefs.getString(key);
+      if (stored != null || !migrateRetiredPanelKey) return _padFor(stored);
+
+      final retired = await _prefs.getString(_kRetiredPanelPrefsKey);
+      final migrated = _kRetiredPanelPads[retired] ?? KeyboardPad.type;
+      await save(migrated);
+      return migrated;
     } on Object {
       return KeyboardPad.type;
     }
   }
 
+  static KeyboardPad _padFor(String? stored) => KeyboardPad.values.firstWhere(
+        (pad) => pad.name == stored,
+        orElse: () => KeyboardPad.type,
+      );
+
   /// Persists [pad] (its enum name: 'type' | 'arrows' | 'numpad' | 'fn')
-  /// under [kKeyboardPadPrefsKey].
-  Future<void> save(KeyboardPad pad) =>
-      _prefs.setString(kKeyboardPadPrefsKey, pad.name);
+  /// under this store's [key].
+  Future<void> save(KeyboardPad pad) => _prefs.setString(key, pad.name);
 }
 
 /// The [KeyboardPadStore] singleton (overridable in tests).
@@ -347,6 +404,43 @@ class KeyboardPadNotifier extends Notifier<KeyboardPad> {
 /// The persisted last-open pad the full-screen keyboard's PageView binds to.
 final keyboardPadProvider = NotifierProvider<KeyboardPadNotifier, KeyboardPad>(
   KeyboardPadNotifier.new,
+);
+
+/// The trackpad-docked panel's store: the SAME model on its own mount-point
+/// key, with the one-time migration of the retired preference enabled.
+final panelPadStoreProvider = Provider<KeyboardPadStore>(
+  (ref) => KeyboardPadStore(
+    key: kPanelPadPrefsKey,
+    migrateRetiredPanelKey: true,
+  ),
+);
+
+/// Riverpod 3 unified [Notifier] over the docked panel's last-open pad —
+/// [KeyboardPadNotifier]'s twin over [panelPadStoreProvider].
+class PanelPadNotifier extends Notifier<KeyboardPad> {
+  @override
+  KeyboardPad build() {
+    // Seed synchronously with the default so the first frame renders;
+    // replace with the persisted (or migrated) value as soon as it loads.
+    unawaited(_load(ref.watch(panelPadStoreProvider)));
+    return KeyboardPad.type;
+  }
+
+  Future<void> _load(KeyboardPadStore store) async {
+    state = await store.load();
+  }
+
+  /// Selects [pad], applying live and persisting immediately
+  /// (fire-and-forget — a failed prefs write costs persistence only).
+  void set(KeyboardPad pad) {
+    state = pad;
+    unawaited(ref.read(panelPadStoreProvider).save(pad));
+  }
+}
+
+/// The persisted last-open pad the trackpad-docked panel's PageView binds to.
+final panelPadProvider = NotifierProvider<PanelPadNotifier, KeyboardPad>(
+  PanelPadNotifier.new,
 );
 
 // ── Widgets ────────────────────────────────────────────────────────────────

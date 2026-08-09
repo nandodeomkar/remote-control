@@ -83,10 +83,9 @@ void main() {
       expect(prefs.map[kKeyboardPadPrefsKey], 'numpad');
     });
 
-    test('save() never writes the docked panel\'s keyboard.rowGroup key',
-        () async {
+    test("save() never writes the docked panel's key", () async {
       await store.save(KeyboardPad.fn);
-      expect(prefs.map.containsKey(kKeyRowGroupPrefsKey), isFalse);
+      expect(prefs.map.containsKey(kPanelPadPrefsKey), isFalse);
       expect(prefs.map.keys, [kKeyboardPadPrefsKey]);
     });
 
@@ -97,5 +96,101 @@ void main() {
         expect(await KeyboardPadStore(prefs: prefs).load(), pad);
       });
     }
+  });
+
+  // ── The docked panel's mount-point key + its one-time migration ──────────
+  //
+  // 260809-ipc, D-94: ONE model (KeyboardPad), TWO keys. The retired
+  // docked-panel preference is migrated on the panel store's first load, not
+  // orphaned — and the legacy key is spelled BY HAND here so the migration
+  // cannot drift away from what shipped installs actually wrote.
+  group('the docked panel store (kPanelPadPrefsKey)', () {
+    /// The retired preference, pinned by hand — never imported.
+    const retiredKey = 'keyboard.rowGroup';
+
+    late _FakePrefsKv prefs;
+    late KeyboardPadStore panel;
+
+    setUp(() {
+      prefs = _FakePrefsKv();
+      panel = KeyboardPadStore(
+        prefs: prefs,
+        key: kPanelPadPrefsKey,
+        migrateRetiredPanelKey: true,
+      );
+    });
+
+    test('kPanelPadPrefsKey is "keyboard.panelPad", distinct from the '
+        'full-screen keyboard\'s key', () {
+      expect(kPanelPadPrefsKey, 'keyboard.panelPad');
+      expect(kPanelPadPrefsKey, isNot(kKeyboardPadPrefsKey));
+    });
+
+    test('no keys at all: KeyboardPad.type (the default)', () async {
+      expect(await panel.load(), KeyboardPad.type);
+    });
+
+    const migrations = {
+      'num': KeyboardPad.numpad,
+      'fn': KeyboardPad.fn,
+      'nav': KeyboardPad.type,
+      'not-a-group': KeyboardPad.type,
+      '': KeyboardPad.type,
+    };
+
+    for (final entry in migrations.entries) {
+      test('a retired "${entry.key}" migrates to ${entry.value.name} and is '
+          'written straight back under the panel key', () async {
+        prefs.map[retiredKey] = entry.key;
+
+        expect(await panel.load(), entry.value);
+        expect(prefs.map[kPanelPadPrefsKey], entry.value.name,
+            reason: 'the migration must persist immediately, so the legacy '
+                'read never happens a second time');
+
+        // The second load reads the panel key only — remove the legacy value
+        // and the answer is unchanged.
+        prefs.map.remove(retiredKey);
+        expect(await panel.load(), entry.value);
+      });
+    }
+
+    test('both keys present: the panel key wins and the legacy value is '
+        'ignored', () async {
+      prefs.map[retiredKey] = 'fn';
+      prefs.map[kPanelPadPrefsKey] = 'arrows';
+
+      expect(await panel.load(), KeyboardPad.arrows);
+      expect(prefs.map[kPanelPadPrefsKey], 'arrows');
+    });
+
+    test('a throwing platform read degrades to KeyboardPad.type — a broken '
+        'pref never takes the keyboard down (T-10-04)', () async {
+      final throwing = KeyboardPadStore(
+        prefs: _ThrowingPrefsKv(),
+        key: kPanelPadPrefsKey,
+        migrateRetiredPanelKey: true,
+      );
+      expect(await throwing.load(), KeyboardPad.type);
+    });
+
+    test('save/load roundtrips every pad under the panel key, and never '
+        'touches the full-screen key', () async {
+      for (final pad in KeyboardPad.values) {
+        await panel.save(pad);
+        expect(prefs.map[kPanelPadPrefsKey], pad.name);
+        expect(prefs.map.containsKey(kKeyboardPadPrefsKey), isFalse);
+        expect(await panel.load(), pad);
+      }
+    });
+
+    test('the migration is OFF by default — a plain store ignores the retired '
+        'key entirely', () async {
+      prefs.map[retiredKey] = 'fn';
+      final plain = KeyboardPadStore(prefs: prefs, key: kPanelPadPrefsKey);
+
+      expect(await plain.load(), KeyboardPad.type);
+      expect(prefs.map.containsKey(kPanelPadPrefsKey), isFalse);
+    });
   });
 }

@@ -133,6 +133,28 @@ void main() {
       }
     });
 
+    testWidgets('TypePad(showHint: false) renders the 7-cap extras row and NO '
+        'hint — the docked-panel strip (260809-ipc)', (tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: TypePad(
+            enabled: true,
+            showHint: false,
+            onKeyDown: (code) => events.add('down:$code'),
+            onKeyUp: (code) => events.add('up:$code'),
+            onKeyTapWithMods: (code) => events.add('tapMods:$code'),
+            hasArmedMods: () => armed,
+          ),
+        ),
+      ));
+
+      expect(find.text(kKeyboardHint), findsNothing);
+      expect(find.byType(KeyCap), findsNWidgets(7));
+      for (final def in kTypeExtrasCaps) {
+        expect(capOf(def.code), findsOneWidget);
+      }
+    });
+
     testWidgets('FnPad renders Esc plus all twelve F-keys', (tester) async {
       await tester.pumpWidget(host(KeyboardPad.fn));
 
