@@ -9,6 +9,26 @@ criteria_passed: 0
 criteria_blocked: 4
 ---
 
+> ## SUPERSEDED 2026-08-11 — the gate PASSED; see `02-04-GATE-RESULT.md`
+>
+> This verification was written on 2026-07-08, **before plan 02-03 built the
+> client half it reports as missing** — the client-side pair→challenge→auth
+> handshake FSM, the trackpad screen with finger capture, and the latency HUD.
+> Every "Missing" and "never called in app code" below was accurate on the day
+> it was written and is stale now.
+>
+> Plan 02-04 then ran the hard transport gate on real WiFi and it **PASSED** at
+> **p50 6ms / p95 10ms**, well inside the <30ms PAD-05 budget. That outcome is
+> recorded in `02-04-GATE-RESULT.md` and in the ROADMAP's Phase 2 line. This
+> verification was simply never re-run afterwards, which is the only reason it
+> still reads BLOCKED.
+>
+> **Read `02-04-GATE-RESULT.md` for the outcome.** The body below is left intact
+> as the honest record of what was true on 2026-07-08 — this project marks such
+> history rather than deleting it. The frontmatter `status: gaps_found` is also
+> **preserved deliberately**, so the file still reads as the artifact it was;
+> this banner is the correction, not a rewrite.
+
 # Phase 02 Verification: End-to-End Cursor Spike
 
 **Verdict: GAPS FOUND — the hard transport gate cannot be exercised.**

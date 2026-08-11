@@ -12,7 +12,7 @@
 - [x] **CONN-03**: Paired phone reconnects silently using challenge-response auth — the token never crosses the wire
 - [x] **CONN-04**: Connection recovers automatically after WiFi drops or PC IP changes (backoff + beacon re-listen)
 - [x] **CONN-05**: User can connect by typing IP:port manually when discovery fails (AP isolation, firewall, VPN adapters)
-- [ ] **CONN-06**: User sees connection status and live latency in the app header
+- [x] **CONN-06**: User sees connection status and live latency in the app header
 - [x] **CONN-07**: Server releases all held keys/buttons when a session ends (no phantom input after mid-drag disconnect)
 
 ### Trackpad
@@ -73,7 +73,7 @@
 
 ### App UI
 
-- [x] **UI-01**: Dashboard home with tool tiles plus persistent trackpad quick-bar on every screen
+- [x] **UI-01**: Dashboard home with tool tiles plus a persistent floating trackpad bubble on every tool screen
 - [x] **UI-02**: Dark minimal theme (#0E0F12, blue accent), haptic feedback toggle, keep-awake during trackpad/presenter
 
 ## v2 Requirements
@@ -117,7 +117,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CONN-03 | Phase 3 | Complete |
 | CONN-04 | Phase 3 | Complete |
 | CONN-05 | Phase 3 | Complete |
-| CONN-06 | Phase 3 | Pending |
+| CONN-06 | Phase 3 | Complete |
 | CONN-07 | Phase 1 | Complete |
 | PAD-01 | Phase 4 | Complete |
 | PAD-02 | Phase 4 | Complete |
@@ -133,9 +133,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PWR-01 | Phase 5 | Complete |
 | PWR-02 | Phase 5 | Complete |
 | PWR-03 | Phase 5 | Complete |
-| APPS-01 | Phase 6 | Code complete (06-01 contract + 06-02 WinApps + 06-03 client: focus/close + err→toast); on-device UAT 06-07 |
-| APPS-02 | Phase 6 | Code complete (06-03 client: pin-from-window favorites, relaunch by server path); on-device UAT 06-07 |
-| APPS-03 | Phase 6 | Code complete (06-03 client: live apps.changed refresh, no manual refresh); on-device UAT 06-07 |
+| APPS-01 | Phase 6 | Complete (06-01 contract + 06-02 WinApps + 06-03 client: focus/close + err→toast) |
+| APPS-02 | Phase 6 | Complete (06-03 client: pin-from-window favorites, relaunch by server path) |
+| APPS-03 | Phase 6 | Complete (06-03 client: live apps.changed refresh, no manual refresh) |
 | CLIP-01 | Phase 6 | Complete |
 | CLIP-02 | Phase 6 | Complete |
 | CLIP-03 | Phase 6 | Complete |
