@@ -11,6 +11,13 @@
 ///
 /// Resume (D-06): an [AppLifecycleListener] forwards onResume to
 /// [ConnectionService.onAppResumed] — instant retry, no waiting out backoff.
+///
+/// Discovery (CONN-04): [bindBeacons] attaches the app-scope beacon stream to
+/// the service at app start, BEFORE any screen exists. Beacon attachment used
+/// to belong to the device-list notifier, so a cold start that landed here and
+/// never opened Settings had no beacon feed at all and the D-06 short-circuit
+/// was unreachable — a PC that changed IP could not be recovered. One binding,
+/// no new machinery.
 library;
 
 import 'dart:async';
@@ -49,6 +56,12 @@ class _RemoteControlAppState extends ConsumerState<RemoteControlApp> {
     // (listenManual, fireImmediately) so hapticTick()/hapticTickMedium() are
     // gated correctly from the very first frame.
     bindHapticsCache(ref);
+    // CONN-04: attach the one app-scope beacon listener to the service now, so
+    // the D-06 IP-change short-circuit is live on a cold start that never
+    // leaves the dashboard. Must precede the launch kick below — that dial is
+    // what later lands in backoff, and backoff is the only state the
+    // short-circuit acts in.
+    bindBeacons(ref);
     // D-06: app returns to the foreground -> instant retry (backoff reset).
     _lifecycle = AppLifecycleListener(
       onResume: () => ref.read(connectionServiceProvider).onAppResumed(),

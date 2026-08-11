@@ -3,8 +3,12 @@
 //
 // Storage/beacon seams are overridden with inert fakes so the shell pumps
 // without platform plugins or sockets: the launch kick reads the fake store
-// (no remembered device -> no dial), and the device list notifier is stubbed
-// to an empty list (no BeaconListener bind, no sweep timer).
+// (no remembered device -> no dial), the device list notifier is stubbed to an
+// empty list (no sweep timer), and the app-scope beaconListenerProvider is a
+// fake — the shell's initState now calls bindBeacons(), which would otherwise
+// bind a real UDP socket and reach for the platform MulticastLock.
+
+import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -14,6 +18,8 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 
 import 'package:remote_control/hub/hub_screen.dart';
 import 'package:remote_control/main.dart';
+import 'package:remote_control/net/beacon.dart';
+import 'package:remote_control/net/beacon_listener.dart';
 import 'package:remote_control/net/connection_providers.dart';
 import 'package:remote_control/net/connection_service.dart';
 import 'package:remote_control/store/device_list_store.dart';
@@ -50,6 +56,23 @@ class _StubDeviceList extends DeviceListNotifier {
   List<DeviceListEntry> build() => const [];
 }
 
+/// Inert app-scope beacon listener: no socket, no MulticastLock. Only the
+/// three public members are required — BeaconListener's rest are library-
+/// private and so are not part of its interface here.
+class _FakeBeaconListener implements BeaconListener {
+  final StreamController<Beacon> _controller =
+      StreamController<Beacon>.broadcast();
+
+  @override
+  Stream<Beacon> get stream => _controller.stream;
+
+  @override
+  Future<void> start() async {}
+
+  @override
+  Future<void> stop() async {}
+}
+
 void main() {
   testWidgets('app shell homes on the dashboard', (tester) async {
     // 12-15: the dashboard's settings gear now carries the update badge, which
@@ -68,6 +91,7 @@ void main() {
           connectionServiceProvider.overrideWith(
             (ref) => ConnectionService(store: store),
           ),
+          beaconListenerProvider.overrideWithValue(_FakeBeaconListener()),
           deviceListProvider.overrideWith(_StubDeviceList.new),
         ],
         child: const RemoteControlApp(),

@@ -7,10 +7,10 @@
 ///    every input carries an explicit `nowMillis` (latency_probe style), so
 ///    the whole merge/evict/adopt contract is unit-proven with a fake clock.
 /// 2. [DeviceListNotifier] — a THIN Riverpod 3 [Notifier] wrapper owning the
-///    real seams: a [BeaconListener] subscription (started when first
-///    listened, stopped on disposal — Pitfall 8 screen-visible scoping), a
-///    2s sweep [Timer], [DeviceStore.loadDevices] for the remembered rows,
-///    and [DeviceStore.adoptGuid] for the manual->GUID migration (D-03).
+///    real seams: a subscription to the APP-SCOPE [BeaconListener]
+///    (`beaconListenerProvider` — this notifier neither constructs nor stops
+///    it), a 2s sweep [Timer], [DeviceStore.loadDevices] for the remembered
+///    rows, and [DeviceStore.adoptGuid] for the manual->GUID migration (D-03).
 ///
 /// Anti-churn contract (T-03-22): [DeviceListEntry] equality EXCLUDES
 /// `lastSeenMillis`, so a beacon that changes nothing visible produces an
@@ -233,17 +233,22 @@ final deviceStoreProvider = Provider<DeviceStore>(
   (ref) => DeviceStore(secure: SecureStorageKv(), prefs: SharedPrefsKv()),
 );
 
-/// Thin Riverpod 3 wrapper: owns the [BeaconListener] lifecycle (started on
-/// first listen, stopped on disposal — Pitfall 8 screen-visible scoping; the
-/// backoff re-listen case is 03-07's wiring), a 2s sweep [Timer], stored-row
-/// loading, and the adoption migration. Rebuilds state from
-/// [DeviceListModel.entries] ONLY when the list actually changed.
+/// Thin Riverpod 3 wrapper: SUBSCRIBES to the app-scope [BeaconListener]
+/// (`beaconListenerProvider` owns its construction and its teardown), plus a
+/// 2s sweep [Timer], stored-row loading, and the adoption migration. Rebuilds
+/// state from [DeviceListModel.entries] ONLY when the list actually changed.
+///
+/// Pitfall 8 says never hold the multicast lock with no listener running, and
+/// that still holds. What it does NOT mean — and what the old comment here
+/// wrongly claimed — is that the lock is scoped to a visible screen: the
+/// listener is app-scope and nothing in `lib/` is `autoDispose`, so the lock is
+/// held from app start until ProviderScope teardown. CONN-04's IP-change
+/// recovery needs a bound socket across exactly that window.
 class DeviceListNotifier extends Notifier<List<DeviceListEntry>> {
   /// Sweep cadence — matches the server's 2s beacon interval.
   static const Duration _sweepInterval = Duration(seconds: 2);
 
   DeviceListModel? _model;
-  BeaconListener? _listener;
   StreamSubscription<Beacon>? _beaconSub;
   StreamSubscription<void>? _connSub;
   Timer? _sweepTimer;
@@ -258,22 +263,23 @@ class DeviceListNotifier extends Notifier<List<DeviceListEntry>> {
     );
     _model = model;
 
-    // Beacon feed: start on first listen, stop with the provider (Pitfall 8).
-    final listener = BeaconListener();
-    _listener = listener;
+    // Beacon feed: the ONE app-scope listener, shared with the
+    // ConnectionService (which `bindBeacons` attached at app start). This
+    // notifier takes its own subscription and nothing more — constructing a
+    // second listener would put two clients on one un-refcounted native
+    // multicast lock.
+    final BeaconListener listener = ref.watch(beaconListenerProvider);
     _beaconSub = listener.stream.listen((b) {
       model.onBeacon(b, DateTime.now().millisecondsSinceEpoch);
       _publish();
     });
-    // 03-07: the D-06 beacon short-circuit — a sighting of the CURRENT
-    // target's guid updates its last-known address and skips the remaining
-    // backoff (CONN-04 IP-change recovery). The service holds its own
-    // subscription; it is replaced on re-attach and cancelled on dispose.
-    service.attachBeacons(listener.stream);
+    // start() is idempotent, and calling it here is what keeps this screen
+    // working under an entry point that never ran the app-start binding
+    // (tests, and any future non-RemoteControlApp host).
     unawaited(
       listener.start().catchError((Object _) {
         // Bind failure is retryable (OEM quirk / port in use): the grayed
-        // stored rows still render; a later rebuild retries the bind.
+        // stored rows still render; the app-start binding already tried too.
       }),
     );
 
@@ -300,8 +306,8 @@ class DeviceListNotifier extends Notifier<List<DeviceListEntry>> {
       _beaconSub = null;
       _connSub?.cancel();
       _connSub = null;
-      unawaited(_listener?.stop());
-      _listener = null;
+      // NO listener.stop() here: `beaconListenerProvider` owns teardown. This
+      // notifier cancels only its OWN subscription.
       _model = null;
     });
 

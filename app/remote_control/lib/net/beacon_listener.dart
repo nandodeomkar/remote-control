@@ -3,9 +3,19 @@
 /// Binds 0.0.0.0:[kBeaconPort] (SDK primitive — the stale `udp` package is
 /// forbidden by the stack doc), routes every datagram through the strict
 /// total-parse [Beacon.tryParse] (null = silent drop), and pairs a
-/// [MulticastLock] with the socket lifecycle: acquired before bind,
-/// released with the socket (Pitfall 8 — never held while the app sits
-/// authed off the device-list screen).
+/// [MulticastLock] with the socket lifecycle: acquired before bind, released
+/// with the socket (Pitfall 8 — the lock is never held with no listener
+/// running).
+///
+/// HOLD WINDOW, stated as fact rather than intent: this listener is app-scope
+/// (`beaconListenerProvider`) and nothing in `lib/` is `autoDispose`, so its
+/// `stop()` runs only at ProviderScope teardown. The lock is therefore held
+/// from app start until the process ends. That is deliberate — CONN-04's
+/// IP-change recovery needs a bound socket across exactly that window,
+/// including before the user has ever opened Settings. Foreground-gating it is
+/// a real improvement and is DEFERRED, not forgotten: [start] and [stop] have
+/// no generation guard, so an interleaved pair can leave a listener that
+/// believes it is running with its socket already closed.
 library;
 
 import 'dart:async';

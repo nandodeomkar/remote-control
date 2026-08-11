@@ -21,8 +21,31 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../store/device_store.dart';
+import 'beacon_listener.dart';
 import 'connection_service.dart';
 import 'reconnect_fsm.dart';
+
+/// The app-wide [BeaconListener] — **the only one that may exist**.
+///
+/// This provider is a pure factory: it CONSTRUCTS the listener and registers
+/// its teardown, and starts nothing. It is the single owner of both — no
+/// consumer calls `stop()`, and disposal happens once, with the ProviderScope.
+///
+/// [BeaconListener.start] is idempotent BY CONTRACT, so any consumer that
+/// needs beacons flowing may call it (the app-start binding does; the device
+/// list does too, so it still works under an entry point that never ran the
+/// binding). Calling it twice costs nothing.
+///
+/// **A second instance is forbidden.** `MainActivity.kt` creates ONE native
+/// `WifiManager.MulticastLock` and calls `setReferenceCounted(false)`, so two
+/// Dart [MulticastLock] clients share one un-refcounted native lock: whichever
+/// listener stops FIRST drops the lock for the one still running. Construct
+/// beacon listeners here and nowhere else.
+final beaconListenerProvider = Provider<BeaconListener>((ref) {
+  final listener = BeaconListener();
+  ref.onDispose(() => unawaited(listener.stop()));
+  return listener;
+});
 
 /// The app-wide [ConnectionService] over real storage + the TCP_NODELAY
 /// dialer. Disposed with the ProviderScope (cancels subscriptions, closes
@@ -37,6 +60,26 @@ final connectionServiceProvider = Provider<ConnectionService>((ref) {
   ref.onDispose(service.dispose);
   return service;
 });
+
+/// Hands the app-scope beacon stream to the [ConnectionService] and starts the
+/// listener. Call ONCE from `initState` near the app root, exactly like
+/// `bindHapticsCache` — this is the whole CONN-04 fix.
+///
+/// It exists because beacon attachment used to live in `DeviceListNotifier`,
+/// which builds only when a screen watches the device list. A cold start that
+/// landed on the hub therefore had no beacon stream, and the D-06 short-circuit
+/// (`ReconnectFsm.beaconSighted`, which acts only in [ReconnectState.backoff])
+/// could never fire — so a PC that changed IP was unreachable until the user
+/// happened to open Settings.
+///
+/// A bind failure is swallowed: it is retryable OEM/port noise (the same
+/// posture the device list has always used) and must NEVER crash the launch
+/// path.
+void bindBeacons(WidgetRef ref) {
+  final listener = ref.read(beaconListenerProvider);
+  ref.read(connectionServiceProvider).attachBeacons(listener.stream);
+  unawaited(listener.start().catchError((Object _) {}));
+}
 
 /// Immutable UI snapshot of the connection lifecycle.
 ///
