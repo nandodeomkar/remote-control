@@ -1085,11 +1085,24 @@ Recent decisions affecting current work:
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone close:
+Items acknowledged and deferred at the v1.0 milestone close on 2026-08-12.
+None is a blocker; each is recorded so it leaves the live tree triaged rather
+than silently archived. The pre-close audit reported 19 open items — 15 were
+stale or missing frontmatter, corrected in `b28f32a`; these are the remainder
+plus the audit's own tech-debt list.
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| verification | Phase 02 — `02-VERIFICATION.md` reads `gaps_found` and is left that way ON PURPOSE. It is stale, not failing: it was never re-run after 02-03 built the client half it complained was missing, and it is superseded by `02-04-GATE-RESULT.md` (hard gate PASS, p50 6ms / p95 10ms on real WiFi). The file carries a SUPERSEDED banner pointing there. | accepted | 2026-08-12 |
+| verification | Phases 06, 08, 09 and 12 have no `VERIFICATION.md`. Outcome evidence exists for each — 06-UAT.md (complete, SC1-SC5 pass), 08-06-SUMMARY.md (UAT-gated), 09-08-SUMMARY.md (owner-approved on-device visual UAT), and the 2026-08-08 on-hardware SC5/SC7 observation for 12. Documentation debt, not unproven work. | open | 2026-08-12 |
+| design decision | Phase 04 — offline input queueing. Text typed DURING a disconnect still flushes into the PC on re-auth: `SendPolicy.clear()` is called only from the auth-stop path (`connection_service.dart:801`), and the ordinary disconnect at `:1155` sets `authed = false` without clearing. Reported at the 2026-07-10 UAT, never decided. Keep lossless vs. drop queued text frames. | open | 2026-08-12 |
+| ux | Phase 11 item 2 — press-and-HOLD on a tab-row star for >100ms also fires the row's `onTapDown` → `tabs.activate`. Benign tab switch that self-heals on the next `tabs.changed`; a fix changes the shipped press-down feel. | open | 2026-08-12 |
+| ux | Phase 11 item 3 — bookmark truncation copy reads as unintuitive. Production behaviour, not an edge case: the owner's collection is 538 nodes against a 500 cap, so the line is always on screen. Owner: "mark as open problem and keep for later to solve." | open | 2026-08-12 |
+| ux | Phase 11 item 4 — the 100ms press flash is imperceptible on bookmark LINK rows. Pre-existing perceptual issue; changing flash duration is a motion-budget change against 11-UI-SPEC. | open | 2026-08-12 |
+| test coverage | Keymap cross-language lockstep (`CLIENT_KEY_CODES` ↔ `kClientKeyCodes`, 57/57 exact today) has NO automated gate, unlike the fixture tree. A one-sided edit would fail no build and surface as a dead key. | open | 2026-08-12 |
+| test coverage | Nyquist validation — 0 of 12 phases carry `status: validated`. Coverage TODO, not a compliance failure. | open | 2026-08-12 |
+| enhancement | Multicast foreground gating (from quick 260811-wxr) — needs a generation counter in `BeaconListener` first, since `start`/`stop` have no guard and an interleaved pair silently strands the listener. | open | 2026-08-12 |
+| research | Phase 12 RESEARCH OQ-1 — the Chrome extension file lock is still UNEXERCISED. No install to date scheduled a `restartreplace`, so `RemoteControl.iss`'s deferred-replacement path has never run. Not a defect; still unproven. | open | 2026-08-12 |
 
 ## Session Continuity
 

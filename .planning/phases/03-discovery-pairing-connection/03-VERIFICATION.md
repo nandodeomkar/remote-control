@@ -1,5 +1,6 @@
 ---
 phase: 03-discovery-pairing-connection
+status: passed
 verified: 2026-07-09
 method: on-device E2E (owner-driven) + automated suites
 result: PASS
