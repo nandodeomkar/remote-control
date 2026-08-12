@@ -240,6 +240,12 @@ class _KeyboardPanelState extends ConsumerState<KeyboardPanel>
         });
       } else {
         widget.imeFocusNode.unfocus();
+        // The caps unmount with the chrome and free themselves, but this
+        // State survives a collapse — so nothing else would ever release a
+        // LOCKED modifier, and it would stay physically held on the PC with
+        // no chip on screen to un-lock it (260812-tsw). setState from inside
+        // didUpdateWidget is legal: the rebuild is already happening.
+        _controller.dismissed();
       }
     }
   }

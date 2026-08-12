@@ -558,6 +558,57 @@ void main() {
     await tester.pumpWidget(const SizedBox());
   });
 
+  testWidgets(
+      'collapsing the panel releases a LOCKED modifier — the up reaches the '
+      'send seam, not just the chip (260812-tsw)', (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.text('Win'));
+    await tester.pump(const Duration(milliseconds: 250));
+    expect(wire(), ['down:WinLeft'],
+        reason: 'a locked chip is a REAL physical hold (D-10)');
+
+    // Collapse (NOT unmount). Before 260812-tsw nothing ran here: the caps
+    // unmount and free themselves, but this State — and the owner holding
+    // the lock — survives, so the PC kept Shift/Win welded down with no chip
+    // left on screen to release it.
+    await tester.pumpWidget(host(expanded: false));
+    await tester.pump();
+
+    expect(wire(), ['down:WinLeft', 'up:WinLeft'],
+        reason: 'dismiss must free the modifier on the PC');
+
+    // The teardown shares the same flush — it must not release again.
+    await tester.pumpWidget(const SizedBox());
+    expect(wire(), ['down:WinLeft', 'up:WinLeft'],
+        reason: 'dismiss-then-dispose emits the up exactly once');
+  });
+
+  testWidgets(
+      'a modifier locked before a collapse comes back at REST when the panel '
+      'reopens', (tester) async {
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    await tester.longPress(find.text('Win'));
+    await tester.pump(const Duration(milliseconds: 250));
+
+    await tester.pumpWidget(host(expanded: false));
+    await tester.pump();
+    await tester.pumpWidget(host(expanded: true));
+    await tester.pumpAndSettle();
+
+    // Re-locking emits a fresh down: proof the chip really returned to rest
+    // rather than silently staying locked behind a cleared visual.
+    await tester.longPress(find.text('Win'));
+    await tester.pump(const Duration(milliseconds: 250));
+
+    expect(wire(), ['down:WinLeft', 'up:WinLeft', 'down:WinLeft']);
+
+    await tester.pumpWidget(const SizedBox());
+  });
+
   // ── The four-pad deck: height, IME and persistence (D-92 / D-93 / D-94) ──
 
   /// Drives the raw view metrics the panel measures. `devicePixelRatio = 1`

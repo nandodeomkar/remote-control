@@ -111,27 +111,67 @@ class KeyboardInputController {
     onChanged();
   }
 
-  /// Releases everything this owner still owes and detaches from the service.
-  ///
-  /// CR-01: the session may still be authed (the screen was popped, or the
-  /// hosting trackpad screen disposed, mid-hold). Flush every owed release
-  /// before going away — otherwise the server holds the input indefinitely
-  /// (Windows autorepeats a held key; a locked modifier stays physically
-  /// held). On a LIVE socket only: a disconnected session already had its
-  /// held input freed by CONN-07 release_all, and sending into a NEW session
-  /// would be wrong (mirrors the D-12 zero-effect path). [keyUp]'s remove()
-  /// guard keeps this idempotent with each cap's own dispose-time release,
-  /// which Flutter runs FIRST (children unmount before parents).
+  /// Detaches from the service and releases everything this owner still owes
+  /// — see [_flushHolds] for the CR-01 contract and why it is LIVE-only.
   void dispose() {
     _changesSub?.cancel();
-    if (!isDisconnected()) {
+    _flushHolds();
+    imeResetTick.dispose();
+  }
+
+  /// The surface was DISMISSED while this owner lives on — the docked panel
+  /// collapsed (260812-tsw).
+  ///
+  /// Collapsing swaps the chrome for a zero-height box, so the caps unmount
+  /// and each held one frees itself through `KeyCap.dispose`. But the panel's
+  /// `State` — and therefore this object — survives, so [dispose] never runs
+  /// and a LOCKED modifier stays PHYSICALLY HELD on the PC with no chip left
+  /// on screen to release it. Lock Shift, dismiss, and the PC behaves as
+  /// though Shift is welded down.
+  ///
+  /// The chosen semantic is RELEASE ON DISMISS: predictable, and dismissing
+  /// always leaves the PC holding nothing. The alternative — keep the lock and
+  /// surface it on the collapsed chrome — was considered and rejected for the
+  /// persistent chrome and the second un-lock path it costs. The trade is that
+  /// "lock Shift, dismiss, drag-select on the still-live trackpad" is gone.
+  ///
+  /// Shares [_flushHolds] with [dispose] rather than repeating it, so a
+  /// dismiss followed by a teardown emits each owed up exactly ONCE.
+  ///
+  /// Deliberately does NOT fire [imeResetTick]: that wipe is the CR-01 answer
+  /// to a dead socket, not something hiding the keys earns.
+  void dismissed() {
+    _flushHolds();
+    onChanged();
+  }
+
+  /// Releases everything this owner still owes, on a LIVE socket only.
+  ///
+  /// CR-01: the session may still be authed (the screen was popped, the
+  /// hosting trackpad screen disposed, or the panel collapsed mid-hold).
+  /// Flush every owed release — otherwise the server holds the input
+  /// indefinitely (Windows autorepeats a held key; a locked modifier stays
+  /// physically held). On a disconnected socket CONN-07 release_all already
+  /// freed the real keys and sending into a NEW session would be wrong
+  /// (mirrors the D-12 zero-effect path), so the FSM is reset through
+  /// [ModifierFsm.disconnected] — state only, no wire traffic. That branch is
+  /// inert for [dispose], whose object is being discarded; it is there for
+  /// [dismissed], whose object lives on and must not keep showing locked
+  /// chips for keys nothing holds.
+  ///
+  /// [keyUp]'s remove() guard keeps this idempotent with each cap's own
+  /// dispose-time release, which Flutter runs FIRST (children unmount before
+  /// parents).
+  void _flushHolds() {
+    if (isDisconnected()) {
+      _fsm.disconnected(); // zero effects by construction
+    } else {
       for (final code in _heldCodes.toList()) {
         send(KeyMsg(code: code, action: 'up'));
       }
       _sendEffects(_fsm.releaseAll()); // ups for any locked-modifier holds
     }
     _heldCodes.clear();
-    imeResetTick.dispose();
   }
 
   // ── Wiring: FSM effects + key-cap emissions -> the reliable path ─────────

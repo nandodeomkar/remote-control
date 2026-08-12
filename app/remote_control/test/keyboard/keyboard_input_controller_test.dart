@@ -229,4 +229,84 @@ void main() {
 
     expect(sent, isEmpty);
   });
+
+  // ── dismissed(): the collapse that is NOT a teardown (260812-tsw) ────────
+  //
+  // The docked panel's State survives a collapse, so dispose() never runs —
+  // and before this method nothing released a LOCKED modifier. The PC held
+  // Shift with no chip left on screen to un-lock it.
+
+  test(
+      'dismissed() on a LIVE socket flushes owed cap ups AND the locked '
+      "modifier's up — the release must reach the wire, not just the chip",
+      () {
+    final c = build();
+    c.keyDown('Esc');
+    c.chipLongPress(Mod.win);
+    expect(wire(), ['down:Esc', 'down:WinLeft']);
+
+    c.dismissed();
+
+    expect(wire(), ['down:Esc', 'down:WinLeft', 'up:Esc', 'up:WinLeft'],
+        reason: 'same order as dispose: owed cap ups, then releaseAll');
+    expect(c.stateOf(Mod.win), ModifierState.rest,
+        reason: 'the chip must not keep showing a lock nothing holds');
+    expect(c.debugHeldCodes, isEmpty);
+
+    c.dispose();
+  });
+
+  test(
+      'dismissed() on a DISCONNECTED socket sends NOTHING but still resets '
+      'the chips — this owner LIVES ON, unlike dispose', () {
+    final c = build();
+    c.keyDown('Esc');
+    c.chipLongPress(Mod.win);
+    final before = sent.length;
+
+    disconnected = true;
+    c.dismissed();
+
+    expect(sent.length, before,
+        reason: 'CONN-07 release_all already freed the real keys');
+    expect(c.stateOf(Mod.win), ModifierState.rest);
+    expect(c.debugHeldCodes, isEmpty);
+
+    c.dispose();
+  });
+
+  test('dismissed() then dispose() emits each owed up EXACTLY ONCE', () {
+    final c = build();
+    c.keyDown('Esc');
+    c.chipLongPress(Mod.win);
+
+    c.dismissed();
+    c.dispose();
+
+    expect(wire(), ['down:Esc', 'down:WinLeft', 'up:Esc', 'up:WinLeft'],
+        reason: 'the two share one flush — a dismiss-then-teardown must not '
+            'double-release');
+  });
+
+  test('dismissed() fires onChanged so the chips repaint', () {
+    final c = build();
+    final before = changedCount;
+
+    c.dismissed();
+
+    expect(changedCount, before + 1);
+    c.dispose();
+  });
+
+  test(
+      'dismissed() does NOT fire the CR-01 IME wipe — hiding the keys is not '
+      'a disconnect', () {
+    final c = build();
+    final before = c.imeResetTick.value;
+
+    c.dismissed();
+
+    expect(c.imeResetTick.value, before);
+    c.dispose();
+  });
 }
