@@ -20,6 +20,11 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 5: Media, Power, Presenter & Browser** - The everyday control-center extras: media/absolute volume, double-confirmed power actions, slide driving with timer, browser macros (completed 2026-07-11)
 - [x] **Phase 6: Apps & Clipboard** - Window/app management with live server push, and bidirectional clipboard with history and loop-safe auto-sync (completed 2026-07-12)
 - [x] **Phase 7: Server Shell, Dashboard & Polish** - Tray shell with settings/autostart/revoke, firewall and UIPI status surfacing, dashboard identity and final app polish (completed 2026-07-15)
+- [x] **Phase 8: Floating Trackpad Bubble** - The 56px quick-bar is replaced on every tool screen by a draggable bubble that expands into a floating trackpad window sharing `TrackpadCore` with the full screen (completed 2026-07-16 — on-device UAT PASS)
+- [x] **Phase 9: UI Refinement to Design Prototype** - Visual pass across every shipped screen to the approved prototype values, headlined by the dot-grid trackpad texture, with the seven locked palette tokens byte-identical (completed 2026-07-16)
+- [x] **Phase 10: Keyboard Rethink & Shortcuts Tile** - Keyboard becomes four full-screen swipeable pads (Type/Arrows/Numpad/Fn) with persistent modifier chips, plus a Shortcuts hub tile of 25 one-tap Windows shortcuts over the existing key tap+mods path (completed 2026-07-17)
+- [x] **Phase 11: Browser Bookmarks** - Browse the PC browser's bookmark tree by folder, open in a new tab, star/unstar any tab, delete a bookmark or empty folder — URL resolution stays extension-side (protoVersion 1.6) (completed 2026-07-31)
+- [x] **Phase 12: In-App Updates** - App, PC server, and extension each report installed vs. latest and install with one tap, published from a public mirror repo by one `tools/release.ps1` run (protoVersion 1.8) (completed 2026-08-08 — SC5 and SC7 observed on hardware: `1.6.2` → `1.6.3`, three seconds spawn-to-back-up)
 
 ## Phase Details
 
@@ -273,7 +278,7 @@ Plans:
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 may run in parallel with Phases 4–5 — it depends only on Phase 3)
+Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10 → 11 → 12 (Phase 6 may run in parallel with Phases 4–5 — it depends only on Phase 3; Phases 8–12 were added ad-hoc after Phase 7 and each depends on its predecessor)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
@@ -286,6 +291,9 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 (Phase 6 
 | 7. Server Shell, Dashboard & Polish | 13/13 | Complete    | 2026-07-15 |
 | 8. Floating Trackpad Bubble | 6/6 | Complete — on-device UAT PASS | 2026-07-16 |
 | 9. UI Refinement to Design Prototype | 9/9 | Complete   | 2026-07-16 |
+| 10. Keyboard Rethink & Shortcuts Tile | 6/6 | Complete — on-device UAT PASS | 2026-07-17 |
+| 11. Browser Bookmarks | 13/13 | Complete — VERIFIED | 2026-07-31 |
+| 12. In-App Updates | 18/18 | Complete — SC5/SC7 observed on hardware | 2026-08-08 |
 
 ### Phase 8: Floating trackpad bubble — replace quick-bar with draggable bubble + floating trackpad window (spec: docs/superpowers/specs/2026-07-15-trackpad-bubble-design.md)
 
