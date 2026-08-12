@@ -489,7 +489,19 @@ class ConnectionService {
   final void Function(Duration, void Function()) _schedule;
   final int Function() _nowMillis;
   final ReconnectFsm _fsm;
-  final SendPolicy _policy = SendPolicy();
+
+  /// `late` because a plain field initializer cannot read [_nowMillis], which
+  /// the constructor's initializer list sets — and the policy's TTL needs the
+  /// same injected clock the probe and the backoff use (260812-uq8).
+  late final SendPolicy _policy = SendPolicy(nowMillis: _nowMillis);
+
+  /// The target key the reliable queue belongs to, or null when it belongs to
+  /// nobody (never connected, or explicitly disconnected).
+  ///
+  /// The queue outlives a blip now, so it needs an owner: a frame typed at PC
+  /// A while it was in backoff must NOT flush onto PC B when the user switches
+  /// devices inside the TTL. Compared at every dial; mismatch clears.
+  String? _queuedForKey;
 
   WebSocketChannel? _channel;
   StreamSubscription<dynamic>? _sub;
@@ -801,6 +813,12 @@ class ConnectionService {
             ..clear(); // auth-stop drops the queue: the target must re-pair
         case CloseEffect():
           _teardownChannel();
+          // An explicit close is deliberate, not a blip, so the TTL does not
+          // get to keep anything through it. `disconnectRequested` emits this
+          // effect ALONE — no AuthStopEffect rides with it — so this is the
+          // only place a user-driven disconnect can drop the queue.
+          _policy.clear();
+          _queuedForKey = null;
       }
     }
     _notify();
@@ -810,6 +828,15 @@ class ConnectionService {
     final gen = ++_dialGen; // WR-02: this dial episode; supersedes older dials
     _backoffGen++; // a dial supersedes any pending backoff timer (WR-01)
     _teardownChannel(); // a fresh dial never rides an old socket (idempotent)
+
+    // The reliable queue survives the teardown above so a blip stays lossless
+    // (260812-uq8) — but only for the SAME PC. Redialing a different target
+    // (device switch, or a queue built while never connected, where the key is
+    // null) discards it rather than misdelivering it to the new one.
+    if (_queuedForKey != target.key) {
+      _policy.clear();
+    }
+    _queuedForKey = target.key;
 
     final addr = InternetAddress.tryParse(target.host);
     if (addr == null || !isPrivateLanAddress(addr)) {
@@ -860,9 +887,6 @@ class ConnectionService {
     }
 
     _channel = channel;
-    // From here to auth is the ONLY window a reliable frame may queue in
-    // (260812-uge); with no socket installed they are dropped instead.
-    _policy.channelUp = true;
     _sender = MoveSender(channel.sink);
     _hadStoredToken = token != null;
     _probe = LatencyProbe(
@@ -1153,21 +1177,17 @@ class ConnectionService {
     _sender = null;
     _probe?.reset();
     _probe = null;
-    // Volatile gating drops with the channel, and so does the reliable queue
-    // (260812-uge — this REVERSES the original "keep it so a blip is
-    // lossless" rule). Clearing `channelUp` is the load-bearing half: it makes
-    // every reliable frame sent from here until the next socket a DROP rather
-    // than a deferred delivery. The clear() is belt and braces for anything a
-    // half-finished handshake left behind, so it can never outlive its socket.
+    // Volatile gating drops with the channel. The reliable queue does NOT:
+    // teardown is what a blip looks like from here, and surviving it is the
+    // whole point of the TTL (260812-uq8). What bounds the queue is time —
+    // 5s, checked at enqueue and at flush — not the socket's lifetime.
     //
-    // What this costs, knowingly: a sub-second blip is no longer lossless.
-    // What it buys: nothing typed, clicked or confirmed during an outage is
-    // replayed minutes later into whatever window is focused at re-auth —
-    // including a `power` + `confirm` pair, which this queue carried too.
-    _policy
-      ..authed = false
-      ..channelUp = false
-      ..clear();
+    // Teardown has five call sites and only the two blip-shaped ones may keep
+    // the queue, so the clear lives at the other two rather than here:
+    // `CloseEffect` (explicit disconnect) and `_dial` (target switch) each
+    // clear it themselves. `_onTransportLost` / `_onDeadConnection` are the
+    // blips and deliberately do not.
+    _policy.authed = false;
     // The update snapshot is session-scoped and dies WITH the session — unlike
     // the volume/apps/tabs snapshots, which describe a PC that is still the
     // same PC after a blip. A stale serverVersion outliving its session is the

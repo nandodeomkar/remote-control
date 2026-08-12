@@ -470,14 +470,15 @@ void main() {
           reason: 'scroll frames carry the 0x02 opcode, not move\'s 0x01');
     });
 
-    // 260812-uge REVERSED this test's original assertion. It used to prove
-    // that frames sent while reconnecting flush FIFO on re-auth — the shipped
-    // behaviour from phase 3 until the v1.0 close, and the reason anything
-    // typed during an outage arrived late into whatever window was focused
-    // afterwards. The setup is deliberately unchanged so the diff reads as
-    // what it is: the same scenario, the opposite outcome.
-    test('sendReliable during a reconnect is DROPPED, not replayed on re-auth',
-        () async {
+    // This scenario has now carried three different outcomes, so the setup is
+    // held identical across all of them and only the clock moves. Phase 3
+    // flushed unconditionally (anything typed during an outage arrived late,
+    // into whatever window was focused). 260812-uge dropped unconditionally,
+    // which cost blip-tolerance outright. 260812-uq8 splits the difference on
+    // age: the same twelve sends, replayed or not depending only on how long
+    // the redial took.
+    test('sendReliable during a reconnect IS replayed when the redial auths '
+        'inside the TTL', () async {
       final h = Harness();
       await connectAndAuth(h);
       await h.channel.incoming.close(); // drop -> backoff
@@ -488,7 +489,39 @@ void main() {
         h.service.sendReliable(ClickMsg(button: 'b$i'));
       }
 
-      // Fire the backoff timer (last scheduled entry) and re-auth.
+      // Redial #1: 1s base × jitter factor 1.0, plus the handshake.
+      h.now += 1200;
+      h.scheduled.last.$2();
+      await h.pump();
+      h.channel.feed(ChallengeMsg(nonce: testNonce));
+      await h.pump();
+      h.channel.feed(const AuthOkMsg());
+      await h.pump();
+      expect(h.service.isAuthed, isTrue);
+
+      expect(
+        h.channel.sentMessages.whereType<ClickMsg>().map((c) => c.button),
+        [for (var i = 0; i < 10; i++) 'b$i'],
+        reason: 'a blip that recovers on the first redial is lossless again — '
+            'the ten the bound admitted flush FIFO, b10/b11 having already '
+            'overflowed',
+      );
+    });
+
+    test('sendReliable during a reconnect is DROPPED when the redial auths '
+        'past the TTL', () async {
+      final h = Harness();
+      await connectAndAuth(h);
+      await h.channel.incoming.close(); // drop -> backoff
+      await h.pump();
+      expect(h.service.fsmState, ReconnectState.backoff);
+
+      for (var i = 0; i < 12; i++) {
+        h.service.sendReliable(ClickMsg(button: 'b$i'));
+      }
+
+      // A real outage: past 5s, so redial #3 onward can never replay.
+      h.now += 6000;
       h.scheduled.last.$2();
       await h.pump();
       h.channel.feed(ChallengeMsg(nonce: testNonce));
@@ -498,9 +531,45 @@ void main() {
       expect(h.service.isAuthed, isTrue);
 
       expect(h.channel.sentMessages.whereType<ClickMsg>(), isEmpty,
-          reason: 'nothing sent during the outage may reach the PC — this is '
-              'the whole point of the change; a queued power+confirm pair '
-              'rode this same path');
+          reason: 'nothing from a real outage may reach the PC minutes later '
+              'in whatever window is focused; a power+confirm pair rides '
+              'this same queue');
+    });
+
+    // The TTL is what keeps the queue alive across a teardown, so the queue
+    // now needs an owner. Without the target check in _dial this flushes onto
+    // the second PC — a WORSE misdelivery than the one the TTL is bounding.
+    test('switching targets mid-backoff drops the queue rather than flushing '
+        'it onto the second PC', () async {
+      const otherGuid = 'guid-b19c';
+      const otherTarget = DeviceTarget(
+        key: otherGuid,
+        name: 'OTHER-PC',
+        host: '192.168.1.9',
+        port: 17777,
+      );
+
+      final h = Harness();
+      await connectAndAuth(h);
+      await h.channel.incoming.close(); // drop -> backoff
+      await h.pump();
+      expect(h.service.fsmState, ReconnectState.backoff);
+
+      h.service.sendReliable(ClickMsg(button: 'meant-for-the-laptop'));
+
+      // The clock does not move: well inside the TTL, so only the change of
+      // target can be what drops this.
+      h.store.preloadToken(otherGuid, testToken);
+      await h.service.connectTo(otherTarget);
+      h.channel.feed(ChallengeMsg(nonce: testNonce));
+      await h.pump();
+      h.channel.feed(const AuthOkMsg());
+      await h.pump();
+      expect(h.service.isAuthed, isTrue);
+
+      expect(h.channel.sentMessages.whereType<ClickMsg>(), isEmpty,
+          reason: 'a frame typed at one PC must never land on another just '
+              'because the user switched devices inside the TTL');
     });
 
     test('the handshake window still queues: a frame sent after the socket is '
