@@ -1,6 +1,7 @@
 ---
 phase: quick-260730-bm0
 plan: 01
+status: complete
 subsystem: release
 tags: [release, versioning, installer, apk, extension, github]
 requires: [phase-11 waves 1-6]

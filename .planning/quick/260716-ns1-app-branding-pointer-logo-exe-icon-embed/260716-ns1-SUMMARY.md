@@ -1,6 +1,7 @@
 ---
 phase: quick-260716-ns1-app-branding
 plan: 01
+status: complete
 subsystem: branding
 tags: [icons, winresource, tray, android-launcher, pillow]
 requires: []

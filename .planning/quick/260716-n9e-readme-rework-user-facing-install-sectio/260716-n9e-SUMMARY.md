@@ -1,6 +1,7 @@
 ---
 phase: quick-260716-n9e
 plan: 01
+status: complete
 subsystem: docs
 tags: [readme, distribution, onboarding]
 requires: []

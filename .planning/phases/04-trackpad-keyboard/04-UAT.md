@@ -1,5 +1,5 @@
 ---
-status: complete-with-issues
+status: resolved
 phase: 04-trackpad-keyboard
 source: [04-01-SUMMARY.md, 04-02-SUMMARY.md, 04-03-SUMMARY.md, 04-04-SUMMARY.md, 04-05-SUMMARY.md, 04-06-SUMMARY.md, 04-07-SUMMARY.md, 04-08-SUMMARY.md, 04-09-SUMMARY.md]
 mode: mvp
@@ -48,6 +48,19 @@ passed: 4
 issues: 1
 pending: 0
 skipped: 0
+
+## Gap disposition (added at v1.0 milestone close, 2026-08-12)
+
+`status:` moved from `complete-with-issues` to `resolved`. The three gaps below
+are the verbatim 2026-07-10 record; this is what became of each. Two are closed
+in shipped code; the third is genuinely still open and was carried into the
+milestone's Deferred Items rather than quietly absorbed here.
+
+| Gap | Outcome |
+|-----|---------|
+| **major** — server session liveness (half-open TCP left a locked modifier held on the PC) | **CLOSED.** `04-10-PLAN.md`/`-SUMMARY.md` was the gap-closure plan; `server-core/src/transport/session.rs` now carries `LIVENESS_TIMEOUT` (10s post-auth) and `PRE_AUTH_LIVENESS_TIMEOUT` (90s), so the read loop breaks and the straight-line CONN-07 `release_all` fires. Re-checked on device — the ROADMAP line for phase 4 names the WiFi-kill liveness re-check. |
+| **cosmetic** — "the ui is horrible", phase-04 UI below the locked dark-minimal bar | **CLOSED by Phase 9** (UI refinement to design prototype), whose gate was an owner-approved on-device visual UAT across all 12 screen groups against the approved prototype. |
+| **minor** — offline input queueing flushes text typed DURING a disconnect | **STILL OPEN.** Verified 2026-08-12: `SendPolicy.clear()` is called from exactly one place — `connection_service.dart:801`, the auth-stop path — and the ordinary disconnect at `:1155` sets `authed = false` without clearing, so the bounded FIFO still flushes on re-auth exactly as reported. The decision (keep lossless vs. drop text frames queued while disconnected) was never taken. Carried to `.planning/STATE.md` ## Deferred Items at v1.0 close. |
 
 ## Gaps
 

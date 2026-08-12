@@ -2,6 +2,7 @@
 quick_id: 260805-axr
 phase: quick-260805-axr
 plan: 01
+status: complete
 subsystem: server/update
 tags: [windows, self-update, cmd-helper, defect-fix, test-seam]
 requires:

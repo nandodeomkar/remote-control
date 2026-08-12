@@ -1,6 +1,7 @@
 ---
 phase: quick-260809-ipc
 plan: 01
+status: complete
 subsystem: ui
 tags: [flutter, riverpod, keyboard, trackpad, mediaquery, shared-preferences]
 

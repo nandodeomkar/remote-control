@@ -1,3 +1,11 @@
+---
+status: complete
+phase: 11-browser-bookmarks
+source: [11-12-PLAN.md, 11-13-PLAN.md]
+started: 2026-07-30
+updated: 2026-07-31
+result: "11 PASS / 0 FAIL — UAT-8 failed on 2026-07-30, fixed by 11-13 and re-run green 2026-07-31"
+---
 # Phase 11 — On-device UAT results
 
 Recording sheet for the eleven-step on-device UAT (plan `11-12`, task 2). Every row must carry a

@@ -1,6 +1,7 @@
 ---
 phase: quick-260801-rgl
 plan: 01
+status: complete
 subsystem: infra
 tags: [github-actions, ci, cargo, workspace, cross-platform]
 

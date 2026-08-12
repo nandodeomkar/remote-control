@@ -1,4 +1,5 @@
 ---
+status: complete
 quick_id: 260801-r8x
 slug: stage-server-cargo-lock-in-the-release-c
 type: quick
