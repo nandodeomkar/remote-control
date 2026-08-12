@@ -12,13 +12,32 @@ Shipped as v1.0 on 2026-08-12 and in daily personal use. All three components �
 
 The product does what it set out to do: the owner replaced the paid app with it. Distribution is a sideloaded APK plus an Inno Setup PC installer, both published with SHA-256 digests on `nandodeomkar/remote-control-releases`, and the in-app updater keeps all three pieces current.
 
-Currently on a **dogfood/refine hold** — no new milestone planned. See `.planning/MILESTONES.md` for the full v1.0 record and `.planning/STATE.md` `## Deferred Items` for the ten items acknowledged at close.
+**v1.1 started 2026-08-12.** The dogfood/refine hold produced exactly one thing worth building — the summon bar — and lifted for it. See `.planning/MILESTONES.md` for the full v1.0 record and `.planning/STATE.md` `## Deferred Items` for the ten items acknowledged at close; all ten stay deferred through v1.1.
 
 ## Core Value
 
 Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras (media, power, apps, clipboard, presenter, browser) — all free.
 
-**Still correct after shipping.** Daily use confirmed the priority order: cursor latency is the thing that would have killed it, and it was retired first (p50 6ms). The one thing real use changed is *access* — the owner wants the trackpad and keyboard reachable from every screen rather than being destinations, which is what the summon-bar proposal is about.
+**Still correct after shipping.** Daily use confirmed the priority order: cursor latency is the thing that would have killed it, and it was retired first (p50 6ms). The one thing real use changed is *access* — the owner wants the trackpad and keyboard reachable from every screen rather than being destinations, which is what v1.1 is about.
+
+## Current Milestone: v1.1 The Summon Bar
+
+**Goal:** Trackpad and keyboard stop being destinations — a permanent bottom bar on every screen raises them in place, so both are always one tap away alongside every other remote.
+
+**Target features:**
+
+- A permanent bottom bar carrying two icons — trackpad and keyboard — on **every screen, the hub included**
+- Both surfaces raise as an **overlay in place**: nothing beneath resizes or scrolls, and no screen is pushed
+- Dismiss costs **one gesture**; re-summoning restores the surface where it was (which pad, what state) with no visible jump
+- The floating bubble retires outright — `TrackpadBubble`, `FloatingTrackpadWindow` and `windowPositionProvider` all go
+- Both hub tiles **move to the end** of `kHubTiles`; neither is deleted
+- The modifier chip row's 7.3px overflow at 360dp is fixed, on both keyboard surfaces
+
+**Speed contract:** a measured animation budget lives in the spec so the implementation has a target and regressions get caught, but on-device owner judgement is what closes the phase.
+
+**Why now:** quick `260809-ipc` collapsed the docked panel and the full-screen keyboard into one implementation with a single `KeyboardInputController` owning the stuck-key model. A third mount point is now a layout problem rather than a correctness one — before that commit this idea would have meant inventing a third keyboard vocabulary, the exact thing `260809-ipc` existed to delete.
+
+Full design and its landmines: `.planning/notes/summon-bar-trackpad-keyboard.md`.
 
 ## Requirements
 
@@ -39,9 +58,14 @@ Phone controls the laptop over WiFi with zero friction: instant cursor response,
 
 ### Active
 
-Nothing committed. The one designed-but-unplanned candidate:
+Committed for v1.1. Designed 2026-08-11 from several days of real use; scoped and started 2026-08-12.
 
-- [ ] **The summon bar** — a permanent bottom bar on every screen that raises the trackpad and keyboard IN PLACE, retiring the floating bubble and `windowPositionProvider`; both hub tiles move last rather than being deleted. Designed 2026-08-11 from several days of real use, routed to v1.1, ~4-6 plans. Full design and its five landmines: `.planning/notes/summon-bar-trackpad-keyboard.md`.
+- [ ] **Summon bar, every screen** — a permanent bottom bar carrying a trackpad icon and a keyboard icon, present on every screen including the hub
+- [ ] **Raise in place** — tapping an icon overlays that surface without navigating away or resizing anything beneath it
+- [ ] **One-gesture dismiss** — and a re-summon that restores the surface exactly where it was, no visible jump
+- [ ] **Bubble retired** — `TrackpadBubble`, `FloatingTrackpadWindow` and `windowPositionProvider` deleted, not toggled off
+- [ ] **Hub tiles move last** — both survive at the end of `kHubTiles`; the full Trackpad screen stays the precision surface and the docked keyboard-over-live-trackpad stays a distinct mode
+- [ ] **Chip row fits at 360dp** — the 7.3px `ModifierChip` overflow fixed on both keyboard surfaces
 
 ### Out of Scope
 
@@ -83,6 +107,8 @@ Nothing committed. The one designed-but-unplanned candidate:
 | Personal use before public | Ship fast for owner; store compliance/installer deferred | ⚠️ Partly reversed — an installer shipped anyway, and releases now go to a public mirror so the updater can fetch without a token |
 | Protocol-first, fixture-locked, two-language | Both codecs pinned to the same golden fixtures | ✓ Good — the strongest decision of the milestone; no cross-language wire bug reached hardware |
 | Test the seam, inject the boundary | Keeps sequencing testable without real processes | ⚠️ Revisit — it is also how the v1.0 blocking defect hid: `spawn_helper` was the one function in the update path no test ever executed |
+| Summon bar replaces the bubble (v1.1) | Reverses D8-06 (quick-bar deleted outright) and D8-05 (bubble excluded from the hub) on the strength of daily use. The old quick-bar's flaw was that it *navigated away*; the bubble's is that it *only ever carried the trackpad*. A two-icon bar that summons both in place is neither — that distinction is the whole justification for reopening them, and the ~56px re-paid on every screen was accepted knowingly | — Pending |
+| Overlay, not IME-style resize (v1.1) | The IME resizes so the field you type into stays visible; nothing on the phone is the input target here, so there is no field to keep visible. Converts the requirement from a layout contract into a latency-and-gesture one — a planner that "improves" this into a resize/inset contract is solving a problem this app does not have | — Pending |
 
 ## Evolution
 
@@ -102,4 +128,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-08-12 after the v1.0 milestone*
+*Last updated: 2026-08-12 after starting milestone v1.1 The Summon Bar*
