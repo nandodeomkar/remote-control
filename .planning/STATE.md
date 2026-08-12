@@ -1,10 +1,10 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.0
-milestone_name: milestone
-status: Awaiting next milestone
-stopped_at: Quick 260812-tsw closed the last pending todo — a dismissed keyboard panel now releases a locked modifier on the PC. `todos/pending/` is empty again. Milestone v1.0 remains ready for /gsd-complete-milestone.
-last_updated: "2026-08-12T16:14:10.067Z"
+milestone_name: MVP
+status: v1.0 SHIPPED and archived 2026-08-12 — no next milestone planned; dogfood/refine hold applies
+stopped_at: Milestone v1.0 closed as override_closeout (12/12 phases, 108/108 plans, 38/38 requirements; 5 phases carry no passing VERIFICATION.md, 10 items acknowledged in ## Deferred Items). Next step is /gsd-new-milestone when the hold lifts — the designed candidate is the summon bar in notes/summon-bar-trackpad-keyboard.md.
+last_updated: "2026-08-12T16:50:00.000Z"
 last_activity: 2026-08-12
 last_activity_desc: Milestone v1.0 completed and archived
 progress:
@@ -12,6 +12,7 @@ progress:
   completed_phases: 12
   total_plans: 108
   completed_plans: 108
+  percent: 100
 ---
 
 > ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
@@ -29,10 +30,14 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-11)
+See: .planning/PROJECT.md (updated 2026-08-12 after the v1.0 milestone)
 
 **Core value:** Phone controls the laptop over WiFi with zero friction: instant cursor response, full keyboard, and the control-center extras — all free.
-**Current focus:** Phase 12 — in-app-updates
+**Current focus:** None — v1.0 is shipped and archived. Dogfood/refine hold.
+
+**Where v1.0 went:** the milestone record is `.planning/MILESTONES.md`; the full
+phase detail, requirements and audit are under `.planning/milestones/`, including
+all 12 phase directories at `milestones/v1.0-phases/`.
 
 ## Current Position
 
@@ -45,7 +50,8 @@ Last activity: 2026-08-12 — Milestone v1.0 completed and archived
 
 **Velocity:**
 
-- Total plans completed: 48
+- Total plans completed: 108 (the per-phase table below is partial — it only
+  counts the phases whose summaries carried duration frontmatter)
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -154,6 +160,12 @@ Last activity: 2026-08-12 — Milestone v1.0 completed and archived
 | Phase 12 P18 | 7h 15m | 4 tasks | 4 files |
 
 ## Accumulated Context
+
+> This section spans all of v1.0 and is kept deliberately: several entries are
+> live constraints for whatever comes next (the ship-server-with-APK rule, the
+> stale `protoVersion` the client advertises, the presenter F5 limitation). The
+> canonical decision-outcome table now lives in PROJECT.md ## Key Decisions;
+> this is the working log behind it.
 
 ### Roadmap Evolution
 
