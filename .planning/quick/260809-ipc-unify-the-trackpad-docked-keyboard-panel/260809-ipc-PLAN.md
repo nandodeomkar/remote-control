@@ -300,17 +300,30 @@ Do not go hunting `key_pads.dart` for a `64`. It is not there.
 
 ## Panel chrome (constant across pads)
 
-1px top hairline + 64px modifier-chip row (48px `ModifierChip` floor + 8px top +
-8px bottom padding) + 56px `KeyboardTabBar` = **`kPanelChromeHeight` = 121**.
+**1px `HiddenTextInput`** + 1px top hairline + 64px modifier-chip row (48px
+`ModifierChip` floor + 8px top + 8px bottom padding) + 56px `KeyboardTabBar` =
+**`kPanelChromeHeight` = 122**.
+
+> **The first pixel is NOT a rounding artifact and must never be tidied away.**
+> `keyboard_panel.dart:280-313` is
+> `Column(mainAxisSize: min, children: [HiddenTextInput, AnimatedSize(...)])`, and
+> `hidden_text_input.dart:115-118` is a real `SizedBox(width: 1, height: 1)` that
+> is laid out in BOTH states — deliberately never `Offstage`, because detaching it
+> drops the Android input connection (04-05 Pitfall 6). It therefore contributes a
+> real pixel to the panel's rendered height. Counting it is also what keeps the
+> D-91 guarantee exact: with 122, a clamped panel renders at exactly
+> `0.55 × columnHeight`, so the trackpad lands on `0.45 × columnHeight − 64`
+> identically rather than a pixel under it. Put this reasoning in the constant's
+> doc comment.
 
 ## Pad viewport heights (the animating `SizedBox` around the `PageView`)
 
 | Pad | Arithmetic | Viewport | Panel total |
 |---|---|---|---|
-| Type | 32 padding + 48 extras row | **80** | **201** |
-| Arrows | 32 padding + 56 top row + 24 lg gap + 160 inverted-T (2 × 76 + 8) | **272** | **393** |
-| Numpad | 32 padding + 4 × 64 rows + 3 × 8 gaps | **312** | **433** |
-| Fn | 32 padding + 56 Esc + 8 + 3 × 64 rows + 2 × 8 gaps | **304** | **425** |
+| Type | 32 padding + 48 extras row | **80** | **202** |
+| Arrows | 32 padding + 56 top row + 24 lg gap + 160 inverted-T (2 × 76 + 8) | **272** | **394** |
+| Numpad | 32 padding + 4 × 64 rows + 3 × 8 gaps | **312** | **434** |
+| Fn | 32 padding + 56 Esc + 8 + 3 × 64 rows + 2 × 8 gaps | **304** | **426** |
 
 Type ≈ today's ~200px strip (D-93: "Type stays a slim strip"); Arrows medium;
 Numpad and Fn tallest. Order matches D-93 exactly.
