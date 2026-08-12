@@ -860,6 +860,9 @@ class ConnectionService {
     }
 
     _channel = channel;
+    // From here to auth is the ONLY window a reliable frame may queue in
+    // (260812-uge); with no socket installed they are dropped instead.
+    _policy.channelUp = true;
     _sender = MoveSender(channel.sink);
     _hadStoredToken = token != null;
     _probe = LatencyProbe(
@@ -1150,9 +1153,21 @@ class ConnectionService {
     _sender = null;
     _probe?.reset();
     _probe = null;
-    // Volatile gating drops with the channel; the reliable queue is KEPT so
-    // frames sent during a blip flush after the redial auths.
-    _policy.authed = false;
+    // Volatile gating drops with the channel, and so does the reliable queue
+    // (260812-uge — this REVERSES the original "keep it so a blip is
+    // lossless" rule). Clearing `channelUp` is the load-bearing half: it makes
+    // every reliable frame sent from here until the next socket a DROP rather
+    // than a deferred delivery. The clear() is belt and braces for anything a
+    // half-finished handshake left behind, so it can never outlive its socket.
+    //
+    // What this costs, knowingly: a sub-second blip is no longer lossless.
+    // What it buys: nothing typed, clicked or confirmed during an outage is
+    // replayed minutes later into whatever window is focused at re-auth —
+    // including a `power` + `confirm` pair, which this queue carried too.
+    _policy
+      ..authed = false
+      ..channelUp = false
+      ..clear();
     // The update snapshot is session-scoped and dies WITH the session — unlike
     // the volume/apps/tabs snapshots, which describe a PC that is still the
     // same PC after a blip. A stale serverVersion outliving its session is the

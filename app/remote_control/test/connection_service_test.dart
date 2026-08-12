@@ -470,7 +470,13 @@ void main() {
           reason: 'scroll frames carry the 0x02 opcode, not move\'s 0x01');
     });
 
-    test('sendReliable queues (<=10) while reconnecting, flushes FIFO on auth',
+    // 260812-uge REVERSED this test's original assertion. It used to prove
+    // that frames sent while reconnecting flush FIFO on re-auth — the shipped
+    // behaviour from phase 3 until the v1.0 close, and the reason anything
+    // typed during an outage arrived late into whatever window was focused
+    // afterwards. The setup is deliberately unchanged so the diff reads as
+    // what it is: the same scenario, the opposite outcome.
+    test('sendReliable during a reconnect is DROPPED, not replayed on re-auth',
         () async {
       final h = Harness();
       await connectAndAuth(h);
@@ -491,13 +497,34 @@ void main() {
       await h.pump();
       expect(h.service.isAuthed, isTrue);
 
-      final clicks = h.channel.sentMessages.whereType<ClickMsg>().toList();
-      expect(clicks, hasLength(10),
-          reason: 'queue bounded at 10; overflow dropped');
+      expect(h.channel.sentMessages.whereType<ClickMsg>(), isEmpty,
+          reason: 'nothing sent during the outage may reach the PC — this is '
+              'the whole point of the change; a queued power+confirm pair '
+              'rode this same path');
+    });
+
+    test('the handshake window still queues: a frame sent after the socket is '
+        'up but before authOk flushes on auth', () async {
+      final h = Harness();
+      h.store.preloadToken(kGuid, testToken);
+      await h.service.connectTo(kTarget);
+      h.channel.feed(ChallengeMsg(nonce: testNonce));
+      await h.pump();
+
+      // Socket installed, auth still pending — the one window that defers.
+      expect(h.service.isAuthed, isFalse);
+      h.service.sendReliable(ClickMsg(button: 'handshake'));
+      expect(h.channel.sentMessages.whereType<ClickMsg>(), isEmpty,
+          reason: 'not authed yet — held, not sent');
+
+      h.channel.feed(const AuthOkMsg());
+      await h.pump();
+
       expect(
-        clicks.map((c) => c.button).toList(),
-        List.generate(10, (i) => 'b$i'),
-        reason: 'FIFO flush order',
+        h.channel.sentMessages.whereType<ClickMsg>().map((c) => c.button),
+        ['handshake'],
+        reason: 'the bounded queue is NOT dead code — it still covers '
+            'socket-open to auth-complete',
       );
     });
   });
