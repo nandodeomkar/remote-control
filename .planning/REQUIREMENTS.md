@@ -88,40 +88,55 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Populated during roadmap creation.
+Which phases cover which requirements. Populated during roadmap creation 2026-08-13.
+
+Phase numbering **continues** from v1.0 — v1.1 runs **Phases 13-18**, it does not reset to 1.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| BAR-01 | — | Pending |
-| BAR-02 | — | Pending |
-| BAR-03 | — | Pending |
-| BAR-04 | — | Pending |
-| BAR-05 | — | Pending |
-| SUM-01 | — | Pending |
-| SUM-02 | — | Pending |
-| SUM-03 | — | Pending |
-| SUM-04 | — | Pending |
-| SUM-05 | — | Pending |
-| SUM-06 | — | Pending |
-| SURF-01 | — | Pending |
-| SURF-02 | — | Pending |
-| SURF-03 | — | Pending |
-| SURF-04 | — | Pending |
-| SAFE-01 | — | Pending |
-| SAFE-02 | — | Pending |
-| SAFE-03 | — | Pending |
-| RET-01 | — | Pending |
-| RET-02 | — | Pending |
-| RET-03 | — | Pending |
-| MOT-01 | — | Pending |
-| MOT-02 | — | Pending |
-| CHIP-01 | — | Pending |
-| CHIP-02 | — | Pending |
+| BAR-01 | Phase 13 — Summon Shell & Bar | Pending |
+| BAR-02 | Phase 13 — Summon Shell & Bar | Pending |
+| BAR-03 | Phase 13 — Summon Shell & Bar | Pending |
+| BAR-04 | Phase 13 — Summon Shell & Bar | Pending |
+| BAR-05 | Phase 13 — Summon Shell & Bar | Pending |
+| SUM-01 | Phase 13 — Summon Shell & Bar | Pending |
+| SUM-02 | Phase 13 — Summon Shell & Bar | Pending |
+| SUM-03 | Phase 13 — Summon Shell & Bar | Pending |
+| SUM-04 | Phase 13 — Summon Shell & Bar | Pending |
+| SUM-05 | Phase 14 — Raised Trackpad | Pending |
+| SUM-06 | Phase 14 — Raised Trackpad | Pending |
+| SURF-01 | Phase 14 — Raised Trackpad | Pending |
+| SURF-02 | Phase 15 — Raised Keyboard | Pending |
+| SURF-03 | Phase 15 — Raised Keyboard | Pending |
+| SURF-04 | Phase 15 — Raised Keyboard | Pending |
+| SAFE-01 | Phase 15 — Raised Keyboard | Pending |
+| SAFE-02 | Phase 14 — Raised Trackpad | Pending |
+| SAFE-03 | Phase 16 — Bubble Retirement | Pending |
+| RET-01 | Phase 16 — Bubble Retirement | Pending |
+| RET-02 | Phase 17 — Hub Tiles & Bar Identity | Pending |
+| RET-03 | Phase 14 — Raised Trackpad | Pending |
+| MOT-01 | Phase 13 — Summon Shell & Bar | Pending |
+| MOT-02 | Phase 18 — Chip Row & Measured Motion | Pending |
+| CHIP-01 | Phase 18 — Chip Row & Measured Motion | Pending |
+| CHIP-02 | Phase 18 — Chip Row & Measured Motion | Pending |
 
 **Coverage:**
 - v1.1 requirements: 25 total
-- Mapped to phases: 0 (roadmap not yet created)
-- Unmapped: 25 ⚠️
+- Mapped to phases: 25 ✓
+- Unmapped: 0
+- Duplicated across phases: 0
+
+**Per-phase counts:** Phase 13 → 10 · Phase 14 → 5 · Phase 15 → 4 · Phase 16 → 2 ·
+Phase 17 → 1 · Phase 18 → 3.
+
+### Placements a later reader will otherwise re-open
+
+| Requirement | Placed in | Why not the obvious phase |
+|---|---|---|
+| SAFE-03 (UIPI advisory survives) | 16, with the deletion | `bubble_scaffold.dart:181` is the **only** production mount of `UipiBanner` in `lib/`. The shell builds the slot in Phase 13, but the requirement is only *at risk* — and only provable — in the phase that deletes the old mount. The rehoming must ship in the same plan as the delete, or the SRV-05 advisory leaves the product silently and no test notices |
+| RET-03 (full screen stays more precise) | 14, not 17 | It is a property of the *raised* trackpad's geometry, judged on hardware the moment that surface first exists. It is also the justification for RET-02 — if it fails, the tile-survival rationale evaporates, and Phase 17 needs that answer before it starts |
+| MOT-01 (200ms / 150ms) | 13, not 18 | The animation lives in the shell and is fully exercised by the empty overlay; the constants and the t=100ms/t=250ms assertions belong where they are written. MOT-02 (worst-frame trace under repeated use with real surface content) is the half that genuinely needs both surfaces to exist, and it lands in Phase 18 |
+| SUM-02 (nothing beneath reflows; outside taps still land) | 13 | A host property, provable against an empty overlay. The retiring bubble suite's version of that same test is separately carried into Phase 16's success criteria as a migration contract — that is a test-survival obligation, not a second requirement mapping |
 
 ## Decisions Folded In
 
@@ -137,4 +152,4 @@ Recorded here because each was a live question answered by the owner during
 
 ---
 *Requirements defined: 2026-08-13*
-*Last updated: 2026-08-13 after initial definition for v1.1*
+*Last updated: 2026-08-13 — traceability populated by roadmap creation (Phases 13-18, 25/25 mapped)*

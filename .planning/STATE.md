@@ -3,10 +3,10 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: The Summon Bar
 status: planning
-last_updated: "2026-08-12T17:24:43.926Z"
-last_activity: 2026-08-12
+last_updated: "2026-08-13T17:43:26.000Z"
+last_activity: 2026-08-13
 progress:
-  total_phases: 0
+  total_phases: 6
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -39,10 +39,13 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 
 ## Current Position
 
-Phase: Not started (defining requirements)
+Phase: 13 of 18 — Summon Shell & Bar (not started)
 Plan: —
-Status: Defining requirements
-Last activity: 2026-08-12 — Milestone v1.1 started
+Status: Roadmap complete — ready to plan Phase 13
+Last activity: 2026-08-13 — v1.1 roadmap created (Phases 13-18, 25/25 requirements mapped)
+
+> **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
+> reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
 
 ## Performance Metrics
 
@@ -173,6 +176,22 @@ Last activity: 2026-08-12 — Milestone v1.1 started
 - Phase 9 added: UI refinement to design prototype — visual pass across all screens to match the Claude Design handoff (spec: docs/superpowers/specs/2026-07-16-ui-refinement-prototype/Prototype.dc.html). User-decided: dot-grid trackpad texture only — NO fake cursor dot, NO tap ripple. Palette untouched (7 D-12 tokens already byte-identical to prototype).
 - Phase 12 added: In-App Updates — a "check for updates" surface that self-updates all three components (Flutter app, Windows server, browser extension), driven from the phone. Design spec approved 2026-08-01: `docs/superpowers/specs/2026-08-01-in-app-updates-design.md` (commit 3e0135f) — read it before planning; its Decisions table IS the acceptance surface. LOCKED decisions: (a) a second, PUBLIC repo `nandodeomkar/remote-control-releases` holds the 3 release assets so no auth token ships inside any artifact — the private repo keeps source and `.planning/`; (b) the phone is the control surface for all three, PC settings keeps a fallback check; (c) one unified `X.Y.Z` across `server-windows/Cargo.toml`, `pubspec.yaml`, and `extension/manifest.json`, with NO update manifest file — the public releases API already returns tag, asset names, and per-asset sha256 `digest`; (d) protoVersion 1.7 → 1.8 adds `update.check` / `update.status` / `update.apply` / `update.progress` plus srv→ext `ext.reload`; (e) the server resolves asset URL + hash itself from a compiled-in constant and NEVER accepts one from the wire (a wire-supplied URL is RCE on the PC — this is not negotiable for convenience); (f) PC apply = silent Inno install + detached relaunch helper + an `update-result.json` marker read at startup, because the process that would report a failed install has already exited; (g) the extension rides the installer (it is already bundled at `{app}\extension`) and reloads in place via `chrome.runtime.reload()`, guarded to one attempt per target version per process run. Entry-scan notes for planning, NOT locked: new deps look like `ureq` 3.3 server-side (blocking + rustls, off the tokio runtime like the other worker threads) and `crypto` app-side (Dart has no built-in sha256); the Android install channel should mirror the hand-written `platform/multicast_lock.dart` MethodChannel pattern rather than take a plugin. Sequencing constraint: `tools/release.ps1` and the mirror repo come FIRST — nothing client-side is testable end-to-end until a real release exists to check against. Owner action outstanding: the public mirror repo does not exist yet and must be created by the owner. Known one-time cost: every already-installed client predates this, so the first upgrade onto it is still a manual install for both users.
 - Phase 11 added: Browser bookmarks — view the PC browser's bookmarks on the Browser tile, open one in a new tab, and star/unstar the current tab. Extends the existing Tab Bridge extension leg (SPEC §15) with a `bookmarks` permission and a new `bm.*` phone-facing family (proto minor bump 1.6 — 1.0–1.5 clients stay accepted). Entry-scan notes for planning, NOT locked decisions: (a) the §7 "no `url` ever crosses the phone-facing wire" invariant is preserved by keeping URL resolution extension-side — the phone sends `bm.open {id}` and the extension does `bookmarks.get(id)` → `tabs.create({url})`; (b) a full flattened `bm.state` push snapshot mirrors `tabs.state`, avoiding request-correlation machinery on the push-only ext leg, but needs node/title caps against the 56 KB frame budget; (c) the bookmarks-bar parent for new bookmarks must be resolved via `getTree()`, not the hardcoded id `"1"`; (d) a per-TabEl `bookmarked` flag would drive the star state; (e) tab rows already spend tap-down (activate), long-press and swipe (close), so a star needs a trailing button, not another row gesture. Open scope questions for discuss-phase: whether `bm.remove` (destructive, no undo) is in v1 at all, and Tabs/Bookmarks segmented control vs a separate screen.
+
+**v1.1 The Summon Bar — roadmapped 2026-08-13 (Phases 13-18, 6 phases, 25/25 requirements mapped).**
+Derived from `research/SUMMARY.md` `## Implications for Roadmap`; grouping and ordering
+adopted as written, phase numbers continued from v1.0 rather than reset.
+
+- Phase 13 added: **Summon Shell & Bar** — `SummonShell` at `MaterialApp.builder`, the two-icon bar on every screen incl. the hub, `SummonBackGuard`, the derived inset arithmetic + `kSummonBarHeight = 56`, the rehomed `UipiBanner` slot, the unconditional hidden IME field, and a correctly-sized **empty** overlay. Covers BAR-01..05, SUM-01..04, MOT-01. **Opens with the D5 spike:** `PopScope` registers with the enclosing `ModalRoute`, and above the Navigator there is no route — so a shell-level `PopScope` is a silent no-op. If the per-route guard does not intercept back, the host shape changes, and this is the cheapest place to find out. Research flag: **yes**
+- Phase 14 added: **Raised Trackpad** — the novel half (no prior art, all the gesture risk, no IME entanglement), unmount-on-dismiss, `TrackpadCoreState.dismissed()` for the drag-lock flush, the 48dp handle as a `Listener` **sibling**, visibility-driven keep-awake. Covers SURF-01, SUM-05, SUM-06, SAFE-02, RET-03. Carries SUM-06's falsifiable form verbatim. Research flag: no
+- Phase 15 added: **Raised Keyboard** — extracted `KeyboardDeck`, `summonPadProvider` (a **third** pad key), controller at shell scope, `summonPadHeight`, synchronous pad restore landing on frame one. Covers SURF-02..04, SAFE-01. **D1: SAFE-01 is NOT already satisfied** — `dismissed()` has exactly one call site in `lib/` and `KeyboardScreen` never calls it. **D6: pad restore is uncovered by any test** and depends on `PageStorage` rather than explicit code. Research flag: **yes**
+- Phase 16 added: **Bubble Retirement** — deletion of `TrackpadBubble`, `FloatingTrackpadWindow`, `BubbleScaffold`, `window_position.dart`, `bubble_position.dart`, `kBubbleSize`/`kBubbleEdgeInset`/`_bubbleAnchor`; 4 test suites deleted, `bubble_scaffold_test.dart` rewritten into `summon_shell_test.dart`; the orphaned-prefs decision recorded. Covers RET-01, SAFE-03. **D3: `bubble_scaffold.dart:181` is the ONLY production mount of `UipiBanner`** — deleting the scaffold without rehoming it silently deletes the SRV-05 advisory from the product and no test catches it. That is why SAFE-03 is in this phase and not Phase 13. Sequenced after Phase 14 so the owner never loses fast trackpad access. Research flag: no
+- Phase 17 added: **Hub Tiles & Bar Identity** — `SummonSurface` + `activeSurfaceProvider`, `HubTileSpec.showBubble` deleted, Trackpad and Keyboard moved to the **end** of `kHubTiles` (neither deleted). Covers RET-02. **D4: `test/hub/hub_screen_test.dart:22-35` carries an unlisted order pin whose rationale is already stale** — it will fail for the right reason with a wrong explanation, which is exactly how a migration gets "fixed" by re-pinning Trackpad to index 0 and quietly reverting RET-02. Kept as its own phase against the one-requirement compression heuristic, deliberately. Research flag: no
+- Phase 18 added: **Chip Row & Measured Motion** — covers CHIP-01, CHIP-02, MOT-02. **C6: opens with VERIFICATION, not implementation** — the 7.3px is measured under the widget-test font (`Shift` = 5 x 16px = 80dp in a 74dp cell) and may not exist with the shipped face; "no fix needed" is a legitimate outcome. **D2: the tripwire is at `test/trackpad/trackpad_screen_test.dart:291-304`, NOT in a keyboard suite**, and it is INVERTED (`expect(overflows, greaterThan(0))`) — when the row is fixed that test fails, and the failure is the PASS signal. Research flag: no
+
+Milestone-wide constraints recorded in ROADMAP.md: **zero new dependencies**
+(`pubspec.yaml` unchanged — a plan proposing to edit it has drifted); no server,
+protocol or extension change; and **not** an IME-style resize contract (nothing on the
+phone is the input target, so there is no field to keep visible).
 
 ### Decisions
 
@@ -490,10 +509,26 @@ plus the audit's own tech-debt list.
 
 ## Session Continuity
 
-Last session: 2026-08-12T16:20:00.000Z
-Stopped at: Quick 260812-tsw closed the last pending todo — a dismissed keyboard panel now releases a locked modifier on the PC. `todos/pending/` is empty again. Milestone v1.0 remains ready for /gsd-complete-milestone.
+Last session: 2026-08-13T17:43:26.000Z
+Stopped at: v1.1 roadmap created — six phases (13-18) with all 25 requirements mapped and no orphans. ROADMAP.md and REQUIREMENTS.md traceability written. Nothing planned or executed yet.
 Resume file: None
+
+Previous session: 2026-08-12T16:20:00.000Z — quick 260812-tsw closed the last pending
+todo (a dismissed keyboard panel releases a locked modifier on the PC); v1.0 was closed
+and archived, and v1.1 was started.
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- Review `.planning/ROADMAP.md` (Phases 13-18) and `.planning/REQUIREMENTS.md` `## Traceability`
+- Plan the first phase with `/gsd-plan-phase 13 --research-phase`
+- **Phase 13's first plan must be the D5 back-dismiss spike.** `SummonBackGuard` is
+  unproven: `PopScope` registers with the enclosing `ModalRoute`, and above the Navigator
+  there is no route, so it is a silent no-op — no error, no warning, no log. If it does
+  not intercept back from a route below a `MaterialApp.builder` shell, the host shape
+  changes, and Phase 13 is the cheapest place in the milestone for that to happen
+- Two cheap pre-planning checks named by research: does `AndroidManifest.xml` already
+  declare `android:enableOnBackInvokedCallback="true"` (2 min), and how many existing
+  `PopScope`/`WillPopScope` usages are there (5 min — they AND with the bar's)
+- Research flags: Phases 13 and 15 want `--research-phase`; 14, 16, 17 and 18 use
+  established patterns and should skip it
+- The ten v1.0 deferred items above stay deferred through v1.1
