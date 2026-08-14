@@ -85,16 +85,17 @@ so a planner does not re-open it.
 
 ### Overlay geometry
 
-- **D-13-06:** **Each icon raises its real final height in Phase 13**, not a
-  placeholder. The trackpad icon raises the trackpad fraction; the keyboard icon raises
-  the keyboard's (~0.75). Both come from **one shared derivation** — deriving once and
-  applying a per-surface fraction, never forking the arithmetic per surface. Phases 14
-  and 15 then only fill a box that is already the right size. This is the reason the
-  phase exists ahead of the surfaces: validating the formula against a number nothing
-  ships would reproduce exactly the "invisibly wrong until a real device" failure the
-  ordering was designed to prevent. — **Reversibility:** costly — the derivation is
-  pinned by driven-viewport discriminator tests across five devices; changing its shape
-  means re-deriving and re-pinning all of them.
+- **D-13-06 (AMENDED 2026-08-14 — see `## Amendments After Research` below):** **Each
+  icon raises its real final height in Phase 13**, not a placeholder. Both heights come
+  from **one shared derivation** of `available` — deriving once, never forking the
+  arithmetic per surface. Phases 14 and 15 then only fill a box that is already the
+  right size. This is the reason the phase exists ahead of the surfaces: validating the
+  formula against a number nothing ships would reproduce exactly the "invisibly wrong
+  until a real device" failure the ordering was designed to prevent.
+  **Superseded in part:** the heights are now two plain **dp constants** clamped to
+  `available`, not screen fractions — see D-13-14. — **Reversibility:** costly — the
+  derivation is pinned by driven-viewport discriminator tests across five devices;
+  changing its shape means re-deriving and re-pinning all of them.
 
 - **D-13-07:** **The 48dp drag handle ships in Phase 13 as inert chrome.** SUM-05
   (the handle as a working dismiss route, a11y-drivable) stays mapped to Phase 14, but
@@ -108,14 +109,11 @@ so a planner does not re-open it.
   label, no debug height readout. Every pixel of Phase 13's overlay is chrome that
   Phases 14 and 15 inherit.
 
-- **D-13-09:** **The height fractions are tuned on hardware during Phase 13's UAT.**
-  Ship research's proposals as starting values (keyboard ~0.75; trackpad sized so the
-  raised pad beats the retiring bubble window's 234px on the reference device while
-  staying clearly smaller than the full Trackpad screen), then adjust in the same UAT
-  session that judges 200/150ms and closes OQ-A1 sub-question 1. Both are
-  one-constant changes. `kSummonMaxHeightFraction` / `kSummonTrackpadFraction` are
-  declared design choices, not derived values — name them as such in code so a later
-  reader does not treat them as arithmetic.
+- **D-13-09 (AMENDED — values superseded by D-13-14):** **The heights are tuned on
+  hardware during Phase 13's UAT**, in the same session that judges 200/150ms and closes
+  OQ-A1 sub-question 1. Both are one-constant changes. They are declared **design
+  choices, not derived values** — name them as such in code so a later reader does not
+  treat them as arithmetic.
 
 ### Summon / dismiss behaviour
 
@@ -156,6 +154,93 @@ so a planner does not re-open it.
   — **never** a `ConnectionService.changes` subscription (research P9: the bar is on
   every screen including the trackpad's hot path, and the bar needs no `Timer.periodic`).
 
+## Amendments After Research (2026-08-14)
+
+Captured during `/gsd-plan-phase 13` after `13-RESEARCH.md` landed. These **supersede**
+the earlier decisions they name.
+
+- **D-13-14 — Two plain dp heights, not screen fractions. Supersedes the fraction half
+  of D-13-06 and D-13-09.** The owner asked for normal-Android-keyboard sizing rather
+  than a screen fraction. Resolution:
+  - **Trackpad surface = standard Android IME height** (~280dp starting value, tuned at
+    UAT). This is what "normal height" means.
+  - **Keyboard surface = tall enough for its tallest pad** (~430dp starting value),
+    because the four pads do not fit an IME-height box (below).
+  - Both are **dp constants clamped to `available`**, from the one shared derivation
+    (D-13-06's structure survives; only the fraction is replaced). No per-surface
+    fraction, no per-pad clamp.
+
+  **Why two numbers and not one.** The owner's first preference was a single matched
+  height at IME size. That is not satisfiable with SURF-02's four pads: at 280dp the
+  chip row (64dp) and tab bar (56dp) consume 120dp, leaving 160dp of pad, while the
+  pads' own arithmetic (`key_pads.dart:185-206`) needs Type 80 / Arrows 272 / Numpad
+  312 / Fn 304. Even crushed to `KeyCap.minHeight: 48`, the Numpad's 4 rows + gaps +
+  padding is ~248dp, i.e. ~368dp with chrome. The conflict was surfaced with these
+  numbers and the owner chose two heights over shrinking the pads or dropping the tab
+  bar. — **Reversibility:** reversible — two named constants.
+
+  **Consequence for Phase 14 (RET-03):** an IME-height raised trackpad (~280dp) is only
+  modestly larger than the 234px floating-bubble window being retired. "Is the raised
+  trackpad actually better than the affordance it replaces?" becomes a genuine UAT
+  question rather than a foregone conclusion. Do not let Phase 14 assume RET-03 passes.
+
+- **D-13-15 — SURF-02 stands: all four pads survive on the raised keyboard.** The owner
+  considered reducing the raised surface to Gboard plus a slim strip (retiring
+  Arrows/Numpad/Fn from it) and rejected it. Type/Arrows/Numpad/Fn, the modifier chip
+  row and the tab bar all appear on the raised surface exactly as SURF-02 says. No
+  requirement is amended. **Note for Phase 15:** pads size **inside** the fixed box with
+  `Expanded`, the way `keyboard_screen.dart:275-318` already does — so
+  `kPanelPadHeights`, `panelPadHeight` and `kPanelColumnOverhead` are **never reused**,
+  which is what "re-derive, do not copy" asked for. This closes RESEARCH OQ-1.
+
+- **D-13-16 — Add the push-site guard test (RESEARCH OQ-4).** A source-scanning test in
+  the style of `test/icons_guard_test.dart` that bans a bare `MaterialPageRoute(` in
+  `lib/` outside `lib/shell/`, with a reasoned allowlist. SUM-04 fails **silently** on
+  any un-guarded page route and research found **8 push sites across 5 files** — without
+  this, back silently stops dismissing the moment anyone adds a screen. Accepted as new
+  scope beyond the 10 requirements.
+
+- **D-13-17 — BAR-03's predicate is corrected before it is implemented.** Milestone
+  research (PITFALLS P12, SUMMARY C5) proposed gating the keyboard icon on
+  `FocusManager.instance.primaryFocus` being **null**. It never is — it reverts to
+  `rootScope` (`focus_manager.dart:1965-1969`) and `WidgetsApp` autofocuses a
+  `FocusScope` around the Navigator, so that predicate disables the icon permanently.
+  **Use instead:** the focused node has an `EditableText` ancestor **and** is not the
+  shell's own hidden IME node — the second clause is what stops Phase 15's keyboard from
+  disabling its own dismiss affordance. See `13-RESEARCH.md` §8 and correction X1.
+
+- **D-13-18 — D-13-05's browser resolution must be predicate-based, never
+  order-based.** `ModalRoute._popEntries` is a `Set` (`routes.dart:1980`) and
+  `onPopInvokedWithResult` fires **every** registered entry in unspecified order, so
+  "surface first, folder next" cannot be implemented as ordering or as a consumed-latch.
+  Both callbacks run; each must independently decide via mutually-exclusive predicates.
+  The browser reads shell state through a non-subscribing
+  `getInheritedWidgetOfExactType` so it never rebuilds off summon state.
+
+- **D-13-19 — Route ownership is a monotonic `int` guard-id stack, never a retained
+  `Route`.** Each `SummonBackGuard` mints an id on mount, appends to a shell-scope
+  `List<int>`, removes it on dispose; summon records `owner = stack.last`. D-13-03's
+  orphan case then falls out for free — the owner's id is simply no longer in the stack,
+  `canPop` is true everywhere, and no popped route's object graph is retained. This is
+  the concrete mechanism for D-13-02.
+
+### Accepted research recommendations (Claude's discretion — no owner input needed)
+
+- **OQ-2:** mount the `Positioned(width:1, height:1)` **hidden-IME slot** in Phase 13
+  with a `const SizedBox.shrink()` placeholder and a doc comment naming the constraint;
+  Phase 15 drops `HiddenTextInput` into it. Zero behaviour now, zero retrofit risk later
+  (PITFALLS P4 recovery is a host rewrite).
+- **OQ-3:** SC2's "the surface sits on top of it" means **vertical stacking**, not
+  z-order — the surface's bottom edge rests on the bar's top edge and the bar is never
+  occluded. Pin with the geometry invariants; note the wording in VERIFICATION so a
+  later reader does not re-litigate it.
+- **OQ-5:** run the full `flutter test` suite **before** any shell code and again
+  immediately after the +56 padding injection lands, as a discrete task. Anything red is
+  signal about BAR-05, not noise.
+- **Test-migration counts corrected:** **838** declarations, **37** vanish, **5**
+  rewrite — not the 882/42/5 recorded in milestone research and repeated in ROADMAP.md.
+  Use the corrected figures in the Phase 16 checklist.
+
 ### Already Locked Upstream — do not re-open
 
 - Host shape: `SummonShell` at `MaterialApp.builder` + a thin per-route
@@ -194,6 +279,18 @@ so a planner does not re-open it.
 ## Canonical References
 
 **Downstream agents MUST read these before planning or implementing.**
+
+### Phase-level research — read these FIRST
+- `.planning/phases/13-summon-shell-bar/13-RESEARCH.md` — **supersedes milestone
+  research wherever they disagree.** Its `## Corrections to Milestone Research` table
+  (X1-X4) fixes four claims, one of which would ship a permanently-disabled button.
+  Carries the D5 spike as three complete test bodies (§11), the verified inset
+  arithmetic with five worked devices and six named failure modes (§6), the animation
+  shape for swap-in-place (§7), the corrected BAR-03 predicate (§8), the predictive-back
+  baseline check (§10), and the Phase 16 test-migration checklist (§12).
+- `.planning/phases/13-summon-shell-bar/13-VALIDATION.md` — the Nyquist validation
+  contract: 10 Wave-0 test files, the per-requirement command map, and the manual-only
+  UAT list.
 
 ### Design intent and its known drift
 - `.planning/research/SUMMARY.md` §`Design-Note Drift` — **read this BEFORE the design
