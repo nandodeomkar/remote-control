@@ -5,16 +5,16 @@ milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
 status: executing
-stopped_at: Completed 13-07-PLAN.md
-last_updated: "2026-08-14T18:05:00.000Z"
+stopped_at: Completed 13-08-PLAN.md
+last_updated: "2026-08-14T19:00:00.000Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 13 plan 07 executed (pushGuarded seam + all seven page pushes converted; a bare page-route construction outside lib/shell now fails the build, proved red by hand; full suite 956 green)
+last_activity_desc: Phase 13 plan 08 executed (the C4 hit-test pair carried into the successor suite with a control tap, the no-reflow and route-stack contracts, the three named 360x640 reach cases all hand-falsified red, and BAR-01 anchored on the real application widget; full suite 962 green)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 10
-  completed_plans: 6
-  percent: 60
+  completed_plans: 7
+  percent: 70
 ---
 
 > ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
@@ -44,13 +44,15 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 ## Current Position
 
 Phase: 13 (Summon Shell & Bar) — EXECUTING
-Plan: 6 of 10 complete (13-01, 13-02, 13-03, 13-05, 13-06, 13-07) — 13-04 still outstanding
+Plan: 7 of 10 complete (13-01, 13-02, 13-03, 13-05, 13-06, 13-07, 13-08) — 13-04 still outstanding
 Status: Executing Phase 13
-Last activity: 2026-08-14 — 13-07 done: every page route in the app is now minted by one
-helper (`pushGuarded<T>`), closing the half of SUM-04 that failed silently on Settings,
-Device List, Updates, the QR screen and the bubble's expand. A source scan fails the build
-on a bare page-route construction outside `lib/shell/`, proved red by hand against a real
-violation (`device_list_screen.dart:95`) and green against a prose mention
+Last activity: 2026-08-14 — 13-08 done: the milestone's most valuable contract (a tap
+outside a raised surface still lands) now lives in the suite that survives Phase 16,
+paired with the negative it was missing and a nothing-raised control tap. The three
+surfaces SC1 names reach their last item at 360x640, each proved red by deleting the
++56 reservation — and that falsification is what caught two browser cases that had been
+green for a reason unrelated to the bar. `widget_test.dart` is now the BAR-01 end-to-end
+anchor through `main.dart`. No screen was edited: `git diff -- lib/` is empty
 
 > **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
 > reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
@@ -174,6 +176,7 @@ violation (`device_list_screen.dart:95`) and green against a prose mention
 | Phase 13 P05 | 45m | 2 tasks | 2 files |
 | Phase 13 P06 | 40m | 2 tasks | 3 files |
 | Phase 13 P07 | 35m | 2 tasks | 9 files |
+| Phase 13 P08 | 50m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -431,6 +434,10 @@ Recent decisions affecting current work:
 - [Phase 13-07]: Every page route in lib/ is minted by one helper (`pushGuarded<T>`, generic so the QR push keeps its awaited PairQrData) and a source scan fails the build on a bare construction — SUM-04 fails SILENTLY on an un-guarded route, so it must be enforced by the build rather than remembered by the author (D-13-16)
 - [Phase 13-07]: The push-site guard exempts lib/shell/ by PATH PREFIX, never by a line number that the next edit invalidates; both exemption maps are location→reason and a second case asserts every reason is non-empty, because a bare exemption is indistinguishable from a silenced failure
 - [Phase 13-07]: Test-host fidelity is scoped to the case that needs it — mounting SummonShell in settings_screen_test's SHARED host reserved 56px, shortened the lazily-built ListView and redded two unrelated Accent-chip cases that no longer laid out the row they assert on
+- [Phase 13-08]: A reach case is not trusted until the reservation it guards is deleted and it goes red. Doing that caught two of the three SC1 browser cases sitting green for a reason unrelated to the bar — the browser's scroll region is bounded by its PINNED macro footer, not by the safe area, so its last row cannot be stranded; the footer is what a lost reservation actually buries, and both cases now assert it
+- [Phase 13-08]: A negative hit-test case carries a nothing-raised CONTROL tap first — without it, a target that was mis-placed, zero-sized or behind the bar passes the negative for entirely the wrong reason
+- [Phase 13-08]: A tolerated exception is drained by a helper that ASSERTS what it swallows. The 360dp macro-grid overflow is horizontal ("on the right") and pre-existing (it reproduces with no shell mounted at all); a VERTICAL overflow — the failure under test — does not match and still reds. Logged to deferred-items.md rather than fixed, because a screen edit would destroy BAR-05's zero-per-screen-edit property
+- [Phase 13-08]: test/widget_test.dart is the BAR-01 end-to-end anchor — the only test that pumps main.dart, so removing the SummonShell mount reds it while the harness-built shell suite stays fully green. Phase 16 RE-RUNS it, never deletes it
 
 ### Pending Todos
 

@@ -25,7 +25,7 @@ protocol change, no `protoVersion` bump. Requirement IDs use fresh prefixes; v1.
 ### Summon & Dismiss
 
 - [x] **SUM-01**: Tapping a bar icon raises that surface over the current screen without navigating away
-- [ ] **SUM-02**: Nothing beneath a raised surface resizes or reflows, and a tappable widget outside the surface still receives its tap
+- [x] **SUM-02**: Nothing beneath a raised surface resizes or reflows, and a tappable widget outside the surface still receives its tap
 - [x] **SUM-03**: Tapping the same bar icon again dismisses the raised surface
 - [x] **SUM-04**: The Android back gesture dismisses a raised surface before it pops the screen
 - [ ] **SUM-05**: A 48dp drag handle offers a third dismiss route that assistive services can drive
@@ -100,7 +100,7 @@ Phase numbering **continues** from v1.0 — v1.1 runs **Phases 13-18**, it does 
 | BAR-04 | Phase 13 — Summon Shell & Bar | Pending |
 | BAR-05 | Phase 13 — Summon Shell & Bar | Complete |
 | SUM-01 | Phase 13 — Summon Shell & Bar | Complete |
-| SUM-02 | Phase 13 — Summon Shell & Bar | Pending |
+| SUM-02 | Phase 13 — Summon Shell & Bar | Complete |
 | SUM-03 | Phase 13 — Summon Shell & Bar | Complete |
 | SUM-04 | Phase 13 — Summon Shell & Bar | Complete |
 | SUM-05 | Phase 14 — Raised Trackpad | Pending |
