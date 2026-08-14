@@ -42,6 +42,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:remote_control/shell/summon_bar.dart';
 import 'package:remote_control/shell/summon_geometry.dart';
+import 'package:remote_control/shell/summon_handle.dart';
 import 'package:remote_control/shell/summon_icon_button.dart';
 import 'package:remote_control/shell/summon_scope.dart';
 import 'package:remote_control/shell/summon_surface.dart';
@@ -704,6 +705,202 @@ void main() {
       // that is precisely why the shell reads its metrics ONCE, into locals,
       // before it constructs the wrap.
       expectSurfaceInvariants(t, d, SummonSurfaceKind.keyboard);
+    });
+
+    // ── F4: the retarget discriminator ───────────────────────────────────
+    //
+    // The one failure in the set that no single-frame assertion can see. Every
+    // case above would pass identically against a shell that snapshotted its
+    // metrics once, because at a FIXED metric the snapshot and the live read
+    // are the same number. What separates them is a metric that MOVES.
+    //
+    // This case runs after plan 13-03, deliberately. 13-03 replaced the resting
+    // height with the swap lerp, and the lerp's two endpoints are re-derived
+    // from the live `available` on every build precisely so that a stored dp
+    // figure cannot hide in them. At REST — swap settled, both endpoints the
+    // same kind, the lerp an identity that is still evaluated — is exactly
+    // where a stored size would hide, so that is where this case sits. If it
+    // ever goes red the fault is in the shell's height SOURCE and the repair
+    // belongs there, never in this assertion.
+
+    testWidgets(
+        'F4: the surface RETARGETS on the very next frame when only the IME '
+        'inset moves — a snapshot taken from the view registers no dependency, '
+        'so it would sit at the covered height for the rest of the animation '
+        'and never correct itself', (t) async {
+      const covered = _deviceD; // 360x640 with the keyboard fully up
+      const falling = _deviceE; // the same device, the IME mid-fall
+
+      driveView(
+        t,
+        size: covered.size,
+        top: covered.top,
+        bottom: covered.bottom,
+        ime: covered.ime,
+      );
+      final nav = GlobalKey<NavigatorState>();
+      await pumpShell(t, nav: nav);
+      await raiseAndLand(t, SummonSurfaceKind.keyboard);
+
+      final coveredHeight = summonSurfaceHeightFor(
+        SummonSurfaceKind.keyboard,
+        availableOf(
+          size: covered.size,
+          top: covered.top,
+          bottom: covered.bottom,
+          ime: covered.ime,
+        ),
+      );
+      final fallingHeight = summonSurfaceHeightFor(
+        SummonSurfaceKind.keyboard,
+        availableOf(
+          size: falling.size,
+          top: falling.top,
+          bottom: falling.bottom,
+          ime: falling.ime,
+        ),
+      );
+      expect(
+        fallingHeight,
+        greaterThan(coveredHeight),
+        reason: 'the two ends must actually differ, or a shell that ignored '
+            'the change entirely would pass this case',
+      );
+
+      expect(
+        t.getRect(find.byKey(kSummonSurfaceKey)).height,
+        closeTo(coveredHeight, 0.01),
+        reason: 'the starting point: with the keyboard fully up the clamp '
+            'binds and the surface is exactly what is left',
+      );
+
+      // ONLY the IME inset changes. No icon is tapped, no controller is
+      // touched, nothing is re-raised — this is the metric moving underneath a
+      // surface that is already at rest.
+      t.view.viewInsets = FakeViewPadding(bottom: falling.ime);
+      await t.pump();
+
+      expect(
+        t.getRect(find.byKey(kSummonSurfaceKey)).height,
+        closeTo(fallingHeight, 0.01),
+        reason: 'ONE frame, no observer, no setState: the ancestor query is '
+            'not value-equal across an IME animation, so the rebuild is '
+            'automatic and the height is re-derived from the live metrics. A '
+            'MediaQueryData.fromView(View.of(context)) read is numerically '
+            'identical at any fixed metric and registers NO dependency, so it '
+            'would still be showing the line above',
+      );
+      expectSurfaceInvariants(t, falling, SummonSurfaceKind.keyboard);
+    });
+
+    // ── F5: the padding-strip probe ──────────────────────────────────────
+    //
+    // A PROBE, not a rendering assertion, and the distinction is the whole
+    // point of the case. Phase 13's surface contains no inner `SafeArea`, so
+    // the absence of the strip changes NOTHING that can be measured with a
+    // Rect today. It changes something in Phase 15: `KeyboardTabBar` carries
+    // its own `SafeArea` (key_pads.dart:349-353), which contributes 0 in the
+    // docked panel only because an ancestor had already stripped the bottom
+    // padding. Nothing has stripped it here — the surface is a `Positioned`
+    // sibling of the shell's injection, not a descendant of any screen's safe
+    // area — so the tab bar would silently add the whole gesture-nav inset of
+    // dead space, and by then it would be unattributable.
+    //
+    // ── A CORRECTION TO 13-RESEARCH §6.5 / THE PLAN'S F5 WORDING ──────────
+    //
+    // Both state the second assertion as "`viewPaddingOf` inside the surface
+    // still reports 48". That is not what `MediaQuery.removePadding` does.
+    // `MediaQueryData.removePadding` (media_query.dart:930-953) sets
+    // `padding.bottom` to 0 AND sets `viewPadding.bottom` to
+    // `max(0, viewPadding.bottom - padding.bottom)` — it SUBTRACTS the padding
+    // it just consumed rather than leaving viewPadding alone. With the IME
+    // DOWN, `padding.bottom == viewPadding.bottom`, so both land on 0 and the
+    // quoted assertion is red against correct code.
+    //
+    // The guarantee is therefore split across the two cases below: the strip
+    // is real and it is SCOPED to the surface's subtree (first case), and it
+    // subtracts rather than zeroes (second case). Making the original wording
+    // literally true would mean replacing `removePadding` with a hand-rolled
+    // copyWith that leaves viewPadding at the full inset — which would WEAKEN
+    // the guard, because a `SafeArea(maintainBottomViewPadding: true)` inside
+    // the surface would then re-introduce exactly the dead space F5 exists to
+    // prevent. The production code is right; the assertion was wrong.
+    //
+    // THE PROBE IS THE GUARD, THE COROLLARY IS NOT. Deleting the strip from
+    // `summon_surface.dart` reds the probe by the full nav inset and leaves the
+    // corollary GREEN — with the IME up there was nothing to strip in the first
+    // place. Confirmed by hand while writing this plan. Anyone tempted to keep
+    // only one of the two cases must keep the probe.
+
+    testWidgets(
+        'F5 PROBE: the raised surface\'s subtree has its bottom padding '
+        'stripped, and the strip is scoped to that subtree — without it '
+        'KeyboardTabBar\'s own SafeArea adds the whole gesture-nav inset of '
+        'dead space the moment Phase 15 mounts it', (t) async {
+      const d = _deviceA; // the reference device, IME down, nav inset 48
+      driveView(t, size: d.size, top: d.top, bottom: d.bottom);
+      final nav = GlobalKey<NavigatorState>();
+      await pumpShell(t, nav: nav);
+      await raiseAndLand(t, SummonSurfaceKind.keyboard);
+
+      // The handle is the natural probe point: it is the only thing inside the
+      // surface in Phase 13, and it is where Phase 15's chrome sits next to.
+      final inside = t.element(find.byType(SummonHandle));
+      final outside = t.element(find.byKey(kSummonBarKey));
+
+      expect(
+        MediaQuery.paddingOf(inside).bottom,
+        closeTo(0, 0.01),
+        reason: 'this is the entire deliverable of the strip. Nothing in '
+            'Phase 13 consumes padding, so nothing in Phase 13 can see this '
+            'go wrong — the probe is the only detector that exists, and it '
+            'fails in Phase 15 if the strip is ever removed from here',
+      );
+      expect(
+        MediaQuery.viewPaddingOf(outside).bottom,
+        closeTo(d.bottom, 0.01),
+        reason: 'the strip is SCOPED: the bar layer, a sibling of the surface, '
+            'still sees the device\'s full inset. A strip that leaked upward '
+            'would move the bar off the nav zone and I2 would be measuring a '
+            'consequence of the test rather than of the shell',
+      );
+      expect(
+        MediaQuery.viewInsetsOf(inside).bottom,
+        closeTo(0, 0.01),
+        reason: 'and only PADDING is touched — viewInsets pass through '
+            'untouched, which is what keeps the IME state readable from '
+            'inside the surface when Phase 15 needs it',
+      );
+    });
+
+    testWidgets(
+        'F5 corollary: removePadding SUBTRACTS the padding it consumed rather '
+        'than zeroing viewPadding — with the IME up the inset survives inside '
+        'the surface, which is where a maintainBottomViewPadding SafeArea '
+        'would put the dead space back', (t) async {
+      const d = _deviceC; // IME up: the engine has already collapsed padding
+      driveView(t, size: d.size, top: d.top, bottom: d.bottom, ime: d.ime);
+      final nav = GlobalKey<NavigatorState>();
+      await pumpShell(t, nav: nav);
+      await raiseAndLand(t, SummonSurfaceKind.keyboard);
+
+      final inside = t.element(find.byType(SummonHandle));
+      expect(
+        MediaQuery.paddingOf(inside).bottom,
+        closeTo(0, 0.01),
+        reason: 'the strip holds in both IME states, which is what makes it a '
+            'guarantee rather than a coincidence of the reference device',
+      );
+      expect(
+        MediaQuery.viewPaddingOf(inside).bottom,
+        closeTo(d.bottom, 0.01),
+        reason: 'with the IME up the engine has already collapsed padding to '
+            '0, so there is nothing to subtract and the nav inset survives on '
+            'viewPadding. Phase 15 must therefore not reach for '
+            'maintainBottomViewPadding inside the surface: it would read this '
+            'number and reintroduce precisely the dead space the strip above '
+            'exists to remove',
+      );
     });
   });
 }
