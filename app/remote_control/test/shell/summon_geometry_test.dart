@@ -18,10 +18,17 @@
 //  6. the content box Phases 14 and 15 inherit — height minus the top rule
 //     minus the handle band, on every device, for both surfaces.
 //
-// THIS SUITE IS DELIBERATELY WIDGET-FREE. The four functions take plain
-// doubles precisely so the arithmetic can be pinned without a pump; the
-// RENDERED invariants (I1 surfaceRect.bottom == barRect.top, I2, I3, I4) and
-// the driven-viewport discriminators land in plan 13-04 against a real tree.
+// ── THE TWO HALVES OF THIS FILE ────────────────────────────────────────────
+//
+// The FIRST half (13-02) is DELIBERATELY WIDGET-FREE. The four functions take
+// plain doubles precisely so the arithmetic can be pinned without a pump.
+//
+// The SECOND half (13-04) drives five real viewports through the REAL shell and
+// pins the RENDERED invariants — I1 `surfaceRect.bottom == barRect.top`, I2, I3
+// and I4 — plus the five named failure modes F1/F1b, F2, F3, F4 and F5. It has
+// its own preamble at the `THE RENDERED HALF` banner below, naming which cases
+// are references and which are discriminators, and why an inset-free harness
+// cannot catch this bug class at all.
 //
 // House rule, verbatim from test/trackpad/trackpad_screen_test.dart:143-145 —
 // every asserted number is COMPUTED from the device inputs by the helpers
@@ -30,15 +37,24 @@
 // of the production functions; asserting a function against itself would pass
 // for any formula.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:remote_control/shell/summon_bar.dart';
 import 'package:remote_control/shell/summon_geometry.dart';
+import 'package:remote_control/shell/summon_icon_button.dart';
 import 'package:remote_control/shell/summon_scope.dart';
+import 'package:remote_control/shell/summon_surface.dart';
 
-/// One worked device from 13-RESEARCH §6.4. Width is carried in [id] only —
-/// none of this arithmetic is horizontal.
+import 'summon_test_harness.dart';
+
+/// One worked device from 13-RESEARCH §6.4.
+///
+/// None of the arithmetic in the first half is horizontal, so [width] is
+/// carried purely so the rendered half can drive a real viewport with it.
 class _Device {
   final String id;
+  final double width;
   final double height;
   final double top;
   final double bottom;
@@ -46,27 +62,34 @@ class _Device {
 
   const _Device(
     this.id, {
+    required this.width,
     required this.height,
     required this.top,
     required this.bottom,
     this.ime = 0,
   });
+
+  /// The viewport [driveView] is handed.
+  Size get size => Size(width, height);
 }
 
 const _deviceA = _Device(
   'A — 411x891, gesture nav 48, IME down (the reference device)',
+  width: 411,
   height: 891,
   top: 24,
   bottom: 48,
 );
 const _deviceB = _Device(
   'B — 360x640, nav 24, IME down (short)',
+  width: 360,
   height: 640,
   top: 24,
   bottom: 24,
 );
 const _deviceC = _Device(
   'C — 411x891, nav 24, IME up (viewPadding-vs-padding discriminator)',
+  width: 411,
   height: 891,
   top: 24,
   bottom: 24,
@@ -74,6 +97,7 @@ const _deviceC = _Device(
 );
 const _deviceD = _Device(
   'D — 360x640, nav 24, IME up (short AND covered: the clamp binds)',
+  width: 360,
   height: 640,
   top: 24,
   bottom: 24,
@@ -81,6 +105,7 @@ const _deviceD = _Device(
 );
 const _deviceE = _Device(
   'E — 360x640, nav 24, IME mid-fall (retarget discriminator)',
+  width: 360,
   height: 640,
   top: 24,
   bottom: 24,
@@ -320,6 +345,365 @@ void main() {
             'and the tuning session is this phase\'s UAT. Do not let Phase 14 '
             'assume RET-03 passes',
       );
+    });
+  });
+
+  // ═══ THE RENDERED HALF (13-04) ═══════════════════════════════════════════
+  //
+  // WHY A SECOND HALF EXISTS AT ALL. Everything above proves the formula is the
+  // formula. None of it proves the SHELL feeds that formula the right inputs,
+  // and that is the half of this phase which is invisibly wrong until a real
+  // device with gesture nav and a raised IME. An inset-free harness cannot
+  // catch this bug class at all: at zero insets `padding` and `viewPadding` are
+  // the same number, the injected copy and the raw one differ by a reservation
+  // nothing has consumed yet, and every failure below is green.
+  //
+  // REFERENCES vs DISCRIMINATORS. A viewport case is only worth writing when
+  // the correct and the naive numbers differ VISIBLY. The five:
+  //
+  //   A  411x891, nav 48, IME down  REFERENCE. The device the phase is designed
+  //                                 against. Not an F1 discriminator — IME down
+  //                                 means padding == viewPadding — but it is
+  //                                 where F2 and F3 live, and F3 is the nastiest
+  //                                 of the set precisely because nothing about
+  //                                 this device looks unusual.
+  //   B  360x640, nav 24, IME down  REFERENCE. The short viewport, where the
+  //                                 arithmetic has the least room to be sloppy.
+  //   C  411x891, nav 24, IME up    DISCRIMINATOR (F1). The naive read draws the
+  //                                 bar AT the window bottom — behind the raised
+  //                                 keyboard, where it cannot be tapped.
+  //   D  360x640, nav 24, IME up    DISCRIMINATOR (F1b), and the one device
+  //                                 where the clamp binds for BOTH surfaces.
+  //   E  360x640, nav 24, IME mid   the mid-fall metric, and F4's destination
+  //                                 (Task 2).
+  //
+  // Every expected number is COMPUTED from the driven metrics by the harness
+  // helpers (`availableOf`, `barBottomOffsetOf`, `summonSurfaceHeightFor`),
+  // which re-derive the arithmetic independently of the production functions.
+  // Nothing below quotes a pixel figure that is not a DRIVEN INPUT.
+  //
+  // NO SETTLE-UNTIL-IDLE PUMP IN THIS FILE, and the ban is enforced by a grep
+  // in the plan's verify rather than by good intentions. A pump that advances
+  // until no frames are scheduled makes a 200ms summon and a 900ms summon
+  // indistinguishable, so every advance below is an explicit `pump(Duration)`.
+  // The harness's `pumpShell` settles the initial ROUTE transition inside its
+  // own file, which is navigation settling and never a geometry read.
+
+  group('rendered on the five driven viewports (13-04)', () {
+    setUp(installSummonTestPlatforms);
+
+    /// One frame past the budget.
+    ///
+    /// `_InterpolationSimulation.isDone` is a STRICT `>`, so at exactly the
+    /// budget the controller's value has arrived but its status has not yet
+    /// flipped.
+    const tick = Duration(milliseconds: 1);
+
+    /// The bar icon that raises [kind]. Located BY KEY, never by glyph:
+    /// `Symbols.keyboard_rounded` collides with `KeyboardTabBar`'s Type tab the
+    /// moment Phase 15 mounts the tab bar inside the raised surface.
+    Key iconFor(SummonSurfaceKind kind) => kind == SummonSurfaceKind.trackpad
+        ? kSummonTrackpadIconKey
+        : kSummonKeyboardIconKey;
+
+    /// Taps [kind]'s icon and lands the motion exactly. Serves a first raise
+    /// and a swap alike — the swap budget is the raise budget (D-13-10, one
+    /// motion), so a single helper cannot silently paper over a lower-then-
+    /// raise.
+    Future<void> raiseAndLand(WidgetTester t, SummonSurfaceKind kind) async {
+      await t.tap(find.byKey(iconFor(kind)));
+      await t.pump();
+      await t.pump(kSummonRaiseDuration);
+      await t.pump(tick);
+    }
+
+    /// I1-I4 against the rendered tree, for one driven device and one raised
+    /// surface. The `expectColumnFits` shape from
+    /// `test/trackpad/trackpad_screen_test.dart:187-194`: one helper, four
+    /// assertions, and a `reason:` on each that states the GUARANTEE rather
+    /// than restating the assertion.
+    void expectSurfaceInvariants(
+      WidgetTester t,
+      _Device d,
+      SummonSurfaceKind kind,
+    ) {
+      final bar = t.getRect(find.byKey(kSummonBarKey));
+      final surface = t.getRect(find.byKey(kSummonSurfaceKey));
+      final available = availableOf(
+        size: d.size,
+        top: d.top,
+        bottom: d.bottom,
+        ime: d.ime,
+      );
+      final offset = barBottomOffsetOf(bottom: d.bottom, ime: d.ime);
+
+      expect(
+        surface.bottom,
+        closeTo(bar.top, 0.01),
+        reason: 'I1 — "the surface sits on top of the bar, never under it" is '
+            'VERTICAL stacking, not z-order. The bar keeps every pixel of its '
+            'own band, so it is never occluded by the thing it summoned',
+      );
+      expect(
+        bar.bottom,
+        closeTo(d.height - offset, 0.01),
+        reason: 'I2 — the bar always clears whichever system chrome is '
+            'present: the gesture-nav zone when the IME is down, the keyboard '
+            'itself when it is up. Whichever is larger, never their sum',
+      );
+      expect(
+        surface.top,
+        greaterThanOrEqualTo(d.top - 0.01),
+        reason: 'I3 — the surface never reaches under the status bar, so its '
+            'top edge is always something the user can see meeting the screen '
+            'behind it',
+      );
+      expect(
+        surface.height,
+        closeTo(summonSurfaceHeightFor(kind, available), 0.01),
+        reason: 'I4 — the rendered height IS the one shared derivation over '
+            'the live metrics; a second sizing site anywhere in the shell '
+            'would show up here as a number that no longer tracks the device',
+      );
+    }
+
+    for (final d in _devices) {
+      testWidgets('${d.id} — both surfaces hold I1-I4', (t) async {
+        driveView(
+          t,
+          size: d.size,
+          top: d.top,
+          bottom: d.bottom,
+          ime: d.ime,
+        );
+        final nav = GlobalKey<NavigatorState>();
+        await pumpShell(t, nav: nav);
+
+        await raiseAndLand(t, SummonSurfaceKind.trackpad);
+        expectSurfaceInvariants(t, d, SummonSurfaceKind.trackpad);
+
+        // The SWAP, not a lower-then-raise. The taller surface rides the same
+        // derivation and owes the same four invariants — one function, both
+        // surfaces (D-13-06).
+        await raiseAndLand(t, SummonSurfaceKind.keyboard);
+        expectSurfaceInvariants(t, d, SummonSurfaceKind.keyboard);
+      });
+    }
+
+    testWidgets(
+        'D — the clamp binds for BOTH surfaces and they collapse to the same '
+        'height: the documented consequence of ONE shared derivation, not a '
+        'bug to be fixed into two floors', (t) async {
+      const d = _deviceD;
+      driveView(t, size: d.size, top: d.top, bottom: d.bottom, ime: d.ime);
+      final nav = GlobalKey<NavigatorState>();
+      await pumpShell(t, nav: nav);
+
+      final available = availableOf(
+        size: d.size,
+        top: d.top,
+        bottom: d.bottom,
+        ime: d.ime,
+      );
+
+      await raiseAndLand(t, SummonSurfaceKind.trackpad);
+      final trackpad = t.getRect(find.byKey(kSummonSurfaceKey));
+      await raiseAndLand(t, SummonSurfaceKind.keyboard);
+      final keyboard = t.getRect(find.byKey(kSummonSurfaceKey));
+
+      expect(trackpad.height, closeTo(available, 0.01));
+      expect(
+        keyboard.height,
+        closeTo(available, 0.01),
+        reason: 'both chosen heights exceed what this device has, so both '
+            'clamp to the same number. Do not resolve this into a per-surface '
+            'fraction or a per-pad clamp — D-13-15 resolves it in Phase 15 by '
+            'sizing the pads INSIDE the fixed box',
+      );
+      expect(keyboard.height, closeTo(trackpad.height, 0.01));
+
+      // What the clamp actually buys at the extreme, stated honestly: the
+      // surface fills `available` EXACTLY, so its top edge lands ON the status
+      // inset. I3 holds with equality here and nowhere else — this is the
+      // tightest the geometry ever gets, and the clamp is precisely what stops
+      // it going one pixel further in either direction.
+      expect(
+        keyboard.top,
+        closeTo(d.top, 0.01),
+        reason: 'the host screen above the surface is the status band and '
+            'nothing more on this device; without the clamp the surface would '
+            'reach UNDER the status bar (I3) or over the bar (I1)',
+      );
+      final bar = t.getRect(find.byKey(kSummonBarKey));
+      expect(
+        keyboard.bottom,
+        closeTo(bar.top, 0.01),
+        reason: 'the bar keeps its full band even here — a clamped surface is '
+            'a SHORT surface, never one that eats the bar',
+      );
+      expect(
+        keyboard.height,
+        greaterThan(kSummonHandleBandHeight + kSummonHairline),
+        reason: 'a clamped surface is still a usable one: the handle band and '
+            'its rule fit inside it, which is what makes "a pathologically '
+            'small available yields a short surface, never a failure" true on '
+            'a real viewport rather than only in the arithmetic',
+      );
+    });
+
+    // ── The three geometry discriminators ────────────────────────────────
+    //
+    // Each of the three is a way the arithmetic can be written wrong that
+    // still looks plausible in the source. The test names carry the wrong
+    // outcome, so a reader who breaks one is told what they broke.
+
+    testWidgets(
+        'F1 on device C: the bar clears the RAISED IME — reading paddingOf '
+        'instead of viewPaddingOf puts it AT the window bottom, behind the '
+        'keyboard, where the dismiss affordance cannot be tapped at all',
+        (t) async {
+      const d = _deviceC;
+      driveView(t, size: d.size, top: d.top, bottom: d.bottom, ime: d.ime);
+      final nav = GlobalKey<NavigatorState>();
+      await pumpShell(t, nav: nav);
+      await raiseAndLand(t, SummonSurfaceKind.keyboard);
+
+      final bar = t.getRect(find.byKey(kSummonBarKey));
+      expect(
+        d.height - bar.bottom,
+        closeTo(barBottomOffsetOf(bottom: d.bottom, ime: d.ime), 0.01),
+        reason: 'the bar sits the IME\'s own height above the window bottom. '
+            'With the naive read this gap is ZERO — the bar is drawn behind '
+            'the raised keyboard and is untappable, so "dismiss costs one '
+            'gesture" would be false on exactly the surface that needs it',
+      );
+      expect(
+        d.height - bar.bottom,
+        greaterThan(d.bottom),
+        reason: 'and the gap is the IME rather than the nav inset, which is '
+            'what makes this device a discriminator instead of a second '
+            'reference case',
+      );
+      expectSurfaceInvariants(t, d, SummonSurfaceKind.keyboard);
+    });
+
+    testWidgets(
+        'F1b on device D: the same read on the short viewport — naively the '
+        'bar AND the bottom of the surface both land behind the IME, which is '
+        'most of the surface on a 640dp device', (t) async {
+      const d = _deviceD;
+      driveView(t, size: d.size, top: d.top, bottom: d.bottom, ime: d.ime);
+      final nav = GlobalKey<NavigatorState>();
+      await pumpShell(t, nav: nav);
+      await raiseAndLand(t, SummonSurfaceKind.keyboard);
+
+      final bar = t.getRect(find.byKey(kSummonBarKey));
+      final surface = t.getRect(find.byKey(kSummonSurfaceKey));
+      final offset = barBottomOffsetOf(bottom: d.bottom, ime: d.ime);
+
+      expect(bar.bottom, closeTo(d.height - offset, 0.01));
+      expect(
+        surface.bottom,
+        lessThanOrEqualTo(d.height - offset + 0.01),
+        reason: 'nothing the shell draws crosses the IME\'s top edge. The '
+            'naive read leaves the whole stack a full IME height too low, so '
+            'the user sees a bar and a surface that are simply not there',
+      );
+      expectSurfaceInvariants(t, d, SummonSurfaceKind.keyboard);
+    });
+
+    testWidgets(
+        'F2 on device A: the surface\'s bottom edge IS the bar\'s top edge — '
+        'omitting kSummonBarHeight from `available` drops it a full bar height '
+        'lower, so the surface overlaps the band it is supposed to rest on',
+        (t) async {
+      const d = _deviceA;
+      driveView(t, size: d.size, top: d.top, bottom: d.bottom, ime: d.ime);
+      final nav = GlobalKey<NavigatorState>();
+      await pumpShell(t, nav: nav);
+      await raiseAndLand(t, SummonSurfaceKind.keyboard);
+
+      final bar = t.getRect(find.byKey(kSummonBarKey));
+      final surface = t.getRect(find.byKey(kSummonSurfaceKey));
+
+      expect(
+        surface.bottom,
+        closeTo(bar.top, 0.01),
+        reason: 'I1 is what catches F2, and it catches it as a RELATIONSHIP '
+            'rather than as a number: no single height assertion notices that '
+            'the surface has been placed a bar height too low, because the '
+            'height itself is still right',
+      );
+      expect(
+        bar.bottom - surface.bottom,
+        closeTo(kSummonBarHeight, 0.01),
+        reason: 'the naive placement is exactly one bar height away — the '
+            'surface would end at the bar\'s BOTTOM edge, covering both icons '
+            'and violating BAR-02 for as long as anything is raised',
+      );
+    });
+
+    testWidgets(
+        'F3 on device A with the IME DOWN: `available` is the band between the '
+        'status inset and the bar — reading the INJECTED MediaQuery back costs '
+        'exactly one bar height of dead space and nothing looks broken',
+        (t) async {
+      const d = _deviceA;
+      driveView(t, size: d.size, top: d.top, bottom: d.bottom, ime: d.ime);
+      final nav = GlobalKey<NavigatorState>();
+      await pumpShell(t, nav: nav);
+      await raiseAndLand(t, SummonSurfaceKind.keyboard);
+
+      final bar = t.getRect(find.byKey(kSummonBarKey));
+      final available = availableOf(
+        size: d.size,
+        top: d.top,
+        bottom: d.bottom,
+        ime: d.ime,
+      );
+
+      // `available` IS the rendered band between the status inset and the top
+      // of the bar — that is the whole content of the derivation, read off the
+      // tree rather than trusted from the arithmetic.
+      expect(
+        bar.top - d.top,
+        closeTo(available, 0.01),
+        reason: 'the shell reads the RAW ancestor query into locals before it '
+            'builds its +56 wrap. Reading that wrap back is the nastiest of '
+            'the whole set: the IME is down, the device is the reference one, '
+            'nothing looks broken, and the surface is simply short',
+      );
+
+      // The counterfactual, computed: the injected copy carries the bar's own
+      // reservation on `viewPadding.bottom`, so re-reading it subtracts the
+      // reservation twice.
+      final injected = availableOf(
+        size: d.size,
+        top: d.top,
+        bottom: d.bottom + kSummonBarHeight,
+        ime: d.ime,
+      );
+      expect(
+        available - injected,
+        closeTo(kSummonBarHeight, 0.01),
+        reason: 'the error is a bar height, not a rounding wobble',
+      );
+
+      // WHAT THE HAND-FALSIFICATION SHOWED, recorded because it decides where
+      // the tripwire has to live. Feeding the injected `viewPadding.bottom`
+      // through BOTH derivations reds this case by exactly one bar height, and
+      // it reds it through I1 below — the surface lands a bar height clear of
+      // the bar it should be resting on.
+      //
+      // Feeding it through `available` ALONE reds nothing on any of the five
+      // devices, and that is not a gap in the case, it is a property of the
+      // design: a fixed height only consults `available` through the clamp, the
+      // clamp only binds where the IME is up, and where the IME is up it
+      // dominates `max(Pbot, Ibot)` and swallows the injected term whole. The
+      // offset half shares the same local, so I1 is the tripwire for both — and
+      // that is precisely why the shell reads its metrics ONCE, into locals,
+      // before it constructs the wrap.
+      expectSurfaceInvariants(t, d, SummonSurfaceKind.keyboard);
     });
   });
 }
