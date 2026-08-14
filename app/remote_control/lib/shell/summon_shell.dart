@@ -126,16 +126,63 @@ class _SummonShellState extends ConsumerState<SummonShell>
   /// with no queue and no input lockout, which is the framework default: a
   /// 150ms reverse from 0.5 settles in ~75ms because the duration scales by the
   /// remaining distance.
+  ///
+  /// **No reduced-motion branch, and that is a decision rather than an
+  /// omission** (13-UI-SPEC § Motion Budgets rule 7). A 200/150ms translate
+  /// with no parallax, no scale, no blur and no opacity is already inside every
+  /// reduced-motion guideline, so gating it on the platform's
+  /// remove-animations accessibility flag would buy nothing — and it would
+  /// double the timing surface MOT-01 has to pin, because every budget below
+  /// would then exist in two variants and only one of them would be tested.
   late final CurvedAnimation _curvedRaise = CurvedAnimation(
     parent: _raise,
     curve: Curves.easeOut,
     reverseCurve: Curves.easeIn,
   );
 
+  /// The swap controller — D-13-10's **one motion** (plan 13-03).
+  ///
+  /// Rests at 1, which is the "the surface is showing [_toKind]" position. A
+  /// swap runs it 0 → 1 while [_raise] stays untouched at 1, so the surface
+  /// resizes to the other surface's height **without ever detaching from the
+  /// bar**. There is no lower-then-raise anywhere in this file, and a 150ms
+  /// lower followed by a 200ms raise is exactly what this controller exists to
+  /// make impossible.
+  late final AnimationController _swap = AnimationController(
+    vsync: this,
+    duration: kSummonSwapDuration,
+    value: 1,
+  );
+
   /// Which surface is on screen, including while it animates back down. Null
   /// only once the lower has fully settled, so the slab is never yanked out
   /// from under its own exit animation.
   SummonSurfaceKind? _rendered;
+
+  /// The swap's two lerp endpoints — **kinds, never dp figures**.
+  ///
+  /// This is the whole point of storing them this way. The rendered height is a
+  /// build-time derivation of the live ancestor metrics (plan 13-02), so an IME
+  /// inset change retargets the surface on the very next frame; caching either
+  /// endpoint as a number at raise time or at swap time would reintroduce
+  /// exactly the snapshot 13-RESEARCH §5 files as an anti-pattern. The damage
+  /// is worst at **rest**, where [_swap] sits at 1 and the rendered height
+  /// would be a frozen figure that no longer tracks `available` at all.
+  SummonSurfaceKind _fromKind = SummonSurfaceKind.trackpad;
+
+  /// The endpoint the swap is heading to; equal to [_fromKind] at rest, which
+  /// makes the lerp an identity that is still *evaluated* every build.
+  SummonSurfaceKind _toKind = SummonSurfaceKind.trackpad;
+
+  /// True only while a swap is being armed at its starting value.
+  ///
+  /// Rewinding the swap controller to 0 to start a fresh forward reports a
+  /// transient `dismissed` — the same status a *settled reverse* reports, and
+  /// [_onSwapStatus] would read it as "the swap ended where it began" and
+  /// collapse both endpoints onto the outgoing kind. The swap would then run
+  /// its whole 200ms between two identical heights and the surface would never
+  /// resize. This flag is what tells the two apart.
+  bool _armingSwap = false;
 
   /// The bar's own layer. Created once — an `OverlayEntry` must not be rebuilt
   /// into existence per frame.
@@ -146,34 +193,113 @@ class _SummonShellState extends ConsumerState<SummonShell>
     super.initState();
     _controller.raised.addListener(_onRaisedChanged);
     _raise.addStatusListener(_onRaiseStatus);
+    _swap.addStatusListener(_onSwapStatus);
   }
 
   @override
   void dispose() {
     _controller.raised.removeListener(_onRaisedChanged);
     _raise.removeStatusListener(_onRaiseStatus);
+    _swap.removeStatusListener(_onSwapStatus);
     _curvedRaise.dispose();
+    _swap.dispose();
     _raise.dispose();
     _controller.dispose();
     super.dispose();
   }
 
-  /// Drives the one controller off the controller's own notifier. The bar's tap
-  /// handler calls `SummonShellController.toggle(kind)` and nothing else — the
-  /// summon path pushes, pops and replaces no route.
+  /// Drives the two controllers off the controller's own notifier. The bar's
+  /// tap handler calls `SummonShellController.toggle(kind)` and nothing else —
+  /// the summon path pushes, pops and replaces no route.
+  ///
+  /// Exactly three transitions land here, and the dismiss seam fires on two of
+  /// them. **The shell owns the seam, not `SummonShellController`**: the seam
+  /// reports a surface *leaving the screen*, and the screen is what this widget
+  /// knows about. Firing it from the state object as well would report every
+  /// surface twice, which is worse than reporting it zero times — Phase 15
+  /// would release a modifier that a later frame re-holds.
   void _onRaisedChanged() {
     final raise = _controller.raised.value;
+    final showing = _rendered;
+
+    // ── LOWER ────────────────────────────────────────────────────────────
+    // Reverse from the LIVE value: no queue, no input lockout. A reverse from
+    // a half-raised surface settles in roughly half the lower duration because
+    // the controller scales by the remaining distance.
+    //
+    // A mid-swap tap on the DESTINATION icon lands here too, and deliberately:
+    // by then the shell is already committed to the destination kind, so under
+    // D-13-10 the showing surface's own icon lowers it. `_swap` is left running
+    // underneath — cancelling it would snap the rendered height on the tap
+    // frame, and holding the lower until it finished would be the input lockout
+    // this file refuses everywhere else.
     if (raise == null) {
+      if (showing != null) _controller.onSurfaceDismissed?.call(showing);
       unawaited(_raise.reverse());
       return;
     }
+
+    // ── RAISE ────────────────────────────────────────────────────────────
+    // Both endpoints are the raised kind, so the lerp is an identity — but it
+    // is still evaluated in `build`, so the resting surface keeps tracking the
+    // live `available`.
+    if (showing == null) {
+      setState(() {
+        _rendered = raise.surface;
+        _fromKind = raise.surface;
+        _toKind = raise.surface;
+      });
+      _swap.value = 1;
+      unawaited(_raise.forward());
+      return;
+    }
+
+    // A no-op re-raise of the surface already showing. `raise()` already
+    // guards this; the guard is repeated because the shell must never restart
+    // a motion that nothing asked for.
+    if (showing == raise.surface) return;
+
+    // ── SWAP ─────────────────────────────────────────────────────────────
+    // `_raise` is UNTOUCHED and stays at 1. One motion.
+    _controller.onSurfaceDismissed?.call(showing);
     setState(() => _rendered = raise.surface);
-    unawaited(_raise.forward());
+    if (_swap.isAnimating) {
+      // Mid-swap, a tap on the ORIGIN icon is a swap back. There are only two
+      // kinds, so serve it by reversing (or re-forwarding) from the live value
+      // rather than by reassigning the endpoints — which is what keeps the
+      // motion continuous without ever capturing a size mid-flight.
+      unawaited(
+        raise.surface == _fromKind ? _swap.reverse() : _swap.forward(),
+      );
+      return;
+    }
+    setState(() {
+      _fromKind = showing;
+      _toKind = raise.surface;
+    });
+    _armingSwap = true;
+    _swap.value = 0;
+    _armingSwap = false;
+    unawaited(_swap.forward());
   }
 
   void _onRaiseStatus(AnimationStatus status) {
     if (status == AnimationStatus.dismissed && _rendered != null) {
       setState(() => _rendered = null);
+    }
+  }
+
+  /// Collapses the two endpoints onto the kind now showing once a swap settles,
+  /// so there is exactly one resting representation. Both branches are
+  /// identity-preserving: the rendered height before and after the collapse is
+  /// the same number, re-derived from the same live `available`.
+  void _onSwapStatus(AnimationStatus status) {
+    if (_armingSwap || _fromKind == _toKind) return;
+    if (status == AnimationStatus.completed) {
+      setState(() => _fromKind = _toKind);
+    } else if (status == AnimationStatus.dismissed) {
+      setState(() => _toKind = _fromKind);
+      _swap.value = 1;
     }
   }
 
@@ -247,8 +373,6 @@ class _SummonShellState extends ConsumerState<SummonShell>
     );
 
     final rendered = _rendered;
-    final surfaceHeight =
-        rendered == null ? 0.0 : summonSurfaceHeight(rendered, available);
 
     return SummonScope(
       controller: _controller,
@@ -327,25 +451,48 @@ class _SummonShellState extends ConsumerState<SummonShell>
             //    fresh element and its already-mounted `OverlayEntry` is then
             //    re-inserted into a second `Overlay`, which asserts. The keys
             //    below are the belt to that braces.
+            //
+            //    The `Positioned` carries no `height`: the slab sizes itself
+            //    from the swap lerp below, and left+right+bottom already fix
+            //    everything else. Stating a height here as well would be a
+            //    second derivation site, and a second site is how two numbers
+            //    drift apart.
             Positioned(
               key: const ValueKey<String>('summon-surface-layer'),
               left: 0,
               right: 0,
               bottom: barBottomOffset + kSummonBarHeight,
-              height: surfaceHeight,
               child: rendered == null
                   ? const SizedBox.shrink()
                   : AnimatedBuilder(
-                      animation: _curvedRaise,
-                      builder: (context, child) => Transform.translate(
-                        offset:
-                            Offset(0, (1 - _curvedRaise.value) * surfaceHeight),
-                        child: child,
-                      ),
-                      child: SummonSurface(
-                        kind: rendered,
-                        height: surfaceHeight,
-                      ),
+                      // OUTER = the swap, so it runs only while the height is
+                      // actually changing. Through a plain raise the swap sits
+                      // at rest, this builder does not run, and the slab is
+                      // built exactly once per raise — the cached-child rule
+                      // 13-02 established, preserved.
+                      animation: _swap,
+                      builder: (context, _) {
+                        // BOTH endpoints re-derived from the live `available`
+                        // on EVERY build, from KINDS rather than from stored
+                        // numbers. This is what makes an IME metric change
+                        // retarget the surface at rest and mid-swap alike; a
+                        // cached dp figure here is 13-RESEARCH F4 going red.
+                        final fromHeight =
+                            summonSurfaceHeight(_fromKind, available);
+                        final toHeight =
+                            summonSurfaceHeight(_toKind, available);
+                        final slab = fromHeight +
+                            (toHeight - fromHeight) *
+                                Curves.easeOut.transform(_swap.value);
+                        return AnimatedBuilder(
+                          animation: _curvedRaise,
+                          builder: (context, child) => Transform.translate(
+                            offset: Offset(0, (1 - _curvedRaise.value) * slab),
+                            child: child,
+                          ),
+                          child: SummonSurface(kind: rendered, height: slab),
+                        );
+                      },
                     ),
             ),
             // 5. The bar — LAST, so it paints over the sliding surface and

@@ -108,12 +108,19 @@ class SummonShellController {
   /// Invoked with the *outgoing* surface from **both** paths that take a
   /// surface off screen:
   ///
-  ///  * [lower] — the surface goes away entirely.
-  ///  * [raise] with a *different* kind already up — the swap. The outgoing
-  ///    surface is dismissed before the incoming one takes over. There is no
-  ///    lower-then-raise anywhere in the code path; the swap is one motion.
+  ///  * the lower — the surface goes away entirely.
+  ///  * the swap — a *different* kind is raised while one is showing. The
+  ///    outgoing surface is dismissed as the incoming one takes over. There is
+  ///    no lower-then-raise anywhere in the code path; the swap is one motion.
   ///
-  /// One seam, not two call sites, precisely so a later phase cannot wire its
+  /// **`SummonShell` owns both call expressions, not this class** (plan 13-03).
+  /// The seam reports a surface *leaving the screen*, and the screen is what
+  /// the shell knows about: it holds the animation state, so it is the only
+  /// place that can report the outgoing kind exactly once per departure. Firing
+  /// it from here as well would report every surface twice, which is worse than
+  /// reporting it zero times.
+  ///
+  /// One seam, not two seams, precisely so a later phase cannot wire its
   /// dismiss handling to only one of them. Its two future consumers are
   /// Phase 14's `TrackpadCoreState.dismissed()` (release held mouse buttons)
   /// and Phase 15's `KeyboardInputController.dismissed()` (release held
@@ -151,27 +158,27 @@ class SummonShellController {
 
   /// Raises [kind], recording the topmost live guard as its owner.
   ///
-  /// If a *different* surface is already up this is a swap: [onSurfaceDismissed]
-  /// fires for the outgoing surface first. If the *same* surface is already up
-  /// this is a no-op re-raise — ownership is deliberately **not** re-pointed at
-  /// the current top of the stack, because re-raising is not a new gesture.
+  /// If a *different* surface is already up this is a swap; the shell fires the
+  /// dismiss seam for the outgoing surface off this notification. If the *same*
+  /// surface is already up this is a no-op re-raise — ownership is deliberately
+  /// **not** re-pointed at the current top of the stack, because re-raising is
+  /// not a new gesture.
   void raise(SummonSurfaceKind kind) {
     final current = raised.value;
     if (current != null && current.surface == kind) return;
-    if (current != null) onSurfaceDismissed?.call(current.surface);
     raised.value = SummonRaise(
       surface: kind,
       ownerGuardId: _guardStack.isEmpty ? null : _guardStack.last,
     );
   }
 
-  /// Lowers whatever is raised, firing [onSurfaceDismissed] for it. A no-op
-  /// when nothing is up.
+  /// Lowers whatever is raised. A no-op when nothing is up. The shell fires the
+  /// dismiss seam off this notification — see the seam's own doc for why the
+  /// call does not live here.
   void lower() {
     final current = raised.value;
     if (current == null) return;
     raised.value = null;
-    onSurfaceDismissed?.call(current.surface);
   }
 
   /// Raises [kind] if it is not up, lowers if it is (SUM-01's toggle).
