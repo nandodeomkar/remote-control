@@ -5,16 +5,16 @@ milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
 status: executing
-stopped_at: Completed 13-01-PLAN.md — D5 spike green, host shape settled
-last_updated: "2026-08-14T11:13:04.058Z"
+stopped_at: Completed 13-02-PLAN.md — bar + empty surface visible, inset arithmetic pinned
+last_updated: "2026-08-14T13:20:00.000Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 13 planned (10 plans, 5 waves; research + UI-SPEC + patterns consumed)
+last_activity_desc: Phase 13 plan 02 executed (bar, surface, handle, geometry; full suite 936 green)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 10
-  completed_plans: 1
-  percent: 10
+  completed_plans: 2
+  percent: 20
 ---
 
 > ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
@@ -43,10 +43,12 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 
 ## Current Position
 
-Phase: 13 of 18 — Summon Shell & Bar (executing)
-Plan: 1/10 complete — Wave 1 done (13-01, the D5 tracer); 13-02 next
-Status: Executing — host shape settled, D5 spike green on first run
-Last activity: 2026-08-14 — 13-01 complete: SummonShell + SummonBackGuard land, S1/S2/S2b/S2c/S2d/S3 pass, full suite 888 green
+Phase: 13 (Summon Shell & Bar) — EXECUTING
+Plan: 2 of 10 complete — next is 13-03
+Status: Executing Phase 13
+Last activity: 2026-08-14 — 13-02 done: the bar renders on every screen, an empty
+correctly-sized surface raises and lowers in place, and the one shared inset derivation
+is pinned across five worked devices
 
 > **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
 > reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
@@ -165,6 +167,7 @@ Last activity: 2026-08-14 — 13-01 complete: SummonShell + SummonBackGuard land
 | Phase 12 P14 | 35min | 3 tasks | 5 files |
 | Phase 12 P18 | 7h 15m | 4 tasks | 4 files |
 | Phase 13 P01 | 50m | 3 tasks | 6 files |
+| Phase 13 P02 | 70m | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -407,6 +410,11 @@ Recent decisions affecting current work:
 - [Phase ?]: 12-14: pcDidNotReturn (D-25) reads the EXISTING reconnect FSM attempt counter (>=5) instead of starting a timer, honouring D-17's ban on a second reconnect path
 - [Phase ?]: D5 spike passed first run against the real SummonShell + SummonBackGuard — app-scope host shape settled, D-13-04 failure branch not taken
 - [Phase ?]: BAR-05 +56 injection is transparent: full suite 882 -> 888, delta is exactly the 6 new spike tests, zero pre-existing status changes
+- [Phase 13]: 13-02: the summon bar rides its OWN full-screen Overlay inside the shell's Stack — Tooltip calls debugCheckHasOverlay at BUILD time, and shell chrome is a sibling of the Navigator, so the Navigator's overlay is out of reach; without it the shell throws on its first frame
+- [Phase 13]: 13-02: a Border on a bare DecoratedBox is painted, not laid out — the raised surface needs an explicit Padding(top: kSummonHairline) or the inherited content box is height-48 instead of the height-1-48 Phases 14/15 were handed
+- [Phase 13]: 13-02: the shell's Stack children list must stay CONSTANT length (the surface slot collapses to zero height rather than dropping out) — a Stack matches children by position, and a shifting index re-parents the bar's OverlayEntry into a second Overlay, which asserts
+- [Phase 13]: 13-02: the keyboard surface's clamp binds on TWO of the five worked devices (short-with-IME and mid-fall), not one — the 432dp choice runs out of room sooner than the 280dp trackpad; the plan's "device D and only there" was true of the trackpad only
+- [Phase 13]: 13-02: full suite 888 -> 936 with the bar RENDERED (not merely reserved); delta is exactly the 48 new declarations, zero pre-existing status changes
 
 ### Pending Todos
 
@@ -516,8 +524,8 @@ plus the audit's own tech-debt list.
 
 ## Session Continuity
 
-Last session: 2026-08-14T11:13:04.030Z
-Stopped at: Completed 13-01-PLAN.md
+Last session: 2026-08-14T13:20:00.000Z
+Stopped at: Completed 13-02-PLAN.md
 Resume file: None
 
 Previous session: 2026-08-12T16:20:00.000Z — quick 260812-tsw closed the last pending

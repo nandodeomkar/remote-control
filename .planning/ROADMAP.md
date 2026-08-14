@@ -94,7 +94,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 13-02-PLAN.md — The one shared derivation, the two-icon bar, the empty surface and its inert handle, mounted and raising end to end
+- [x] 13-02-PLAN.md — The one shared derivation, the two-icon bar, the empty surface and its inert handle, mounted and raising end to end
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -415,7 +415,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 13. Summon Shell & Bar | 1/10 | In Progress | - |
+| 13. Summon Shell & Bar | 2/10 | In Progress | - |
 | 14. Raised Trackpad | 0/TBD | Not started | - |
 | 15. Raised Keyboard | 0/TBD | Not started | - |
 | 16. Bubble Retirement | 0/TBD | Not started | - |
