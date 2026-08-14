@@ -1,10 +1,11 @@
 ---
 phase: 13
 slug: summon-shell-bar
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-08-14
+reviewed_at: 2026-08-14
 ---
 
 # Phase 13 — UI Design Contract
@@ -120,6 +121,8 @@ Three places where a locked decision and a locked success criterion cannot both 
 **Resolution.** Resting-and-connected is **`kText`**; disconnected is **`kMuted`**; raised is **`kAccent`**.
 
 **Why this serves both decisions.** D-13-11's stated purpose is *"what makes the tap-to-dismiss toggle legible rather than a guess"* — `kAccent` (#4C8DFF) against `kText` (#E6E8EB) is a full hue separation plus a large luminance step, so the toggle is at least as legible as accent-against-muted, and arguably more so. D-13-13's operative content — *stay tappable when disconnected*, and *never subscribe to `ConnectionService.changes`* — is honoured verbatim. The literal word `kMuted` in D-13-11 is read as **"never accent"**, which is what the sentence is for.
+
+**Owner-confirmed at UI-phase resolution (2026-08-14).** This is a locked-decision *reinterpretation*, not a gap CONTEXT left open, and the checker flagged it as owner-visible drift. The owner accepted `kText` resting. **Carry it onto the Phase 13 UAT eyeball list as a one-line yes/no** — *"resting connected glyphs read as `kText`, not muted — correct?"* — because it is a one-const change if it looks wrong on hardware.
 
 ### CR-2 — BAR-03's disabled state is a **glyph swap**, not a tint change
 
@@ -299,6 +302,7 @@ At the starting constants, on the reference device (`available = 763`, IME down)
 4. **The swap never detaches from the bar.** During a swap, `surfaceRect.bottom == barRect.top` on **every** frame — that assertion is what proves it is one motion rather than a lower-then-raise (13-RESEARCH §7.6 swap test).
 5. **The swap is a dismiss for the outgoing surface.** Phase 13 has no surfaces, so what it owes is a **single named seam** — one `void _onSurfaceDismissed(SummonSurface outgoing)` called from **both** the lower path and the swap path, with a doc comment saying exactly that. If Phase 13 ships two separate call sites, Phase 15 will wire `dismissed()` to one of them and every swap will leave a modifier physically held on the PC (D-13-10).
 6. **No new animation primitives.** No shimmer, no skeleton, no scrim fade, no bounce, no spring, no scale, no rotation, no cross-fade between the two surfaces' content.
+7. **Do not add a `MediaQuery.disableAnimations` branch.** A 200/150ms translate with no parallax, scale, blur or opacity already satisfies every reduced-motion guideline, and a conditional path would double the timing surface MOT-01 has to pin (§ UI Considerations → open axes).
 
 ---
 
@@ -311,7 +315,7 @@ At the starting constants, on the reference device (`available = 763`, IME down)
 | Trackpad bar icon — keyboard raised | **swap** to trackpad (200ms, one motion) | tooltip | **nothing** | — |
 | Keyboard bar icon | mirror of the three rows above | tooltip | **nothing** | — |
 | Keyboard bar icon — **disabled** (BAR-03) | **nothing**, no ripple | tooltip (states why) | **nothing** | — |
-| Bar background (the dead width) | **nothing** — inert, and it does not swallow a tap for a widget beneath it either, because the bar is opaque chrome at the screen edge | — | **nothing** | — |
+| Bar background (the dead width) | **nothing** — the dead width **absorbs** taps across the full 56dp band, as bottom chrome should. No host widget is reachable under it because BAR-05 reserves the 56dp via the `MediaQuery` bottom-padding injection, so nothing is placed there to be swallowed | — | **nothing** | — |
 | Raised surface **body** | **nothing** in Phase 13 (it is empty) | — | **nothing** | — |
 | Drag handle | **nothing** in Phase 13 (inert — D-13-07) | — | **nothing** | — |
 | Owning route, surface raised | — | — | — | **lower the surface** (SUM-04) |
@@ -332,24 +336,84 @@ At the starting constants, on the reference device (`available = 763`, IME down)
 
 ## UI Considerations
 
-Applicable state considerations resolved: **9 covered, 2 backstop, 0 unresolved.**
+Shape-rooted state coverage, computed by the `ui-consideration-probe` engine over five described
+surfaces and resolved with the owner at UI-phase time.
 
-| Category | Element(s) | Status | Resolution / Reason |
-|----------|------------|--------|---------------------|
-| loading | `SummonBar` (nav) | ✅ covered | **There is no loading state.** The bar is chrome mounted with `MaterialApp.builder`; it is present in the first frame of the app and never awaits anything. No spinner, no skeleton, no deferred mount |
-| loading | `SummonIconButton` (interactive-control) | ✅ covered | **No in-flight state.** A tap starts a local `AnimationController` synchronously — there is no request, so there is nothing to be pending. The icon never shows a spinner and is never disabled *by* a tap |
-| error | `SummonBar` (nav) | ✅ covered | **No error state exists in this phase.** Nothing the bar does can fail: no IO, no wire traffic, no persistence. `kError` is used nowhere — see § No Destructive, Error, or Empty Copy |
-| error | `SummonIconButton` (interactive-control) | ✅ covered | Same. A disconnected PC is **not** an error — it is state 3 (`kMuted`, still tappable), muted-never-red per the `_HubTile` house rule |
-| error | `SummonSurface` (static-content) | ✅ covered | The surface cannot fail to raise. If `available` is pathologically small the clamp yields a short surface, not a failure — see the `overflow` row |
-| empty | `SummonSurface` (static-content) | ✅ covered | **The surface is empty on purpose and renders no empty-state copy** (D-13-08). `kSurface` fill + 1px hairline + the 48dp handle, nothing else. A placeholder label is explicitly forbidden — see § No Destructive, Error, or Empty Copy |
-| overflow | `SummonBar` (nav) | ✅ covered | The icon pair is a fixed **144dp** (56 + 32 + 56), centred. It cannot overflow: the narrowest plausible Android viewport is 320dp, leaving 88dp dead per side. No wrap, no scroll, no `FittedBox`. Pinned by the five-viewport suite |
-| overflow | `SummonSurface` (static-content) | ✅ covered | `summonSurfaceHeight` is `min(available, …)` — the surface can never exceed the space that exists, and can never overlap the bar or reach under the status bar. Pinned by invariants I1–I4 across five driven viewports, with expected values **computed from the driven metrics, never quoted** (`floorFor()` idiom, `trackpad_screen_test.dart:143-145, 166-176`) |
-| overflow | Host screen content with the bar present (static-content) | 🧪 backstop | BAR-05: the `MediaQuery` bottom-padding injection reserves 56dp for all 14 screens with zero per-screen edits, because every screen already `SafeArea`-wraps. Verified structurally against `Scaffold` (`material/scaffold.dart:3032-3033`) — but "nothing is clipped or stranded" on **all fourteen** screens is a rendering claim no single assertion covers. **Backstop:** run the full `flutter test` suite immediately before and immediately after the +56 injection lands, as a discrete task; anything red is BAR-05 signal, not noise (D-13-19 / OQ-5). Plus the SC1 named cases at 640dp: the browser tab list, the bookmarks section, the scrolling hub grid |
-| long-text | `SummonBar` / `SummonIconButton` (nav, interactive-control) | ✅ covered | **The bar renders no text at all**, so there is nothing to truncate, wrap or ellipsize. The names ship as tooltips/semantics, which Flutter lays out in its own overlay and which cannot affect bar geometry. The longest string in the phase is `Keyboard — finish typing on the phone first` (43 chars) and it never occupies bar space |
-| populated / partial / zero-one-many | — | dismissed | **Not applicable.** No element in this phase is a `list-collection`, a `form`, or `media`. The bar is a fixed two-item nav whose item count is locked ("exactly two icons", third icon deferred to v2+); the surface holds no data in this phase |
-| *(open axis)* offline behaviour | `SummonIconButton` | ✅ covered | State 3 in § The bar icon button: `kMuted`, **still tappable**, no auto-dismiss on disconnect, driven by the value-equal `connectionStatusProvider` only |
-| *(open axis)* accessibility | `SummonIconButton`, `SummonHandle` | 🧪 backstop | Every control ≥48dp; every control carries a tooltip/semantics label; the disabled state is carried by a **glyph**, not a colour (CR-2), so it survives colour-blindness and a screen reader. **Backstop:** SUM-05's "an accessibility service can drive the handle" is Phase **14**'s falsifiable claim — Phase 13 only reserves a real 48×48 target for it. Assert here that the target is 48×48 and that the disabled icon still reports `findsOneWidget` with an unchanged bar `Rect` |
-| *(open axis)* reduced motion | `SummonSurface` | ✅ covered | No `MediaQuery.disableAnimations` branch is added. 200/150ms translate with no parallax, scale, blur or opacity is already inside every reduced-motion guideline, and a conditional path would double the timing surface MOT-01 has to pin. Recorded as a decision |
+**Coverage: 31 applicable · 31 resolved (27 explicit / 4 backstop) · 0 unresolved · 0 unclassified.**
+
+Element kinds were **widened past the prose classifier at the owner's direction**: the heuristic tagged
+`SummonSurface` and `SummonHandle` as `static-content` only, which would have raised nothing but
+`overflow` and `long-text` — and so would never have asked the *"what shows when there is no content"*
+question about the surface whose emptiness is this phase's entire deliverable. `SummonSurface` was
+re-run as a content container and `SummonHandle` as an interactive-control, raising six further
+considerations (E3 `empty`/`loading`/`error`/`populated`, E4 `loading`/`error`).
+
+Empty-state and error-state **copy** stays in § Copywriting Contract → *No Destructive, Error, or Empty
+Copy*; the rows below cover STATE and reference that section rather than restating it.
+
+### E1 — `SummonBar` (nav, media)
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| empty | ✅ resolved (explicit) | No data-driven content exists. The item count is a **compile-time constant** — exactly two icon slots, never zero, never dynamic (third icon deferred to v2+). The 88–133.5dp dead width either side is deliberately and permanently empty (D-13-12) and carries no placeholder and no `Spacer()` a future icon could drop into |
+| loading | ✅ resolved (explicit) | No loading state. The bar mounts via `MaterialApp.builder` and is present in the **first frame** of the app; it awaits nothing and reads no async source. No spinner, no skeleton, no deferred mount |
+| error | ✅ resolved (explicit) | No error state. The bar performs no IO, no wire traffic, no persistence, no permission request — nothing it does can fail. `kError` appears nowhere in this phase |
+| populated | ✅ resolved (explicit) | The happy path is the only path: 56dp band, `kBg` fill, 1px `kHairline` top rule, two 56×56 slots with a 32dp gap, 144dp centred. SC1 requires it **geometrically identical** on the hub and all nine tool screens — pinned by a `barRect` equality assertion across screens, not by eye |
+| overflow | ✅ resolved (explicit) | Cannot overflow. A fixed 144dp pair against a 320dp narrowest plausible Android viewport leaves 88dp dead per side (133.5dp on the 411dp reference device). No wrap, no scroll, no `FittedBox`. Pinned by the five-viewport driven-metrics suite |
+| long-text | ✅ resolved (explicit) | The bar renders **no text at all** (icon-only, D-13-12; no label under the icons). Names ship as tooltips/semantics, which Flutter lays out in its own overlay and which cannot affect bar geometry. The phase's longest string (43 chars) never occupies bar space |
+
+### E2 — `SummonIconButton` (interactive-control, media, static-content, form)
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| empty | ✅ resolved (explicit) | No empty state. Both base glyphs are compile-time consts **already shipping in the tree** (`hub_screen.dart:89, :97`) — never absent, never a network-loaded asset, never a `Symbols.get()` lookup that could miss |
+| loading | ✅ resolved (explicit) | No in-flight state. A tap starts a local `AnimationController` **synchronously**; there is no request, so nothing can be pending. The icon never shows a spinner and is never disabled *by* its own tap |
+| error | ✅ resolved (explicit) | No failure mode. A disconnected PC is **state 3** (`kMuted`, still tappable, still raises) — state, not error. Muted-never-red, per the `_HubTile` offline house rule (`hub_screen.dart:211-256`) |
+| populated | ✅ resolved (explicit) | Resting-connected (state 4) is the normal state: base glyph at 24px in `kText`, centred in a 56×56 slot, tooltip attached, `Semantics(selected:)` false. **Owner-confirmed at UI-phase resolution (CR-1):** resting-connected is `kText`, not `kMuted` |
+| partial | ✅ resolved (explicit) | The four-state function is **total and strictly prioritised** — raised > BAR-03 disabled > disconnected > resting — so no input combination lands outside it. The order is defensive by design: state 1 beats state 2 so an unexpected focus can never disable the affordance that dismisses the thing holding focus |
+| overflow | ✅ resolved (explicit) | Fixed 56×56 slot, 24px glyph, centred; the box is identical in all four states. Pin with a `Rect`-equality assertion across **all four states including the CR-2 glyph swap** to `keyboard_off_rounded` — geometry must not move when the glyph changes |
+| long-text | ✅ resolved (explicit) | Renders no visible text. `kSummonKeyboardBlockedLabel` (43 chars) is the phase's only sentence and lives in a tooltip overlay. **BINDING:** the `Tooltip` must wrap the `InkWell` as an **ancestor**, never ride as `IconButton.tooltip` on a button with `onPressed: null` — a disabled button does not surface its own tooltip, which would make the string unreachable by both long-press and TalkBack and would undo CR-2's accessibility rationale |
+
+### E3 — `SummonSurface` (static-content, content container — widened)
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| empty | ✅ resolved (explicit) | **THE DELIVERABLE.** The surface is empty on purpose and renders no empty-state heading, body, illustration, hint, or debug height readout (D-13-08). Its entire visible content is the `kSurface` fill, the 1px `kHairline` top rule, and the 48dp handle band. A placeholder is exactly the throwaway artefact that *"can confuse a failure"* during the geometry UAT this phase exists to run. **Assert the surface's only descendants are the handle band and an empty `Expanded`** |
+| loading | ✅ resolved (explicit) | No loading state. The height is computed **synchronously** from driven metrics; the surface awaits nothing. No skeleton, no progressive reveal — the 200ms translate is *motion*, not a loading affordance, and must never be dressed as one |
+| error | ✅ resolved (explicit) | The surface cannot fail to raise. A pathologically small `available` yields a short **clamped** surface, not a failure. No error copy, no `kError`, no fallback surface |
+| populated | ✅ resolved (explicit) | **Empty *is* the populated state in Phase 13.** Phases 14/15 fill the `Expanded` through the inherited content box `surfaceContentHeight(s) = height − 1 − 48`. At the starting constants: trackpad 280 → **231** of pad (vs the retiring `FloatingTrackpadWindow`'s 234 — see **CR-3**), keyboard 432 → 383 → **263** of pad viewport against a ~248dp crushed Numpad (~15dp of headroom) |
+| overflow | ✅ resolved (explicit) | `summonSurfaceHeight` is `min(available, …)` from the **one shared derivation** (D-13-06) — the surface can never exceed the space that exists, never overlap the bar, never reach under the status bar. `surfaceRect.bottom == barRect.top` on **every frame** of a raise, a lower and a swap (invariant **I1**). Pinned by I1–I4 across five driven viewports with expected values **computed from the driven metrics, never quoted** (`floorFor()` idiom, `trackpad_screen_test.dart:143-145, 166-176`) |
+| long-text | ✅ resolved (explicit) | Renders no text in this phase — D-13-08 forbids a label, hint or readout inside the overlay. Nothing to truncate, wrap or ellipsize |
+
+### E4 — `SummonHandle` (static-content, interactive-control — widened)
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| loading | ✅ resolved (explicit) | No loading state. The handle is a const glyph rendered in the first frame of the surface. It is **inert** in Phase 13 by decision (D-13-07) — and *inert is not pending*: no spinner, no extra dimming, no "coming soon" treatment |
+| error | ✅ resolved (explicit) | No failure mode: in Phase 13 the handle has **no gesture recognizer at all**. Do **not** add a no-op `GestureDetector` "for later" — an affordance that swallows a tap and does nothing is worse than one that visibly does nothing. Phase 14 attaches its `Listener` to the tap target as a **sibling** of the surface content, never as an ancestor (`floating_trackpad_window.dart:245-257` rule) |
+| overflow | ✅ resolved (explicit) | Fixed 48dp band, full width, centred 48×48 tap target, 24px glyph. Cannot overflow at any viewport width. The target is a **real 48×48 box**, not an icon-sized hit region, so an accessibility service has something to drive in Phase 14 (SUM-05) |
+| long-text | ✅ resolved (explicit) | No visible text. `kSummonHandleLabel = 'Dismiss'` ships as `Semantics(label:)` on the inert target and never occupies layout |
+
+### E5 — Host screen content beneath the bar (list-collection, nav)
+
+| Category | Status | Resolution |
+|----------|--------|------------|
+| empty | ✅ resolved (explicit) | A host screen with an empty state (no bookmarks, no saved tabs) gains the same 56dp of reserved bottom padding as any other; its existing empty-state copy stays centred in the remaining box. **No screen's empty state is edited by this phase** — BAR-05 reserves the space through one `MediaQuery` injection, with zero per-screen edits |
+| loading | ✅ resolved (explicit) | Host screens' own loading states are untouched. The injection is a **static** `MediaQuery` value applied above them, not a rebuild trigger — and the bar itself subscribes to nothing (value-equal `connectionStatusProvider` only; never `ConnectionService.changes`, never `Timer.periodic`) |
+| error | ✅ resolved (explicit) | Host screens' own error and reconnecting treatments are untouched. The bar adds **no third connection channel** — `ConnectionHeaderChip` and `ReconnectingBannerSlot` already own that fact on every connected-capable screen |
+| populated | 🧪 resolved (backstop) | Every normal populated screen gains 56dp of bottom inset; content shifts up and nothing reflows horizontally. Part of the SC1 *"nothing clipped or stranded on all fourteen screens"* claim — covered by the full-suite backstop below rather than by fourteen hand-written assertions |
+| partial | 🧪 resolved (backstop) | Screens rendering partial data (a tab list mid-load, a bookmark folder with some entries) inherit the same vertical-only inset. Part of the same SC1 claim; covered by the full-suite backstop |
+| overflow | 🧪 resolved (backstop) | **The BAR-05 claim — owner-directed backstop.** *"Nothing is clipped or stranded"* across all fourteen screens is a rendering claim no single assertion covers. **Backstop:** run the full 882-test suite immediately before and immediately after the +56 injection lands, **as a discrete task** — anything red is BAR-05 signal, not noise (D-13-19 / OQ-5). Plus the three SC1 named cases driven at 640dp height: the browser tab list, the bookmarks section, and the already-scrolling hub grid |
+| zero-one-many | 🧪 resolved (backstop) | Lists must still scroll to their **true last item** with the bar present — the failure mode is a final row stranded under 56dp of new chrome, which reads as *"the list ends one item early"*. Named cases: the browser tab list and the hub grid. Covered by the same full-suite backstop plus the 640dp named-case checks |
+| long-text | ✅ resolved (explicit) | Long labels in host lists are unaffected: the injection is **vertical only** and changes no horizontal constraint, so existing truncation and wrapping behaviour is byte-identical before and after |
+
+### Open-axis considerations (prose-owned, outside the compiled taxonomy)
+
+| Axis | Element(s) | Status | Resolution |
+|------|------------|--------|------------|
+| offline behaviour | `SummonIconButton` | ✅ resolved (explicit) | State 3 in § The bar icon button: `kMuted`, **still tappable**, no auto-dismiss on disconnect, driven by the value-equal `connectionStatusProvider` only |
+| accessibility | `SummonIconButton`, `SummonHandle` | 🧪 backstop | Every control ≥48dp; every control carries a tooltip/semantics label; the disabled state is carried by a **glyph**, not a colour (CR-2), so it survives colour-blindness and a screen reader. **Backstop:** SUM-05's *"an accessibility service can drive the handle"* is Phase **14**'s falsifiable claim — Phase 13 only reserves a real 48×48 target for it. Assert here that the target is 48×48 and that the disabled icon still reports `findsOneWidget` with an unchanged bar `Rect` |
+| reduced motion | `SummonSurface` | ✅ resolved (explicit) | No `MediaQuery.disableAnimations` branch is added. A 200/150ms translate with no parallax, scale, blur or opacity is already inside every reduced-motion guideline, and a conditional path would double the timing surface MOT-01 has to pin. Recorded as a decision |
 
 ---
 
@@ -379,6 +443,7 @@ House rule: **no inline copy literals** — every string below ships as a named 
 - **The two nouns are byte-identical to the hub tile labels** `Trackpad` and `Keyboard` (`hub_screen.dart:88, :96`). Same word, same glyph, same destination — a second vocabulary for the same two things is the single most confusing outcome available to this phase, and Phase 17 is about to make these two icons and those two tiles talk about each other.
 - **The nouns never become verbs and never change with state.** Not `Show trackpad` / `Hide trackpad`. Raised-ness is announced structurally via `Semantics(selected: true)` on the raised icon, not by rewriting the label — because Phase 17 adds a *second* selected-ish concept ("you are here" for the screen you are on) to these same two icons, and a string vocabulary would have to multiply to cover the cross product. One noun, two orthogonal semantic flags.
 - **`kSummonKeyboardBlockedLabel` names the problem and the next step** and is the one place this phase spends words, because a `kMuted` slashed glyph is legible but not self-explaining, and a non-visual user gets nothing from either. Precedent: `kSettingsWithUpdateTooltip = 'Settings — update available'` (12-UI-SPEC).
+- **BINDING — the state-2 tooltip must actually reach the user.** Attach the `Tooltip` as an **ancestor of the `InkWell`**, never as `IconButton.tooltip` on a button with `onPressed: null`: a disabled button does not surface its own tooltip, so the one string this phase spends words on would be unreachable by both long-press and TalkBack — which would undo CR-2's entire accessibility rationale. Assert the label is discoverable in state 2, not merely that the const exists.
 - **No jargon, no blame, no mechanism.** Not `focus`, not `IME`, not `PIN`, not `disabled`, not `you must`. `finish typing on the phone first` says what is true and what to do.
 - The separator is an em dash with spaces (` — `), the house form.
 - **No toasts, no snackbars, no banners** are introduced by this phase. The only banner in the shell is the **rehomed** `UipiBanner` slot, whose copy is unchanged and whose only production mount moves into it in Phase 16 (SAFE-03).
@@ -430,11 +495,22 @@ Recorded as a decision, not an omission, because the checker's Copywriting dimen
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+Verified by `gsd-ui-checker` on 2026-08-14. All seven palette consts, all four glyphs (with line
+numbers) and both hub tile labels were re-checked against the live codebase — no invented tokens.
 
-**Approval:** pending
+- [x] Dimension 1 Copywriting: **PASS**
+- [x] Dimension 2 Visuals: **PASS** (was FLAG — the § Interaction / Gesture Map "bar background" row's hit-test rationale was wrong and has been corrected; the behaviour it described was always right)
+- [x] Dimension 3 Color: **PASS** (was FLAG — CR-1 is owner-confirmed drift; see the CR-1 note and the UAT line it mandates)
+- [x] Dimension 4 Typography: **PASS**
+- [x] Dimension 5 Spacing: **PASS**
+- [x] Dimension 6 Registry Safety: **PASS**
+
+**UI-consideration probe:** 31 applicable · 31 resolved (27 explicit / 4 backstop) · 0 unresolved · 0 unclassified.
+
+**Approval:** APPROVED — ready for `/gsd-plan-phase 13`.
+
+**Three things the planner must carry forward from this review:**
+
+1. **CR-1** — resting-connected is `kText`. One line on the UAT eyeball list; a one-const change if wrong on hardware.
+2. **CR-3** — at the locked 280dp starting constant, the raised trackpad gives **231dp** of pad against the retiring bubble window's **234dp**. Record the *tuned* value in the Phase 13 UAT record so Phase 14's RET-03 inherits a fact, not an assumption.
+3. **The state-2 tooltip must be an ancestor `Tooltip`**, not `IconButton.tooltip` on a disabled button, or CR-2's accessibility rationale silently fails.
