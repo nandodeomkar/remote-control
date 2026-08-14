@@ -85,7 +85,20 @@ Phase directories: [`milestones/v1.0-phases/`](./milestones/v1.0-phases/)
   5. On the owner's device, summon and dismiss feel quick at the frequency a permanent bar invites (this is what closes OQ-A1 sub-question 1; 200/150 is a one-constant change each if it does not)
 
 **Research**: recommended — run `--research-phase`. Highest concentration of unverified premises in the milestone
-**Plans**: TBD
+**Plans**: 10 plans
+
+Plans:
+- [ ] 13-01-PLAN.md — TRACER: pre-flight baseline + test-migration checklist, the app-scope shell, the per-route back guard, the D5 spike, and the BAR-05 reservation audit
+- [ ] 13-02-PLAN.md — The one shared derivation, the two-icon bar, the empty surface and its inert handle, mounted and raising end to end
+- [ ] 13-03-PLAN.md — Motion: 200/150 pinned by falsifiable timing, swap-in-place as one motion, and the single dismiss seam
+- [ ] 13-04-PLAN.md — Geometry pinned on five driven viewports with four invariants and the F1/F2/F3/F4/F5 discriminators
+- [ ] 13-05-PLAN.md — The back vocabulary: the ownership scenario, the orphan case, and the predictive-back baseline
+- [ ] 13-06-PLAN.md — Browser one-thing-per-gesture: the predicate-conditional bookmarks back handler
+- [ ] 13-07-PLAN.md — Push-site coverage: one guarded seam, seven call sites, and a source-scanning guard
+- [ ] 13-08-PLAN.md — The overlay contracts (outside taps land, nothing reflows) and the three named 640dp reach cases
+- [ ] 13-09-PLAN.md — Bar state: the corrected keyboard focus gate and depth-counted QR suppression
+- [ ] 13-10-PLAN.md — Hardware UAT: felt latency, the two heights, the resting tint and the back baseline, recorded
+
 **UI hint**: yes
 
 **Notes the plan must carry:**
@@ -360,7 +373,7 @@ Phase directories: [`milestones/v1.0-phases/`](./milestones/v1.0-phases/)
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 13. Summon Shell & Bar | 0/TBD | Not started | - |
+| 13. Summon Shell & Bar | 0/10 | Planned | - |
 | 14. Raised Trackpad | 0/TBD | Not started | - |
 | 15. Raised Keyboard | 0/TBD | Not started | - |
 | 16. Bubble Retirement | 0/TBD | Not started | - |
