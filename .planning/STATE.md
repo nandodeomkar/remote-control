@@ -5,16 +5,16 @@ milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
 status: executing
-stopped_at: Completed 13-04-PLAN.md
-last_updated: "2026-08-14T21:30:00.000Z"
+stopped_at: Completed 13-09-PLAN.md
+last_updated: "2026-08-14T23:55:00.000Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 13 plan 04 executed (five driven viewports through the real shell, the four geometry invariants for both surfaces on each, and all five named failure modes F1/F1b/F2/F3/F4/F5 hand-falsified red; the F5 probe corrected against Flutter's actual removePadding semantics; full suite 975 green)
+last_activity_desc: Phase 13 plan 09 executed (BAR-03's corrected focus predicate and BAR-04's depth-counted QR suppressor; both mutations per suite hand-falsified red; one framework deviation — both suppressor lifecycle edges must apply at end-of-frame; full suite 991 green)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 10
-  completed_plans: 8
-  percent: 80
+  completed_plans: 9
+  percent: 90
 ---
 
 > ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
@@ -44,18 +44,24 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 ## Current Position
 
 Phase: 13 (Summon Shell & Bar) — EXECUTING
-Plan: 8 of 10 complete (13-01 … 13-08) — 13-09 and 13-10 outstanding
+Plan: 9 of 10 complete (13-01 … 13-09) — 13-10 outstanding
 Status: Executing Phase 13
-Last activity: 2026-08-14 — 13-04 done: the inset arithmetic is now pinned on five REAL
-viewports through the real shell, not just as arithmetic. The four invariants (I1 the
-surface rests on the bar, I2 the bar clears max(nav, IME), I3 never under the status bar,
-I4 the one derivation) hold for both surface kinds on all five devices, and every one of
-the five named failure modes was hand-falsified red before being trusted: F1/F1b by an
-IME height, F2 and F3 by a bar height, F4 by the stale snapshot (270 → 410 never
-arriving), F5 by the full nav inset. One correction landed: `MediaQuery.removePadding`
-SUBTRACTS the padding it consumed from `viewPadding` rather than leaving it, so
-13-RESEARCH's quoted F5 assertion was red against correct code — the probe was rewritten
-to assert the guarantee, and `lib/` was NOT touched (`git diff -- lib/` is empty)
+Last activity: 2026-08-14 — 13-09 done: the phase's one genuine security control is in.
+The keyboard icon is now disabled for exactly as long as a local text field holds focus,
+by a predicate that is a property of the FOCUSED NODE and names no screen — so the
+pairing sheet, both device-list fields and any future screen that grows a field are all
+covered with nothing to remember. The milestone's original predicate (gate on the focused
+node being absent) is falsified in the suite: focus reverts to the root scope, so that
+version would have shipped a permanently dead button. Phase 15's escape ships today —
+reference identity against the shell's own hidden IME node — so a raised keyboard cannot
+disable the affordance that dismisses it. The bar is also gone entirely on the QR scanner,
+depth-counted at one mount site. ONE FRAMEWORK CORRECTION, recorded rather than hidden:
+the suppressor cannot mutate the shell's notifier inline at either lifecycle edge —
+`initState` runs mid-build and `dispose` runs under `finalizeTree`'s `lockState`, and the
+bar's layer is a SIBLING subtree — so both edges apply in a post-frame callback. The cost
+is one frame at each boundary and neither is observable (on push the incoming route is
+still fully off the viewport; on pop the bar returns after the screen has gone), which is
+asserted frame-by-frame rather than assumed
 
 > **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
 > reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
@@ -181,6 +187,7 @@ to assert the guarantee, and `lib/` was NOT touched (`git diff -- lib/` is empty
 | Phase 13 P07 | 35m | 2 tasks | 9 files |
 | Phase 13 P08 | 50m | 2 tasks | 3 files |
 | Phase 13 P04 | 45m | 2 tasks | 1 files |
+| Phase 13 P09 | 25m | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -442,6 +449,12 @@ Recent decisions affecting current work:
 - [Phase 13-08]: A negative hit-test case carries a nothing-raised CONTROL tap first — without it, a target that was mis-placed, zero-sized or behind the bar passes the negative for entirely the wrong reason
 - [Phase 13-08]: A tolerated exception is drained by a helper that ASSERTS what it swallows. The 360dp macro-grid overflow is horizontal ("on the right") and pre-existing (it reproduces with no shell mounted at all); a VERTICAL overflow — the failure under test — does not match and still reds. Logged to deferred-items.md rather than fixed, because a screen edit would destroy BAR-05's zero-per-screen-edit property
 - [Phase 13-08]: test/widget_test.dart is the BAR-01 end-to-end anchor — the only test that pumps main.dart, so removing the SummonShell mount reds it while the harness-built shell suite stays fully green. Phase 16 RE-RUNS it, never deletes it
+- [Phase 13-09]: BAR-03's gate is a property of the FOCUSED NODE, never of the screen — non-null, not the shell's hidden IME node BY REFERENCE IDENTITY, has a build context, has an exact-type EditableText ancestor. The milestone's "primaryFocus == null" version is falsified in the suite, not just corrected in prose: focus reverts to the root scope, so it would have shipped a permanently disabled button (D-13-17)
+- [Phase 13-09]: The Phase-15 escape ships in Phase 13 with a test that focuses a REAL EditableText the shell owns — the trap is that a raised keyboard focuses a genuine text field, so without reference identity the keyboard icon would disable its own dismiss affordance and back would be the only way out
+- [Phase 13-09]: The focus listener wraps ONE 56x56 slot, proved by a rebuild counter (debugOnRebuildDirtyWidget) asserting the bar and the trackpad icon do not rebuild on a focus change — rebuild scope on the trackpad's hot path is a latency contract, so it is asserted rather than reviewed
+- [Phase 13-09]: A route-scoped wrapper CANNOT mutate an app-scope notifier inline at either lifecycle edge: initState runs mid-build and dispose runs under finalizeTree's lockState (framework.dart:3344), and the listener lives in a sibling subtree. Both edges apply in a post-frame callback; the one-frame cost is unobservable at both boundaries and is asserted frame-by-frame, not assumed
+- [Phase 13-09]: SummonShellController ignores suppress/release once disposed — with a deferred release, a shell torn down in the same frame would otherwise reach a dead notifier and throw during teardown. Mutating a dead controller is a no-op, not a crash
+- [Phase 13-09]: The bar over modal routes is a REQUIREMENT, not an oversight, and now carries a test saying so — SC4 needs the keyboard icon visibly disabled ON the pairing sheet, which is only observable if the bar is drawn there. There is exactly one suppression site in the app and a source gate fails the build on a second
 
 ### Pending Todos
 

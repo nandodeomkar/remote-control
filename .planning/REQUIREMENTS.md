@@ -18,8 +18,8 @@ protocol change, no `protoVersion` bump. Requirement IDs use fresh prefixes; v1.
 
 - [x] **BAR-01**: A permanent bottom bar carrying a trackpad icon and a keyboard icon is visible on the hub and on every tool screen
 - [x] **BAR-02**: The bar stays visible and tappable while a surface is raised — the surface sits on top of it, never under it
-- [ ] **BAR-03**: The keyboard icon is disabled whenever a local text field holds focus, so a pairing PIN can never be typed into the PC
-- [ ] **BAR-04**: The bar is suppressed entirely on the QR scan screen
+- [x] **BAR-03**: The keyboard icon is disabled whenever a local text field holds focus, so a pairing PIN can never be typed into the PC
+- [x] **BAR-04**: The bar is suppressed entirely on the QR scan screen
 - [x] **BAR-05**: Every screen's content stays fully reachable with the bar present — nothing clipped or stranded behind it
 
 ### Summon & Dismiss
@@ -96,8 +96,8 @@ Phase numbering **continues** from v1.0 — v1.1 runs **Phases 13-18**, it does 
 |-------------|-------|--------|
 | BAR-01 | Phase 13 — Summon Shell & Bar | Complete |
 | BAR-02 | Phase 13 — Summon Shell & Bar | Complete |
-| BAR-03 | Phase 13 — Summon Shell & Bar | Pending |
-| BAR-04 | Phase 13 — Summon Shell & Bar | Pending |
+| BAR-03 | Phase 13 — Summon Shell & Bar | Complete |
+| BAR-04 | Phase 13 — Summon Shell & Bar | Complete |
 | BAR-05 | Phase 13 — Summon Shell & Bar | Complete |
 | SUM-01 | Phase 13 — Summon Shell & Bar | Complete |
 | SUM-02 | Phase 13 — Summon Shell & Bar | Complete |

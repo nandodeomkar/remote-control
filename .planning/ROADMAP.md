@@ -415,7 +415,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 13. Summon Shell & Bar | 8/10 | In Progress | - |
+| 13. Summon Shell & Bar | 9/10 | In Progress | - |
 | 14. Raised Trackpad | 0/TBD | Not started | - |
 | 15. Raised Keyboard | 0/TBD | Not started | - |
 | 16. Bubble Retirement | 0/TBD | Not started | - |
