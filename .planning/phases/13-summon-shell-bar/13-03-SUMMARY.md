@@ -183,3 +183,7 @@ None. Nothing in this plan renders a placeholder or defers a data source.
 - **Phase 14 / Phase 15:** wire `dismissed()` to `SummonShellController.onSurfaceDismissed`. It is one field, and the shell already fires it with the outgoing kind on both edges — do not add a second hook.
 - **Plan 13-04:** the F4 discriminator is expected to pass against this implementation in both regimes (confirmed above). If it reds, look at `summon_shell.dart`'s build, not at the test.
 - The mid-swap destination-tap rule is a behavioural contract Phases 14/15 inherit: a surface that is being swapped *in* can be dismissed before it arrives, and it still reports exactly once.
+
+## Self-Check: PASSED
+
+All created/modified files exist on disk and all three commits (`41ac6d7`, `f6dc85e`, `22ed63e`) are present in git history. The throwaway F4 suite was deleted as intended and is confirmed absent.
