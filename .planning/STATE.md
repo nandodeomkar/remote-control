@@ -5,8 +5,8 @@ milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
 status: planning
-stopped_at: Phase 13 context gathered
-last_updated: "2026-08-14T01:05:47.765Z"
+stopped_at: Phase 13 researched — blocked at UI gate, needs /gsd-ui-phase 13
+last_updated: "2026-08-14T01:43:20.138Z"
 last_activity: 2026-08-13
 last_activity_desc: v1.1 roadmap created (Phases 13-18, 25/25 requirements mapped)
 progress:
@@ -513,9 +513,9 @@ plus the audit's own tech-debt list.
 
 ## Session Continuity
 
-Last session: 2026-08-14T01:05:47.742Z
-Stopped at: Phase 13 context gathered
-Resume file: .planning/phases/13-summon-shell-bar/13-CONTEXT.md
+Last session: 2026-08-14T01:43:20.114Z
+Stopped at: Phase 13 researched — blocked at UI gate, needs /gsd-ui-phase 13
+Resume file: .planning/phases/13-summon-shell-bar/13-RESEARCH.md
 
 Previous session: 2026-08-12T16:20:00.000Z — quick 260812-tsw closed the last pending
 todo (a dismissed keyboard panel releases a locked modifier on the PC); v1.0 was closed
