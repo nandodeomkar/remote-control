@@ -135,6 +135,14 @@ class SummonShellController {
 
   int _suppressDepth = 0;
 
+  /// True once [dispose] has run. Both suppression mutators check it, because
+  /// a suppressor releases its count from a **post-frame callback** (its own
+  /// lifecycle edges land inside the build phase, where notifying a listener in
+  /// a sibling subtree is illegal). If the whole shell is torn down in that
+  /// same frame, that callback would otherwise reach a disposed notifier and
+  /// throw during teardown. Mutating a dead controller is a no-op, not a crash.
+  bool _disposed = false;
+
   /// Mints a fresh, never-reused guard id. Monotonic by construction.
   int mintGuardId() => _nextGuardId++;
 
@@ -194,6 +202,7 @@ class SummonShellController {
   /// Hides the bar for as long as the matching [releaseBar] has not run
   /// (BAR-04). Reentrant — see [barVisible] for why this is a depth counter.
   void suppressBar() {
+    if (_disposed) return;
     _suppressDepth++;
     barVisible.value = _suppressDepth == 0;
   }
@@ -201,12 +210,14 @@ class SummonShellController {
   /// Releases one suppression. The bar reappears only when every suppressor has
   /// released.
   void releaseBar() {
+    if (_disposed) return;
     if (_suppressDepth > 0) _suppressDepth--;
     barVisible.value = _suppressDepth == 0;
   }
 
   /// Disposes the notifiers. Called by [SummonShell]'s state.
   void dispose() {
+    _disposed = true;
     raised.dispose();
     barVisible.dispose();
   }
