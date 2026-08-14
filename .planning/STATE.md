@@ -5,16 +5,16 @@ milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
 status: executing
-stopped_at: Completed 13-08-PLAN.md
-last_updated: "2026-08-14T19:00:00.000Z"
+stopped_at: Completed 13-04-PLAN.md
+last_updated: "2026-08-14T21:30:00.000Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 13 plan 08 executed (the C4 hit-test pair carried into the successor suite with a control tap, the no-reflow and route-stack contracts, the three named 360x640 reach cases all hand-falsified red, and BAR-01 anchored on the real application widget; full suite 962 green)
+last_activity_desc: Phase 13 plan 04 executed (five driven viewports through the real shell, the four geometry invariants for both surfaces on each, and all five named failure modes F1/F1b/F2/F3/F4/F5 hand-falsified red; the F5 probe corrected against Flutter's actual removePadding semantics; full suite 975 green)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 10
-  completed_plans: 7
-  percent: 70
+  completed_plans: 8
+  percent: 80
 ---
 
 > ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
@@ -44,15 +44,18 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 ## Current Position
 
 Phase: 13 (Summon Shell & Bar) — EXECUTING
-Plan: 7 of 10 complete (13-01, 13-02, 13-03, 13-05, 13-06, 13-07, 13-08) — 13-04 still outstanding
+Plan: 8 of 10 complete (13-01 … 13-08) — 13-09 and 13-10 outstanding
 Status: Executing Phase 13
-Last activity: 2026-08-14 — 13-08 done: the milestone's most valuable contract (a tap
-outside a raised surface still lands) now lives in the suite that survives Phase 16,
-paired with the negative it was missing and a nothing-raised control tap. The three
-surfaces SC1 names reach their last item at 360x640, each proved red by deleting the
-+56 reservation — and that falsification is what caught two browser cases that had been
-green for a reason unrelated to the bar. `widget_test.dart` is now the BAR-01 end-to-end
-anchor through `main.dart`. No screen was edited: `git diff -- lib/` is empty
+Last activity: 2026-08-14 — 13-04 done: the inset arithmetic is now pinned on five REAL
+viewports through the real shell, not just as arithmetic. The four invariants (I1 the
+surface rests on the bar, I2 the bar clears max(nav, IME), I3 never under the status bar,
+I4 the one derivation) hold for both surface kinds on all five devices, and every one of
+the five named failure modes was hand-falsified red before being trusted: F1/F1b by an
+IME height, F2 and F3 by a bar height, F4 by the stale snapshot (270 → 410 never
+arriving), F5 by the full nav inset. One correction landed: `MediaQuery.removePadding`
+SUBTRACTS the padding it consumed from `viewPadding` rather than leaving it, so
+13-RESEARCH's quoted F5 assertion was red against correct code — the probe was rewritten
+to assert the guarantee, and `lib/` was NOT touched (`git diff -- lib/` is empty)
 
 > **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
 > reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
@@ -177,6 +180,7 @@ anchor through `main.dart`. No screen was edited: `git diff -- lib/` is empty
 | Phase 13 P06 | 40m | 2 tasks | 3 files |
 | Phase 13 P07 | 35m | 2 tasks | 9 files |
 | Phase 13 P08 | 50m | 2 tasks | 3 files |
+| Phase 13 P04 | 45m | 2 tasks | 1 files |
 
 ## Accumulated Context
 
