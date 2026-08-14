@@ -5,16 +5,16 @@ milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
 status: executing
-stopped_at: Completed 13-06-PLAN.md
-last_updated: "2026-08-14T16:49:48.076Z"
+stopped_at: Completed 13-07-PLAN.md
+last_updated: "2026-08-14T18:05:00.000Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 13 plan 06 executed (browser one-thing-per-gesture by predicate; the invariant test caught the guard mutating shared state mid-dispatch; full suite 954 green)
+last_activity_desc: Phase 13 plan 07 executed (pushGuarded seam + all seven page pushes converted; a bare page-route construction outside lib/shell now fails the build, proved red by hand; full suite 956 green)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 10
-  completed_plans: 5
-  percent: 50
+  completed_plans: 6
+  percent: 60
 ---
 
 > ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
@@ -44,12 +44,13 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 ## Current Position
 
 Phase: 13 (Summon Shell & Bar) — EXECUTING
-Plan: 5 of 10 complete (13-01, 13-02, 13-03, 13-05, 13-06) — 13-04 still outstanding
+Plan: 6 of 10 complete (13-01, 13-02, 13-03, 13-05, 13-06, 13-07) — 13-04 still outstanding
 Status: Executing Phase 13
-Last activity: 2026-08-14 — 13-06 done: the one route with two back handlers resolves exactly
-one thing per gesture by predicate. Case 1 found that predicates alone were not enough — the
-guard's synchronous `lower()` destroyed the state the browser's callback had to read, so the
-pop dispatch is now a pure read phase (the lower defers one microtask, not a latch)
+Last activity: 2026-08-14 — 13-07 done: every page route in the app is now minted by one
+helper (`pushGuarded<T>`), closing the half of SUM-04 that failed silently on Settings,
+Device List, Updates, the QR screen and the bubble's expand. A source scan fails the build
+on a bare page-route construction outside `lib/shell/`, proved red by hand against a real
+violation (`device_list_screen.dart:95`) and green against a prose mention
 
 > **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
 > reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
@@ -172,6 +173,7 @@ pop dispatch is now a pure read phase (the lower defers one microtask, not a lat
 | Phase 13 P03 | 55m | 2 tasks | 3 files |
 | Phase 13 P05 | 45m | 2 tasks | 2 files |
 | Phase 13 P06 | 40m | 2 tasks | 3 files |
+| Phase 13 P07 | 35m | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -426,6 +428,9 @@ Recent decisions affecting current work:
 - [Phase 13-05]: debugDefaultTargetPlatformOverride rides a TargetPlatformVariant, never a setUp/tearDown pair — flutter_test verifies foundation debug vars at the end of the test BODY, before any tearDown runs
 - [Phase 13-05]: Ownership is proven as an ABSENT id, not a cleared one — the orphan case asserts the raise still records the dead guard id, plus a source scan that neither shell file names a Route type in code (D-13-19)
 - [Phase 13-06]: two back handlers on one route resolve by mutually-exclusive predicates over one shared state; the pop dispatch is a pure READ phase — the guard defers its lower() one microtask so it cannot destroy the state the browser's callback reads. Not a latch: nothing records which callback ran first
+- [Phase 13-07]: Every page route in lib/ is minted by one helper (`pushGuarded<T>`, generic so the QR push keeps its awaited PairQrData) and a source scan fails the build on a bare construction — SUM-04 fails SILENTLY on an un-guarded route, so it must be enforced by the build rather than remembered by the author (D-13-16)
+- [Phase 13-07]: The push-site guard exempts lib/shell/ by PATH PREFIX, never by a line number that the next edit invalidates; both exemption maps are location→reason and a second case asserts every reason is non-empty, because a bare exemption is indistinguishable from a silenced failure
+- [Phase 13-07]: Test-host fidelity is scoped to the case that needs it — mounting SummonShell in settings_screen_test's SHARED host reserved 56px, shortened the lazily-built ListView and redded two unrelated Accent-chip cases that no longer laid out the row they assert on
 
 ### Pending Todos
 
