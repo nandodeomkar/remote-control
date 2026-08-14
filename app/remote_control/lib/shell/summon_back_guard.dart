@@ -32,6 +32,8 @@
 /// surface is untouched. That is intended behaviour — do not "fix" it.
 library;
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'summon_scope.dart';
@@ -112,7 +114,22 @@ class _SummonBackGuardState extends State<SummonBackGuard> {
           // action runs per gesture regardless of which PopEntry the framework
           // iterates first. Never an order-dependent "consumed" latch.
           if (!controller.ownsRaisedSurface(id)) return;
-          controller.lower();
+          // DEFERRED BY ONE MICROTASK, DELIBERATELY. The framework calls every
+          // registered PopEntry in ONE synchronous loop
+          // (widgets/routes.dart:2044-2050), and the browser's second callback
+          // decides whether to step up a bookmark folder by reading THIS state
+          // (D-13-18). Lowering synchronously here mutates that state mid-loop,
+          // so whichever callback ran second would read "nothing raised" and
+          // act too — two things on one gesture, D-13-05 violated, and the
+          // outcome would depend on the `Set`'s iteration order
+          // (routes.dart:1980) exactly as the predicate design forbids.
+          //
+          // Deferring makes the dispatch a pure READ phase: every voter sees
+          // identical state, so both predicates agree in ANY order. This is NOT
+          // a consumed latch — nothing anywhere records which callback ran
+          // first, and adding a third handler changes nothing. The lower still
+          // starts on the same frame; a microtask is not a frame.
+          scheduleMicrotask(controller.lower);
         },
         child: child!,
       ),
