@@ -85,12 +85,12 @@ Phase directories: [`milestones/v1.0-phases/`](./milestones/v1.0-phases/)
   5. On the owner's device, summon and dismiss feel quick at the frequency a permanent bar invites (this is what closes OQ-A1 sub-question 1; 200/150 is a one-constant change each if it does not)
 
 **Research**: recommended — run `--research-phase`. Highest concentration of unverified premises in the milestone
-**Plans**: 10 plans
+**Plans**: 1/10 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 13-01-PLAN.md — TRACER: pre-flight baseline + test-migration checklist, the app-scope shell, the per-route back guard, the D5 spike, and the BAR-05 reservation audit
+- [x] 13-01-PLAN.md — TRACER: pre-flight baseline + test-migration checklist, the app-scope shell, the per-route back guard, the D5 spike, and the BAR-05 reservation audit
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -415,7 +415,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 13. Summon Shell & Bar | 0/10 | Planned | - |
+| 13. Summon Shell & Bar | 1/10 | In Progress | - |
 | 14. Raised Trackpad | 0/TBD | Not started | - |
 | 15. Raised Keyboard | 0/TBD | Not started | - |
 | 16. Bubble Retirement | 0/TBD | Not started | - |

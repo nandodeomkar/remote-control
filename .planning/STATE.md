@@ -4,17 +4,17 @@ milestone: v1.1
 milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
-status: Ready to execute
-stopped_at: Phase 13 planned — 10 plans in 5 waves, plan-checker passed (0 blockers)
-last_updated: "2026-08-14T10:48:59.130Z"
+status: executing
+stopped_at: Completed 13-01-PLAN.md — D5 spike green, host shape settled
+last_updated: "2026-08-14T11:13:04.058Z"
 last_activity: 2026-08-14
 last_activity_desc: Phase 13 planned (10 plans, 5 waves; research + UI-SPEC + patterns consumed)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 10
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 10
 ---
 
 > ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
@@ -43,10 +43,10 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 
 ## Current Position
 
-Phase: 13 of 18 — Summon Shell & Bar (planned)
-Plan: 0/10 complete — Wave 1 next (13-01, the D5 tracer)
-Status: Ready to execute — 10 plans in 5 waves, plan-checker passed (0 blockers)
-Last activity: 2026-08-14 — Phase 13 planned (10 plans, 5 waves; research + UI-SPEC + patterns consumed)
+Phase: 13 of 18 — Summon Shell & Bar (executing)
+Plan: 1/10 complete — Wave 1 done (13-01, the D5 tracer); 13-02 next
+Status: Executing — host shape settled, D5 spike green on first run
+Last activity: 2026-08-14 — 13-01 complete: SummonShell + SummonBackGuard land, S1/S2/S2b/S2c/S2d/S3 pass, full suite 888 green
 
 > **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
 > reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
@@ -164,6 +164,7 @@ Last activity: 2026-08-14 — Phase 13 planned (10 plans, 5 waves; research + UI
 | Phase 12 P12 | 18min | 3 tasks | 9 files |
 | Phase 12 P14 | 35min | 3 tasks | 5 files |
 | Phase 12 P18 | 7h 15m | 4 tasks | 4 files |
+| Phase 13 P01 | 50m | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -404,6 +405,8 @@ Recent decisions affecting current work:
 - [Phase ?]: 12-12: the update.progress watch Sender is an Arc shared by the update thread AND WinUpdate, so a busy/downgrade/stale refusal reaches the phone without queueing behind an in-flight 5 MB download
 - [Phase ?]: 12-14: UpdateRowState is one value-equal class over an exhaustive UpdateRowKind enum, not 15 sealed subclasses - the enum IS the UI-SPEC matrix, one operator== covers every variant, and 'actionable' being part of the value makes D-18 assertable
 - [Phase ?]: 12-14: pcDidNotReturn (D-25) reads the EXISTING reconnect FSM attempt counter (>=5) instead of starting a timer, honouring D-17's ban on a second reconnect path
+- [Phase ?]: D5 spike passed first run against the real SummonShell + SummonBackGuard — app-scope host shape settled, D-13-04 failure branch not taken
+- [Phase ?]: BAR-05 +56 injection is transparent: full suite 882 -> 888, delta is exactly the 6 new spike tests, zero pre-existing status changes
 
 ### Pending Todos
 
@@ -513,9 +516,9 @@ plus the audit's own tech-debt list.
 
 ## Session Continuity
 
-Last session: 2026-08-14T02:04:41.888Z
-Stopped at: Phase 13 UI-SPEC approved
-Resume file: .planning/phases/13-summon-shell-bar/13-UI-SPEC.md
+Last session: 2026-08-14T11:13:04.030Z
+Stopped at: Completed 13-01-PLAN.md
+Resume file: None
 
 Previous session: 2026-08-12T16:20:00.000Z — quick 260812-tsw closed the last pending
 todo (a dismissed keyboard panel releases a locked modifier on the PC); v1.0 was closed

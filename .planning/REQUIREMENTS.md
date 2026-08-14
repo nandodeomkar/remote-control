@@ -20,14 +20,14 @@ protocol change, no `protoVersion` bump. Requirement IDs use fresh prefixes; v1.
 - [ ] **BAR-02**: The bar stays visible and tappable while a surface is raised — the surface sits on top of it, never under it
 - [ ] **BAR-03**: The keyboard icon is disabled whenever a local text field holds focus, so a pairing PIN can never be typed into the PC
 - [ ] **BAR-04**: The bar is suppressed entirely on the QR scan screen
-- [ ] **BAR-05**: Every screen's content stays fully reachable with the bar present — nothing clipped or stranded behind it
+- [x] **BAR-05**: Every screen's content stays fully reachable with the bar present — nothing clipped or stranded behind it
 
 ### Summon & Dismiss
 
 - [ ] **SUM-01**: Tapping a bar icon raises that surface over the current screen without navigating away
 - [ ] **SUM-02**: Nothing beneath a raised surface resizes or reflows, and a tappable widget outside the surface still receives its tap
 - [ ] **SUM-03**: Tapping the same bar icon again dismisses the raised surface
-- [ ] **SUM-04**: The Android back gesture dismisses a raised surface before it pops the screen
+- [x] **SUM-04**: The Android back gesture dismisses a raised surface before it pops the screen
 - [ ] **SUM-05**: A 48dp drag handle offers a third dismiss route that assistive services can drive
 - [ ] **SUM-06**: No gesture on the surface body dismisses it — 30 consecutive full-height cursor throws and 30 two-finger scrolls produce zero dismissals
 
@@ -98,11 +98,11 @@ Phase numbering **continues** from v1.0 — v1.1 runs **Phases 13-18**, it does 
 | BAR-02 | Phase 13 — Summon Shell & Bar | Pending |
 | BAR-03 | Phase 13 — Summon Shell & Bar | Pending |
 | BAR-04 | Phase 13 — Summon Shell & Bar | Pending |
-| BAR-05 | Phase 13 — Summon Shell & Bar | Pending |
+| BAR-05 | Phase 13 — Summon Shell & Bar | Complete |
 | SUM-01 | Phase 13 — Summon Shell & Bar | Pending |
 | SUM-02 | Phase 13 — Summon Shell & Bar | Pending |
 | SUM-03 | Phase 13 — Summon Shell & Bar | Pending |
-| SUM-04 | Phase 13 — Summon Shell & Bar | Pending |
+| SUM-04 | Phase 13 — Summon Shell & Bar | Complete |
 | SUM-05 | Phase 14 — Raised Trackpad | Pending |
 | SUM-06 | Phase 14 — Raised Trackpad | Pending |
 | SURF-01 | Phase 14 — Raised Trackpad | Pending |
@@ -121,6 +121,7 @@ Phase numbering **continues** from v1.0 — v1.1 runs **Phases 13-18**, it does 
 | CHIP-02 | Phase 18 — Chip Row & Measured Motion | Pending |
 
 **Coverage:**
+
 - v1.1 requirements: 25 total
 - Mapped to phases: 25 ✓
 - Unmapped: 0
