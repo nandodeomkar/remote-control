@@ -159,7 +159,7 @@ so a planner does not re-open it.
 Captured during `/gsd-plan-phase 13` after `13-RESEARCH.md` landed. These **supersede**
 the earlier decisions they name.
 
-- **D-13-14 — Two plain dp heights, not screen fractions. Supersedes the fraction half
+- **D-13-14:** **Two plain dp heights, not screen fractions. Supersedes the fraction half
   of D-13-06 and D-13-09.** The owner asked for normal-Android-keyboard sizing rather
   than a screen fraction. Resolution:
   - **Trackpad surface = standard Android IME height** (~280dp starting value, tuned at
@@ -209,7 +209,7 @@ the earlier decisions they name.
   shell's own hidden IME node — the second clause is what stops Phase 15's keyboard from
   disabling its own dismiss affordance. See `13-RESEARCH.md` §8 and correction X1.
 
-- **D-13-18 — D-13-05's browser resolution must be predicate-based, never
+- **D-13-18:** **D-13-05's browser resolution must be predicate-based, never
   order-based.** `ModalRoute._popEntries` is a `Set` (`routes.dart:1980`) and
   `onPopInvokedWithResult` fires **every** registered entry in unspecified order, so
   "surface first, folder next" cannot be implemented as ordering or as a consumed-latch.
@@ -217,7 +217,7 @@ the earlier decisions they name.
   The browser reads shell state through a non-subscribing
   `getInheritedWidgetOfExactType` so it never rebuilds off summon state.
 
-- **D-13-19 — Route ownership is a monotonic `int` guard-id stack, never a retained
+- **D-13-19:** **Route ownership is a monotonic `int` guard-id stack, never a retained
   `Route`.** Each `SummonBackGuard` mints an id on mount, appends to a shell-scope
   `List<int>`, removes it on dispose; summon records `owner = stack.last`. D-13-03's
   orphan case then falls out for free — the owner's id is simply no longer in the stack,

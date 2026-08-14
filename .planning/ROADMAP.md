@@ -88,15 +88,29 @@ Phase directories: [`milestones/v1.0-phases/`](./milestones/v1.0-phases/)
 **Plans**: 10 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 13-01-PLAN.md — TRACER: pre-flight baseline + test-migration checklist, the app-scope shell, the per-route back guard, the D5 spike, and the BAR-05 reservation audit
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 13-02-PLAN.md — The one shared derivation, the two-icon bar, the empty surface and its inert handle, mounted and raising end to end
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 13-03-PLAN.md — Motion: 200/150 pinned by falsifiable timing, swap-in-place as one motion, and the single dismiss seam
-- [ ] 13-04-PLAN.md — Geometry pinned on five driven viewports with four invariants and the F1/F2/F3/F4/F5 discriminators
 - [ ] 13-05-PLAN.md — The back vocabulary: the ownership scenario, the orphan case, and the predictive-back baseline
 - [ ] 13-06-PLAN.md — Browser one-thing-per-gesture: the predicate-conditional bookmarks back handler
 - [ ] 13-07-PLAN.md — Push-site coverage: one guarded seam, seven call sites, and a source-scanning guard
 - [ ] 13-08-PLAN.md — The overlay contracts (outside taps land, nothing reflows) and the three named 640dp reach cases
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 13-04-PLAN.md — Geometry pinned on five driven viewports with four invariants and the F1/F2/F3/F4/F5 discriminators
 - [ ] 13-09-PLAN.md — Bar state: the corrected keyboard focus gate and depth-counted QR suppression
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 13-10-PLAN.md — Hardware UAT: felt latency, the two heights, the resting tint and the back baseline, recorded
 
 **UI hint**: yes
@@ -111,10 +125,12 @@ Plans:
   assertion that the builder sits above the Navigator where the docs say. Two widget
   assertions. **If it fails the host shape changes, and this phase is the cheapest
   place to find that out.**
+
 - **Never a static `PopScope(canPop: false)`.** Exactly one reactive `canPop: !raised`.
   The hub is the root route — a `canPop` that is false with nothing raised makes back
   stop exiting the app and the phone appears frozen on the dashboard. Multiple
   `PopScope`s in one subtree AND together: grep for existing ones before adding.
+
 - **Derive the inset arithmetic; do not copy it.** A third mount context with two
   *opposite* failure modes. Do not reuse `kPanelMaxHeightFraction = 0.55` (a contract
   reserving room for a live trackpad that does not exist here) or
@@ -125,16 +141,20 @@ Plans:
   here. Delete the `didChangeMetrics` observer rather than porting it. Pin with
   driven-viewport discriminator tests across five devices, where the naive read yields
   an obviously wrong number.
+
 - **Write the test-migration checklist here, before anything is deleted** (Phase 16
   executes it). ~42 tests vanish and ~5 mutate from a suite of 882; four affected
   suites are named nowhere in the design note.
+
 - **Two guards will fail the build if ignored:** new chrome must use the tokens from
   `theme/tokens.dart` and const `Symbols.*_rounded` icons — never `Icons.`, never
   `Symbols.get()`.
+
 - **`pumpAndSettle` is banned for every timing assertion** in the new summon suites: it
   advances until no frames are scheduled, so a 200ms summon and a 900ms summon are
   indistinguishable. At least one test must assert the overlay is **not yet** at final
   geometry at t=100ms and **is** at t=250ms.
+
 - Two-minute manifest check before planning: does the app already declare
   `android:enableOnBackInvokedCallback="true"`? If not, "don't regress predictive back"
   becomes "turn it on and verify it" — a different, larger task.
@@ -166,6 +186,7 @@ Plans:
   re-summon-and-tap or disconnect. Add `TrackpadCoreState.dismissed()` sharing one
   **idempotent** private flush with `dispose()`; do not rely on
   `TrackpadDriver.dispose()`, which deliberately sends nothing.
+
 - **The trackpad UNMOUNTS on dismiss** (deliberate split policy — the keyboard in Phase
   15 stays mounted). It holds a process-wide ref-counted keep-awake hold acquired in
   `initState`; mounted-but-hidden means the screen never sleeps, on every screen, for
@@ -174,12 +195,14 @@ Plans:
   split as a deliberate decision so nobody unifies it later.** Note also that a "fix"
   which calls `release()` on dismiss while leaving `acquire()` in `initState` will drop
   the Presenter's concurrent hold — include that regression test.
+
 - **The dismiss gesture must never live on the surface body.** The trackpad is a raw
   `Listener` that never enters the gesture arena, so an ancestor `GestureDetector` wins
   uncontested after ~18dp of slop while the cursor has been moving since 10dp: every
   dismiss would nudge the PC cursor, **invisibly**, because the user is looking at the
   laptop. The 48dp handle is a spatially-disjoint **sibling** of the `Listener`, never
   an ancestor.
+
 - `kSummonMaxHeightFraction` / `kSummonTrackpadFraction` are declared **design choices**
   and are movable by the owner on hardware. The proposed geometry is already better
   than the affordance being retired (363px of pad vs the retiring window's 234px on the
@@ -214,6 +237,7 @@ Plans:
   widget-parameter edge, and add a mount-agnostic controller test that runs the *bar's*
   dismiss path end to end. **Warning sign:** `grep -rn "dismissed()" lib` still returns
   only `keyboard_panel.dart` after this phase ships.
+
 - **D6 — pad restore is unverified and depends on framework behaviour, not on code.**
   `PageController(initialPage:)` is built once in `initState`; on remount the `PageView`
   attaches a fresh `ScrollPosition` and whether it lands on `_currentPage` depends on
@@ -221,26 +245,31 @@ Plans:
   expand". Today that path runs rarely; under a summon model it runs dozens of times per
   session. Make the restore **explicit** (post-frame `jumpToPage(_currentPage)` or a
   controller seeded to `_currentPage`) and pin it with a **first-frame** assertion.
+
 - **The restore hop is a race, not a latency — measurement is the wrong tool.** The
   async prefs read is invisible when warm and visible when cold, so it will pass
   hardware UAT and fail in real use on the first summon after launch. **Hoist the prefs
   read to app start** into a synchronous in-memory value so the summon path reads memory
   and lays out correctly on frame one; `_pendingRestore` survives for cold start only.
+
 - **Restore layout, reset input state.** Restore which surface was raised, which pad was
   showing, the geometry. Reset every held and locked modifier, released on the PC.
   Restoring a locked Ctrl would be restoring a hazard.
+
 - The **keyboard host State stays MOUNTED** (its FSM, held-key set and hidden IME
   connection are load-bearing and cannot be rebuilt) — the deliberate opposite of Phase
   14's trackpad. Assert `HiddenTextInput` `State` **identity** across
   summon→dismiss→summon *and* across a route push, and that it is `findsOneWidget` while
   dismissed. `HiddenTextInput` must never sit inside `Offstage`/`Visibility` — add the
   source-scanning guard in the house style.
+
 - Extract a shared `KeyboardDeck` (pads + chip row + tab bar, parameterised by a
   controller **and a height**) rather than making a third copy — a third copy is exactly
   what quick `260809-ipc` existed to delete. Introduce `summonPadHeight`; leave
   `panelPadHeight` untouched so the docked-panel guards at
   `trackpad_screen_test.dart:225-307` stay green as a regression net, and re-run
   `keyboard_panel_test.dart` unchanged to prove the extraction is behaviour-neutral.
+
 - A **third** pad prefs key (`summonPadProvider`), not a shared one — the summon
   surface's usage profile (fast Type/Arrows bursts) differs from the full screen's
   (Numpad/Fn work), and sharing a key would make them yank each other's landing pad.
@@ -268,19 +297,23 @@ Plans:
   "input blocked — elevated window" advisory from the product, and no test catches it**
   (`uipi_banner_test.dart` builds the widget directly). **The rehoming must be in the
   same plan as the deletion — that is why SAFE-03 exists and why it lives in this phase.**
+
 - Beyond `TrackpadBubble`, `FloatingTrackpadWindow` and `windowPositionProvider`, also
   delete `bubble_position.dart` / `bubblePositionProvider`, and `kBubbleSize` /
   `kBubbleEdgeInset` / `_bubbleAnchor` — **grep for these; the analyzer will not flag an
   unused public const.**
+
 - **Execute Phase 13's migration checklist. Do not delete a file until its successor
   exists.** Copy each deleted suite's header contract block into its successor and tick
   every line. Four suites go (`trackpad_bubble_test.dart`, `window_position_test.dart`,
   `bubble_position_test.dart` and the bubble scaffold suite, ~42 tests) and
   `bubble_scaffold_test.dart` is rewritten into `summon_shell_test.dart`;
   `widget_test.dart` and `hub_offline_test.dart` must be re-run.
+
 - Prefer a **recorded decision that the two orphaned prefs keys are knowingly orphaned**
   over migration machinery — but do record it: the app is sideloaded and updated in
   place, so "just reinstall" is not the delivery model.
+
 - No `UI hint`: this phase deletes UI and rehomes one existing widget. It introduces no
   new visual design surface, so it needs no UI-SPEC.
 
@@ -307,6 +340,7 @@ Plans:
   right reason with a wrong explanation — which is exactly how a migration gets "fixed"
   by re-pinning Trackpad to index 0 and quietly reverting RET-02. Update it with a *new*
   rationale; do not re-pin.
+
 - **A mechanical `showBubble` → `showBar` rename is wrong three ways** and produces a bar
   **absent from the Trackpad screen — the one screen where the *keyboard* icon is most
   valuable.** `showBubble` dies with the window; it is attached to the *tile that creates
@@ -315,14 +349,18 @@ Plans:
   screen declares what it *is* (`SummonSurface` + `activeSurfaceProvider`) and the bar
   renders the matching icon **selected-and-inert**. The original intent survives verbatim
   — *never a shortcut to the screen you are on* — only the mechanism moves.
+
 - Use a depth-counted / last-writer-wins stack for `activeSurfaceProvider`, not a naive
   set/clear: on push, the new route's `initState` runs while the old route is still
   mounted, and on pop, `dispose` runs *after* the transition.
+
 - **RET-02's justification is RET-03, verified in Phase 14.** If the full Trackpad screen
   did not remain meaningfully more precise than the raised one, the tile-survival
   rationale evaporates — check that Phase 14 closed it before planning this.
+
 - **HUBF-01 (deleting either tile) is explicitly deferred and must not be pulled
   forward.** Deleting a tile is a one-line follow-up; un-deleting one is not.
+
 - No `UI hint`: registry ordering plus an icon state that already exists in the design
   language. No new visual surface.
 
@@ -348,10 +386,12 @@ Plans:
   16px = 80dp against a 74dp cell). With the shipped Material face at 16/w600, `Shift`
   measures roughly half that. The suite's reference device is also 411×891, where even
   the *test* font fits. Verify first; scope the fix second, if at all.
+
 - **D2 — the tripwire is in the WRONG FILE relative to the design note.** It is
   `test/trackpad/trackpad_screen_test.dart:291-304`, **not** a keyboard suite;
   `modifier_chip_test.dart` contains no overflow handling at all. A plan that greps the
   keyboard suites will conclude the tripwire does not exist.
+
 - **The tripwire is INVERTED — "repairing" it back to green silently un-fixes the bug.**
   It asserts `expect(overflows, greaterThan(0))`. When the chip row is fixed, **that test
   fails with `Expected: a value greater than <0> / Actual: <0>`, and that failure is the
@@ -363,10 +403,12 @@ Plans:
   commit**, or the suite goes red for the right reason and looks like a regression. Also
   update the `expectColumnFits` comment block at `:178-186` and close item 1 in
   `260809-ipc/deferred-items.md`.
+
 - Jank here is **not** shader compilation — Impeller has been default on Android API 29+
   since 3.27 and precompiles its set. The real causes are rebuild scope and `saveLayer`.
   Never subscribe the bar to `ConnectionService.changes`; watch the value-equal
   `connectionStatusProvider`. The bar needs no `Timer.periodic`.
+
 - `pumpAndSettle` remains banned for timing assertions in the summon suites.
 
 ## Progress
@@ -406,13 +448,16 @@ These apply to every phase and are cheap to state once:
   it destroys its child's State on dismiss, breaking both the restore requirement and
   the Android IME connection. If a plan proposes editing `pubspec.yaml`, that is a
   signal the plan drifted; challenge it before merging.
+
 - **No server, protocol or extension change.** Client-side Flutter only. No
   `protoVersion` bump, therefore no two-sided release coupling for this milestone.
+
 - **Not an IME-style resize contract.** Nothing on the phone is the input target — every
   keystroke and cursor delta goes to the PC, so there is no field to keep visible.
   Converting "raise in place" into a resize/inset contract solves a problem this app does
   not have, at the cost of making every tool screen scrollable. A planner who "improves"
   this is regressing it.
+
 - **Anti-features a planner must not re-derive:** a scrim; swipe-down-anywhere-to-dismiss;
   filling the bar's dead width with more actions (it becomes a second hub); keeping the
   bubble as a fallback toggle; multi-height peek/expanded surfaces; nested `Navigator`;

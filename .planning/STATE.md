@@ -4,15 +4,15 @@ milestone: v1.1
 milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
-status: planning
-stopped_at: Phase 13 UI-SPEC approved
-last_updated: "2026-08-14T02:04:41.908Z"
-last_activity: 2026-08-13
-last_activity_desc: v1.1 roadmap created (Phases 13-18, 25/25 requirements mapped)
+status: Ready to execute
+stopped_at: Phase 13 planned — 10 plans in 5 waves, plan-checker passed (0 blockers)
+last_updated: "2026-08-14T10:48:59.130Z"
+last_activity: 2026-08-14
+last_activity_desc: Phase 13 planned (10 plans, 5 waves; research + UI-SPEC + patterns consumed)
 progress:
   total_phases: 6
   completed_phases: 0
-  total_plans: 0
+  total_plans: 10
   completed_plans: 0
   percent: 0
 ---
@@ -43,10 +43,10 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 
 ## Current Position
 
-Phase: 13 of 18 — Summon Shell & Bar (not started)
-Plan: —
-Status: Roadmap complete — ready to plan Phase 13
-Last activity: 2026-08-13 — v1.1 roadmap created (Phases 13-18, 25/25 requirements mapped)
+Phase: 13 of 18 — Summon Shell & Bar (planned)
+Plan: 0/10 complete — Wave 1 next (13-01, the D5 tracer)
+Status: Ready to execute — 10 plans in 5 waves, plan-checker passed (0 blockers)
+Last activity: 2026-08-14 — Phase 13 planned (10 plans, 5 waves; research + UI-SPEC + patterns consumed)
 
 > **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
 > reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
