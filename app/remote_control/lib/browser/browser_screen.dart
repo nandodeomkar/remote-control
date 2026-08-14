@@ -77,6 +77,7 @@ import 'package:remote_protocol/remote_protocol.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus, ConnectionService;
 import '../settings/haptics.dart';
+import '../shell/summon_scope.dart';
 import '../theme/tokens.dart';
 import '../widgets/connection_header.dart';
 import 'bookmark_confirm.dart';
@@ -576,7 +577,25 @@ class _BrowserScreenState extends ConsumerState<BrowserScreen> {
       body: PopScope(
         canPop: !inFolder,
         onPopInvokedWithResult: (didPop, result) {
-          if (!didPop) _onBookmarksBack();
+          // This callback ALSO fires on a genuine pop
+          // (widgets/navigator.dart:5620), so the early return stays first.
+          if (didPop) return;
+          // D-13-05 / D-13-18 — strict one-thing-per-gesture, by PREDICATE.
+          // This route carries a SECOND PopScope (SummonBackGuard's), and three
+          // framework facts decide the shape: both callbacks fire whenever
+          // either canPop is false (widgets/routes.dart:2044-2050); the two
+          // canPop values simply AND, so blocking is safe to share; and the
+          // registration container is an unordered Set (routes.dart:1980) that
+          // re-registers on route changes, so there is NO ordering contract.
+          // A "consumed" latch set by whichever callback ran first is therefore
+          // FORBIDDEN: it works today and breaks silently the moment a third
+          // handler appears or the registration order shifts.
+          // Non-subscribing lookup (SummonScope uses
+          // getInheritedWidgetOfExactType): a subscribing read would rebuild
+          // this whole screen — tab list and bookmark tree — on every raise and
+          // every lower.
+          if (SummonScope.ownsRaisedSurface(context)) return;
+          _onBookmarksBack();
         },
         child: SafeArea(
           child: Column(
