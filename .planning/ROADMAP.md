@@ -85,7 +85,7 @@ Phase directories: [`milestones/v1.0-phases/`](./milestones/v1.0-phases/)
   5. On the owner's device, summon and dismiss feel quick at the frequency a permanent bar invites (this is what closes OQ-A1 sub-question 1; 200/150 is a one-constant change each if it does not)
 
 **Research**: recommended — run `--research-phase`. Highest concentration of unverified premises in the milestone
-**Plans**: 8/10 plans executed
+**Plans**: 9/10 plans executed
 
 Plans:
 **Wave 1**
@@ -107,7 +107,7 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 13-04-PLAN.md — Geometry pinned on five driven viewports with four invariants and the F1/F2/F3/F4/F5 discriminators
-- [ ] 13-09-PLAN.md — Bar state: the corrected keyboard focus gate and depth-counted QR suppression
+- [x] 13-09-PLAN.md — Bar state: the corrected keyboard focus gate and depth-counted QR suppression
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
