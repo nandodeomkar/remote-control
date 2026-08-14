@@ -29,6 +29,8 @@ import 'hub/hub_screen.dart';
 import 'net/connection_providers.dart';
 import 'net/reconnect_fsm.dart';
 import 'settings/haptics.dart';
+import 'shell/summon_back_guard.dart';
+import 'shell/summon_shell.dart';
 import 'store/device_list_store.dart';
 import 'theme/tokens.dart';
 
@@ -113,7 +115,15 @@ class _RemoteControlAppState extends ConsumerState<RemoteControlApp> {
       title: 'Remote Control',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: const HubScreen(),
+      // 13-01: the single insertion point for the app-scope summon shell. The
+      // builder's result is handed the Navigator as `child`, so the shell is
+      // unambiguously the Navigator's ancestor and reaches all 14 screens —
+      // including `home:` — with zero per-screen edits (widgets/app.dart:1690).
+      builder: (context, child) => SummonShell(child: child!),
+      // The root route needs its own guard like every other page route:
+      // back-handling is route-scoped, because there is no route above the
+      // Navigator for a shell-level PopScope to register with.
+      home: const SummonBackGuard(child: HubScreen()),
     );
   }
 }
