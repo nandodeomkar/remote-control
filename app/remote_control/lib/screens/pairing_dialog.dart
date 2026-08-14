@@ -32,6 +32,7 @@ import '../net/handshake.dart';
 import '../net/handshake_fsm.dart';
 import '../net/pair_qr.dart';
 import '../net/reconnect_fsm.dart';
+import '../shell/summon_back_guard.dart';
 import '../store/device_store.dart';
 import '../theme/tokens.dart';
 import 'connection_copy.dart';
@@ -356,9 +357,10 @@ Future<void> showPairingSheet(BuildContext context, DeviceTarget target) {
                   ),
                 ),
               ),
-              scanQr: () => Navigator.of(sheetContext).push<PairQrData>(
-                MaterialPageRoute(builder: (_) => const QrScanScreen()),
-              ),
+              // Guarded like every other page push (13-07, SUM-04). The helper
+              // is generic, so the scanned PairQrData still flows back here.
+              scanQr: () =>
+                  pushGuarded<PairQrData>(sheetContext, const QrScanScreen()),
             ),
           ),
         );

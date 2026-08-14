@@ -40,6 +40,7 @@ import 'package:remote_protocol/remote_protocol.dart';
 import '../net/connection_providers.dart';
 import '../net/connection_service.dart';
 import '../settings/bubble_position.dart';
+import '../shell/summon_back_guard.dart';
 import '../theme/tokens.dart';
 import '../trackpad/floating_trackpad_window.dart';
 import '../trackpad/trackpad_screen.dart';
@@ -114,13 +115,9 @@ class _BubbleScaffoldState extends ConsumerState<BubbleScaffold>
   void _openFullTrackpad(BuildContext context) {
     _collapse();
     unawaited(
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const BubbleScaffold(
-            showBubble: false,
-            body: TrackpadScreen(),
-          ),
-        ),
+      pushGuarded<void>(
+        context,
+        const BubbleScaffold(showBubble: false, body: TrackpadScreen()),
       ),
     );
   }

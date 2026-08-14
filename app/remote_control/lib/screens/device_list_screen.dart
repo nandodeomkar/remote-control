@@ -35,6 +35,7 @@ import '../net/connection_providers.dart';
 import '../net/connection_service.dart' show ChipStatus;
 import '../net/handshake.dart';
 import '../net/reconnect_fsm.dart';
+import '../shell/summon_back_guard.dart';
 import '../store/device_list_store.dart';
 import '../store/device_store.dart';
 import '../theme/tokens.dart';
@@ -89,11 +90,7 @@ class _DeviceListScreenState extends ConsumerState<DeviceListScreen> {
   /// call sites route through this helper so they can never drift. Same
   /// unawaited push shape as before — only the destination changed.
   void _openHub(BuildContext context) {
-    unawaited(
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const HubScreen()),
-      ),
-    );
+    unawaited(pushGuarded<void>(context, const HubScreen()));
   }
 
   // Previous-ping snapshots so the sheet opens on TRANSITIONS only (a

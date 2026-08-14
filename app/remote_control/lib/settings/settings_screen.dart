@@ -37,6 +37,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../net/connection_providers.dart';
 import '../screens/connection_copy.dart' show deviceMetaPaired;
 import '../screens/device_list_screen.dart';
+import '../shell/summon_back_guard.dart';
 import '../store/device_list_store.dart';
 import '../theme/tokens.dart';
 import '../trackpad/tuning.dart';
@@ -215,9 +216,7 @@ class _PairedPcsGroup extends ConsumerWidget {
       children: [
         for (final entry in paired) _PairedPcRow(entry: entry),
         _AddSwitchPcRow(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute<void>(builder: (_) => const DeviceListScreen()),
-          ),
+          onTap: () => pushGuarded<void>(context, const DeviceListScreen()),
         ),
       ],
     );
@@ -656,9 +655,7 @@ class _AboutGroup extends ConsumerWidget {
           badge: badge,
           onTap: () {
             hapticTick();
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(builder: (_) => const UpdatesScreen()),
-            );
+            pushGuarded<void>(context, const UpdatesScreen());
           },
         ),
         ConstrainedBox(

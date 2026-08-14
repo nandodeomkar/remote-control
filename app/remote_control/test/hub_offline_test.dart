@@ -22,6 +22,7 @@ import 'package:remote_control/hub/hub_screen.dart';
 import 'package:remote_control/net/connection_providers.dart';
 import 'package:remote_control/net/connection_service.dart';
 import 'package:remote_control/settings/settings_screen.dart';
+import 'package:remote_control/shell/summon_shell.dart';
 import 'package:remote_control/store/device_list_store.dart';
 import 'package:remote_control/store/device_store.dart';
 
@@ -56,7 +57,7 @@ class _StubDeviceList extends DeviceListNotifier {
   List<DeviceListEntry> build() => const [];
 }
 
-Widget _host(DeviceStore store) => ProviderScope(
+Widget _host(DeviceStore store, {bool shell = false}) => ProviderScope(
       overrides: [
         deviceStoreProvider.overrideWithValue(store),
         connectionServiceProvider.overrideWith(
@@ -64,7 +65,19 @@ Widget _host(DeviceStore store) => ProviderScope(
         ),
         deviceListProvider.overrideWith(_StubDeviceList.new),
       ],
-      child: const MaterialApp(home: HubScreen()),
+      child: MaterialApp(
+        // `shell: true` is the production shape (main.dart:114-126) — the
+        // shell mounted at `MaterialApp.builder` so every route sits under a
+        // `SummonScope`. The gear's push now goes through `pushGuarded`
+        // (13-07), whose `SummonBackGuard` asserts a scope above it, so a
+        // bare host throws on the push and proves nothing about D-11.
+        //
+        // It is opt-in rather than the default because the shell reserves
+        // `kSummonBarHeight` at the bottom, and the tile cases below assert
+        // on a grid laid out at a known viewport.
+        builder: shell ? (context, child) => SummonShell(child: child!) : null,
+        home: const HubScreen(),
+      ),
     );
 
 void main() {
@@ -121,7 +134,7 @@ void main() {
     addTearDown(t.view.resetPhysicalSize);
     addTearDown(t.view.resetDevicePixelRatio);
 
-    await t.pumpWidget(_host(store));
+    await t.pumpWidget(_host(store, shell: true));
     await t.pump();
 
     expect(find.byIcon(Symbols.settings_rounded), findsOneWidget);

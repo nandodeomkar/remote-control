@@ -38,13 +38,46 @@ import 'package:flutter/material.dart';
 
 import 'summon_scope.dart';
 
+/// Pushes [screen] as a page route wrapped in a [SummonBackGuard] — the ONE
+/// seam every page push in `lib/` goes through (SUM-04, 13-07).
+///
+/// **Why a helper rather than a convention.** A page route pushed without the
+/// guard silently loses back-dismiss on that route: back keeps popping the
+/// screen with the surface still raised, and there is no error, no assert and
+/// no log to notice it by. The requirement simply does not hold there. Before
+/// this helper existed the guard reached only the root route and the nine tool
+/// screens, so Settings, Device List, Updates, the QR scanner and the bubble's
+/// own expand were all quietly outside SUM-04.
+///
+/// **Enforcement, not memory.** `test/push_sites_guard_test.dart` scans `lib/`
+/// and fails the build on a bare page-route construction outside `lib/shell/`,
+/// so a screen added later is guarded by construction. Do not construct a page
+/// route directly; call this.
+///
+/// **Generic on purpose.** [T] is the route's return type and the returned
+/// future is the route's own, so a caller that awaits a value — the pairing
+/// sheet awaiting `PairQrData` from the QR scanner — still receives it.
+/// Everything else about the push is unchanged: a plain `MaterialPageRoute`
+/// (house rule, D-01 — no go_router), default transition, default settings.
+///
+/// **Modal routes are deliberately NOT pushed through here.** `showDialog` /
+/// `showModalBottomSheet` push their own `ModalRoute`; with one open it is the
+/// topmost route, so back closes it first and the raised surface is untouched.
+/// That is intended behaviour (six such sites exist) — do not wire guards into
+/// them and do not "fix" it.
+Future<T?> pushGuarded<T>(BuildContext context, Widget screen) {
+  return Navigator.of(context).push<T>(
+    MaterialPageRoute<T>(builder: (_) => SummonBackGuard(child: screen)),
+  );
+}
+
 /// Wraps one page route so a system back lowers the surface **that route
 /// raised** before it pops the route itself.
 ///
-/// Every page route needs one or SUM-04 fails silently on the un-wrapped ones
-/// (a later plan adds `pushGuarded<T>` plus a source-scanning guard test so an
-/// un-wrapped push cannot ship). Modal routes deliberately do not — see the
-/// library doc.
+/// Every page route needs one or SUM-04 fails silently on the un-wrapped ones,
+/// which is why [pushGuarded] is the only sanctioned way to push one and
+/// `test/push_sites_guard_test.dart` fails the build on a bare construction.
+/// Modal routes deliberately do not — see the library doc.
 class SummonBackGuard extends StatefulWidget {
   /// The route's content.
   final Widget child;

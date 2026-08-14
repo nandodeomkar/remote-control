@@ -11,9 +11,9 @@
 ///
 /// [HubTileGrid] is widget-only (the MouseButtonsBar callback pattern):
 /// taps surface through the injected `onOpen(spec)` so widget tests never
-/// touch the Navigator. [HubScreen] wires `onOpen` to a plain
-/// `MaterialPageRoute` push of the spec's builder (house rule — no
-/// go_router).
+/// touch the Navigator. [HubScreen] wires `onOpen` to `pushGuarded` — a plain
+/// page-route push of the spec's builder (house rule — no go_router) through
+/// the one back-guarded seam (13-07, SUM-04).
 ///
 /// Offline-disabled tiles (D-08 / 07-UI-SPEC §2): when the chip status is
 /// `disconnected`, every tool tile renders with `onTap: null` and a muted
@@ -47,6 +47,7 @@ import '../net/connection_service.dart' show ChipStatus, ConnectionService;
 import '../power/power_screen.dart';
 import '../presenter/presenter_screen.dart';
 import '../settings/settings_screen.dart';
+import '../shell/summon_back_guard.dart';
 import '../shortcuts/shortcuts_screen.dart';
 import '../theme/tokens.dart';
 import '../trackpad/trackpad_screen.dart';
@@ -63,7 +64,7 @@ class HubTileSpec {
   /// Tile icon (UI-SPEC icon table), rendered 32px muted.
   final IconData icon;
 
-  /// Builds the destination screen for the MaterialPageRoute push.
+  /// Builds the destination screen for the guarded page push.
   final WidgetBuilder builder;
 
   /// Whether the pushed destination shows the floating trackpad bubble
@@ -275,18 +276,24 @@ class _HubScreenState extends ConsumerState<HubScreen> {
     _service = ref.read(connectionServiceProvider);
   }
 
-  /// Tile tap → plain MaterialPageRoute push (house rule, D-01), wrapped in
-  /// [BubbleScaffold] CENTRALLY so every tool screen gets the floating
-  /// trackpad bubble + UIPI banner (D8-05) — the Trackpad tile alone
-  /// passes `showBubble: false` (no shortcut to the screen you are on).
+  /// Tile tap → [pushGuarded] (13-07: the one seam every page push goes
+  /// through, so back dismisses a raised surface here as everywhere), with the
+  /// destination still wrapped in [BubbleScaffold] CENTRALLY so every tool
+  /// screen gets the floating trackpad bubble + UIPI banner (D8-05) — the
+  /// Trackpad tile alone passes `showBubble: false` (no shortcut to the screen
+  /// you are on). The guard sits OUTSIDE the bubble wrapper: the bubble is not
+  /// retired until Phase 16 and the two must coexist until then.
+  ///
+  /// `spec.builder` receives this screen's context rather than the route's;
+  /// every entry in [kHubTiles] discards its argument (`(_) => const …`), so
+  /// the destination widget is identical.
   void _open(HubTileSpec spec) {
     unawaited(
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (context) => BubbleScaffold(
-            showBubble: spec.showBubble,
-            body: spec.builder(context),
-          ),
+      pushGuarded<void>(
+        context,
+        BubbleScaffold(
+          showBubble: spec.showBubble,
+          body: spec.builder(context),
         ),
       ),
     );
@@ -294,11 +301,7 @@ class _HubScreenState extends ConsumerState<HubScreen> {
 
   /// Gear tap → SettingsScreen. Always reachable, including offline (D-11).
   void _openSettings() {
-    unawaited(
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const SettingsScreen()),
-      ),
-    );
+    unawaited(pushGuarded<void>(context, const SettingsScreen()));
   }
 
   @override

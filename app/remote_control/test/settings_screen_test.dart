@@ -23,6 +23,7 @@ import 'package:remote_control/net/connection_service.dart';
 import 'package:remote_control/screens/connection_copy.dart' show deviceMetaPaired;
 import 'package:remote_control/screens/device_list_screen.dart';
 import 'package:remote_control/settings/settings_screen.dart';
+import 'package:remote_control/shell/summon_shell.dart';
 import 'package:remote_control/store/device_list_store.dart';
 import 'package:remote_control/store/device_store.dart';
 import 'package:remote_control/theme/tokens.dart';
@@ -97,6 +98,32 @@ Widget _host(DeviceStore store, {bool badge = false}) => ProviderScope(
         updateBadgeProvider.overrideWithValue(badge),
       ],
       child: const MaterialApp(home: SettingsScreen()),
+    );
+
+/// [_host] with the shell mounted at `MaterialApp.builder`, exactly as
+/// `main.dart:114-126` does it.
+///
+/// Only the push test needs this: the add/switch-PC row goes through
+/// `pushGuarded` (13-07), and the `SummonBackGuard` it wraps the route in
+/// asserts a `SummonScope` above it, so a bare `MaterialApp` host throws on
+/// the push. It is deliberately NOT the default host — the shell reserves
+/// `kSummonBarHeight` at the bottom, which shortens the lazily-built
+/// `ListView` and would stop unrelated cases from laying out the rows they
+/// assert on.
+Widget _shellHost(DeviceStore store) => ProviderScope(
+      overrides: [
+        deviceStoreProvider.overrideWithValue(store),
+        connectionServiceProvider.overrideWith(
+          (ref) => ConnectionService(store: store),
+        ),
+        deviceListProvider.overrideWith(_StubPairedList.new),
+        appVersionProvider.overrideWith((ref) async => _kTestVersion),
+        updateBadgeProvider.overrideWithValue(false),
+      ],
+      child: MaterialApp(
+        builder: (context, child) => SummonShell(child: child!),
+        home: const SettingsScreen(),
+      ),
     );
 
 /// Pumps the screen tall enough that the About group — last of the six — is
@@ -360,7 +387,7 @@ void main() {
 
   testWidgets('the add/switch-PC entry pushes the device list screen',
       (t) async {
-    await t.pumpWidget(_host(store));
+    await t.pumpWidget(_shellHost(store));
     await t.pump();
 
     expect(find.text(kAddSwitchPcLabel), findsOneWidget);
