@@ -5,16 +5,16 @@ milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
 status: executing
-stopped_at: Completed 13-05-PLAN.md
-last_updated: "2026-08-14T16:34:12.341Z"
+stopped_at: Completed 13-06-PLAN.md
+last_updated: "2026-08-14T16:49:48.076Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 13 plan 05 executed (back-guard ownership + orphan scenarios, predictive-back baseline recorded; full suite 951 green)
+last_activity_desc: Phase 13 plan 06 executed (browser one-thing-per-gesture by predicate; the invariant test caught the guard mutating shared state mid-dispatch; full suite 954 green)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 10
-  completed_plans: 4
-  percent: 40
+  completed_plans: 5
+  percent: 50
 ---
 
 > ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
@@ -44,11 +44,12 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 ## Current Position
 
 Phase: 13 (Summon Shell & Bar) — EXECUTING
-Plan: 4 of 10 complete (13-01, 13-02, 13-03, 13-05) — 13-04 still outstanding
+Plan: 5 of 10 complete (13-01, 13-02, 13-03, 13-05, 13-06) — 13-04 still outstanding
 Status: Executing Phase 13
-Last activity: 2026-08-14 — 13-05 done: back resolves exactly one thing per gesture on the
-owning route and rides along everywhere else, the D-13-03 orphan behaves as the owner decided,
-and the predictive-back baseline is recorded as false/true/false with nothing enabled
+Last activity: 2026-08-14 — 13-06 done: the one route with two back handlers resolves exactly
+one thing per gesture by predicate. Case 1 found that predicates alone were not enough — the
+guard's synchronous `lower()` destroyed the state the browser's callback had to read, so the
+pop dispatch is now a pure read phase (the lower defers one microtask, not a latch)
 
 > **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
 > reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
@@ -170,6 +171,7 @@ and the predictive-back baseline is recorded as false/true/false with nothing en
 | Phase 13 P02 | 70m | 3 tasks | 9 files |
 | Phase 13 P03 | 55m | 2 tasks | 3 files |
 | Phase 13 P05 | 45m | 2 tasks | 2 files |
+| Phase 13 P06 | 40m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -423,6 +425,7 @@ Recent decisions affecting current work:
 - [Phase 13-05]: The predictive-back baseline test must drive the app lifecycle to resumed BEFORE the first pump — WidgetsApp latches lifecycleState once in initState and nothing re-dispatches the startup NavigationNotification, so the research-documented after-pump ordering leaves the channel capture empty
 - [Phase 13-05]: debugDefaultTargetPlatformOverride rides a TargetPlatformVariant, never a setUp/tearDown pair — flutter_test verifies foundation debug vars at the end of the test BODY, before any tearDown runs
 - [Phase 13-05]: Ownership is proven as an ABSENT id, not a cleared one — the orphan case asserts the raise still records the dead guard id, plus a source scan that neither shell file names a Route type in code (D-13-19)
+- [Phase 13-06]: two back handlers on one route resolve by mutually-exclusive predicates over one shared state; the pop dispatch is a pure READ phase — the guard defers its lower() one microtask so it cannot destroy the state the browser's callback reads. Not a latch: nothing records which callback ran first
 
 ### Pending Todos
 
@@ -532,8 +535,8 @@ plus the audit's own tech-debt list.
 
 ## Session Continuity
 
-Last session: 2026-08-14T16:34:12.310Z
-Stopped at: Completed 13-05-PLAN.md
+Last session: 2026-08-14T16:49:48.046Z
+Stopped at: Completed 13-06-PLAN.md
 Resume file: None
 
 Previous session: 2026-08-12T16:20:00.000Z — quick 260812-tsw closed the last pending
