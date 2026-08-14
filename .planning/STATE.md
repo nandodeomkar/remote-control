@@ -2,9 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: The Summon Bar
+current_phase: 13
+current_phase_name: Summon Shell & Bar
 status: planning
-last_updated: "2026-08-13T17:43:26.000Z"
+stopped_at: Phase 13 context gathered
+last_updated: "2026-08-14T01:05:47.765Z"
 last_activity: 2026-08-13
+last_activity_desc: v1.1 roadmap created (Phases 13-18, 25/25 requirements mapped)
 progress:
   total_phases: 6
   completed_phases: 0
@@ -509,9 +513,9 @@ plus the audit's own tech-debt list.
 
 ## Session Continuity
 
-Last session: 2026-08-13T17:43:26.000Z
-Stopped at: v1.1 roadmap created — six phases (13-18) with all 25 requirements mapped and no orphans. ROADMAP.md and REQUIREMENTS.md traceability written. Nothing planned or executed yet.
-Resume file: None
+Last session: 2026-08-14T01:05:47.742Z
+Stopped at: Phase 13 context gathered
+Resume file: .planning/phases/13-summon-shell-bar/13-CONTEXT.md
 
 Previous session: 2026-08-12T16:20:00.000Z — quick 260812-tsw closed the last pending
 todo (a dismissed keyboard panel releases a locked modifier on the PC); v1.0 was closed
@@ -526,9 +530,12 @@ and archived, and v1.1 was started.
   there is no route, so it is a silent no-op — no error, no warning, no log. If it does
   not intercept back from a route below a `MaterialApp.builder` shell, the host shape
   changes, and Phase 13 is the cheapest place in the milestone for that to happen
+
 - Two cheap pre-planning checks named by research: does `AndroidManifest.xml` already
   declare `android:enableOnBackInvokedCallback="true"` (2 min), and how many existing
   `PopScope`/`WillPopScope` usages are there (5 min — they AND with the bar's)
+
 - Research flags: Phases 13 and 15 want `--research-phase`; 14, 16, 17 and 18 use
   established patterns and should skip it
+
 - The ten v1.0 deferred items above stay deferred through v1.1
