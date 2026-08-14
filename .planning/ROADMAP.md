@@ -85,7 +85,7 @@ Phase directories: [`milestones/v1.0-phases/`](./milestones/v1.0-phases/)
   5. On the owner's device, summon and dismiss feel quick at the frequency a permanent bar invites (this is what closes OQ-A1 sub-question 1; 200/150 is a one-constant change each if it does not)
 
 **Research**: recommended — run `--research-phase`. Highest concentration of unverified premises in the milestone
-**Plans**: 3/10 plans executed
+**Plans**: 4/10 plans executed
 
 Plans:
 **Wave 1**
@@ -99,7 +99,7 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 13-03-PLAN.md — Motion: 200/150 pinned by falsifiable timing, swap-in-place as one motion, and the single dismiss seam
-- [ ] 13-05-PLAN.md — The back vocabulary: the ownership scenario, the orphan case, and the predictive-back baseline
+- [x] 13-05-PLAN.md — The back vocabulary: the ownership scenario, the orphan case, and the predictive-back baseline
 - [ ] 13-06-PLAN.md — Browser one-thing-per-gesture: the predicate-conditional bookmarks back handler
 - [ ] 13-07-PLAN.md — Push-site coverage: one guarded seam, seven call sites, and a source-scanning guard
 - [ ] 13-08-PLAN.md — The overlay contracts (outside taps land, nothing reflows) and the three named 640dp reach cases
@@ -415,7 +415,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 13. Summon Shell & Bar | 3/10 | In Progress | - |
+| 13. Summon Shell & Bar | 4/10 | In Progress | - |
 | 14. Raised Trackpad | 0/TBD | Not started | - |
 | 15. Raised Keyboard | 0/TBD | Not started | - |
 | 16. Bubble Retirement | 0/TBD | Not started | - |
