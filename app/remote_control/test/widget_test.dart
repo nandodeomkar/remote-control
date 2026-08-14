@@ -1,6 +1,18 @@
 // App-shell smoke test: home is the dashboard (D-08, 07-13), and the
 // remote_protocol path dependency resolves and imports.
 //
+// 13-08 — THIS FILE IS NOW THE BAR-01 END-TO-END ANCHOR.
+//
+// It is the only test in the suite that pumps `RemoteControlApp` (the real
+// `main.dart` entry point), so it is the only place where BAR-01 is proved
+// through the production wiring rather than through a harness that builds
+// `SummonShell` itself. `test/shell/summon_shell_test.dart` mounts the shell
+// at `MaterialApp.builder` by hand and would stay green if `main.dart` stopped
+// mounting it at all; this file would not. That is why TEST-MIGRATION.md
+// schedules this file's mutation for Phase 13 rather than Phase 16 — and why
+// Phase 16's migration pass must RE-RUN it rather than treat it as bubble-era
+// collateral.
+//
 // Storage/beacon seams are overridden with inert fakes so the shell pumps
 // without platform plugins or sockets: the launch kick reads the fake store
 // (no remembered device -> no dial), the device list notifier is stubbed to an
@@ -22,6 +34,9 @@ import 'package:remote_control/net/beacon.dart';
 import 'package:remote_control/net/beacon_listener.dart';
 import 'package:remote_control/net/connection_providers.dart';
 import 'package:remote_control/net/connection_service.dart';
+import 'package:remote_control/shell/summon_bar.dart';
+import 'package:remote_control/shell/summon_geometry.dart';
+import 'package:remote_control/shell/summon_icon_button.dart';
 import 'package:remote_control/store/device_list_store.dart';
 import 'package:remote_control/store/device_store.dart';
 
@@ -73,36 +88,78 @@ class _FakeBeaconListener implements BeaconListener {
   Future<void> stop() async {}
 }
 
+/// Pumps the REAL application widget over the inert seams.
+///
+/// Extracted (13-08) so the BAR-01 case below pumps byte-identically to the
+/// homing case — the two must not drift into testing two different apps.
+/// Every line of setup and every comment is the original.
+Future<void> _pumpApp(WidgetTester tester) async {
+  // 12-15: the dashboard's settings gear now carries the update badge, which
+  // reads the update CACHE (shared_preferences) so it is correct offline and
+  // before the Updates screen has ever been opened. `SharedPreferencesAsync`
+  // throws from its CONSTRUCTOR when no platform instance is registered, so
+  // the in-memory platform is required here for the same reason
+  // hub_offline_test and settings_screen_test already install it.
+  SharedPreferencesAsyncPlatform.instance =
+      InMemorySharedPreferencesAsync.empty();
+  final store = DeviceStore(secure: _FakeSecureKv(), prefs: _FakePrefsKv());
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        deviceStoreProvider.overrideWithValue(store),
+        connectionServiceProvider.overrideWith(
+          (ref) => ConnectionService(store: store),
+        ),
+        beaconListenerProvider.overrideWithValue(_FakeBeaconListener()),
+        deviceListProvider.overrideWith(_StubDeviceList.new),
+      ],
+      child: const RemoteControlApp(),
+    ),
+  );
+  await tester.pump();
+}
+
 void main() {
   testWidgets('app shell homes on the dashboard', (tester) async {
-    // 12-15: the dashboard's settings gear now carries the update badge, which
-    // reads the update CACHE (shared_preferences) so it is correct offline and
-    // before the Updates screen has ever been opened. `SharedPreferencesAsync`
-    // throws from its CONSTRUCTOR when no platform instance is registered, so
-    // the in-memory platform is required here for the same reason
-    // hub_offline_test and settings_screen_test already install it.
-    SharedPreferencesAsyncPlatform.instance =
-        InMemorySharedPreferencesAsync.empty();
-    final store = DeviceStore(secure: _FakeSecureKv(), prefs: _FakePrefsKv());
-    await tester.pumpWidget(
-      ProviderScope(
-        overrides: [
-          deviceStoreProvider.overrideWithValue(store),
-          connectionServiceProvider.overrideWith(
-            (ref) => ConnectionService(store: store),
-          ),
-          beaconListenerProvider.overrideWithValue(_FakeBeaconListener()),
-          deviceListProvider.overrideWith(_StubDeviceList.new),
-        ],
-        child: const RemoteControlApp(),
-      ),
-    );
-    await tester.pump();
+    await _pumpApp(tester);
 
     // Home is the dashboard (D-08) with the fallback "Remote" title —
     // no remembered device means no connected target name.
     expect(find.byType(HubScreen), findsOneWidget);
     expect(find.text('Remote'), findsOneWidget);
+  });
+
+  testWidgets('BAR-01: the summon bar renders on the hub through the REAL '
+      'application widget', (tester) async {
+    await _pumpApp(tester);
+
+    expect(
+      find.byType(HubScreen),
+      findsOneWidget,
+      reason: 'the bar claim below is about the HUB specifically — BAR-01 says '
+          'the bar is on every screen INCLUDING the dashboard',
+    );
+    expect(
+      find.byKey(kSummonBarKey),
+      findsOneWidget,
+      reason: 'ONE bar, app-scope. `main.dart` mounts SummonShell at '
+          'MaterialApp.builder; if that mount is ever removed or moved below '
+          'the Navigator, this is the only test in the suite that notices',
+    );
+    expect(find.byKey(kSummonTrackpadIconKey), findsOneWidget);
+    expect(
+      find.byKey(kSummonKeyboardIconKey),
+      findsOneWidget,
+      reason: 'both slots, located BY KEY — the keyboard glyph collides with '
+          'KeyboardTabBar\'s Type tab the moment Phase 15 mounts it',
+    );
+
+    expect(
+      tester.getRect(find.byKey(kSummonBarKey)).height,
+      closeTo(kSummonBarHeight, 0.01),
+      reason: 'the RENDERED height, against the declared constant — "a widget '
+          'of that type exists somewhere" is not BAR-01',
+    );
   });
 
   test('remote_protocol imports via path dependency', () {
