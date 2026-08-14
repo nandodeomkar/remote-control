@@ -52,7 +52,7 @@ protocol change, no `protoVersion` bump. Requirement IDs use fresh prefixes; v1.
 
 ### Motion
 
-- [ ] **MOT-01**: Summon completes in 200ms and dismiss in 150ms
+- [x] **MOT-01**: Summon completes in 200ms and dismiss in 150ms
 - [ ] **MOT-02**: Summon and dismiss stay smooth under repeated use, with worst-frame UI and raster times recorded from a 20-cycle trace
 
 ### Chip Row
@@ -115,7 +115,7 @@ Phase numbering **continues** from v1.0 — v1.1 runs **Phases 13-18**, it does 
 | RET-01 | Phase 16 — Bubble Retirement | Pending |
 | RET-02 | Phase 17 — Hub Tiles & Bar Identity | Pending |
 | RET-03 | Phase 14 — Raised Trackpad | Pending |
-| MOT-01 | Phase 13 — Summon Shell & Bar | Pending |
+| MOT-01 | Phase 13 — Summon Shell & Bar | Complete |
 | MOT-02 | Phase 18 — Chip Row & Measured Motion | Pending |
 | CHIP-01 | Phase 18 — Chip Row & Measured Motion | Pending |
 | CHIP-02 | Phase 18 — Chip Row & Measured Motion | Pending |

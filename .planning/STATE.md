@@ -5,16 +5,16 @@ milestone_name: The Summon Bar
 current_phase: 13
 current_phase_name: Summon Shell & Bar
 status: executing
-stopped_at: Completed 13-02-PLAN.md — bar + empty surface visible, inset arithmetic pinned
-last_updated: "2026-08-14T13:20:00.000Z"
+stopped_at: Completed 13-03-PLAN.md — swap in place, one dismiss seam, MOT-01 falsifiably pinned
+last_updated: "2026-08-14T16:14:20.176Z"
 last_activity: 2026-08-14
-last_activity_desc: Phase 13 plan 02 executed (bar, surface, handle, geometry; full suite 936 green)
+last_activity_desc: Phase 13 plan 03 executed (swap in place, one dismiss seam, MOT-01 pinned; full suite 941 green)
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 10
-  completed_plans: 2
-  percent: 20
+  completed_plans: 3
+  percent: 30
 ---
 
 > ✅ **2026-08-08 — THE 100% IS NOW REAL.** It stopped being a file count on
@@ -44,11 +44,11 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 ## Current Position
 
 Phase: 13 (Summon Shell & Bar) — EXECUTING
-Plan: 2 of 10 complete — next is 13-03
+Plan: 3 of 10 complete — next is 13-04
 Status: Executing Phase 13
-Last activity: 2026-08-14 — 13-02 done: the bar renders on every screen, an empty
-correctly-sized surface raises and lowers in place, and the one shared inset derivation
-is pinned across five worked devices
+Last activity: 2026-08-14 — 13-03 done: the surface swaps in place as one motion that
+never leaves the bar, one named dismiss seam fires on both the lower and the swap edge,
+and the 200/150 budgets are pinned by assertions a wrong duration turns red
 
 > **Phase numbering continues from v1.0.** v1.1 runs Phases **13-18**; it does not
 > reset to 1. The `total_phases: 6` in frontmatter counts v1.1's phases only.
@@ -168,6 +168,7 @@ is pinned across five worked devices
 | Phase 12 P18 | 7h 15m | 4 tasks | 4 files |
 | Phase 13 P01 | 50m | 3 tasks | 6 files |
 | Phase 13 P02 | 70m | 3 tasks | 9 files |
+| Phase 13 P03 | 55m | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -415,6 +416,9 @@ Recent decisions affecting current work:
 - [Phase 13]: 13-02: the shell's Stack children list must stay CONSTANT length (the surface slot collapses to zero height rather than dropping out) — a Stack matches children by position, and a shifting index re-parents the bar's OverlayEntry into a second Overlay, which asserts
 - [Phase 13]: 13-02: the keyboard surface's clamp binds on TWO of the five worked devices (short-with-IME and mid-fall), not one — the 432dp choice runs out of room sooner than the 280dp trackpad; the plan's "device D and only there" was true of the trackpad only
 - [Phase 13]: 13-02: full suite 888 -> 936 with the bar RENDERED (not merely reserved); delta is exactly the 48 new declarations, zero pre-existing status changes
+- [Phase 13]: 13-03: The dismiss seam's two call expressions live in SummonShell, not SummonShellController — the seam reports a surface LEAVING THE SCREEN and the shell is what holds the animation state; the controller's two invocations were removed so each departing surface reports exactly once (D-13-10, T-13-08)
+- [Phase 13]: 13-03: Both swap lerp endpoints are stored as SummonSurfaceKinds and re-derived from the live 'available' every build — never a cached dp figure, so an IME metric change retargets the surface at rest AND mid-swap (RESEARCH F4, verified in both regimes)
+- [Phase 13]: 13-03: MOT-01's budgets are pinned by assertions, not constants — confirmed by hand-mutation (lower 150→200 reds cases 2+4; raise 200→300 reds case 1; a _raise.reverse() in the swap path reds cases 3+5)
 
 ### Pending Todos
 
@@ -524,8 +528,8 @@ plus the audit's own tech-debt list.
 
 ## Session Continuity
 
-Last session: 2026-08-14T13:20:00.000Z
-Stopped at: Completed 13-02-PLAN.md
+Last session: 2026-08-14T16:14:20.136Z
+Stopped at: Completed 13-03-PLAN.md — swap in place, one dismiss seam, MOT-01 falsifiably pinned
 Resume file: None
 
 Previous session: 2026-08-12T16:20:00.000Z — quick 260812-tsw closed the last pending
