@@ -97,11 +97,21 @@ class SummonSurface extends StatelessWidget {
               top: BorderSide(color: kHairline, width: kSummonHairline),
             ),
           ),
-          child: Column(
-            children: [
-              SummonHandle(),
-              Expanded(child: SizedBox.shrink()),
-            ],
+          // A `Border` on a `DecoratedBox` is PAINTED, not laid out — it costs
+          // zero height unless something reserves it. The content box Phases 14
+          // and 15 inherit is `height - kSummonHairline -
+          // kSummonHandleBandHeight`, so the rule must actually cost its 1dp
+          // here or the expanded region is 1dp taller than the number those
+          // phases were handed, and the handle band sits under the rule instead
+          // of below it.
+          child: Padding(
+            padding: EdgeInsets.only(top: kSummonHairline),
+            child: Column(
+              children: [
+                SummonHandle(),
+                Expanded(child: SizedBox.shrink()),
+              ],
+            ),
           ),
         ),
       ),
