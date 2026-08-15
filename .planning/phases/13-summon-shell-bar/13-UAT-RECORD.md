@@ -2,11 +2,13 @@
 phase: 13-summon-shell-bar
 plan: 10
 kind: uat-record
-status: awaiting-observation
-build: flutter build apk --debug (app/remote_control)
+status: partially-observed
+build: RemoteControl-v1.7.0.apk — the RELEASE build (AOT), not the debug APK this
+  plan originally specified. Motion judgements below are therefore against the
+  build the owner actually runs, which is the stricter and more relevant surface.
 device: <fill in: model + Android version>
 observed_by: owner
-observed_on: <fill in: YYYY-MM-DD>
+observed_on: 2026-08-15
 ---
 
 # Phase 13 — Hardware UAT Record
@@ -54,12 +56,28 @@ real use. Also tap trackpad → keyboard → trackpad to feel the swap.
 say **which direction** — raise and lower are separate constants and can move
 independently.
 
-- Observation (raise, currently 200ms):
-- Observation (lower, currently 150ms):
-- Observation (swap, currently 200ms):
-- Tuning requested (new value, or "none"):
+- Observation (raise, currently 200ms): Works on tap. Raises nicely.
+- Observation (lower, currently 150ms): Lowers nicely.
+- Observation (swap, currently 200ms): Swaps nicely.
+- Tuning requested (new value, or "none"): **none** — all three budgets stand at
+  200 / 150 / 200. Judged on the v1.7.0 RELEASE build, so this verdict is against
+  AOT timings rather than debug-JIT ones.
 
-**Status:** ⬜ not yet observed
+**Also observed, unprompted — and it is the SPECIFIED behaviour, not a defect.**
+Dragging a raised surface up or down does nothing. That is D-13-07: the 48dp handle
+ships in Phase 13 as *inert chrome*, with no gesture recognizer at all
+(`summon_handle.dart` states it in its library doc). SUM-05 — the handle as a working,
+a11y-drivable dismiss route — is mapped to **Phase 14**. The band is rendered now only
+so the geometry this phase pins is the geometry that ships.
+
+**This is a positive signal for Phase 14, not a null result.** The owner reached for a
+drag without being asked to, which is evidence the affordance reads as draggable. Phase
+14 must attach its recognizer to the 48x48 target as a **sibling** of the surface
+content, never an ancestor — the `floating_trackpad_window.dart:245-257` rule — or the
+trackpad's raw pointer listener will lose the arena uncontested and every dismiss will
+nudge the PC cursor invisibly.
+
+**Status:** ✅ observed — no tuning
 
 ---
 
@@ -88,12 +106,16 @@ drag — even though it is empty chrome in this build, judge the *space*.
    this answer is the justification for the full-screen Trackpad hub tile surviving,
    and **Phase 14 inherits this verdict** (RET-03).
 
-- Observation (vs the bubble window's 234dp):
-- Observation (still clearly smaller than the full Trackpad screen?):
-- Tuning requested (new height in dp, or "none" — 280 stays):
-- Resulting content box if tuned (`new height − 1 − 48` = ___ dp):
+- Observation (vs the bubble window's 234dp): "Looks good." The 3dp deficit does not
+  read as a downgrade.
+- Observation (still clearly smaller than the full Trackpad screen?): **OUTSTANDING.**
+  The owner's "looks good" answered the height question; this is the separate second
+  question and it has not been answered yet. It must not be inferred from the first.
+- Tuning requested (new height in dp, or "none" — 280 stays): **none** — 280 stays.
+- Resulting content box if tuned (`new height − 1 − 48` = ___ dp): unchanged at **231**dp.
 
-**Status:** ⬜ not yet observed
+**Status:** 🟡 half observed — the height verdict is in (280 stays, 231dp of pad).
+Phase 14's RET-03 input is still open.
 
 ---
 
@@ -112,10 +134,12 @@ you are used to.
 
 **What to answer.** Does it look right on your screen, or too tall?
 
-- Observation:
-- Tuning requested (new height in dp, or "none" — 432 stays):
+- Observation: "Looks good." Not too tall on the owner's screen.
+- Tuning requested (new height in dp, or "none" — 432 stays): **none** — 432 stays,
+  383dp of content.
 
-**Status:** ⬜ not yet observed
+**Status:** ✅ observed — no tuning. Phase 15 sizes its four pads inside a **confirmed**
+432dp box with `Expanded` (D-13-15), against ~15dp of headroom.
 
 ---
 
@@ -160,11 +184,19 @@ the baseline that SC3 is later measured against. There is no wrong answer here.*
 
 Attach a screen recording if it is easier than describing it.
 
-- Observation (nothing raised — the baseline):
-- Observation (surface raised — what the surface does during the gesture):
-- Video / screen recording attached (path or "none"):
+- Observation (nothing raised — the baseline): **OUTSTANDING.** The owner reported route
+  behaviour — "back from a hub tile goes to the hub" — which confirms SUM-04's *logic*
+  but is not this slot. This slot wants what the **system compositor** draws during a
+  back gesture **from the hub root** with nothing raised: whether the app window peeks
+  or scales away toward home, or whether there is no animation at all.
+- Observation (surface raised — what the surface does during the gesture): **confirmed
+  functionally** — a back gesture from a raised surface lowers the surface and the app
+  stays (SUM-04 holds, and the guard fires on the route that raised it). What the raised
+  surface *looks like* mid-gesture, while the compositor scales the window, is still open.
+- Video / screen recording attached (path or "none"): none
 
-**Status:** ⬜ not yet observed · **recorded as a BASELINE, not a pass**
+**Status:** 🟡 half observed — the dismiss behaviour is confirmed; the compositor
+baseline SC3 is measured against is not yet recorded. **Still a BASELINE, not a pass.**
 
 ---
 
