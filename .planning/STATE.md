@@ -6,9 +6,9 @@ current_phase: 13
 current_phase_name: Summon Shell & Bar
 status: executing
 stopped_at: Completed 13-09-PLAN.md
-last_updated: "2026-08-14T23:55:00.000Z"
-last_activity: 2026-08-14
-last_activity_desc: Phase 13 plan 09 executed (BAR-03's corrected focus predicate and BAR-04's depth-counted QR suppressor; both mutations per suite hand-falsified red; one framework deviation — both suppressor lifecycle edges must apply at end-of-frame; full suite 991 green)
+last_updated: "2026-08-15T00:06:00.000Z"
+last_activity: 2026-08-15
+last_activity_desc: Phase 13 wave 5 resumed — 13-10 is the hardware UAT plan; the record is on disk with every slot blank and the debug APK is built, awaiting the owner's six observations at the blocking checkpoint
 progress:
   total_phases: 6
   completed_phases: 0
@@ -46,7 +46,8 @@ all 12 phase directories at `milestones/v1.0-phases/`.
 Phase: 13 (Summon Shell & Bar) — EXECUTING
 Plan: 9 of 10 complete (13-01 … 13-09) — 13-10 outstanding
 Status: Executing Phase 13
-Last activity: 2026-08-14 — 13-09 done: the phase's one genuine security control is in.
+Last activity: 2026-08-15 — Wave 5 resumed at 13-10, the hardware UAT plan. 13-09 remains
+the last code landing: the phase's one genuine security control is in.
 The keyboard icon is now disabled for exactly as long as a local text field holds focus,
 by a predicate that is a property of the FOCUSED NODE and names no screen — so the
 pairing sheet, both device-list fields and any future screen that grows a field are all

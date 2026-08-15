@@ -7,3 +7,5 @@ graphify-out/
 # Installer output (installer/build-installer.ps1) -- release artifacts are
 # attached to GitHub Releases, never committed.
 /dist/
+# GSD runtime scratch (dispatch-isolation sentinel) -- per-machine, not source.
+/.gsd/
