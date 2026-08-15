@@ -7,7 +7,7 @@
 //! action. Positioned bottom-right of the primary work area (just above the
 //! taskbar), like the Win11 quick-settings flyout.
 
-use winit::dpi::{LogicalSize, PhysicalPosition};
+use winit::dpi::{LogicalSize, PhysicalPosition, PhysicalSize};
 use winit::event_loop::{ActiveEventLoop, EventLoopProxy};
 use winit::platform::windows::WindowAttributesExtWindows as _;
 use winit::window::{Window, WindowId, WindowLevel};
@@ -17,10 +17,142 @@ use super::glwin::GlWindow;
 use super::style::{self, icon};
 use super::{ShellCtx, UserEvent};
 
-/// Logical size (handoff: 344px wide flyout).
-const SIZE: (f64, f64) = (344.0, 398.0);
 /// Gap between the flyout and the work-area edges (logical px).
 const EDGE_GAP: f64 = 12.0;
+/// Logical width (handoff: 344px wide flyout).
+const WIDTH: f64 = 344.0;
+/// Logical height at creation. Deliberately the *disconnected* height: the
+/// common open then needs no correction, and only a connected open pays one
+/// frame of catch-up.
+const INITIAL_HEIGHT: f64 = 398.0;
+/// Anti-oscillation tolerance for the content-driven resize (logical px).
+/// The loop this guards is real, not hypothetical: at 125% scale a 458.0
+/// logical request becomes 572.5 physical, rounds to 572 or 573, and reads
+/// back as 457.6 or 458.4. Without the tolerance that 0.4px is a fresh resize
+/// every frame, each resize forces a redraw, and the shell thread spins.
+/// 1.5 sits far above that wobble and far below the ~60px signal.
+const HEIGHT_EPSILON: f64 = 1.5;
+/// Floor for the content-driven height (logical px).
+const MIN_HEIGHT: f64 = 200.0;
+
+/// The inner height to request, in logical px, for a frame that measured
+/// `content_h` of content against a window currently `current_h` tall — or
+/// `None` to leave the window alone.
+fn next_height(content_h: f64, current_h: f64, max_h: f64) -> Option<f64> {
+    // A frame that allocated nothing yields `Rect::NOTHING` (`max.y == -inf`),
+    // and a NaN would sail straight through `clamp` into `request_inner_size`.
+    if !content_h.is_finite() {
+        return None;
+    }
+    // `max_h.max(MIN_HEIGHT)`, not `max_h`: `f64::clamp` panics when min > max,
+    // and a tiny work area supplies exactly that.
+    let target = content_h.clamp(MIN_HEIGHT, max_h.max(MIN_HEIGHT));
+    ((target - current_h).abs() > HEIGHT_EPSILON).then_some(target)
+}
+
+/// Bottom-right anchor for a window of `size`, inset `gap` from the work
+/// area's `right`/`bottom` edges. All physical px.
+fn anchor_bottom_right(
+    size: PhysicalSize<u32>,
+    right: i32,
+    bottom: i32,
+    gap: i32,
+) -> PhysicalPosition<i32> {
+    PhysicalPosition::new(
+        right - size.width as i32 - gap,
+        bottom - size.height as i32 - gap,
+    )
+}
+
+/// The primary work area's far edges and height, in physical px.
+struct WorkArea {
+    right: i32,
+    bottom: i32,
+    height: i32,
+}
+
+/// Read the primary work area (the desktop minus the taskbar). Falls back to
+/// the current monitor when the work-area read fails.
+fn work_area(window: &Window) -> Option<WorkArea> {
+    use windows::Win32::Foundation::RECT;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        SystemParametersInfoW, SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
+    };
+    let mut work = RECT::default();
+    // SAFETY: SPI_GETWORKAREA writes a RECT into the provided pointer.
+    let got = unsafe {
+        SystemParametersInfoW(
+            SPI_GETWORKAREA,
+            0,
+            Some(&mut work as *mut _ as *mut _),
+            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
+        )
+    }
+    .is_ok();
+    if got {
+        return Some(WorkArea {
+            right: work.right,
+            bottom: work.bottom,
+            height: work.bottom - work.top,
+        });
+    }
+    let mon = window.current_monitor()?;
+    let pos = mon.position();
+    let msize = mon.size();
+    Some(WorkArea {
+        right: pos.x + msize.width as i32,
+        bottom: pos.y + msize.height as i32,
+        height: msize.height as i32,
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{anchor_bottom_right, next_height, WIDTH};
+    use winit::dpi::PhysicalSize;
+
+    #[test]
+    fn connecting_grows_the_flyout() {
+        assert_eq!(next_height(458.0, 398.0, 900.0), Some(458.0));
+    }
+
+    #[test]
+    fn disconnecting_shrinks_it_back() {
+        assert_eq!(next_height(398.0, 458.0, 900.0), Some(398.0));
+    }
+
+    #[test]
+    fn sub_pixel_wobble_requests_nothing() {
+        assert_eq!(next_height(398.4, 398.0, 900.0), None);
+        assert_eq!(next_height(397.6, 398.0, 900.0), None);
+    }
+
+    #[test]
+    fn never_taller_than_the_work_area() {
+        assert_eq!(next_height(2000.0, 398.0, 700.0), Some(700.0));
+    }
+
+    #[test]
+    fn a_tiny_work_area_does_not_panic() {
+        assert_eq!(next_height(458.0, 398.0, 100.0), Some(200.0));
+    }
+
+    #[test]
+    fn an_unmeasured_frame_is_ignored() {
+        assert_eq!(next_height(f64::NEG_INFINITY, 398.0, 900.0), None);
+    }
+
+    #[test]
+    fn the_bottom_edge_never_moves() {
+        let (right, bottom, gap) = (1920, 1040, 12);
+        let short = anchor_bottom_right(PhysicalSize::new(344, 398), right, bottom, gap);
+        let tall = anchor_bottom_right(PhysicalSize::new(344, 458), right, bottom, gap);
+        assert_eq!(short.y + 398, tall.y + 458);
+        assert_eq!(short.y + 398, bottom - gap);
+        assert_eq!(short.x, tall.x);
+        assert_eq!(short.x + WIDTH as i32, right - gap);
+    }
+}
 
 pub struct Flyout {
     gl: GlWindow,
@@ -37,7 +169,7 @@ impl Flyout {
     ) -> anyhow::Result<Self> {
         let attrs = Window::default_attributes()
             .with_title("Remote Control")
-            .with_inner_size(LogicalSize::new(SIZE.0, SIZE.1))
+            .with_inner_size(LogicalSize::new(WIDTH, INITIAL_HEIGHT))
             .with_resizable(false)
             .with_decorations(false)
             .with_window_level(WindowLevel::AlwaysOnTop)
@@ -101,39 +233,17 @@ fn glass_clear() -> (f32, f32, f32) {
 }
 
 /// Anchor the flyout to the bottom-right of the primary work area (above
-/// the taskbar). Falls back to monitor size when the work-area read fails.
+/// the taskbar). No-op when the work area is unreadable.
 fn position_above_tray(window: &Window) {
-    use windows::Win32::Foundation::RECT;
-    use windows::Win32::UI::WindowsAndMessaging::{
-        SystemParametersInfoW, SPI_GETWORKAREA, SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS,
-    };
-    let scale = window.scale_factor();
-    let size = window.outer_size();
-    let gap = (EDGE_GAP * scale) as i32;
-
-    let mut work = RECT::default();
-    // SAFETY: SPI_GETWORKAREA writes a RECT into the provided pointer.
-    let got = unsafe {
-        SystemParametersInfoW(
-            SPI_GETWORKAREA,
-            0,
-            Some(&mut work as *mut _ as *mut _),
-            SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0),
-        )
-    }
-    .is_ok();
-    let (right, bottom) = if got {
-        (work.right, work.bottom)
-    } else if let Some(mon) = window.current_monitor() {
-        let pos = mon.position();
-        let msize = mon.size();
-        (pos.x + msize.width as i32, pos.y + msize.height as i32)
-    } else {
+    let Some(area) = work_area(window) else {
         return;
     };
-    window.set_outer_position(PhysicalPosition::new(
-        right - size.width as i32 - gap,
-        bottom - size.height as i32 - gap,
+    let gap = (EDGE_GAP * window.scale_factor()) as i32;
+    window.set_outer_position(anchor_bottom_right(
+        window.outer_size(),
+        area.right,
+        area.bottom,
+        gap,
     ));
 }
 
