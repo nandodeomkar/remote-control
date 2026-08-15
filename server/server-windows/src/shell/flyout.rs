@@ -202,8 +202,15 @@ impl Flyout {
     pub fn request_redraw(&self) {
         self.gl.request_redraw();
     }
-    pub fn resize(&self, size: winit::dpi::PhysicalSize<u32>) {
+    pub fn resize(&self, size: PhysicalSize<u32>) {
         self.gl.resize(size);
+        // Re-anchoring is not polish, it is half the fix. The flyout is
+        // bottom-anchored, and winit's `request_inner_size` reaches
+        // `SetWindowPos` with `SWP_NOMOVE` — the top-left corner stays pinned,
+        // so a taller window grows DOWNWARD, putting the rows the resize was
+        // meant to reveal under the taskbar. No loop: `set_outer_position` is
+        // a move, and a move emits no `Resized`.
+        position_above_tray(self.gl.window());
     }
     pub fn on_window_event(&mut self, event: &winit::event::WindowEvent) -> bool {
         self.gl.on_window_event(event)
@@ -215,10 +222,40 @@ impl Flyout {
     pub fn redraw(&mut self, ctx: &ShellCtx, paused: bool) -> Vec<ShellAction> {
         let mut actions = Vec::new();
         let ip_text = self.ip_text.clone();
+        let mut used_h = 0.0f32;
         self.gl.redraw(glass_clear(), |_window, ui| {
-            render(ui, ctx, paused, &ip_text, &mut actions);
+            used_h = render(ui, ctx, paused, &ip_text, &mut actions);
         });
+        self.fit_to_content(used_h as f64);
         actions
+    }
+
+    /// Grow or shrink the window to the height `render` just measured.
+    ///
+    /// egui clips *painting*, not layout, so an overflowing panel still
+    /// reports the height it wanted — which is what makes the overflow
+    /// correctable at all.
+    ///
+    /// Safe to call from inside the `RedrawRequested` handler: `SetWindowPos`
+    /// carries `SWP_ASYNCWINDOWPOS`, so `WM_SIZE` is queued rather than
+    /// dispatched re-entrantly. If a redraw beats the `Resized` event,
+    /// `current_h` is still stale and the same size is requested again —
+    /// idempotent, and `next_height`'s tolerance stops it once the size lands.
+    fn fit_to_content(&self, content_h: f64) {
+        let win = self.gl.window();
+        let scale = win.scale_factor();
+        let current_h = win.inner_size().height as f64 / scale;
+        // The clamp is a safety net, not a layout rule — at every plausible
+        // DPI the panel clears the work area easily.
+        let max_h = work_area(win)
+            .map(|a| a.height as f64 / scale - 2.0 * EDGE_GAP)
+            .unwrap_or(f64::INFINITY);
+        if let Some(h) = next_height(content_h, current_h, max_h) {
+            // The return value is `None` on Windows — the resize is async and
+            // arrives as `WindowEvent::Resized`, which is where the re-anchor
+            // lives because that is the one place the new size is truthful.
+            let _ = win.request_inner_size(LogicalSize::new(WIDTH, h));
+        }
     }
 }
 
@@ -247,13 +284,18 @@ fn position_above_tray(window: &Window) {
     ));
 }
 
+/// Draws the flyout and returns the logical height its content used.
+///
+/// This `ui` is egui's *root* ui, built with `max_rect(ctx.viewport_rect())`,
+/// so `min_rect()` here is exactly what `Context::globally_used_rect()`
+/// records — no new accessor and no plumbing through the shared window type.
 fn render(
     ui: &mut egui::Ui,
     ctx: &ShellCtx,
     paused: bool,
     ip_text: &str,
     actions: &mut Vec<ShellAction>,
-) {
+) -> f32 {
     // Esc dismisses like a menu.
     if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
         actions.push(ShellAction::Close);
@@ -422,6 +464,12 @@ fn render(
                 actions.push(ShellAction::Quit);
             }
         });
+
+    // `max.y`, not `height()`: the window height needed is the distance from
+    // the window's top, and the two only agree while `min.y` is 0. The
+    // full-panel border above paints against `max_rect` and allocates
+    // nothing, so it cannot inflate this.
+    ui.min_rect().max.y
 }
 
 /// A 40px flyout menu row: icon + label (+ right mono tag). `active` tints
