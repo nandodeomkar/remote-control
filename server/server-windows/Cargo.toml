@@ -4,7 +4,7 @@ name = "server-windows"
 # the exe's VERSIONINFO (build.rs) and installer/build-installer.ps1 reads it
 # for the setup filename and Inno's AppVersion. Bumped off the 0.1.0 scaffold
 # default to match the shipped release line (quick 260729-38z).
-version = "1.7.0"
+version = "1.7.1"
 edition.workspace = true
 rust-version.workspace = true
 description = "Windows composition root for Remote Control: enigo input injection, DPI awareness, tracing subscriber, ServerDeps assembly around server-core."

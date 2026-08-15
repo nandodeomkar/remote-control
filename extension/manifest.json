@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Remote Control — Tab Bridge",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "description": "Feeds your open tabs to the Remote Control server on this PC (localhost only — no data leaves the machine).",
   "permissions": ["tabs", "tabGroups", "favicon", "alarms", "bookmarks"],
   "background": { "service_worker": "background.js" }
