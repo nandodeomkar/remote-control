@@ -108,14 +108,21 @@ drag — even though it is empty chrome in this build, judge the *space*.
 
 - Observation (vs the bubble window's 234dp): "Looks good." The 3dp deficit does not
   read as a downgrade.
-- Observation (still clearly smaller than the full Trackpad screen?): **OUTSTANDING.**
-  The owner's "looks good" answered the height question; this is the separate second
-  question and it has not been answered yet. It must not be inferred from the first.
+- Observation (still clearly smaller than the full Trackpad screen?): **ANSWERED — and it
+  FALSIFIES the premise.** The owner's verdict on the raised pad, verbatim: *"small mouse
+  is equally useful."* The full Trackpad screen is therefore **not** clearly the larger,
+  more precise surface in practice — 231dp of raised pad does the same work. RET-03 as
+  written does not hold. The owner volunteered a different possible justification for the
+  full screen in the same breath (more mouse buttons); that is a feature request, not a
+  precision verdict, and it is recorded under `## Findings`.
 - Tuning requested (new height in dp, or "none" — 280 stays): **none** — 280 stays.
 - Resulting content box if tuned (`new height − 1 − 48` = ___ dp): unchanged at **231**dp.
 
-**Status:** 🟡 half observed — the height verdict is in (280 stays, 231dp of pad).
-Phase 14's RET-03 input is still open.
+**Status:** ✅ fully observed — and the second half is a **failing result**, which is
+exactly what this slot existed to catch. No tuning: 280 stays, 231dp of pad, and the 3dp
+deficit against the retiring bubble window does not read as a downgrade. But RET-03's
+premise is **falsified**, and Phases 14 and 17 inherit that rather than the comfortable
+answer. See `## Findings` item 1.
 
 ---
 
@@ -200,10 +207,15 @@ Attach a screen recording if it is easier than describing it.
   aside behind a rounded leading edge and the **hub is revealed underneath it**, with the
   system's edge chevron riding the finger. The animation **holds midway** while the
   gesture is held. What is revealed is therefore the *previous route*, not the launcher.
-  Still open: the same gesture **from the hub root**, where there is no route beneath and
-  the system must either peel the window toward home or do nothing. That is the case
-  D-13-01's "measured, not enabled" claim is actually about, and the manifest declares no
-  `enableOnBackInvokedCallback`.
+  From the **hub root** the owner reports the app simply **closes** — there is no route
+  beneath it, so back exits. Asked directly, twice, what the *system* draws during that
+  exit, the owner described route behaviour both times and named no window animation.
+  **This is recorded as what was said, not as a confirmed "no animation".** The absence of
+  a reported peel is consistent with the manifest declaring no
+  `enableOnBackInvokedCallback`, but weak evidence is not an observation, and D-13-01's
+  "measured, not enabled" deserves better than an inference. Closing it properly needs a
+  **screen recording** — and per the finding below, a still will not do it on this
+  device.
 - Observation (surface raised — what the surface does during the gesture): **ANSWERED,
   and it closes cleaner than the slot anticipated.** There is no compositor animation to
   describe, because the guard **consumes the gesture outright**: the surface lowers, the
@@ -229,9 +241,10 @@ Attach a screen recording if it is easier than describing it.
 > bar and surface state — none of it can be a still screenshot on this hardware.** Use a
 > screen recording, or judge from the device.
 
-**Status:** 🟡 half observed — the raised-surface pass is **closed**, and the tool-screen
-back animation is recorded. One sub-slot remains: the gesture **from the hub root**, which
-is the baseline SC3 is measured against. **Still a BASELINE, not a pass.**
+**Status:** 🟡 as closed as conversation can get it. The raised-surface pass is **closed**
+and the tool-screen animation is recorded. The hub-root compositor baseline is **recorded
+incomplete on purpose** rather than inferred — see `## Findings` item 3 for the one cheap
+way to finish it. **Still a BASELINE, not a pass.**
 
 ---
 
@@ -282,5 +295,50 @@ bar on the pairing sheet.
 > as a finding with its reason and surfaced for the next planning pass — it is not
 > absorbed into this plan.
 
-- Constants changed:
+- **Constants changed: none.** Every tuning slot came back "none" — the 200/150/200
+  motion budgets, the 280dp trackpad, the 432dp keyboard and the `kText` resting tint all
+  stand as planned. Phase 13 ships the constants it was designed with. That is a result,
+  not an absence of one: four declared design choices were judged on hardware and survived.
+
 - Findings deferred:
+
+  **1. RET-03 is falsified, and Phase 17 inherits the consequence.** The owner's verdict is
+  that the raised pad is *equally useful*, so the full Trackpad screen's survival can no
+  longer be justified by precision. ROADMAP Phase 17 states the dependency in as many
+  words: *"RET-02's justification is RET-03 ... If the full Trackpad screen did not remain
+  meaningfully more precise than the raised one, the tile-survival rationale evaporates."*
+  It has evaporated. This does **not** mean delete the tile: HUBF-01 is explicitly deferred
+  and "deleting a tile is a one-line follow-up; un-deleting one is not." It means Phase 17
+  must either cite a different justification or put the question to the owner, and must not
+  quietly restate the precision one. Phase 14 must also stop treating RET-03 as a pass it
+  will confirm — CONTEXT already warned "do not let Phase 14 assume RET-03 passes", and it
+  does not.
+
+  **2. Feature request — more mouse buttons, as a candidate new justification for the full
+  screen.** Raised unprompted at UAT: the owner's gaming mouse carries 8 buttons and a
+  scroll wheel against the standard 3, and the full Trackpad screen's extra space could
+  carry the extras. This is the most promising replacement rationale for the tile that
+  finding 1 just stripped — but it is a feature, not a tuning, so it is recorded here and
+  surfaced for the next planning pass rather than absorbed into this plan.
+
+  *Scope, stated so nobody under-estimates it.* This is not client-only and sits firmly
+  outside v1.1's "No server, protocol or extension change" constraint. The wire vocabulary
+  is exactly `"left" | "middle" | "right"` (`protocol/SPEC.md:110-111`); the core `Button`
+  enum has three variants (`server-core/src/executors/mod.rs:17-21`); `map_button`
+  (`dispatch/router.rs:432-434`) maps those three and nothing else. Adding buttons means a
+  SPEC change, a `protoVersion` bump, a two-sided release, plus the enum, the router, the
+  Windows executor and the client.
+
+  *And there is a ceiling worth knowing before anyone scopes "8 buttons".* Windows
+  `SendInput` injects five mouse buttons: left, middle, right, XBUTTON1, XBUTTON2. A gaming
+  mouse's remaining buttons are **not** extra mouse buttons at the OS level — the mouse's
+  own firmware remaps them to key combinations. So the honest shape of this feature is
+  **two genuinely new buttons (back/forward)** plus any number of **macro** buttons, and
+  the macro half needs no protocol work at all: the Shortcuts tile and `keymap.rs`
+  `CLIENT_KEY_CODES` already send arbitrary key combos. Which of the two is actually wanted
+  should be settled before it is planned, because they are different sizes of job.
+
+  **3. The hub-root back baseline stayed unrecorded.** See item 5. Two direct attempts
+  returned route behaviour rather than compositor behaviour, so it is not closeable by
+  asking. A short screen recording of one back gesture from the hub closes it in seconds —
+  but it must be video: stills on this device silently drop the bar layer (item 5).
