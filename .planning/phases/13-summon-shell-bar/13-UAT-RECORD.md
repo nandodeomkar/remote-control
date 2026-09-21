@@ -156,10 +156,20 @@ change if it reads wrong on hardware.
 
 **What to answer.** Do they read as normal light text, or as dimmed/muted? Yes or no.
 
-- Observation (yes = reads as light text / no = reads muted):
-- Tuning requested (revert to `kMuted`, or "none"):
+- Observation (yes = reads as light text / no = reads muted): **yes** — resting-and-
+  connected reads as normal light text, not dimmed. Answered in two passes: the owner
+  first confirmed against the disconnected A/B that the two states are **visibly
+  different** on hardware, then confirmed the connected state *on its own* reads as
+  normal light text. The second pass was asked rather than inferred from the first,
+  deliberately — this record's item 2 shows what inferring costs.
+- Tuning requested (revert to `kMuted`, or "none"): **none** — CR-1's reinterpretation
+  stands: resting-and-connected is `kText`, disconnected is `kMuted`, raised is `kAccent`.
 
-**Status:** ⬜ not yet observed
+**Status:** ✅ observed — no tuning. Two things close here, not one: CR-1's
+reinterpretation of D-13-11 is confirmed on hardware, **and** D-13-13's "when
+disconnected, both icons render `kMuted`" clause is proven live rather than vacuous —
+the states are distinguishable to the eye. Phase 17 builds its bar-identity styling on a
+resting tone that has now been looked at.
 
 ---
 
