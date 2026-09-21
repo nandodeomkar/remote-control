@@ -194,19 +194,44 @@ the baseline that SC3 is later measured against. There is no wrong answer here.*
 
 Attach a screen recording if it is easier than describing it.
 
-- Observation (nothing raised — the baseline): **OUTSTANDING.** The owner reported route
-  behaviour — "back from a hub tile goes to the hub" — which confirms SUM-04's *logic*
-  but is not this slot. This slot wants what the **system compositor** draws during a
-  back gesture **from the hub root** with nothing raised: whether the app window peeks
-  or scales away toward home, or whether there is no animation at all.
-- Observation (surface raised — what the surface does during the gesture): **confirmed
-  functionally** — a back gesture from a raised surface lowers the surface and the app
-  stays (SUM-04 holds, and the guard fires on the route that raised it). What the raised
-  surface *looks like* mid-gesture, while the compositor scales the window, is still open.
+- Observation (nothing raised — the baseline): **partially recorded — the tool-screen
+  case is in, the hub-root case is not.** From a *tool* screen (observed on Clipboard,
+  Apps and Media) a right-edge swipe animates a route pop: the outgoing screen translates
+  aside behind a rounded leading edge and the **hub is revealed underneath it**, with the
+  system's edge chevron riding the finger. The animation **holds midway** while the
+  gesture is held. What is revealed is therefore the *previous route*, not the launcher.
+  Still open: the same gesture **from the hub root**, where there is no route beneath and
+  the system must either peel the window toward home or do nothing. That is the case
+  D-13-01's "measured, not enabled" claim is actually about, and the manifest declares no
+  `enableOnBackInvokedCallback`.
+- Observation (surface raised — what the surface does during the gesture): **ANSWERED,
+  and it closes cleaner than the slot anticipated.** There is no compositor animation to
+  describe, because the guard **consumes the gesture outright**: the surface lowers, the
+  app stays, and only the *following* swipe produces the back animation. Leaving a screen
+  with a surface up therefore takes two swipes — first lowers, second navigates. SUM-04
+  holds and the guard fires on the route that raised it. The question "what does the
+  surface look like while the compositor scales the window" has no answer here because
+  the compositor never gets the gesture.
+- Also confirmed, unprompted: **the bar stays visible throughout the back gesture**, on
+  every surface. That is BAR-02's "the bar stays visible the whole time" corroborated at
+  a moment no test covers.
 - Video / screen recording attached (path or "none"): none
 
-**Status:** 🟡 half observed — the dismiss behaviour is confirmed; the compositor
-baseline SC3 is measured against is not yet recorded. **Still a BASELINE, not a pass.**
+> **Methodological finding — screenshots on this device do not capture the bar layer.**
+> Three mid-gesture screenshots (Clipboard, Apps, Media) show the app window, the route
+> transition and the floating bubble, but **no summon bar** — while the owner confirms the
+> bar is present on all surfaces and during the gesture itself. The capture silently drops
+> the bar's layer; the device does not. This is recorded because it is a trap with a
+> plausible wrong conclusion attached: read as evidence, those screenshots look exactly
+> like an SC1 failure ("the bar is missing on tool screens"), and that is the reading this
+> session initially took before the owner corrected it from the device. **Phase 18 owes a
+> recorded 20-cycle summon/dismiss trace, and Phases 14/15/17 will want visual evidence of
+> bar and surface state — none of it can be a still screenshot on this hardware.** Use a
+> screen recording, or judge from the device.
+
+**Status:** 🟡 half observed — the raised-surface pass is **closed**, and the tool-screen
+back animation is recorded. One sub-slot remains: the gesture **from the hub root**, which
+is the baseline SC3 is measured against. **Still a BASELINE, not a pass.**
 
 ---
 
